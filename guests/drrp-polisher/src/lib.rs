@@ -16,10 +16,13 @@ You are a legal provision extractor specialising in UK ESH (environment, safety,
 Given a section of legislation text and a DRRP type (duty, right, responsibility, or power), \
 extract the precise provision.
 
+If taxa classification context is provided, use it to inform your extraction — \
+it indicates the regex-detected duty family, actors, and management categories for this provision.
+
 Respond ONLY with a JSON object. No markdown fences, no explanation, just raw JSON:
 {
   \"holder\": \"the entity that holds this duty/right/responsibility/power\",
-  \"text\": \"the exact provision text, quoted from the source\",
+  \"ai_clause\": \"the exact provision text, quoted from the source\",
   \"qualifier\": \"any qualifying phrase (e.g. 'so far as is reasonably practicable')\" or null,
   \"clause_ref\": \"the specific clause reference (e.g. 's.2(1)')\"
 }
@@ -27,40 +30,84 @@ Respond ONLY with a JSON object. No markdown fences, no explanation, just raw JS
 If the source text contains multiple provisions, extract the primary one that best matches the DRRP type.
 If you cannot identify a clear provision, set holder to \"unknown\" and text to the most relevant sentence.";
 
-fn build_user_prompt(ann: &Annotation) -> String {
-    format!(
+fn build_user_prompt(ann: &Annotation, taxa: Option<&TaxaContext>) -> String {
+    let mut prompt = format!(
         "Law: {law}\n\
          Section: {provision}\n\
          DRRP type: {drrp_type}\n\
-         Regex confidence: {confidence:.2}\n\
-         \n\
-         Source text:\n\
-         {source_text}",
+         Regex confidence: {confidence:.2}\n",
         law = ann.law_name,
         provision = ann.provision,
         drrp_type = ann.drrp_type,
         confidence = ann.confidence,
-        source_text = ann.source_text,
-    )
+    );
+
+    if let Some(t) = taxa {
+        prompt.push_str("\nTaxa classification context:\n");
+        if !t.duty_types.is_empty() {
+            prompt.push_str(&format!("  Duty types: {}\n", t.duty_types));
+        }
+        if !t.duty_family.is_empty() {
+            prompt.push_str(&format!(
+                "  Duty family: {} / {}\n",
+                t.duty_family, t.duty_sub_type
+            ));
+        }
+        if !t.governed_actors.is_empty() {
+            prompt.push_str(&format!("  Governed actors: {}\n", t.governed_actors));
+        }
+        if !t.government_actors.is_empty() {
+            prompt.push_str(&format!("  Government actors: {}\n", t.government_actors));
+        }
+        if !t.popimar.is_empty() {
+            prompt.push_str(&format!("  POPIMAR categories: {}\n", t.popimar));
+        }
+        if !t.purposes.is_empty() {
+            prompt.push_str(&format!("  Purpose: {}\n", t.purposes));
+        }
+    }
+
+    prompt.push_str(&format!("\nSource text:\n{}", ann.source_text));
+    prompt
 }
 
 // ── Types ──
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct Annotation {
     law_name: String,
     provision: String,
     drrp_type: String,
     source_text: String,
+    regex_clause: String,
     confidence: f64,
 }
 
 #[derive(Deserialize)]
 struct PolishedEntry {
     holder: String,
-    text: String,
+    ai_clause: String,
     qualifier: Option<String>,
     clause_ref: String,
+}
+
+#[derive(Deserialize)]
+struct TaxaContext {
+    #[serde(default)]
+    duty_types: String,
+    #[serde(default)]
+    duty_family: String,
+    #[serde(default)]
+    duty_sub_type: String,
+    #[serde(default)]
+    governed_actors: String,
+    #[serde(default)]
+    government_actors: String,
+    #[serde(default)]
+    popimar: String,
+    #[serde(default)]
+    purposes: String,
 }
 
 // ── Helpers ──
@@ -108,6 +155,7 @@ impl Guest for DrrpPolisher {
                 provision      VARCHAR NOT NULL,
                 drrp_type      VARCHAR NOT NULL,
                 source_text    VARCHAR NOT NULL,
+                regex_clause   VARCHAR NOT NULL,
                 confidence     FLOAT   NOT NULL,
                 scraped_at     TIMESTAMPTZ NOT NULL,
                 polished       BOOLEAN NOT NULL DEFAULT false,
@@ -121,7 +169,7 @@ impl Guest for DrrpPolisher {
                 provision      VARCHAR NOT NULL,
                 drrp_type      VARCHAR NOT NULL,
                 holder         VARCHAR NOT NULL,
-                text           VARCHAR NOT NULL,
+                ai_clause      VARCHAR NOT NULL,
                 qualifier      VARCHAR,
                 clause_ref     VARCHAR NOT NULL,
                 confidence     FLOAT   NOT NULL,
@@ -177,6 +225,7 @@ fn process_one(offset: i64) -> Result<u32, String> {
             provision := provision,
             drrp_type := drrp_type,
             source_text := source_text,
+            regex_clause := regex_clause,
             confidence := confidence
         )) FROM drrp_annotations
         WHERE polished = false
@@ -187,8 +236,27 @@ fn process_one(offset: i64) -> Result<u32, String> {
     let ann: Annotation =
         serde_json::from_str(&json_str).map_err(|e| format!("parse annotation JSON: {e}"))?;
 
+    // Query taxa classification context (if available).
+    let taxa = query_string(&format!(
+        "SELECT to_json(struct_pack(
+            duty_types := duty_types,
+            duty_family := duty_family,
+            duty_sub_type := duty_sub_type,
+            governed_actors := governed_actors,
+            government_actors := government_actors,
+            popimar := popimar,
+            purposes := purposes
+        )) FROM taxa_classifications
+        WHERE law_name = '{law}' AND provision = '{prov}'
+        LIMIT 1",
+        law = sql_escape(&ann.law_name),
+        prov = sql_escape(&ann.provision),
+    ))
+    .ok()
+    .and_then(|s| serde_json::from_str::<TaxaContext>(&s).ok());
+
     // Call Claude to extract the precise DRRP provision.
-    let user_prompt = build_user_prompt(&ann);
+    let user_prompt = build_user_prompt(&ann, taxa.as_ref());
     let response = ai_inference::generate(&ai_inference::GenerateRequest {
         system_prompt: Some(SYSTEM_PROMPT.to_string()),
         user_prompt,
@@ -213,17 +281,17 @@ fn process_one(offset: i64) -> Result<u32, String> {
 
     execute(&format!(
         "INSERT INTO polished_drrp (
-            law_name, provision, drrp_type, holder, text, qualifier,
+            law_name, provision, drrp_type, holder, ai_clause, qualifier,
             clause_ref, confidence, polished_at, model, pushed
         ) VALUES (
-            '{law_name}', '{provision}', '{drrp_type}', '{holder}', '{text}', {qualifier},
+            '{law_name}', '{provision}', '{drrp_type}', '{holder}', '{ai_clause}', {qualifier},
             '{clause_ref}', {confidence}, CURRENT_TIMESTAMP, 'claude', false
         )",
         law_name = sql_escape(&ann.law_name),
         provision = sql_escape(&ann.provision),
         drrp_type = sql_escape(&ann.drrp_type),
         holder = sql_escape(&entry.holder),
-        text = sql_escape(&entry.text),
+        ai_clause = sql_escape(&entry.ai_clause),
         qualifier = qualifier_sql,
         clause_ref = sql_escape(&entry.clause_ref),
         confidence = response.confidence,

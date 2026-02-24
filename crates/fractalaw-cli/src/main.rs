@@ -124,13 +124,10 @@ enum Command {
         action: SyncAction,
     },
 
-    /// Run Taxa DRRP classification on legislation text sections
+    /// Taxa DRRP classification tools
     Taxa {
-        /// Legislation name (e.g., UK_ukpga_1974_37)
-        name: String,
-        /// Maximum text sections to process
-        #[arg(long, default_value_t = 200)]
-        limit: usize,
+        #[command(subcommand)]
+        action: TaxaAction,
     },
 }
 
@@ -148,6 +145,20 @@ enum SyncAction {
         #[arg(long, env = "SERTANTAI_URL")]
         url: String,
     },
+}
+
+#[derive(Subcommand)]
+enum TaxaAction {
+    /// Show taxa classifications for a law's text sections (from LanceDB)
+    Show {
+        /// Legislation name (e.g., UK_ukpga_1974_37)
+        name: String,
+        /// Maximum text sections to process
+        #[arg(long, default_value_t = 200)]
+        limit: usize,
+    },
+    /// Pre-compute taxa for all unpolished DRRP annotations into DuckDB
+    Enrich,
 }
 
 #[tokio::main]
@@ -206,7 +217,10 @@ async fn main() -> anyhow::Result<()> {
         },
 
         // Taxa classification.
-        Command::Taxa { name, limit } => cmd_taxa(&data_dir, &name, limit).await,
+        Command::Taxa { action } => match action {
+            TaxaAction::Show { name, limit } => cmd_taxa_show(&data_dir, &name, limit).await,
+            TaxaAction::Enrich => cmd_taxa_enrich(&open_duck(&data_dir)?),
+        },
     }
 }
 
@@ -430,7 +444,7 @@ async fn cmd_text(data_dir: &std::path::Path, name: &str, limit: usize) -> anyho
     Ok(())
 }
 
-async fn cmd_taxa(data_dir: &std::path::Path, name: &str, limit: usize) -> anyhow::Result<()> {
+async fn cmd_taxa_show(data_dir: &std::path::Path, name: &str, limit: usize) -> anyhow::Result<()> {
     let lance = LanceStore::open(&data_dir.join("lancedb"))
         .await
         .context("opening LanceDB")?;
@@ -519,6 +533,125 @@ async fn cmd_taxa(data_dir: &std::path::Path, name: &str, limit: usize) -> anyho
     }
 
     println!("=== {section_num} sections processed, {classified_num} with classifications ===");
+    Ok(())
+}
+
+fn cmd_taxa_enrich(store: &DuckStore) -> anyhow::Result<()> {
+    store.create_drrp_tables()?;
+
+    // Create taxa_classifications table (idempotent).
+    store.execute(
+        "CREATE TABLE IF NOT EXISTS taxa_classifications (
+            law_name          VARCHAR NOT NULL,
+            provision         VARCHAR NOT NULL,
+            duty_types        VARCHAR,
+            duty_family       VARCHAR,
+            duty_sub_type     VARCHAR,
+            pattern_conf      FLOAT,
+            governed_actors   VARCHAR,
+            government_actors VARCHAR,
+            popimar           VARCHAR,
+            purposes          VARCHAR
+        )",
+    )?;
+
+    // Fetch unpolished annotations.
+    let batches = store.query_arrow(
+        "SELECT DISTINCT law_name, provision, source_text
+         FROM drrp_annotations
+         WHERE polished = false
+         ORDER BY law_name, provision",
+    )?;
+
+    let total: usize = batches.iter().map(|b| b.num_rows()).sum();
+    if total == 0 {
+        println!("No unpolished annotations to enrich.");
+        return Ok(());
+    }
+
+    println!("=== Taxa Enrichment: {total} annotations ===\n");
+
+    // Clear existing classifications for these annotations (re-enrichment).
+    store.execute(
+        "DELETE FROM taxa_classifications
+         WHERE (law_name, provision) IN (
+             SELECT DISTINCT law_name, provision
+             FROM drrp_annotations WHERE polished = false
+         )",
+    )?;
+
+    let mut enriched = 0usize;
+    for batch in &batches {
+        let law_col = batch.column_by_name("law_name");
+        let prov_col = batch.column_by_name("provision");
+        let text_col = batch.column_by_name("source_text");
+
+        for row in 0..batch.num_rows() {
+            let law_name = law_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+            let provision = prov_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+            let source_text = text_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+
+            if source_text.trim().is_empty() {
+                continue;
+            }
+
+            let record = fractalaw_core::taxa::parse(&source_text);
+
+            let duty_types = record
+                .duty_types
+                .iter()
+                .map(|d| d.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            let (duty_family, duty_sub_type, pattern_conf) =
+                if let Some(ref c) = record.classification {
+                    (
+                        format!("{:?}", c.family),
+                        format!("{:?}", c.sub_type),
+                        c.confidence,
+                    )
+                } else {
+                    (String::new(), String::new(), 0.0)
+                };
+            let governed = record.governed_actors.join(", ");
+            let government = record.government_actors.join(", ");
+            let popimar = record.popimar.join(", ");
+            let purposes = record.purposes.join(", ");
+
+            store.execute(&format!(
+                "INSERT INTO taxa_classifications VALUES (\
+                    '{law}', '{prov}', '{duty_types}', '{family}', '{sub_type}', \
+                    {conf}, '{governed}', '{government}', '{popimar}', '{purposes}')",
+                law = law_name.replace('\'', "''"),
+                prov = provision.replace('\'', "''"),
+                duty_types = duty_types.replace('\'', "''"),
+                family = duty_family.replace('\'', "''"),
+                sub_type = duty_sub_type.replace('\'', "''"),
+                conf = pattern_conf,
+                governed = governed.replace('\'', "''"),
+                government = government.replace('\'', "''"),
+                popimar = popimar.replace('\'', "''"),
+                purposes = purposes.replace('\'', "''"),
+            ))?;
+
+            enriched += 1;
+            if enriched.is_multiple_of(100) {
+                eprint!("\r  Enriched {enriched}/{total}...");
+            }
+        }
+    }
+
+    if enriched >= 100 {
+        eprintln!();
+    }
+
+    println!("Enriched {enriched} annotations into taxa_classifications.");
     Ok(())
 }
 
