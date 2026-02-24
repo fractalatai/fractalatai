@@ -3234,6 +3234,7 @@ dependencies = [
  "clap",
  "datafusion 52.1.0",
  "fractalaw-ai",
+ "fractalaw-core",
  "fractalaw-host",
  "fractalaw-store",
  "fractalaw-sync",

@@ -11,6 +11,7 @@ name = "fractalaw"
 path = "src/main.rs"
 
 [dependencies]
+fractalaw-core = { path = "../fractalaw-core" }
 fractalaw-store = { path = "../fractalaw-store", features = ["duckdb", "datafusion", "lancedb"] }
 fractalaw-ai = { path = "../fractalaw-ai", features = ["onnx"] }
 fractalaw-host = { path = "../fractalaw-host", features = ["duckdb", "inference"] }

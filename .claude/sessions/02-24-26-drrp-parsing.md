@@ -257,21 +257,43 @@ This module will need the most careful porting. The windowed search optimisation
 | Map Elixir types → Rust types | [x] | Enums + structs documented above |
 | Document architecture decisions | [x] | 7 decisions |
 | Implement text_cleaner.rs | [x] | 17 tests passing, uses `LazyLock` (std, no `once_cell`), `Cow<str>` zero-copy |
-| Implement duty_patterns.rs | [ ] | |
-| Implement duty_type.rs | [ ] | |
-| Implement actors.rs | [ ] | |
-| Implement clause_refiner.rs | [ ] | |
-| Implement popimar.rs | [ ] | |
-| Implement purpose.rs | [ ] | |
-| Implement making.rs | [ ] | |
-| Implement confidence.rs | [ ] | |
-| Implement mod.rs (orchestrator + TaxaRecord) | [ ] | |
-| Port Elixir test cases to Rust | [ ] | |
+| Implement duty_patterns.rs | [x] | 29 tests. Merged 3 Elixir modules. Fixed pattern ordering (domain-specific before generic fallbacks), `\brisks?\b` for plurals, broadened general duty regex |
+| Implement duty_type.rs | [x] | 9 tests. Top-level DRRP classifier orchestrating v1→v2→governed→unknown |
+| Implement actors.rs | [x] | 8 tests. ~73 actor patterns (40 government + 33 governed), progressive text removal, blacklist |
+| Implement clause_refiner.rs | [x] | 9 tests. Modal-window extraction. Replaced Elixir lookahead `(?=[A-Z])` with capture group approach |
+| Implement popimar.rs | [x] | 11 tests. 16 POPIMAR categories. `const RAW_PATTERNS` + `LazyLock<Vec>` pattern (fixed E0492). Removed lookaheads |
+| Implement purpose.rs | [x] | 12 tests. 15 purpose categories with `+` separator. Same `LazyLock<Vec>` pattern |
+| Implement making.rs | [x] | 9 tests. Bayesian composite score, 4 tiers. Fixed "to make further provision" variant matching |
+| Implement confidence.rs | [x] | 6 tests. Scores: V2 capture, clean ending, adequate length, strong modal |
+| Implement mod.rs (orchestrator + TaxaRecord) | [x] | 5 tests. `TaxaRecord` struct + `parse()` pipeline |
+| Port Elixir test cases to Rust | [x] | 116 tests total, all passing |
 | Wire taxa parser into CLI | [ ] | |
 | Wire enriched annotations into drrp-polisher | [ ] | |
 
+## Key Porting Issues
+
+### Rust `regex` crate: no lookahead/lookbehind
+The Rust `regex` crate doesn't support `(?=...)` or `(?!...)`. Several Elixir patterns had to be rewritten:
+- `clause_refiner.rs`: `[.;]\s*(?=[A-Z])` → `[.;]\s+([A-Z])` with capture group iteration
+- `popimar.rs`: `(?!authority)` in competence → simplified to `[Cc]ompeten(?:t|ce|cy)\s`
+- `popimar.rs`: `(?!to)` in Records → `[^t]`; `(?!representative)` in Permit → `[^r]`
+
+### `LazyLock` interior mutability (E0492)
+`LazyLock<Regex>` inside a struct inside `&[struct]` static borrows fails because `LazyLock` has interior mutability. Fixed by using `const RAW_PATTERNS: &[(&str, &str)]` + `static COMPILED: LazyLock<Vec<(&str, Regex)>>`.
+
+### Pattern ordering
+Elixir's `match_governed` order didn't work in Rust because domain-specific patterns (SFAIRP, risk, info, training) need to be checked before generic prescriptive/enabling fallbacks to avoid false matches.
+
+### Description pattern flexibility
+`"to make provision for securing"` didn't match `"to make further provision for securing"` (real UK legislation text). Added variant patterns with "further" for both `provision_securing` and `provision_for`.
+
+## Commit
+
+`70accbd` — Implement DRRP/Taxa regex classification pipeline in pure Rust (#16) — 15 files, 3,332 insertions, 116 tests
+
 ## Next Steps
 
-1. Start implementation with `text_cleaner.rs` (simplest, no internal deps)
-2. Build up through the dependency chain: patterns → classifier → actors → refinement
-3. Orchestrator last (depends on all other modules)
+1. Wire taxa parser into CLI (e.g. `fractalaw taxa <law_id>` command)
+2. Wire enriched annotations into drrp-polisher guest (taxa classifications as additional context for AI polishing)
+3. Explore `RegexSet` pre-filter optimisation for batch classification
+4. Consider `rayon` parallelism for classifying all sections of large Acts

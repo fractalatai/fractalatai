@@ -123,6 +123,15 @@ enum Command {
         #[command(subcommand)]
         action: SyncAction,
     },
+
+    /// Run Taxa DRRP classification on legislation text sections
+    Taxa {
+        /// Legislation name (e.g., UK_ukpga_1974_37)
+        name: String,
+        /// Maximum text sections to process
+        #[arg(long, default_value_t = 200)]
+        limit: usize,
+    },
 }
 
 #[derive(Subcommand)]
@@ -195,6 +204,9 @@ async fn main() -> anyhow::Result<()> {
             SyncAction::Pull { url } => cmd_sync_pull(&data_dir, &url).await,
             SyncAction::Push { url } => cmd_sync_push(&data_dir, &url).await,
         },
+
+        // Taxa classification.
+        Command::Taxa { name, limit } => cmd_taxa(&data_dir, &name, limit).await,
     }
 }
 
@@ -415,6 +427,98 @@ async fn cmd_text(data_dir: &std::path::Path, name: &str, limit: usize) -> anyho
         &["provision", "section_type", "heading_group", "text"],
     );
     print_batches(&projected)?;
+    Ok(())
+}
+
+async fn cmd_taxa(data_dir: &std::path::Path, name: &str, limit: usize) -> anyhow::Result<()> {
+    let lance = LanceStore::open(&data_dir.join("lancedb"))
+        .await
+        .context("opening LanceDB")?;
+
+    let filter = format!("law_name = '{}'", name.replace('\'', "''"));
+    let batches = lance.query_legislation_text(&filter, limit).await?;
+
+    let total: usize = batches.iter().map(|b| b.num_rows()).sum();
+    if total == 0 {
+        println!("No text sections found for '{name}'.");
+        println!("(Ensure LanceDB has been populated via `fractalaw embed`)");
+        return Ok(());
+    }
+
+    println!("=== Taxa Classification: {name} ({total} sections) ===\n");
+
+    let mut section_num = 0usize;
+    let mut classified_num = 0usize;
+    for batch in &batches {
+        let provision_col = batch.column_by_name("provision");
+        let text_col = batch.column_by_name("text");
+
+        for row in 0..batch.num_rows() {
+            let provision = provision_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+            let text = text_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+
+            if text.trim().is_empty() {
+                continue;
+            }
+
+            let record = fractalaw_core::taxa::parse(&text);
+            section_num += 1;
+
+            // Skip sections with no classification signal.
+            if record.duty_types.is_empty()
+                && record.governed_actors.is_empty()
+                && record.government_actors.is_empty()
+            {
+                continue;
+            }
+
+            classified_num += 1;
+            println!("--- {provision} ---");
+
+            if !record.duty_types.is_empty() {
+                let types: Vec<&str> = record.duty_types.iter().map(|d| d.as_str()).collect();
+                println!("  DRRP:    {}", types.join(", "));
+            }
+
+            if let Some(ref class) = record.classification {
+                println!(
+                    "  Pattern: {:?} / {:?} ({:.0}%)",
+                    class.family,
+                    class.sub_type,
+                    class.confidence * 100.0,
+                );
+            }
+
+            if !record.governed_actors.is_empty() {
+                println!("  Governed:   {}", record.governed_actors.join(", "));
+            }
+            if !record.government_actors.is_empty() {
+                println!("  Government: {}", record.government_actors.join(", "));
+            }
+
+            if !record.popimar.is_empty() {
+                println!("  POPIMAR: {}", record.popimar.join(", "));
+            }
+            if !record.purposes.is_empty() {
+                println!("  Purpose: {}", record.purposes.join(", "));
+            }
+
+            // Show a truncated preview of the cleaned text.
+            let preview = if record.cleaned_text.len() > 120 {
+                format!("{}...", &record.cleaned_text[..120])
+            } else {
+                record.cleaned_text.clone()
+            };
+            println!("  Text:    {preview}");
+            println!();
+        }
+    }
+
+    println!("=== {section_num} sections processed, {classified_num} with classifications ===");
     Ok(())
 }
 
