@@ -157,7 +157,7 @@ enum TaxaAction {
         #[arg(long, default_value_t = 200)]
         limit: usize,
     },
-    /// Pre-compute taxa for all unpolished DRRP annotations into DuckDB
+    /// Enrich LRT DRRP columns for laws missing taxa data (from LanceDB text)
     Enrich,
 }
 
@@ -219,7 +219,7 @@ async fn main() -> anyhow::Result<()> {
         // Taxa classification.
         Command::Taxa { action } => match action {
             TaxaAction::Show { name, limit } => cmd_taxa_show(&data_dir, &name, limit).await,
-            TaxaAction::Enrich => cmd_taxa_enrich(&open_duck(&data_dir)?),
+            TaxaAction::Enrich => cmd_taxa_enrich(&data_dir, &open_duck(&data_dir)?).await,
         },
     }
 }
@@ -536,114 +536,192 @@ async fn cmd_taxa_show(data_dir: &std::path::Path, name: &str, limit: usize) -> 
     Ok(())
 }
 
-fn cmd_taxa_enrich(store: &DuckStore) -> anyhow::Result<()> {
-    store.create_drrp_tables()?;
+async fn cmd_taxa_enrich(data_dir: &std::path::Path, store: &DuckStore) -> anyhow::Result<()> {
+    use std::collections::BTreeSet;
 
-    // Create taxa_classifications table (idempotent).
-    store.execute(
-        "CREATE TABLE IF NOT EXISTS taxa_classifications (
-            law_name          VARCHAR NOT NULL,
-            provision         VARCHAR NOT NULL,
-            duty_types        VARCHAR,
-            duty_family       VARCHAR,
-            duty_sub_type     VARCHAR,
-            pattern_conf      FLOAT,
-            governed_actors   VARCHAR,
-            government_actors VARCHAR,
-            popimar           VARCHAR,
-            purposes          VARCHAR
-        )",
+    let lance = LanceStore::open(&data_dir.join("lancedb"))
+        .await
+        .context("opening LanceDB")?;
+
+    // Find laws that have NO DRRP taxa data yet (duty_holder is null or empty).
+    let law_batches = store.query_arrow(
+        "SELECT name FROM legislation
+         WHERE duty_holder IS NULL OR len(duty_holder) = 0
+         ORDER BY name",
     )?;
 
-    // Fetch unpolished annotations.
-    let batches = store.query_arrow(
-        "SELECT DISTINCT law_name, provision, source_text
-         FROM drrp_annotations
-         WHERE polished = false
-         ORDER BY law_name, provision",
-    )?;
+    let law_names: Vec<String> = law_batches
+        .iter()
+        .flat_map(|b| {
+            let col = b.column_by_name("name");
+            (0..b.num_rows()).filter_map(move |i| col.and_then(|c| get_string_value(c.as_ref(), i)))
+        })
+        .collect();
 
-    let total: usize = batches.iter().map(|b| b.num_rows()).sum();
-    if total == 0 {
-        println!("No unpolished annotations to enrich.");
+    if law_names.is_empty() {
+        println!("All laws already have DRRP taxa data.");
         return Ok(());
     }
 
-    println!("=== Taxa Enrichment: {total} annotations ===\n");
+    println!(
+        "=== Taxa Enrichment: {} laws without DRRP data ===\n",
+        law_names.len()
+    );
 
-    // Clear existing classifications for these annotations (re-enrichment).
-    store.execute(
-        "DELETE FROM taxa_classifications
-         WHERE (law_name, provision) IN (
-             SELECT DISTINCT law_name, provision
-             FROM drrp_annotations WHERE polished = false
-         )",
-    )?;
+    // Per-law aggregation containers.
+    struct LawTaxa {
+        duty_holders: BTreeSet<String>,
+        rights_holders: BTreeSet<String>,
+        responsibility_holders: BTreeSet<String>,
+        power_holders: BTreeSet<String>,
+        duty_types: BTreeSet<String>,
+        roles: BTreeSet<String>,
+        roles_gvt: BTreeSet<String>,
+        duties: Vec<(String, String, String, String)>, // (holder, duty_type, clause, article)
+        rights: Vec<(String, String, String, String)>,
+        responsibilities: Vec<(String, String, String, String)>,
+        powers: Vec<(String, String, String, String)>,
+    }
 
     let mut enriched = 0usize;
-    for batch in &batches {
-        let law_col = batch.column_by_name("law_name");
-        let prov_col = batch.column_by_name("provision");
-        let text_col = batch.column_by_name("source_text");
+    let total = law_names.len();
 
-        for row in 0..batch.num_rows() {
-            let law_name = law_col
-                .and_then(|c| get_string_value(c.as_ref(), row))
-                .unwrap_or_default();
-            let provision = prov_col
-                .and_then(|c| get_string_value(c.as_ref(), row))
-                .unwrap_or_default();
-            let source_text = text_col
-                .and_then(|c| get_string_value(c.as_ref(), row))
-                .unwrap_or_default();
+    for law_name in &law_names {
+        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
+        let batches = lance.query_legislation_text(&filter, 500).await?;
 
-            if source_text.trim().is_empty() {
-                continue;
-            }
+        let mut taxa = LawTaxa {
+            duty_holders: BTreeSet::new(),
+            rights_holders: BTreeSet::new(),
+            responsibility_holders: BTreeSet::new(),
+            power_holders: BTreeSet::new(),
+            duty_types: BTreeSet::new(),
+            roles: BTreeSet::new(),
+            roles_gvt: BTreeSet::new(),
+            duties: Vec::new(),
+            rights: Vec::new(),
+            responsibilities: Vec::new(),
+            powers: Vec::new(),
+        };
 
-            let record = fractalaw_core::taxa::parse(&source_text);
+        for batch in &batches {
+            let prov_col = batch.column_by_name("provision");
+            let text_col = batch.column_by_name("text");
 
-            let duty_types = record
-                .duty_types
-                .iter()
-                .map(|d| d.as_str())
-                .collect::<Vec<_>>()
-                .join(", ");
-            let (duty_family, duty_sub_type, pattern_conf) =
-                if let Some(ref c) = record.classification {
-                    (
-                        format!("{:?}", c.family),
-                        format!("{:?}", c.sub_type),
-                        c.confidence,
-                    )
+            for row in 0..batch.num_rows() {
+                let provision = prov_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let text = text_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                if text.trim().is_empty() {
+                    continue;
+                }
+
+                let record = fractalaw_core::taxa::parse(&text);
+                if record.duty_types.is_empty()
+                    && record.governed_actors.is_empty()
+                    && record.government_actors.is_empty()
+                {
+                    continue;
+                }
+
+                // Aggregate actors into holder sets and role sets.
+                for actor in &record.governed_actors {
+                    taxa.roles.insert(actor.clone());
+                }
+                for actor in &record.government_actors {
+                    taxa.roles_gvt.insert(actor.clone());
+                }
+
+                // Map duty types to holder columns and DRRPEntry lists.
+                let clause_preview = if record.cleaned_text.len() > 200 {
+                    format!("{}...", &record.cleaned_text[..200])
                 } else {
-                    (String::new(), String::new(), 0.0)
+                    record.cleaned_text.clone()
                 };
-            let governed = record.governed_actors.join(", ");
-            let government = record.government_actors.join(", ");
-            let popimar = record.popimar.join(", ");
-            let purposes = record.purposes.join(", ");
+                let article = format!("section/{provision}");
 
-            store.execute(&format!(
-                "INSERT INTO taxa_classifications VALUES (\
-                    '{law}', '{prov}', '{duty_types}', '{family}', '{sub_type}', \
-                    {conf}, '{governed}', '{government}', '{popimar}', '{purposes}')",
-                law = law_name.replace('\'', "''"),
-                prov = provision.replace('\'', "''"),
-                duty_types = duty_types.replace('\'', "''"),
-                family = duty_family.replace('\'', "''"),
-                sub_type = duty_sub_type.replace('\'', "''"),
-                conf = pattern_conf,
-                governed = governed.replace('\'', "''"),
-                government = government.replace('\'', "''"),
-                popimar = popimar.replace('\'', "''"),
-                purposes = purposes.replace('\'', "''"),
-            ))?;
-
-            enriched += 1;
-            if enriched.is_multiple_of(100) {
-                eprint!("\r  Enriched {enriched}/{total}...");
+                for dt in &record.duty_types {
+                    taxa.duty_types.insert(format!("{dt:?}"));
+                    let holders_set;
+                    let entries;
+                    match dt {
+                        fractalaw_core::taxa::duty_type::DutyType::Duty => {
+                            holders_set = &mut taxa.duty_holders;
+                            entries = &mut taxa.duties;
+                        }
+                        fractalaw_core::taxa::duty_type::DutyType::Right => {
+                            holders_set = &mut taxa.rights_holders;
+                            entries = &mut taxa.rights;
+                        }
+                        fractalaw_core::taxa::duty_type::DutyType::Responsibility => {
+                            holders_set = &mut taxa.responsibility_holders;
+                            entries = &mut taxa.responsibilities;
+                        }
+                        fractalaw_core::taxa::duty_type::DutyType::Power => {
+                            holders_set = &mut taxa.power_holders;
+                            entries = &mut taxa.powers;
+                        }
+                    }
+                    // Add governed actors as holders for this duty type.
+                    for actor in &record.governed_actors {
+                        holders_set.insert(actor.clone());
+                    }
+                    for actor in &record.government_actors {
+                        holders_set.insert(actor.clone());
+                    }
+                    // Build a DRRPEntry-style tuple.
+                    let holder = record
+                        .governed_actors
+                        .first()
+                        .or(record.government_actors.first())
+                        .cloned()
+                        .unwrap_or_else(|| "Unknown".to_string());
+                    entries.push((
+                        holder,
+                        format!("{dt:?}").to_uppercase(),
+                        clause_preview.clone(),
+                        article.clone(),
+                    ));
+                }
             }
+        }
+
+        // Skip laws where taxa found nothing.
+        if taxa.duty_types.is_empty() && taxa.roles.is_empty() && taxa.roles_gvt.is_empty() {
+            enriched += 1;
+            continue;
+        }
+
+        // Build SQL UPDATE for this law's LRT DRRP columns.
+        let esc = |s: &str| s.replace('\'', "''");
+
+        let sql = format!(
+            "UPDATE legislation SET
+                duty_holder = {duty_holder},
+                rights_holder = {rights_holder},
+                responsibility_holder = {resp_holder},
+                power_holder = {power_holder},
+                duty_type = {duty_type},
+                role = {role},
+                role_gvt = {role_gvt}
+             WHERE name = '{name}'",
+            duty_holder = format_sql_list(taxa.duty_holders.iter().map(|s| s.as_str())),
+            rights_holder = format_sql_list(taxa.rights_holders.iter().map(|s| s.as_str())),
+            resp_holder = format_sql_list(taxa.responsibility_holders.iter().map(|s| s.as_str())),
+            power_holder = format_sql_list(taxa.power_holders.iter().map(|s| s.as_str())),
+            duty_type = format_sql_list(taxa.duty_types.iter().map(|s| s.as_str())),
+            role = format_sql_list(taxa.roles.iter().map(|s| s.as_str())),
+            role_gvt = format_sql_list(taxa.roles_gvt.iter().map(|s| s.as_str())),
+            name = esc(law_name),
+        );
+        store.execute(&sql)?;
+
+        enriched += 1;
+        if enriched.is_multiple_of(100) {
+            eprint!("\r  Enriched {enriched}/{total}...");
         }
     }
 
@@ -651,7 +729,14 @@ fn cmd_taxa_enrich(store: &DuckStore) -> anyhow::Result<()> {
         eprintln!();
     }
 
-    println!("Enriched {enriched} annotations into taxa_classifications.");
+    // Count how many actually got data.
+    let filled = store.query_arrow(
+        "SELECT count(*)::BIGINT FROM legislation
+         WHERE duty_holder IS NOT NULL AND len(duty_holder) > 0",
+    )?;
+    let filled_count = extract_i64(&filled[0], 0);
+
+    println!("Processed {enriched} laws. LRT now has {filled_count} laws with DRRP taxa data.");
     Ok(())
 }
 

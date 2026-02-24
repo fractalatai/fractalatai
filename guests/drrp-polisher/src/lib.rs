@@ -16,8 +16,8 @@ You are a legal provision extractor specialising in UK ESH (environment, safety,
 Given a section of legislation text and a DRRP type (duty, right, responsibility, or power), \
 extract the precise provision.
 
-If taxa classification context is provided, use it to inform your extraction — \
-it indicates the regex-detected duty family, actors, and management categories for this provision.
+If law-level DRRP context is provided, use it to inform your extraction — \
+it shows the known duty holders, roles, and duty types for this law from the Legal Register.
 
 Respond ONLY with a JSON object. No markdown fences, no explanation, just raw JSON:
 {
@@ -43,27 +43,18 @@ fn build_user_prompt(ann: &Annotation, taxa: Option<&TaxaContext>) -> String {
     );
 
     if let Some(t) = taxa {
-        prompt.push_str("\nTaxa classification context:\n");
-        if !t.duty_types.is_empty() {
-            prompt.push_str(&format!("  Duty types: {}\n", t.duty_types));
+        prompt.push_str("\nLaw-level DRRP context (from Legal Register):\n");
+        if !t.duty_type.is_empty() {
+            prompt.push_str(&format!("  Duty types: {}\n", t.duty_type));
         }
-        if !t.duty_family.is_empty() {
-            prompt.push_str(&format!(
-                "  Duty family: {} / {}\n",
-                t.duty_family, t.duty_sub_type
-            ));
+        if !t.duty_holder.is_empty() {
+            prompt.push_str(&format!("  Duty holders: {}\n", t.duty_holder));
         }
-        if !t.governed_actors.is_empty() {
-            prompt.push_str(&format!("  Governed actors: {}\n", t.governed_actors));
+        if !t.role.is_empty() {
+            prompt.push_str(&format!("  Roles: {}\n", t.role));
         }
-        if !t.government_actors.is_empty() {
-            prompt.push_str(&format!("  Government actors: {}\n", t.government_actors));
-        }
-        if !t.popimar.is_empty() {
-            prompt.push_str(&format!("  POPIMAR categories: {}\n", t.popimar));
-        }
-        if !t.purposes.is_empty() {
-            prompt.push_str(&format!("  Purpose: {}\n", t.purposes));
+        if !t.role_gvt.is_empty() {
+            prompt.push_str(&format!("  Government roles: {}\n", t.role_gvt));
         }
     }
 
@@ -95,19 +86,13 @@ struct PolishedEntry {
 #[derive(Deserialize)]
 struct TaxaContext {
     #[serde(default)]
-    duty_types: String,
+    duty_holder: String,
     #[serde(default)]
-    duty_family: String,
+    duty_type: String,
     #[serde(default)]
-    duty_sub_type: String,
+    role: String,
     #[serde(default)]
-    governed_actors: String,
-    #[serde(default)]
-    government_actors: String,
-    #[serde(default)]
-    popimar: String,
-    #[serde(default)]
-    purposes: String,
+    role_gvt: String,
 }
 
 // ── Helpers ──
@@ -236,21 +221,17 @@ fn process_one(offset: i64) -> Result<u32, String> {
     let ann: Annotation =
         serde_json::from_str(&json_str).map_err(|e| format!("parse annotation JSON: {e}"))?;
 
-    // Query taxa classification context (if available).
+    // Query law-level DRRP context from the LRT (if available).
     let taxa = query_string(&format!(
         "SELECT to_json(struct_pack(
-            duty_types := duty_types,
-            duty_family := duty_family,
-            duty_sub_type := duty_sub_type,
-            governed_actors := governed_actors,
-            government_actors := government_actors,
-            popimar := popimar,
-            purposes := purposes
-        )) FROM taxa_classifications
-        WHERE law_name = '{law}' AND provision = '{prov}'
+            duty_holder := array_to_string(duty_holder, ', '),
+            duty_type := array_to_string(duty_type, ', '),
+            role := array_to_string(role, ', '),
+            role_gvt := array_to_string(role_gvt, ', ')
+        )) FROM legislation
+        WHERE name = '{law}'
         LIMIT 1",
         law = sql_escape(&ann.law_name),
-        prov = sql_escape(&ann.provision),
     ))
     .ok()
     .and_then(|s| serde_json::from_str::<TaxaContext>(&s).ok());
