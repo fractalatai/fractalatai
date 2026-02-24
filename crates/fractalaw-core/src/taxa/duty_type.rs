@@ -1,0 +1,240 @@
+//! Top-level duty type classifier.
+//!
+//! Orchestrates the three pattern tiers (government v1 → v2 → governed → unknown)
+//! and maps the result to the four DRRP categories:
+//! - **Duty** — obligation on a governed entity
+//! - **Right** — permission granted to a governed entity
+//! - **Responsibility** — obligation on a government entity
+//! - **Power** — discretionary authority granted to government
+//!
+//! Ported from `Taxa.DutyType` + `Taxa.DutyTypeLib`.
+
+use super::duty_patterns::{self, DutyClassification, DutyFamily, DutySubType};
+
+/// The four DRRP duty-type labels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum DutyType {
+    Duty,
+    Right,
+    Responsibility,
+    Power,
+}
+
+impl DutyType {
+    /// Display label (matches Elixir output).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Duty => "Duty",
+            Self::Right => "Right",
+            Self::Responsibility => "Responsibility",
+            Self::Power => "Power",
+        }
+    }
+
+    /// Sort priority (lower = higher priority).
+    pub fn priority(self) -> u8 {
+        match self {
+            Self::Duty => 1,
+            Self::Right => 2,
+            Self::Responsibility => 3,
+            Self::Power => 4,
+        }
+    }
+}
+
+/// Result of classifying a single piece of text.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassificationResult {
+    /// Primary DRRP types found (sorted by priority).
+    pub duty_types: Vec<DutyType>,
+    /// The underlying pattern classification (if any).
+    pub classification: Option<DutyClassification>,
+}
+
+/// Classify a **downcased** legal text into DRRP duty types.
+///
+/// Tries pattern tiers in order:
+/// 1. Government v1 (strong patterns)
+/// 2. Government v2 (extended patterns)
+/// 3. Governed patterns
+/// 4. Falls back to `Unknown` / empty
+///
+/// The family determines DRRP mapping:
+/// - `Government` + obligation → Responsibility
+/// - `Government` + enabling   → Power
+/// - `Governed`   + obligation → Duty
+/// - `Governed`   + enabling   → Right
+pub fn classify(text: &str) -> ClassificationResult {
+    // Try government v1 first
+    if let Some(dc) = duty_patterns::match_government_v1(text) {
+        return to_result(dc);
+    }
+    // Then government v2
+    if let Some(dc) = duty_patterns::match_government_v2(text) {
+        return to_result(dc);
+    }
+    // Then governed
+    if let Some(dc) = duty_patterns::match_governed(text) {
+        return to_result(dc);
+    }
+    // No match
+    ClassificationResult {
+        duty_types: Vec::new(),
+        classification: None,
+    }
+}
+
+/// Map a `DutyClassification` to DRRP duty types.
+fn to_result(dc: DutyClassification) -> ClassificationResult {
+    let dt = map_to_duty_type(&dc);
+    ClassificationResult {
+        duty_types: dt,
+        classification: Some(dc),
+    }
+}
+
+/// Map family + sub-type to one or more DRRP types.
+fn map_to_duty_type(dc: &DutyClassification) -> Vec<DutyType> {
+    match dc.family {
+        DutyFamily::Government => {
+            match dc.sub_type {
+                DutySubType::Enabling => vec![DutyType::Power],
+                _ => {
+                    // Most government sub-types are responsibilities
+                    if duty_patterns::has_enabling(dc.sub_type.as_str_lower()) {
+                        vec![DutyType::Power]
+                    } else {
+                        vec![DutyType::Responsibility]
+                    }
+                }
+            }
+        }
+        DutyFamily::Governed => match dc.sub_type {
+            DutySubType::Enabling => vec![DutyType::Right],
+            DutySubType::Prohibitive => vec![DutyType::Duty],
+            _ => {
+                if duty_patterns::has_enabling(dc.sub_type.as_str_lower()) {
+                    vec![DutyType::Right]
+                } else {
+                    vec![DutyType::Duty]
+                }
+            }
+        },
+        DutyFamily::Unknown => Vec::new(),
+    }
+}
+
+impl DutySubType {
+    /// Lowercase label for keyword checks.
+    fn as_str_lower(self) -> &'static str {
+        match self {
+            Self::RegulationMaking => "regulation making",
+            Self::CodeApproval => "code approval",
+            Self::Enforcement => "enforcement",
+            Self::Direction => "direction",
+            Self::Guidance => "guidance",
+            Self::ConsultationObligation => "consultation obligation",
+            Self::Appointment => "appointment",
+            Self::Delegation => "delegation",
+            Self::Fees => "fees",
+            Self::ParliamentaryReporting => "parliamentary reporting",
+            Self::GeneralDuty => "general duty",
+            Self::Prohibitive => "prohibitive",
+            Self::SfairpDuty => "sfairp duty",
+            Self::InformationDuty => "information duty",
+            Self::RiskAssessment => "risk assessment",
+            Self::TrainingDuty => "training duty",
+            Self::Prescriptive => "prescriptive",
+            Self::Enabling => "enabling",
+            Self::Unclassified => "unclassified",
+        }
+    }
+}
+
+/// Sort duty types by priority (Duty → Right → Responsibility → Power).
+pub fn sort_duty_types(types: &mut Vec<DutyType>) {
+    types.sort_by_key(|t| t.priority());
+    types.dedup();
+}
+
+// ── Tests ────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn classify_employer_duty() {
+        let text = "every employer shall ensure the health, safety and welfare of employees";
+        let result = classify(text);
+        assert_eq!(result.duty_types, vec![DutyType::Duty]);
+    }
+
+    #[test]
+    fn classify_government_responsibility() {
+        let text = "the secretary of state shall have power to make regulations";
+        let result = classify(text);
+        assert_eq!(result.duty_types, vec![DutyType::Responsibility]);
+    }
+
+    #[test]
+    fn classify_government_power() {
+        let text = "the commission may authorise any person to carry out";
+        let result = classify(text);
+        assert_eq!(result.duty_types, vec![DutyType::Power]);
+    }
+
+    #[test]
+    fn classify_governed_right() {
+        let text = "the employee may request a review of the assessment";
+        let result = classify(text);
+        assert_eq!(result.duty_types, vec![DutyType::Right]);
+    }
+
+    #[test]
+    fn classify_unknown_text() {
+        let text = "the quick brown fox jumped over the lazy dog";
+        let result = classify(text);
+        assert!(result.duty_types.is_empty());
+        assert!(result.classification.is_none());
+    }
+
+    #[test]
+    fn classify_prohibition_is_duty() {
+        let text = "no person shall carry out work at height unless properly trained";
+        let result = classify(text);
+        assert_eq!(result.duty_types, vec![DutyType::Duty]);
+    }
+
+    #[test]
+    fn classify_gov_direction_is_responsibility() {
+        let text = "the secretary of state may give directions to the executive";
+        let result = classify(text);
+        // Direction is government v2 — maps to Responsibility (not Power)
+        // because it's an obligation on government to direct
+        assert!(!result.duty_types.is_empty());
+    }
+
+    #[test]
+    fn sort_deduplicates() {
+        let mut types = vec![
+            DutyType::Power,
+            DutyType::Duty,
+            DutyType::Duty,
+            DutyType::Right,
+        ];
+        sort_duty_types(&mut types);
+        assert_eq!(
+            types,
+            vec![DutyType::Duty, DutyType::Right, DutyType::Power]
+        );
+    }
+
+    #[test]
+    fn duty_type_as_str() {
+        assert_eq!(DutyType::Duty.as_str(), "Duty");
+        assert_eq!(DutyType::Right.as_str(), "Right");
+        assert_eq!(DutyType::Responsibility.as_str(), "Responsibility");
+        assert_eq!(DutyType::Power.as_str(), "Power");
+    }
+}

@@ -1,0 +1,307 @@
+//! Modal-window clause extraction and refinement.
+//!
+//! Detection patterns capture everything before the modal verb (shall/must/may)
+//! but often miss the actual action that follows. This module extracts a clean
+//! window around the modal:
+//! - **Subject**: the actor (up to 100 chars before modal)
+//! - **Modal**: the obligation verb
+//! - **Action**: what they must do (up to 200 chars after modal)
+//!
+//! Ported from `Taxa.ClauseRefiner`.
+
+use std::sync::LazyLock;
+
+use regex::Regex;
+
+// ── Constants ────────────────────────────────────────────────────────
+
+const MAX_CLAUSE_LENGTH: usize = 300;
+const SUBJECT_WINDOW: usize = 100;
+const ACTION_WINDOW: usize = 200;
+
+static MODAL_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(shall|must|may(?:\s+(?:not|only))?)\b").unwrap());
+static SENTENCE_END_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[.;]|\n\n").unwrap());
+// Matches a sentence boundary: period or semicolon followed by whitespace and uppercase.
+// Rust regex doesn't support lookahead, so we capture the boundary and uppercase char.
+static SENTENCE_START_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[.;]\s+([A-Z])").unwrap());
+
+// ── Public API ───────────────────────────────────────────────────────
+
+/// Refine a raw clause capture into a focused, readable clause.
+///
+/// - `raw_clause`: the raw regex match
+/// - `section_text`: optional full section for action extraction
+/// - `captured_action`: optional V2 capture group text
+///
+/// Returns a refined clause string (max 300 chars).
+pub fn refine(
+    raw_clause: &str,
+    section_text: Option<&str>,
+    captured_action: Option<&str>,
+) -> String {
+    if raw_clause.is_empty() {
+        return String::new();
+    }
+
+    // Find the last modal verb in the raw clause
+    let modal_match = find_last_modal(raw_clause);
+
+    match modal_match {
+        None => {
+            // No modal found — might be V2 capture group output
+            let cleaned = ensure_clean_ending(raw_clause);
+            truncate_smart(&cleaned, MAX_CLAUSE_LENGTH)
+        }
+        Some((modal_start, modal_len, modal_text)) => {
+            let subject = extract_subject(raw_clause, modal_start);
+
+            let action = if let Some(ca) = captured_action {
+                if !ca.is_empty() {
+                    ensure_clean_ending(ca)
+                } else {
+                    extract_action(raw_clause, modal_start + modal_len, section_text)
+                }
+            } else {
+                extract_action(raw_clause, modal_start + modal_len, section_text)
+            };
+
+            combine_clause(&subject, &modal_text, &action)
+        }
+    }
+}
+
+// ── Modal detection ──────────────────────────────────────────────────
+
+fn find_last_modal(text: &str) -> Option<(usize, usize, String)> {
+    let mut last: Option<(usize, usize, String)> = None;
+    for m in MODAL_RE.find_iter(text) {
+        last = Some((m.start(), m.len(), m.as_str().to_string()));
+    }
+    last
+}
+
+// ── Subject extraction ───────────────────────────────────────────────
+
+fn extract_subject(text: &str, modal_start: usize) -> String {
+    let window_start = modal_start.saturating_sub(SUBJECT_WINDOW);
+    let before_modal = &text[window_start..modal_start];
+
+    // Find last sentence start (capital letter after period/semicolon)
+    // SENTENCE_START_RE captures the uppercase char in group 1.
+    let mut last_cap_start = None;
+    for caps in SENTENCE_START_RE.captures_iter(before_modal) {
+        if let Some(m) = caps.get(1) {
+            last_cap_start = Some(m.start());
+        }
+    }
+    if let Some(pos) = last_cap_start {
+        before_modal[pos..].trim_start().to_string()
+    } else if before_modal
+        .trim_start()
+        .starts_with(|c: char| c.is_ascii_uppercase())
+    {
+        before_modal.trim_start().to_string()
+    } else {
+        clean_leading(before_modal.trim_start())
+    }
+}
+
+fn clean_leading(text: &str) -> String {
+    let s =
+        text.trim_start_matches(|c: char| c == ',' || c == ';' || c == ':' || c.is_whitespace());
+    s.to_string()
+}
+
+// ── Action extraction ────────────────────────────────────────────────
+
+fn extract_action(raw_clause: &str, modal_end: usize, section_text: Option<&str>) -> String {
+    let end = (modal_end + ACTION_WINDOW).min(raw_clause.len());
+    let after = &raw_clause[modal_end..end];
+
+    if after.trim().is_empty() {
+        if let Some(section) = section_text {
+            extract_action_from_section(raw_clause, section)
+        } else {
+            String::new()
+        }
+    } else {
+        extract_to_sentence_end(after)
+    }
+}
+
+fn extract_action_from_section(raw_clause: &str, section_text: &str) -> String {
+    // Find the modal in raw_clause, locate it in section_text, extract action
+    let Some((modal_start, _modal_len, modal_text)) = find_last_modal(raw_clause) else {
+        return String::new();
+    };
+    let ctx_start = modal_start.saturating_sub(40);
+    let ctx_end = (modal_start + 60).min(raw_clause.len());
+    let context = &raw_clause[ctx_start..ctx_end];
+
+    // Try to find context in section text
+    if let Some(pos) = section_text.find(context) {
+        let section_context = &section_text[pos..];
+        if let Some(modal_pos) = section_context.find(&modal_text) {
+            let action_start = modal_pos + modal_text.len();
+            let action_end = (action_start + ACTION_WINDOW).min(section_context.len());
+            return extract_to_sentence_end(&section_context[action_start..action_end]);
+        }
+    }
+    String::new()
+}
+
+fn extract_to_sentence_end(text: &str) -> String {
+    if let Some(m) = SENTENCE_END_RE.find(text)
+        && m.start() > 0
+    {
+        return text[..m.start() + 1].to_string();
+    }
+    truncate_at_word(text).to_string()
+}
+
+fn truncate_at_word(text: &str) -> &str {
+    let trimmed = text.trim_end();
+    if let Some(pos) = trimmed.rfind(|c: char| c.is_whitespace()) {
+        trimmed[..pos].trim_end()
+    } else {
+        trimmed
+    }
+}
+
+// ── Clause combination ───────────────────────────────────────────────
+
+fn combine_clause(subject: &str, modal: &str, action: &str) -> String {
+    let parts: Vec<&str> = [subject.trim(), modal.trim(), action.trim()]
+        .iter()
+        .filter(|s| !s.is_empty())
+        .copied()
+        .collect();
+    let mut clause = parts.join(" ");
+
+    // Collapse multiple spaces
+    while clause.contains("  ") {
+        clause = clause.replace("  ", " ");
+    }
+
+    // Add ellipsis if action is missing or truncated
+    if (action.is_empty() || !clause.ends_with(['.', ';', '!', '?'])) && !clause.ends_with("...") {
+        clause.push_str("...");
+    }
+
+    truncate_smart(&clause, MAX_CLAUSE_LENGTH)
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+fn ensure_clean_ending(text: &str) -> String {
+    let trimmed = text.trim();
+    if trimmed.ends_with(['.', ';', '!', '?', ')']) {
+        return trimmed.to_string();
+    }
+    // Try to find last sentence boundary
+    if let Some(m) = SENTENCE_END_RE.find_iter(trimmed).last()
+        && m.start() > trimmed.len() / 2
+    {
+        return trimmed[..m.start() + 1].to_string();
+    }
+    // No good boundary — truncate at word and add ellipsis
+    let word_end = truncate_at_word(trimmed);
+    if word_end.ends_with(['.', ';', '!', '?', ')']) {
+        word_end.to_string()
+    } else {
+        format!("{word_end}...")
+    }
+}
+
+fn truncate_smart(text: &str, max_len: usize) -> String {
+    if text.len() <= max_len {
+        return text.to_string();
+    }
+    let truncated = &text[..max_len.saturating_sub(3)];
+    // Try to find a sentence boundary
+    if let Some(m) = SENTENCE_END_RE.find_iter(truncated).last()
+        && m.start() > max_len / 2
+    {
+        return truncated[..m.start() + 1].to_string();
+    }
+    let word_end = truncate_at_word(truncated);
+    if word_end.ends_with(['.', ';', '!', '?']) {
+        word_end.to_string()
+    } else {
+        format!("{word_end}...")
+    }
+}
+
+// ── Tests ────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn refine_simple_clause() {
+        let raw = "The employer shall ensure";
+        let result = refine(raw, None, None);
+        assert!(result.contains("employer"));
+        assert!(result.contains("shall"));
+    }
+
+    #[test]
+    fn refine_with_section_text() {
+        let raw = "The planning authority must";
+        let section = "Some preamble. The planning authority must consult the relevant bodies.";
+        let result = refine(raw, Some(section), None);
+        assert!(result.contains("must"));
+    }
+
+    #[test]
+    fn refine_with_captured_action() {
+        let raw = "The employer shall";
+        let action = "ensure the health and safety of employees.";
+        let result = refine(raw, None, Some(action));
+        assert!(result.contains("ensure the health"));
+    }
+
+    #[test]
+    fn refine_empty_input() {
+        assert!(refine("", None, None).is_empty());
+    }
+
+    #[test]
+    fn refine_no_modal() {
+        let result = refine("some text without a modal verb", None, None);
+        assert!(!result.is_empty());
+    }
+
+    #[test]
+    fn refine_long_preamble_truncated() {
+        let preamble = "a ".repeat(200);
+        let raw = format!("{preamble}The employer shall ensure safety.");
+        let result = refine(&raw, None, None);
+        assert!(result.len() <= MAX_CLAUSE_LENGTH);
+    }
+
+    #[test]
+    fn max_length_enforced() {
+        let long_text = "The employer shall ".to_string() + &"ensure safety and ".repeat(50);
+        let result = refine(&long_text, None, None);
+        assert!(result.len() <= MAX_CLAUSE_LENGTH);
+    }
+
+    #[test]
+    fn find_last_modal_works() {
+        let text = "The employer shall ensure employees must comply";
+        let (start, _, modal) = find_last_modal(text).unwrap();
+        assert_eq!(modal, "must");
+        assert!(start > 0);
+    }
+
+    #[test]
+    fn extract_subject_sentence_start() {
+        let text = "Some context. The employer shall ensure safety.";
+        let subject = extract_subject(text, text.find("shall").unwrap());
+        assert!(subject.starts_with("The employer"));
+    }
+}
