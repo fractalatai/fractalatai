@@ -131,6 +131,54 @@ impl LanceStore {
         Ok(results)
     }
 
+    /// Query provisions that have taxa data but no AI refinement yet.
+    pub async fn query_unpolished(
+        &self,
+        law_name: &str,
+        limit: usize,
+    ) -> Result<Vec<RecordBatch>, StoreError> {
+        let filter = format!(
+            "law_name = '{}' AND drrp_types IS NOT NULL AND ai_clause IS NULL",
+            law_name.replace('\'', "''")
+        );
+        self.query_legislation_text(&filter, limit).await
+    }
+
+    /// Write taxa classification results for provisions.
+    ///
+    /// Uses `merge_insert` keyed on `section_id` — updates only the provided
+    /// columns for matched rows. The batch must contain `section_id` plus any
+    /// taxa columns to update.
+    pub async fn update_taxa(&self, batch: RecordBatch) -> Result<(), StoreError> {
+        let table = self.legislation_text().await?;
+        let schema = batch.schema();
+        let reader = RecordBatchIterator::new(vec![Ok(batch)], schema);
+        let mut builder = table.merge_insert(&["section_id"]);
+        builder.when_matched_update_all(None);
+        builder
+            .execute(Box::new(reader))
+            .await
+            .map_err(|e| StoreError::Other(format!("merge_insert taxa: {e}")))?;
+        Ok(())
+    }
+
+    /// Write AI-polished results for provisions.
+    ///
+    /// Uses `merge_insert` keyed on `section_id` — updates only `ai_*` columns
+    /// for matched rows.
+    pub async fn update_polished(&self, batch: RecordBatch) -> Result<(), StoreError> {
+        let table = self.legislation_text().await?;
+        let schema = batch.schema();
+        let reader = RecordBatchIterator::new(vec![Ok(batch)], schema);
+        let mut builder = table.merge_insert(&["section_id"]);
+        builder.when_matched_update_all(None);
+        builder
+            .execute(Box::new(reader))
+            .await
+            .map_err(|e| StoreError::Other(format!("merge_insert polished: {e}")))?;
+        Ok(())
+    }
+
     /// List table names in the database.
     pub async fn table_names(&self) -> Result<Vec<String>, StoreError> {
         let names = self.db.table_names().execute().await?;

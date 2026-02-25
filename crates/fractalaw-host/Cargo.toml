@@ -9,7 +9,9 @@ repository.workspace = true
 [features]
 default = []
 duckdb = ["fractalaw-store/duckdb"]
+lancedb = ["fractalaw-store/lancedb", "dep:serde_json"]
 inference = ["dep:reqwest", "dep:serde", "dep:serde_json"]
+onnx = ["fractalaw-ai/onnx", "dep:serde_json"]
 
 [dependencies]
 fractalaw-core = { path = "../fractalaw-core" }

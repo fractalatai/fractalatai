@@ -7,6 +7,8 @@ use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
 #[cfg(feature = "duckdb")]
 use fractalaw_store::DuckStore;
+#[cfg(feature = "lancedb")]
+use fractalaw_store::LanceStore;
 
 wasmtime::component::bindgen!({
     world: "micro-app",
@@ -57,8 +59,12 @@ pub struct HostState {
     pub table: ResourceTable,
     #[cfg(feature = "duckdb")]
     pub duck: Option<DuckStore>,
+    #[cfg(feature = "lancedb")]
+    pub lance: Option<LanceStore>,
     #[cfg(feature = "inference")]
     pub inference: Option<InferenceConfig>,
+    #[cfg(feature = "onnx")]
+    pub extractor: Option<fractalaw_ai::DrrpExtractor>,
 }
 
 impl Default for HostState {
@@ -79,8 +85,12 @@ impl HostState {
             table: ResourceTable::new(),
             #[cfg(feature = "duckdb")]
             duck: None,
+            #[cfg(feature = "lancedb")]
+            lance: None,
             #[cfg(feature = "inference")]
             inference: None,
+            #[cfg(feature = "onnx")]
+            extractor: None,
         }
     }
 
@@ -91,10 +101,24 @@ impl HostState {
         self
     }
 
+    /// Attach a LanceDB store for legislation_text queries.
+    #[cfg(feature = "lancedb")]
+    pub fn with_lance(mut self, store: LanceStore) -> Self {
+        self.lance = Some(store);
+        self
+    }
+
     /// Attach an inference backend for ai-inference host functions.
     #[cfg(feature = "inference")]
     pub fn with_inference(mut self, config: InferenceConfig) -> Self {
         self.inference = Some(config);
+        self
+    }
+
+    /// Attach an ONNX DRRP extraction model for local inference.
+    #[cfg(feature = "onnx")]
+    pub fn with_extractor(mut self, extractor: fractalaw_ai::DrrpExtractor) -> Self {
+        self.extractor = Some(extractor);
         self
     }
 }
@@ -134,8 +158,317 @@ impl fractal::app::data_query::Host for HostState {
         &mut self,
         sql: String,
     ) -> Result<Vec<u8>, fractal::app::data_query::QueryError> {
+        // Route legislation_text queries to LanceDB when available.
+        #[cfg(feature = "lancedb")]
+        if sql.contains("legislation_text")
+            && let Some(ref lance) = self.lance
+        {
+            return lance_query_impl(lance, &sql).await;
+        }
         self.query_impl(&sql)
     }
+}
+
+/// Route a legislation_text query to LanceDB.
+///
+/// Parses the guest's SQL minimally to extract WHERE and LIMIT clauses,
+/// then queries LanceDB and returns Arrow IPC bytes.
+///
+/// Free function (not a method on HostState) to avoid borrowing `&self`
+/// across `.await` points, which would trigger Send/Sync requirements
+/// on HostState that DuckDB's Connection cannot satisfy.
+#[cfg(feature = "lancedb")]
+async fn lance_query_impl(
+    lance: &LanceStore,
+    sql: &str,
+) -> Result<Vec<u8>, fractal::app::data_query::QueryError> {
+    let sql_upper = sql.to_uppercase();
+
+    // Extract WHERE clause.
+    let filter = if let Some(where_pos) = sql_upper.find("WHERE ") {
+        let after_where = &sql[where_pos + 6..];
+        // WHERE clause ends at LIMIT, ORDER BY, GROUP BY, or end of string.
+        let end = ["LIMIT ", "ORDER ", "GROUP "]
+            .iter()
+            .filter_map(|kw| after_where.to_uppercase().find(kw))
+            .min()
+            .unwrap_or(after_where.len());
+        after_where[..end].trim().to_string()
+    } else {
+        String::new()
+    };
+
+    // Extract LIMIT.
+    let limit = if let Some(limit_pos) = sql_upper.find("LIMIT ") {
+        let after_limit = &sql[limit_pos + 6..];
+        after_limit
+            .split_whitespace()
+            .next()
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(1000)
+    } else {
+        1000
+    };
+
+    // Query LanceDB.
+    let batches = if filter.is_empty() {
+        lance.query_legislation_text("true", limit).await
+    } else {
+        lance.query_legislation_text(&filter, limit).await
+    }
+    .map_err(|e| fractal::app::data_query::QueryError {
+        code: 2,
+        message: format!("LanceDB query failed: {e}"),
+    })?;
+
+    // Check if the guest wants a to_json() result — single-string IPC.
+    if sql_upper.contains("TO_JSON(") {
+        return lance_to_json_result(&batches);
+    }
+
+    // Check if the guest wants a count.
+    if sql_upper.contains("COUNT(") {
+        let total: i64 = batches.iter().map(|b| b.num_rows() as i64).sum();
+        let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
+            arrow::datatypes::Field::new("count", arrow::datatypes::DataType::Int64, false),
+        ]));
+        let batch = arrow::record_batch::RecordBatch::try_new(
+            schema,
+            vec![std::sync::Arc::new(arrow::array::Int64Array::from(vec![
+                total,
+            ]))],
+        )
+        .map_err(|e| fractal::app::data_query::QueryError {
+            code: 3,
+            message: format!("failed to build count result: {e}"),
+        })?;
+        return encode_ipc(&[batch]).map_err(|e| fractal::app::data_query::QueryError {
+            code: 3,
+            message: e.to_string(),
+        });
+    }
+
+    // Return raw Arrow IPC.
+    encode_ipc(&batches).map_err(|e| fractal::app::data_query::QueryError {
+        code: 3,
+        message: e.to_string(),
+    })
+}
+
+/// Serialise a LanceDB result row to JSON and return as single-string Arrow IPC.
+///
+/// This handles the guest's `SELECT to_json(struct_pack(...)) FROM ...` pattern.
+/// The guest's IPC parser only handles single-row, single-column results.
+#[cfg(feature = "lancedb")]
+fn lance_to_json_result(
+    batches: &[arrow::record_batch::RecordBatch],
+) -> Result<Vec<u8>, fractal::app::data_query::QueryError> {
+    use arrow::array::Array;
+
+    if batches.is_empty() || batches[0].num_rows() == 0 {
+        // Return empty string result.
+        let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
+            arrow::datatypes::Field::new("json", arrow::datatypes::DataType::Utf8, false),
+        ]));
+        let batch = arrow::record_batch::RecordBatch::try_new(
+            schema,
+            vec![std::sync::Arc::new(arrow::array::StringArray::from(vec![
+                "",
+            ]))],
+        )
+        .map_err(|e| fractal::app::data_query::QueryError {
+            code: 3,
+            message: format!("failed to build empty JSON result: {e}"),
+        })?;
+        return encode_ipc(&[batch]).map_err(|e| fractal::app::data_query::QueryError {
+            code: 3,
+            message: e.to_string(),
+        });
+    }
+
+    // Build JSON object from first row of first batch.
+    let batch = &batches[0];
+    let schema = batch.schema();
+    let mut map = serde_json::Map::new();
+
+    for (i, field) in schema.fields().iter().enumerate() {
+        let col = batch.column(i);
+        if col.is_null(0) {
+            map.insert(field.name().clone(), serde_json::Value::Null);
+            continue;
+        }
+        let value = match field.data_type() {
+            arrow::datatypes::DataType::Utf8 => {
+                let arr = col
+                    .as_any()
+                    .downcast_ref::<arrow::array::StringArray>()
+                    .unwrap();
+                serde_json::Value::String(arr.value(0).to_string())
+            }
+            arrow::datatypes::DataType::Float32 => {
+                let arr = col
+                    .as_any()
+                    .downcast_ref::<arrow::array::Float32Array>()
+                    .unwrap();
+                serde_json::json!(arr.value(0))
+            }
+            arrow::datatypes::DataType::Int32 => {
+                let arr = col
+                    .as_any()
+                    .downcast_ref::<arrow::array::Int32Array>()
+                    .unwrap();
+                serde_json::json!(arr.value(0))
+            }
+            arrow::datatypes::DataType::List(_) => {
+                // List<Utf8> — serialize as JSON array of strings.
+                let list_arr = col
+                    .as_any()
+                    .downcast_ref::<arrow::array::ListArray>()
+                    .unwrap();
+                let values = list_arr.value(0);
+                if let Some(str_arr) = values.as_any().downcast_ref::<arrow::array::StringArray>() {
+                    let items: Vec<serde_json::Value> = (0..str_arr.len())
+                        .map(|j| serde_json::Value::String(str_arr.value(j).to_string()))
+                        .collect();
+                    serde_json::Value::Array(items)
+                } else {
+                    serde_json::Value::Null
+                }
+            }
+            _ => {
+                // Fallback: try to format as string.
+                serde_json::Value::String(format!("{:?}", col))
+            }
+        };
+        map.insert(field.name().clone(), value);
+    }
+
+    let json_str = serde_json::to_string(&serde_json::Value::Object(map)).map_err(|e| {
+        fractal::app::data_query::QueryError {
+            code: 3,
+            message: format!("JSON serialization failed: {e}"),
+        }
+    })?;
+
+    // Wrap in single-string Arrow IPC.
+    let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
+        arrow::datatypes::Field::new("json", arrow::datatypes::DataType::Utf8, false),
+    ]));
+    let batch = arrow::record_batch::RecordBatch::try_new(
+        schema,
+        vec![std::sync::Arc::new(arrow::array::StringArray::from(vec![
+            json_str.as_str(),
+        ]))],
+    )
+    .map_err(|e| fractal::app::data_query::QueryError {
+        code: 3,
+        message: format!("failed to build JSON IPC result: {e}"),
+    })?;
+    encode_ipc(&[batch]).map_err(|e| fractal::app::data_query::QueryError {
+        code: 3,
+        message: e.to_string(),
+    })
+}
+
+/// Route an UPDATE on legislation_text to LanceDB.
+///
+/// Parses `UPDATE legislation_text SET col1 = val1, ... WHERE filter`.
+///
+/// Free function to avoid Send/Sync issues (same reason as lance_query_impl).
+#[cfg(feature = "lancedb")]
+async fn lance_execute_impl(
+    lance: &LanceStore,
+    sql: &str,
+) -> Result<u64, fractal::app::data_mutate::MutateError> {
+    let sql_upper = sql.to_uppercase();
+
+    if !sql_upper.starts_with("UPDATE ") {
+        // Only UPDATE is supported for legislation_text mutations via LanceDB.
+        // DDL like CREATE TABLE is silently accepted (no-op) since the table already exists.
+        if sql_upper.starts_with("CREATE ") || sql_upper.starts_with("ALTER ") {
+            return Ok(0);
+        }
+        return Err(fractal::app::data_mutate::MutateError {
+            code: 2,
+            message: format!(
+                "unsupported LanceDB mutation: {}",
+                &sql[..sql.len().min(80)]
+            ),
+        });
+    }
+
+    // Parse SET clause.
+    let set_pos = sql_upper
+        .find("SET ")
+        .ok_or(fractal::app::data_mutate::MutateError {
+            code: 2,
+            message: "UPDATE without SET clause".into(),
+        })?;
+    let after_set = &sql[set_pos + 4..];
+
+    // WHERE clause.
+    let (set_part, filter) = if let Some(where_pos) = after_set.to_uppercase().find("WHERE ") {
+        (&after_set[..where_pos], after_set[where_pos + 6..].trim())
+    } else {
+        (after_set, "true")
+    };
+
+    let table =
+        lance
+            .legislation_text()
+            .await
+            .map_err(|e| fractal::app::data_mutate::MutateError {
+                code: 2,
+                message: format!("failed to open legislation_text: {e}"),
+            })?;
+
+    let mut update = table.update().only_if(filter);
+
+    // Parse comma-separated SET assignments: col = val, col = val, ...
+    // Handle quoted strings containing commas by tracking quote state.
+    let mut assignments = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    for ch in set_part.chars() {
+        match ch {
+            '\'' if !in_quotes => {
+                in_quotes = true;
+                current.push(ch);
+            }
+            '\'' if in_quotes => {
+                in_quotes = false;
+                current.push(ch);
+            }
+            ',' if !in_quotes => {
+                assignments.push(current.trim().to_string());
+                current = String::new();
+            }
+            _ => current.push(ch),
+        }
+    }
+    if !current.trim().is_empty() {
+        assignments.push(current.trim().to_string());
+    }
+
+    for assignment in &assignments {
+        let parts: Vec<&str> = assignment.splitn(2, '=').collect();
+        if parts.len() != 2 {
+            continue;
+        }
+        let col_name = parts[0].trim();
+        let col_value = parts[1].trim();
+        update = update.column(col_name, col_value);
+    }
+
+    let result = update
+        .execute()
+        .await
+        .map_err(|e| fractal::app::data_mutate::MutateError {
+            code: 2,
+            message: format!("LanceDB update failed: {e}"),
+        })?;
+
+    Ok(result.rows_updated)
 }
 
 impl HostState {
@@ -187,6 +520,13 @@ impl fractal::app::data_mutate::Host for HostState {
         &mut self,
         sql: String,
     ) -> Result<u64, fractal::app::data_mutate::MutateError> {
+        // Route legislation_text mutations to LanceDB when available.
+        #[cfg(feature = "lancedb")]
+        if sql.contains("legislation_text")
+            && let Some(ref lance) = self.lance
+        {
+            return lance_execute_impl(lance, &sql).await;
+        }
         self.execute_impl(&sql)
     }
 }
@@ -304,6 +644,41 @@ impl HostState {
         request: fractal::app::ai_inference::GenerateRequest,
     ) -> Result<fractal::app::ai_inference::GenerateResponse, fractal::app::ai_embeddings::AiError>
     {
+        // Try ONNX backend first (local-first).
+        #[cfg(feature = "onnx")]
+        if let Some(ref mut extractor) = self.extractor {
+            if let Some(parsed) = parse_drrp_prompt(&request.user_prompt) {
+                let extraction = extractor
+                    .extract(
+                        &parsed.drrp_type,
+                        &parsed.holder,
+                        &parsed.source_text,
+                        &parsed.article,
+                    )
+                    .map_err(|e| fractal::app::ai_embeddings::AiError {
+                        code: 4,
+                        message: format!("ONNX extraction failed: {e}"),
+                    })?;
+
+                let confidence = extraction.confidence;
+                let text = extraction.to_json();
+
+                tracing::info!(
+                    holder = %extraction.holder,
+                    confidence,
+                    "ONNX DRRP extraction complete"
+                );
+
+                return Ok(fractal::app::ai_inference::GenerateResponse {
+                    text,
+                    tokens_used: 0,
+                    confidence,
+                });
+            }
+            // Prompt doesn't match DRRP format — fall through to Claude.
+            tracing::debug!("prompt does not match DRRP format, falling through to Claude");
+        }
+
         #[cfg(feature = "inference")]
         {
             let config = self
@@ -404,6 +779,52 @@ impl HostState {
     }
 }
 
+// ── ONNX prompt parsing ──
+
+/// Structured fields parsed from a DRRP polisher user prompt.
+#[cfg(feature = "onnx")]
+struct ParsedDrrpPrompt {
+    drrp_type: String,
+    holder: String,
+    article: String,
+    source_text: String,
+}
+
+/// Parse a DRRP polisher user prompt into structured fields.
+///
+/// Returns `None` if the prompt doesn't match the expected format,
+/// allowing fallthrough to the Claude API backend.
+#[cfg(feature = "onnx")]
+fn parse_drrp_prompt(user_prompt: &str) -> Option<ParsedDrrpPrompt> {
+    let mut drrp_type = None;
+    let mut holder = None;
+    let mut article = None;
+    let mut source_text = None;
+
+    let mut lines = user_prompt.lines().peekable();
+    while let Some(line) = lines.next() {
+        if let Some(val) = line.strip_prefix("DRRP type: ") {
+            drrp_type = Some(val.to_string());
+        } else if let Some(val) = line.strip_prefix("Article reference: ") {
+            article = Some(val.to_string());
+        } else if let Some(val) = line.strip_prefix("- Holder: ") {
+            holder = Some(val.to_string());
+        } else if line.starts_with("Full section text:") {
+            // Everything after this line is the source text.
+            let rest: String = lines.collect::<Vec<_>>().join("\n");
+            source_text = Some(rest);
+            break;
+        }
+    }
+
+    Some(ParsedDrrpPrompt {
+        drrp_type: drrp_type?,
+        holder: holder?,
+        article: article?,
+        source_text: source_text?,
+    })
+}
+
 // ── Arrow IPC encoding/decoding ──
 
 /// Encode Arrow RecordBatches into IPC streaming format bytes.
@@ -486,8 +907,12 @@ pub fn create_linker(engine: &Engine) -> anyhow::Result<wasmtime::component::Lin
 pub struct RunOptions {
     #[cfg(feature = "duckdb")]
     pub duck: Option<DuckStore>,
+    #[cfg(feature = "lancedb")]
+    pub lance: Option<LanceStore>,
     #[cfg(feature = "inference")]
     pub inference: Option<InferenceConfig>,
+    #[cfg(feature = "onnx")]
+    pub extractor: Option<fractalaw_ai::DrrpExtractor>,
 }
 
 /// Load, instantiate, and execute a micro-app component.
@@ -507,9 +932,17 @@ pub async fn run_component(
     if let Some(store) = opts.duck {
         state = state.with_duck(store);
     }
+    #[cfg(feature = "lancedb")]
+    if let Some(store) = opts.lance {
+        state = state.with_lance(store);
+    }
     #[cfg(feature = "inference")]
     if let Some(config) = opts.inference {
         state = state.with_inference(config);
+    }
+    #[cfg(feature = "onnx")]
+    if let Some(extractor) = opts.extractor {
+        state = state.with_extractor(extractor);
     }
 
     let mut store = Store::new(&engine, state);
@@ -740,8 +1173,12 @@ mod tests {
             let duck = DuckStore::open().unwrap();
             let opts = RunOptions {
                 duck: Some(duck),
+                #[cfg(feature = "lancedb")]
+                lance: None,
                 #[cfg(feature = "inference")]
                 inference: None,
+                #[cfg(feature = "onnx")]
+                extractor: None,
             };
             let result = run_component(&data_test_wasm(), 1_000_000_000, opts)
                 .await
@@ -784,12 +1221,35 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn drrp_polisher_no_annotations() {
+        async fn drrp_polisher_no_data() {
             let duck = DuckStore::open().unwrap();
+            // legislation_text with no taxa data → nothing to polish.
+            duck.execute(
+                "CREATE TABLE legislation_text (
+                    section_id VARCHAR NOT NULL,
+                    law_name VARCHAR,
+                    provision VARCHAR,
+                    text VARCHAR,
+                    drrp_types VARCHAR[],
+                    ai_clause VARCHAR
+                )",
+            )
+            .unwrap();
+            duck.execute(
+                "INSERT INTO legislation_text VALUES (
+                    'UK_ukpga_1974_37:s.2', 'UK_ukpga_1974_37', '2',
+                    'Some text here', NULL, NULL
+                )",
+            )
+            .unwrap();
             let opts = RunOptions {
                 duck: Some(duck),
+                #[cfg(feature = "lancedb")]
+                lance: None,
                 #[cfg(feature = "inference")]
                 inference: None,
+                #[cfg(feature = "onnx")]
+                extractor: None,
             };
             let result = run_component(&drrp_polisher_wasm(), 1_000_000_000, opts)
                 .await
@@ -797,7 +1257,7 @@ mod tests {
 
             let output = result.output.expect("guest returned Err");
             assert!(
-                output.contains("No unpolished annotations"),
+                output.contains("No provisions need DRRP polishing"),
                 "expected empty batch message, got: {output}"
             );
         }
@@ -805,30 +1265,40 @@ mod tests {
         #[tokio::test]
         async fn drrp_polisher_reports_inference_errors() {
             let duck = DuckStore::open().unwrap();
-            // Create tables and seed a test annotation.
+            // legislation_text with taxa data but no AI refinement → needs polishing.
             duck.execute(
-                "CREATE TABLE drrp_annotations (
-                    law_name VARCHAR NOT NULL, provision VARCHAR NOT NULL,
-                    drrp_type VARCHAR NOT NULL, source_text VARCHAR NOT NULL,
-                    confidence FLOAT NOT NULL, scraped_at TIMESTAMPTZ NOT NULL,
-                    polished BOOLEAN NOT NULL DEFAULT false,
-                    synced_at TIMESTAMPTZ NOT NULL
+                "CREATE TABLE legislation_text (
+                    section_id VARCHAR NOT NULL,
+                    law_name VARCHAR,
+                    provision VARCHAR,
+                    text VARCHAR,
+                    drrp_types VARCHAR[],
+                    governed_actors VARCHAR[],
+                    government_actors VARCHAR[],
+                    duty_family VARCHAR,
+                    clause_refined VARCHAR,
+                    ai_clause VARCHAR
                 )",
             )
             .unwrap();
             duck.execute(
-                "INSERT INTO drrp_annotations VALUES (
-                    'UK_ukpga_1974_37', 's.2(1)', 'duty',
+                "INSERT INTO legislation_text VALUES (
+                    'UK_ukpga_1974_37:s.2', 'UK_ukpga_1974_37', '2',
                     'It shall be the duty of every employer to ensure, so far as is reasonably practicable, the health, safety and welfare at work of all his employees.',
-                    0.95, '2026-01-15T10:00:00Z', false, '2026-01-15T10:00:00Z'
+                    ['Duty'], ['Org: Employer'], ['Gvt: Minister'], 'Governed',
+                    'the duty of every employer to ensure', NULL
                 )",
             )
             .unwrap();
 
             let opts = RunOptions {
                 duck: Some(duck),
+                #[cfg(feature = "lancedb")]
+                lance: None,
                 #[cfg(feature = "inference")]
                 inference: None, // no API key → inference calls will error
+                #[cfg(feature = "onnx")]
+                extractor: None, // no ONNX model → falls through to Claude → errors
             };
             let result = run_component(&drrp_polisher_wasm(), 1_000_000_000, opts)
                 .await
@@ -841,7 +1311,7 @@ mod tests {
                 "expected 1 inference error, got: {output}"
             );
             assert!(
-                output.contains("Polished 0/1"),
+                output.contains("Polished 0 provisions"),
                 "expected 0 polished, got: {output}"
             );
         }

@@ -1,8 +1,8 @@
 # Fractalaw Schema Design
 
-**Version**: 0.3
-**Date**: 2026-02-19
-**Status**: All four tables exported to Parquet and validated
+**Version**: 0.6
+**Date**: 2026-02-25
+**Status**: Five tables — four exported to Parquet, `polished_drrp` created at runtime by drrp-polisher
 
 This document defines the three-tier data model for Fractalaw. It is the spec from which `fractalaw-core/src/schema.rs` will be implemented.
 
@@ -13,7 +13,7 @@ This document defines the three-tier data model for Fractalaw. It is the spec fr
 
 ## Architecture: Graph-Dense Columnar
 
-Four tables across three access tiers, each optimised for a different query pattern:
+Five tables across four access tiers, each optimised for a different query pattern:
 
 | Tier | Table | Store | Access Pattern |
 |------|-------|-------|---------------|
@@ -21,6 +21,7 @@ Four tables across three access tiers, each optimised for a different query patt
 | **Analytical path** | `law_edges` | DuckDB | Multi-hop graph traversal, amendment network analysis — vectorised joins |
 | **Semantic path** | `legislation_text` (LAT) | LanceDB | Full-text search, embedding similarity, RAG retrieval |
 | **Semantic path** | `amendment_annotations` | LanceDB | Amendment/modification/commencement detail linked to LAT sections |
+| **AI output path** | `polished_drrp` | DuckDB | Per-provision AI-refined DRRP entries, aggregated into LRT `*_ai` columns |
 
 **Guiding principle**: no pointer chasing. The hot path carries denormalized `List<Struct>` relationship arrays so the CPU reads one memory block per law. The analytical path is a flattened edge table for DuckDB's morsel-driven parallel joins. The semantic path stores text with embedding vectors for AI inference.
 
@@ -484,6 +485,86 @@ Note: ~5,960 annotation heading rows (record types `commencement,heading`, `modi
 
 ---
 
+## Table 5: `polished_drrp` — AI Output Path
+
+One row per AI-refined DRRP provision. Produced by the drrp-polisher micro-app from the LRT's regex-extracted DRRP columns and LAT source text. This is the working table where individual polished entries accumulate before being aggregated into the LRT `*_ai` columns.
+
+**Data flow:**
+```
+sertantai                           fractalaw
+─────────                           ─────────
+publishes LRT rows                  taxa enrich picks up laws where
+(with Making function flag)         function contains 'Making'
+and LAT text sections                       │
+        │                                   ▼
+        │ zenoh / sync              taxa regex parser runs on LAT text
+        ▼                                   │
+legislation (LRT)                           ▼
+legislation_text (LAT)              LRT duties[], rights[], etc.
+                                    (rough regex-extracted DRRPEntry)
+                                            │
+                                            ▼
+                                    drrp-polisher micro-app
+                                    reads LRT DRRP + LAT source text
+                                    calls AI to refine each entry
+                                            │
+                                            ▼
+                                    polished_drrp (per-provision AI output)
+                                            │
+                                    ┌───────┴───────┐
+                                    ▼               ▼
+                            LRT *_ai columns    zenoh pub/sub
+                            (aggregated)        → sertantai, Bees
+```
+
+### 5.1 Identity
+
+| Column | Arrow Type | Nullable | Description |
+|--------|-----------|----------|-------------|
+| `law_name` | Utf8 | no | Parent law identifier (FK to LRT `legislation.name`) |
+| `provision` | Utf8 | no | Section/regulation reference (e.g. `s.2(1)`, `reg.3`) |
+| `drrp_type` | Utf8 | no | Category: `duty`, `right`, `responsibility`, `power` |
+
+### 5.2 AI-Extracted Content
+
+| Column | Arrow Type | Nullable | Description |
+|--------|-----------|----------|-------------|
+| `holder` | Utf8 | no | Entity holding this duty/right/responsibility/power (e.g. `every employer`, `the Secretary of State`) |
+| `ai_clause` | Utf8 | no | AI-refined clause text — the precise provision extracted from the source |
+| `qualifier` | Utf8 | yes | Qualifying phrase (e.g. `so far as is reasonably practicable`). NULL when no qualifier applies. |
+| `clause_ref` | Utf8 | no | Specific clause reference within the law (e.g. `s.2(1)`, `reg.3(1)(a)`) |
+
+### 5.3 Provenance
+
+| Column | Arrow Type | Nullable | Description |
+|--------|-----------|----------|-------------|
+| `confidence` | Float32 | no | AI confidence score for this extraction |
+| `polished_at` | Timestamp(ns, UTC) | no | When the AI produced this entry |
+| `model` | Utf8 | no | Model identifier used for extraction (e.g. `deberta-v3-drrp-int8`, or `claude` during prototyping) |
+
+### 5.4 Sync
+
+| Column | Arrow Type | Nullable | Description |
+|--------|-----------|----------|-------------|
+| `pushed` | Boolean | no | Whether this entry has been published (via zenoh or sync push). Default `false`. |
+
+---
+
+## Table 5 → LRT Aggregation: `*_ai` Columns
+
+The polisher writes individual entries to `polished_drrp`. These are then aggregated per-law into the LRT's `List<DRRPEntry>` columns for side-by-side comparison with the regex-extracted originals:
+
+| LRT Column | Arrow Type | Nullable | Source |
+|------------|-----------|----------|--------|
+| `duties_ai` | List\<DRRPEntry\> | yes | Aggregated from `polished_drrp` where `drrp_type = 'duty'` |
+| `rights_ai` | List\<DRRPEntry\> | yes | Aggregated from `polished_drrp` where `drrp_type = 'right'` |
+| `responsibilities_ai` | List\<DRRPEntry\> | yes | Aggregated from `polished_drrp` where `drrp_type = 'responsibility'` |
+| `powers_ai` | List\<DRRPEntry\> | yes | Aggregated from `polished_drrp` where `drrp_type = 'power'` |
+
+The original `duties`, `rights`, `responsibilities`, `powers` columns (§1.9) hold the regex-extracted entries. Once the AI model is validated, the `*_ai` columns may replace the originals.
+
+---
+
 ## Struct Definitions Summary
 
 For reference — the named structs used in `List<Struct>` columns:
@@ -504,7 +585,7 @@ Used in: `enacted_by`, `enacting`, `amending`, `amended_by`, `rescinding`, `resc
 
 ### `DRRPEntry`
 
-Used in: `duties`, `rights`, `responsibilities`, `powers`
+Used in: `duties`, `rights`, `responsibilities`, `powers`, `duties_ai`, `rights_ai`, `responsibilities_ai`, `powers_ai`
 
 ```
 {
@@ -521,10 +602,11 @@ Used in: `duties`, `rights`, `responsibilities`, `powers`
 
 | Table | Scalar Columns | List Columns | Total |
 |-------|---------------|-------------|-------|
-| `legislation` (LRT) | 56 | 22 (12 List\<Utf8\> + 10 List\<Struct\>) | 78 |
+| `legislation` (LRT) | 60 | 26 (12 List\<Utf8\> + 14 List\<Struct\>) | 89 |
 | `law_edges` | 8 | — | 8 |
 | `legislation_text` (LAT) | 28 | — | 28 |
 | `amendment_annotations` | 8 | 1 (List\<Utf8\>) | 9 |
+| `polished_drrp` | 11 | — | 11 |
 
 ---
 

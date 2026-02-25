@@ -117,7 +117,7 @@ pub mod esh {
             Field::new("affected_by_laws_count", DataType::Int32, true),
             Field::new("rescinding_laws_count", DataType::Int32, true),
             Field::new("rescinded_by_laws_count", DataType::Int32, true),
-            // 1.10 DRRP Taxa (11)
+            // 1.10 DRRP Taxa (15)
             Field::new("duty_holder", list_utf8.clone(), true),
             Field::new("rights_holder", list_utf8.clone(), true),
             Field::new("responsibility_holder", list_utf8.clone(), true),
@@ -128,7 +128,11 @@ pub mod esh {
             Field::new("duties", list_drrp_entry.clone(), true),
             Field::new("rights", list_drrp_entry.clone(), true),
             Field::new("responsibilities", list_drrp_entry.clone(), true),
-            Field::new("powers", list_drrp_entry, true),
+            Field::new("powers", list_drrp_entry.clone(), true),
+            Field::new("duties_ai", list_drrp_entry.clone(), true),
+            Field::new("rights_ai", list_drrp_entry.clone(), true),
+            Field::new("responsibilities_ai", list_drrp_entry.clone(), true),
+            Field::new("powers_ai", list_drrp_entry, true),
             // 1.11 Annotation Totals (4)
             Field::new("total_text_amendments", DataType::Int32, true),
             Field::new("total_modifications", DataType::Int32, true),
@@ -224,6 +228,45 @@ pub mod esh {
             // 3.8 Metadata (2)
             Field::new("created_at", timestamp_ns_utc(), false),
             Field::new("updated_at", timestamp_ns_utc(), false),
+            // 3.9 DRRP Taxa — per-provision classification from regex pipeline (10)
+            Field::new(
+                "drrp_types",
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            Field::new(
+                "governed_actors",
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            Field::new(
+                "government_actors",
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            Field::new("duty_family", DataType::Utf8, true),
+            Field::new("duty_sub_type", DataType::Utf8, true),
+            Field::new(
+                "popimar",
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            Field::new(
+                "purposes",
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            Field::new("clause_refined", DataType::Utf8, true),
+            Field::new("taxa_confidence", DataType::Float32, true),
+            Field::new("taxa_classified_at", timestamp_ns_utc(), true),
+            // 3.10 AI-Refined DRRP — polisher output stored back in LanceDB (7)
+            Field::new("ai_holder", DataType::Utf8, true),
+            Field::new("ai_clause", DataType::Utf8, true),
+            Field::new("ai_qualifier", DataType::Utf8, true),
+            Field::new("ai_clause_ref", DataType::Utf8, true),
+            Field::new("ai_confidence", DataType::Float32, true),
+            Field::new("ai_model", DataType::Utf8, true),
+            Field::new("ai_polished_at", timestamp_ns_utc(), true),
         ])
     }
 
@@ -265,6 +308,7 @@ pub mod esh {
             Field::new("provision", DataType::Utf8, false),
             Field::new("drrp_type", DataType::Utf8, false),
             Field::new("source_text", DataType::Utf8, false),
+            Field::new("regex_clause", DataType::Utf8, false),
             Field::new("confidence", DataType::Float32, false),
             Field::new("scraped_at", timestamp_ns_utc(), false),
             Field::new("polished", DataType::Boolean, false),
@@ -282,7 +326,7 @@ pub mod esh {
             Field::new("provision", DataType::Utf8, false),
             Field::new("drrp_type", DataType::Utf8, false),
             Field::new("holder", DataType::Utf8, false),
-            Field::new("text", DataType::Utf8, false),
+            Field::new("ai_clause", DataType::Utf8, false),
             Field::new("qualifier", DataType::Utf8, true),
             Field::new("clause_ref", DataType::Utf8, false),
             Field::new("confidence", DataType::Float32, false),
@@ -318,7 +362,7 @@ mod tests {
 
     #[test]
     fn legislation_schema_field_count() {
-        assert_eq!(esh::legislation_schema().fields().len(), 85);
+        assert_eq!(esh::legislation_schema().fields().len(), 89);
     }
 
     #[test]
@@ -328,7 +372,7 @@ mod tests {
 
     #[test]
     fn legislation_text_schema_field_count() {
-        assert_eq!(esh::legislation_text_schema().fields().len(), 30);
+        assert_eq!(esh::legislation_text_schema().fields().len(), 47);
     }
 
     #[test]
@@ -338,7 +382,7 @@ mod tests {
 
     #[test]
     fn drrp_annotations_schema_field_count() {
-        assert_eq!(esh::drrp_annotations_schema().fields().len(), 8);
+        assert_eq!(esh::drrp_annotations_schema().fields().len(), 9);
     }
 
     #[test]
@@ -463,7 +507,7 @@ mod tests {
             "provision",
             "drrp_type",
             "holder",
-            "text",
+            "ai_clause",
             "clause_ref",
             "model",
         ] {
@@ -589,7 +633,16 @@ mod tests {
     #[test]
     fn all_drrp_columns_use_drrp_entry() {
         let schema = esh::legislation_schema();
-        for col in ["duties", "rights", "responsibilities", "powers"] {
+        for col in [
+            "duties",
+            "rights",
+            "responsibilities",
+            "powers",
+            "duties_ai",
+            "rights_ai",
+            "responsibilities_ai",
+            "powers_ai",
+        ] {
             let field = schema.field_with_name(col).unwrap();
             match field.data_type() {
                 DataType::List(inner) => match inner.data_type() {

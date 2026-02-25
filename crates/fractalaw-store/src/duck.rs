@@ -11,7 +11,7 @@ use crate::StoreError;
 
 /// DuckDB store for legislation hot path and analytical path.
 ///
-/// The hot path (`legislation` table) stores one row per law with 78 columns
+/// The hot path (`legislation` table) stores one row per law with denormalized columns
 /// including `List<Struct>` relationship arrays — single-row lookups need no joins.
 ///
 /// The analytical path (`law_edges` table) is a flattened edge table for
@@ -113,7 +113,7 @@ impl DuckStore {
 
     /// Fetch a single legislation record by exact name match.
     ///
-    /// Returns one RecordBatch with all 78 columns including `List<Struct>`
+    /// Returns one RecordBatch with all columns including `List<Struct>`
     /// relationship arrays. No joins needed.
     pub fn get_legislation(&self, name: &str) -> Result<RecordBatch, StoreError> {
         let mut stmt = self
@@ -231,6 +231,7 @@ impl DuckStore {
                 provision      VARCHAR NOT NULL,
                 drrp_type      VARCHAR NOT NULL,
                 source_text    VARCHAR NOT NULL,
+                regex_clause   VARCHAR NOT NULL,
                 confidence     FLOAT   NOT NULL,
                 scraped_at     TIMESTAMPTZ NOT NULL,
                 polished       BOOLEAN NOT NULL DEFAULT false,
@@ -241,7 +242,7 @@ impl DuckStore {
                 provision      VARCHAR NOT NULL,
                 drrp_type      VARCHAR NOT NULL,
                 holder         VARCHAR NOT NULL,
-                text           VARCHAR NOT NULL,
+                ai_clause      VARCHAR NOT NULL,
                 qualifier      VARCHAR,
                 clause_ref     VARCHAR NOT NULL,
                 confidence     FLOAT   NOT NULL,
@@ -279,11 +280,12 @@ impl DuckStore {
         }
         for ann in annotations {
             let sql = format!(
-                "INSERT INTO drrp_annotations VALUES ('{}', '{}', '{}', '{}', {}, '{}', false, CURRENT_TIMESTAMP)",
+                "INSERT INTO drrp_annotations VALUES ('{}', '{}', '{}', '{}', '{}', {}, '{}', false, CURRENT_TIMESTAMP)",
                 sql_escape(&ann.law_name),
                 sql_escape(&ann.provision),
                 sql_escape(&ann.drrp_type),
                 sql_escape(&ann.source_text),
+                sql_escape(&ann.regex_clause),
                 ann.confidence,
                 sql_escape(&ann.scraped_at),
             );
@@ -295,7 +297,7 @@ impl DuckStore {
     /// Get all polished DRRP entries that haven't been pushed to sertantai yet.
     pub fn get_unpushed_polished(&self) -> Result<Vec<fractalaw_core::PolishedEntry>, StoreError> {
         let batches = self.query_arrow(
-            "SELECT law_name, provision, drrp_type, holder, text, qualifier, \
+            "SELECT law_name, provision, drrp_type, holder, ai_clause, qualifier, \
              clause_ref, confidence, polished_at::VARCHAR AS polished_at, model \
              FROM polished_drrp WHERE pushed = false",
         )?;
@@ -305,7 +307,7 @@ impl DuckStore {
             let provision = string_col(batch, "provision");
             let drrp_type = string_col(batch, "drrp_type");
             let holder = string_col(batch, "holder");
-            let text = string_col(batch, "text");
+            let ai_clause = string_col(batch, "ai_clause");
             let qualifier = string_col_nullable(batch, "qualifier");
             let clause_ref = string_col(batch, "clause_ref");
             let confidence = float_col(batch, "confidence");
@@ -318,7 +320,7 @@ impl DuckStore {
                     provision: provision[i].clone(),
                     drrp_type: drrp_type[i].clone(),
                     holder: holder[i].clone(),
-                    text: text[i].clone(),
+                    ai_clause: ai_clause[i].clone(),
                     qualifier: qualifier[i].clone(),
                     clause_ref: clause_ref[i].clone(),
                     confidence: confidence[i],
@@ -372,6 +374,57 @@ impl DuckStore {
             }
         }
         Ok(None)
+    }
+
+    // ── DRRP AI columns ──
+
+    /// Ensure the `*_ai` DRRP detail columns exist on the `legislation` table.
+    ///
+    /// These hold AI-polished DRRP entries alongside the regex-extracted originals
+    /// (`duties`, `rights`, `responsibilities`, `powers`), enabling side-by-side
+    /// comparison during testing.
+    ///
+    /// Idempotent — safe to call multiple times.
+    pub fn ensure_drrp_ai_columns(&self) -> Result<(), StoreError> {
+        let drrp_struct =
+            "STRUCT(holder VARCHAR, duty_type VARCHAR, clause VARCHAR, article VARCHAR)[]";
+        for col in ["duties_ai", "rights_ai", "responsibilities_ai", "powers_ai"] {
+            self.conn.execute_batch(&format!(
+                "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS {col} {drrp_struct}"
+            ))?;
+        }
+        info!("ensured duties_ai/rights_ai/responsibilities_ai/powers_ai columns exist");
+        Ok(())
+    }
+
+    // ── Training data extraction ──
+
+    /// Extract all DRRPEntry records as flat rows from the four DRRP columns.
+    ///
+    /// Flattens `duties`, `rights`, `responsibilities`, `powers` (each `List<Struct>`)
+    /// into rows of `(law_name, drrp_type, holder, clause, article)` via DuckDB `UNNEST`.
+    pub fn extract_flat_drrp_entries(&self) -> Result<Vec<RecordBatch>, StoreError> {
+        let sql = "\
+            SELECT name AS law_name, 'DUTY' AS drrp_type,
+                   unnest(duties).holder AS holder,
+                   unnest(duties).clause AS clause,
+                   unnest(duties).article AS article
+            FROM legislation WHERE duties IS NOT NULL AND len(duties) > 0
+            UNION ALL
+            SELECT name, 'RIGHT',
+                   unnest(rights).holder, unnest(rights).clause, unnest(rights).article
+            FROM legislation WHERE rights IS NOT NULL AND len(rights) > 0
+            UNION ALL
+            SELECT name, 'RESPONSIBILITY',
+                   unnest(responsibilities).holder, unnest(responsibilities).clause,
+                   unnest(responsibilities).article
+            FROM legislation WHERE responsibilities IS NOT NULL AND len(responsibilities) > 0
+            UNION ALL
+            SELECT name, 'POWER',
+                   unnest(powers).holder, unnest(powers).clause, unnest(powers).article
+            FROM legislation WHERE powers IS NOT NULL AND len(powers) > 0
+        ";
+        self.query_arrow(sql)
     }
 
     // ── Escape hatch ──
@@ -700,6 +753,7 @@ mod tests {
                 "INSERT INTO drrp_annotations VALUES (
                     'UK_ukpga_1974_37', 's.2(1)', 'duty',
                     'It shall be the duty of every employer...',
+                    'the duty of every employer',
                     0.85, '2026-02-21T10:00:00Z', false, '2026-02-21T12:00:00Z'
                 )",
             )
@@ -804,6 +858,7 @@ mod tests {
                 provision: "s.2(1)".into(),
                 drrp_type: "duty".into(),
                 source_text: "It shall be the duty of every employer...".into(),
+                regex_clause: "the duty of every employer".into(),
                 confidence: 0.85,
                 scraped_at: "2026-02-21T10:00:00Z".into(),
             },
@@ -812,6 +867,7 @@ mod tests {
                 provision: "s.7(a)".into(),
                 drrp_type: "duty".into(),
                 source_text: "It shall be the duty of every employee...".into(),
+                regex_clause: "the duty of every employee".into(),
                 confidence: 0.80,
                 scraped_at: "2026-02-21T10:00:00Z".into(),
             },
@@ -842,6 +898,7 @@ mod tests {
             provision: "s.2(1)".into(),
             drrp_type: "duty".into(),
             source_text: "employer's duty to ensure employees' safety".into(),
+            regex_clause: "employer's duty to ensure employees' safety".into(),
             confidence: 0.85,
             scraped_at: "2026-02-21T10:00:00Z".into(),
         }];
@@ -915,9 +972,9 @@ mod tests {
         store
             .execute(
                 "INSERT INTO drrp_annotations VALUES
-                    ('UK_ukpga_1974_37', 's.2(1)', 'duty', 'text1', 0.85,
+                    ('UK_ukpga_1974_37', 's.2(1)', 'duty', 'text1', 'clause1', 0.85,
                      '2026-02-21T10:00:00Z', false, '2026-02-20T12:00:00Z'),
-                    ('UK_ukpga_1974_37', 's.7(a)', 'duty', 'text2', 0.80,
+                    ('UK_ukpga_1974_37', 's.7(a)', 'duty', 'text2', 'clause2', 0.80,
                      '2026-02-21T10:00:00Z', false, '2026-02-21T12:00:00Z')",
             )
             .unwrap();
@@ -929,5 +986,60 @@ mod tests {
             ts.contains("2026-02-21"),
             "expected latest timestamp, got {ts}"
         );
+    }
+
+    // ── DRRP AI columns ──
+
+    #[test]
+    fn ensure_drrp_ai_columns_adds_four_columns() {
+        let dir = require_data();
+        let store = DuckStore::open().unwrap();
+        store
+            .load_legislation(&dir.join("legislation.parquet"))
+            .unwrap();
+
+        let before = store
+            .query_arrow("SELECT * FROM legislation LIMIT 1")
+            .unwrap();
+        let before_cols = before[0].num_columns();
+
+        store.ensure_drrp_ai_columns().unwrap();
+
+        let after = store
+            .query_arrow("SELECT * FROM legislation LIMIT 1")
+            .unwrap();
+        assert_eq!(after[0].num_columns(), before_cols + 4);
+
+        // Verify the columns exist and are nullable (all NULL initially).
+        for col in ["duties_ai", "rights_ai", "responsibilities_ai", "powers_ai"] {
+            let check = store
+                .query_arrow(&format!(
+                    "SELECT {col} FROM legislation WHERE {col} IS NOT NULL LIMIT 1"
+                ))
+                .unwrap();
+            let rows: usize = check.iter().map(|b| b.num_rows()).sum();
+            assert_eq!(rows, 0, "{col} should be all NULL initially");
+        }
+    }
+
+    #[test]
+    fn ensure_drrp_ai_columns_idempotent() {
+        let dir = require_data();
+        let store = DuckStore::open().unwrap();
+        store
+            .load_legislation(&dir.join("legislation.parquet"))
+            .unwrap();
+
+        store.ensure_drrp_ai_columns().unwrap();
+        let after_first = store
+            .query_arrow("SELECT * FROM legislation LIMIT 1")
+            .unwrap();
+        let cols_first = after_first[0].num_columns();
+
+        store.ensure_drrp_ai_columns().unwrap(); // second call should not error or add dupes
+        let after_second = store
+            .query_arrow("SELECT * FROM legislation LIMIT 1")
+            .unwrap();
+        assert_eq!(after_second[0].num_columns(), cols_first);
     }
 }

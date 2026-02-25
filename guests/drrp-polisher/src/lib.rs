@@ -13,86 +13,93 @@ struct DrrpPolisher;
 const SYSTEM_PROMPT: &str = "\
 You are a legal provision extractor specialising in UK ESH (environment, safety, health) legislation.
 
-Given a section of legislation text and a DRRP type (duty, right, responsibility, or power), \
-extract the precise provision.
+Given a provision's DRRP taxa classification (from regex) and the full provision text, refine the \
+extraction with AI precision.
 
-If law-level DRRP context is provided, use it to inform your extraction — \
-it shows the known duty holders, roles, and duty types for this law from the Legal Register.
+The regex classification is rough — it identifies duty types, actors, and a cleaned clause, but may \
+be imprecise. Your job is to produce an accurate, corrected version.
 
 Respond ONLY with a JSON object. No markdown fences, no explanation, just raw JSON:
 {
   \"holder\": \"the entity that holds this duty/right/responsibility/power\",
-  \"ai_clause\": \"the exact provision text, quoted from the source\",
+  \"ai_clause\": \"the exact provision text, quoted verbatim from the source\",
   \"qualifier\": \"any qualifying phrase (e.g. 'so far as is reasonably practicable')\" or null,
   \"clause_ref\": \"the specific clause reference (e.g. 's.2(1)')\"
 }
 
-If the source text contains multiple provisions, extract the primary one that best matches the DRRP type.
-If you cannot identify a clear provision, set holder to \"unknown\" and text to the most relevant sentence.";
+Rules:
+- Quote the provision text EXACTLY from the source — do not paraphrase
+- Include the full clause, not a truncated version
+- The holder should be the specific entity (e.g. 'every employer', not just 'Org: Employer')
+- The clause_ref should be a standard legal citation (e.g. 's.2(1)', 'reg.3(1)(a)')
+- If the regex extraction is correct, return the same values with improved precision
+- If you cannot identify a clear provision, set holder to \"unknown\" and ai_clause to the most relevant sentence";
 
-fn build_user_prompt(ann: &Annotation, taxa: Option<&TaxaContext>) -> String {
+fn build_user_prompt(prov: &ProvisionRow) -> String {
     let mut prompt = format!(
         "Law: {law}\n\
-         Section: {provision}\n\
-         DRRP type: {drrp_type}\n\
-         Regex confidence: {confidence:.2}\n",
-        law = ann.law_name,
-        provision = ann.provision,
-        drrp_type = ann.drrp_type,
-        confidence = ann.confidence,
+         Provision: {provision}\n",
+        law = prov.law_name,
+        provision = prov.provision,
     );
 
-    if let Some(t) = taxa {
-        prompt.push_str("\nLaw-level DRRP context (from Legal Register):\n");
-        if !t.duty_type.is_empty() {
-            prompt.push_str(&format!("  Duty types: {}\n", t.duty_type));
-        }
-        if !t.duty_holder.is_empty() {
-            prompt.push_str(&format!("  Duty holders: {}\n", t.duty_holder));
-        }
-        if !t.role.is_empty() {
-            prompt.push_str(&format!("  Roles: {}\n", t.role));
-        }
-        if !t.role_gvt.is_empty() {
-            prompt.push_str(&format!("  Government roles: {}\n", t.role_gvt));
-        }
+    if !prov.drrp_types.is_empty() {
+        prompt.push_str(&format!("DRRP types: {}\n", prov.drrp_types.join(", ")));
     }
 
-    prompt.push_str(&format!("\nSource text:\n{}", ann.source_text));
+    if let Some(ref family) = prov.duty_family {
+        prompt.push_str(&format!("Duty family: {family}\n"));
+    }
+
+    if !prov.governed_actors.is_empty() {
+        prompt.push_str(&format!(
+            "Governed actors: {}\n",
+            prov.governed_actors.join(", ")
+        ));
+    }
+    if !prov.government_actors.is_empty() {
+        prompt.push_str(&format!(
+            "Government actors: {}\n",
+            prov.government_actors.join(", ")
+        ));
+    }
+
+    if let Some(ref clause) = prov.clause_refined {
+        prompt.push_str(&format!("\nRegex-refined clause:\n{clause}\n"));
+    }
+
+    prompt.push_str(&format!("\nFull section text:\n{}", prov.text));
     prompt
 }
 
 // ── Types ──
 
+/// A provision row from LanceDB with taxa data and source text.
 #[derive(Deserialize)]
-#[allow(dead_code)]
-struct Annotation {
+struct ProvisionRow {
+    section_id: String,
     law_name: String,
     provision: String,
-    drrp_type: String,
-    source_text: String,
-    regex_clause: String,
-    confidence: f64,
+    text: String,
+    #[serde(default)]
+    drrp_types: Vec<String>,
+    #[serde(default)]
+    governed_actors: Vec<String>,
+    #[serde(default)]
+    government_actors: Vec<String>,
+    #[serde(default)]
+    duty_family: Option<String>,
+    #[serde(default)]
+    clause_refined: Option<String>,
 }
 
+/// AI-refined output from the polisher.
 #[derive(Deserialize)]
-struct PolishedEntry {
+struct PolishedOutput {
     holder: String,
     ai_clause: String,
     qualifier: Option<String>,
     clause_ref: String,
-}
-
-#[derive(Deserialize)]
-struct TaxaContext {
-    #[serde(default)]
-    duty_holder: String,
-    #[serde(default)]
-    duty_type: String,
-    #[serde(default)]
-    role: String,
-    #[serde(default)]
-    role_gvt: String,
 }
 
 // ── Helpers ──
@@ -122,7 +129,6 @@ fn execute(sql: &str) -> Result<u64, String> {
         .map_err(|e| format!("execute failed: {} (code {})", e.message, e.code))
 }
 
-/// Escape a string for use in SQL single-quoted literals.
 fn sql_escape(s: &str) -> String {
     s.replace('\'', "''")
 }
@@ -131,159 +137,146 @@ fn sql_escape(s: &str) -> String {
 
 impl Guest for DrrpPolisher {
     fn run() -> Result<String, String> {
-        audit("app-started", "DRRP polisher run starting");
+        audit(
+            "app-started",
+            "DRRP polisher run starting (LanceDB-only mode)",
+        );
 
-        // 1. Ensure DRRP tables exist (idempotent).
-        execute(
-            "CREATE TABLE IF NOT EXISTS drrp_annotations (
-                law_name       VARCHAR NOT NULL,
-                provision      VARCHAR NOT NULL,
-                drrp_type      VARCHAR NOT NULL,
-                source_text    VARCHAR NOT NULL,
-                regex_clause   VARCHAR NOT NULL,
-                confidence     FLOAT   NOT NULL,
-                scraped_at     TIMESTAMPTZ NOT NULL,
-                polished       BOOLEAN NOT NULL DEFAULT false,
-                synced_at      TIMESTAMPTZ NOT NULL
-            )",
+        // 1. Count provisions needing polishing (have taxa data but no AI refinement).
+        let unpolished_count = query_i64(
+            "SELECT COUNT(*) FROM legislation_text
+             WHERE drrp_types IS NOT NULL AND ai_clause IS NULL",
         )?;
 
-        execute(
-            "CREATE TABLE IF NOT EXISTS polished_drrp (
-                law_name       VARCHAR NOT NULL,
-                provision      VARCHAR NOT NULL,
-                drrp_type      VARCHAR NOT NULL,
-                holder         VARCHAR NOT NULL,
-                ai_clause      VARCHAR NOT NULL,
-                qualifier      VARCHAR,
-                clause_ref     VARCHAR NOT NULL,
-                confidence     FLOAT   NOT NULL,
-                polished_at    TIMESTAMPTZ NOT NULL,
-                model          VARCHAR NOT NULL,
-                pushed         BOOLEAN NOT NULL DEFAULT false
-            )",
-        )?;
-
-        // 2. Count unpolished annotations.
-        let count =
-            query_i64("SELECT count(*)::BIGINT FROM drrp_annotations WHERE polished = false")?;
-
-        if count == 0 {
-            audit("batch-empty", "no unpolished annotations found");
-            return Ok("No unpolished annotations to process.".to_string());
+        if unpolished_count == 0 {
+            audit("batch-empty", "No provisions need DRRP polishing");
+            return Ok("No provisions need DRRP polishing.".to_string());
         }
 
-        audit("batch-start", &format!("{count} annotations to polish"));
+        audit(
+            "batch-start",
+            &format!("{unpolished_count} provisions to polish"),
+        );
 
-        // 3. Process each annotation one at a time.
-        let mut polished = 0u64;
-        let mut errors = 0u64;
+        // 2. Process provisions in batches.
+        let batch_size = 50i64;
+        let mut total_polished = 0u64;
+        let mut total_errors = 0u64;
         let mut total_tokens = 0u32;
 
-        for i in 0..count {
-            match process_one(i) {
-                Ok(tokens) => {
-                    polished += 1;
-                    total_tokens += tokens;
-                }
-                Err(e) => {
-                    audit("polish-error", &format!("annotation {i}: {e}"));
-                    errors += 1;
+        let batches = (unpolished_count + batch_size - 1) / batch_size;
+        for batch_idx in 0..batches {
+            // Fetch a batch of unpolished provisions as JSON.
+            // The host routes legislation_text queries to LanceDB and
+            // wraps each row as a JSON string for our IPC parser.
+            let offset = batch_idx * batch_size;
+            let limit = batch_size.min(unpolished_count - offset);
+
+            for i in 0..limit {
+                let row_json = match query_string(&format!(
+                    "SELECT to_json(section_id, law_name, provision, text, drrp_types, \
+                     governed_actors, government_actors, duty_family, clause_refined) \
+                     FROM legislation_text \
+                     WHERE drrp_types IS NOT NULL AND ai_clause IS NULL \
+                     LIMIT 1 OFFSET {}",
+                    offset + i,
+                )) {
+                    Ok(s) => s,
+                    Err(e) => {
+                        audit("query-error", &format!("offset {}: {e}", offset + i));
+                        total_errors += 1;
+                        continue;
+                    }
+                };
+
+                let prov: ProvisionRow = match serde_json::from_str(&row_json) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        audit(
+                            "parse-error",
+                            &format!(
+                                "offset {}: {e}\nraw: {}",
+                                offset + i,
+                                &row_json[..row_json.len().min(200)]
+                            ),
+                        );
+                        total_errors += 1;
+                        continue;
+                    }
+                };
+
+                match process_provision(&prov) {
+                    Ok(tokens) => {
+                        total_polished += 1;
+                        total_tokens += tokens;
+                    }
+                    Err(e) => {
+                        audit("provision-error", &format!("{}: {e}", prov.section_id));
+                        total_errors += 1;
+                    }
                 }
             }
         }
 
         let summary = format!(
-            "Polished {polished}/{count} annotations ({errors} errors, {total_tokens} tokens used)"
+            "Polished {total_polished} provisions \
+             ({total_errors} errors, {total_tokens} tokens used)."
         );
         audit("batch-complete", &summary);
         Ok(summary)
     }
 }
 
-/// Process a single unpolished annotation. Returns tokens used on success.
-fn process_one(offset: i64) -> Result<u32, String> {
-    // Query annotation as JSON via DuckDB's to_json + struct_pack.
-    let json_str = query_string(&format!(
-        "SELECT to_json(struct_pack(
-            law_name := law_name,
-            provision := provision,
-            drrp_type := drrp_type,
-            source_text := source_text,
-            regex_clause := regex_clause,
-            confidence := confidence
-        )) FROM drrp_annotations
-        WHERE polished = false
-        ORDER BY confidence DESC
-        LIMIT 1 OFFSET {offset}"
-    ))?;
+/// Process a single provision: call AI, write results back to LanceDB.
+fn process_provision(prov: &ProvisionRow) -> Result<u32, String> {
+    let user_prompt = build_user_prompt(prov);
 
-    let ann: Annotation =
-        serde_json::from_str(&json_str).map_err(|e| format!("parse annotation JSON: {e}"))?;
-
-    // Query law-level DRRP context from the LRT (if available).
-    let taxa = query_string(&format!(
-        "SELECT to_json(struct_pack(
-            duty_holder := array_to_string(duty_holder, ', '),
-            duty_type := array_to_string(duty_type, ', '),
-            role := array_to_string(role, ', '),
-            role_gvt := array_to_string(role_gvt, ', ')
-        )) FROM legislation
-        WHERE name = '{law}'
-        LIMIT 1",
-        law = sql_escape(&ann.law_name),
-    ))
-    .ok()
-    .and_then(|s| serde_json::from_str::<TaxaContext>(&s).ok());
-
-    // Call Claude to extract the precise DRRP provision.
-    let user_prompt = build_user_prompt(&ann, taxa.as_ref());
+    // Call AI inference (ONNX local-first, falls through to Claude).
     let response = ai_inference::generate(&ai_inference::GenerateRequest {
         system_prompt: Some(SYSTEM_PROMPT.to_string()),
         user_prompt,
         max_tokens: 1024,
         temperature: 0.0,
     })
-    .map_err(|e| format!("inference: {} (code {})", e.message, e.code))?;
+    .map_err(|e| format!("inference error: {} (code {})", e.message, e.code))?;
 
-    // Parse the structured JSON response from Claude.
-    let entry: PolishedEntry = serde_json::from_str(&response.text).map_err(|e| {
+    // Parse the AI response.
+    let output: PolishedOutput = serde_json::from_str(&response.text).map_err(|e| {
         format!(
-            "parse Claude response: {e}\nraw: {}",
+            "parse error: {e}\nraw: {}",
             &response.text[..response.text.len().min(200)]
         )
     })?;
 
-    // Insert polished result.
-    let qualifier_sql = match &entry.qualifier {
+    // Write polished results back to LanceDB via UPDATE.
+    let qualifier_sql = match &output.qualifier {
         Some(q) => format!("'{}'", sql_escape(q)),
         None => "NULL".to_string(),
     };
 
-    execute(&format!(
-        "INSERT INTO polished_drrp (
-            law_name, provision, drrp_type, holder, ai_clause, qualifier,
-            clause_ref, confidence, polished_at, model, pushed
-        ) VALUES (
-            '{law_name}', '{provision}', '{drrp_type}', '{holder}', '{ai_clause}', {qualifier},
-            '{clause_ref}', {confidence}, CURRENT_TIMESTAMP, 'claude', false
-        )",
-        law_name = sql_escape(&ann.law_name),
-        provision = sql_escape(&ann.provision),
-        drrp_type = sql_escape(&ann.drrp_type),
-        holder = sql_escape(&entry.holder),
-        ai_clause = sql_escape(&entry.ai_clause),
-        qualifier = qualifier_sql,
-        clause_ref = sql_escape(&entry.clause_ref),
-        confidence = response.confidence,
-    ))?;
+    let model = if response.tokens_used == 0 {
+        "onnx"
+    } else {
+        "claude"
+    };
 
-    // Mark the source annotation as polished.
     execute(&format!(
-        "UPDATE drrp_annotations SET polished = true
-         WHERE law_name = '{law_name}' AND provision = '{provision}' AND polished = false",
-        law_name = sql_escape(&ann.law_name),
-        provision = sql_escape(&ann.provision),
+        "UPDATE legislation_text SET \
+         ai_holder = '{holder}', \
+         ai_clause = '{ai_clause}', \
+         ai_qualifier = {qualifier}, \
+         ai_clause_ref = '{clause_ref}', \
+         ai_confidence = {confidence}, \
+         ai_model = '{model}', \
+         ai_polished_at = CURRENT_TIMESTAMP \
+         WHERE section_id = '{section_id}'",
+        holder = sql_escape(&output.holder),
+        ai_clause = sql_escape(&output.ai_clause),
+        qualifier = qualifier_sql,
+        clause_ref = sql_escape(&output.clause_ref),
+        confidence = response.confidence,
+        model = model,
+        section_id = sql_escape(&prov.section_id),
     ))?;
 
     Ok(response.tokens_used)

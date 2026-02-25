@@ -129,6 +129,25 @@ enum Command {
         #[command(subcommand)]
         action: TaxaAction,
     },
+
+    /// Export DRRP training data as Parquet (train/val/test splits)
+    ExportTrainingData {
+        /// Output directory for Parquet files
+        #[arg(long, default_value = "./data/drrp-training")]
+        output: PathBuf,
+
+        /// File containing validation law names (one per line)
+        #[arg(long)]
+        val_laws: Option<PathBuf>,
+
+        /// Number of laws for the held-out test set
+        #[arg(long, default_value_t = 5)]
+        test_laws: usize,
+
+        /// Minimum match quality to include (0.0-1.0)
+        #[arg(long, default_value_t = 0.3)]
+        min_match_ratio: f32,
+    },
 }
 
 #[derive(Subcommand)]
@@ -221,6 +240,24 @@ async fn main() -> anyhow::Result<()> {
             TaxaAction::Show { name, limit } => cmd_taxa_show(&data_dir, &name, limit).await,
             TaxaAction::Enrich => cmd_taxa_enrich(&data_dir, &open_duck(&data_dir)?).await,
         },
+
+        // Training data export.
+        Command::ExportTrainingData {
+            output,
+            val_laws,
+            test_laws,
+            min_match_ratio,
+        } => {
+            cmd_export_training_data(
+                &data_dir,
+                &open_duck(&data_dir)?,
+                &output,
+                val_laws.as_deref(),
+                test_laws,
+                min_match_ratio,
+            )
+            .await
+        }
     }
 }
 
@@ -264,9 +301,42 @@ async fn cmd_run(
         fractalaw_host::InferenceConfig::new(key, model)
     });
 
+    // Try to load local ONNX DRRP model (local-first).
+    let extractor = {
+        let model_dir = std::env::var("DRRP_MODEL_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| {
+                // Default: models/deberta-v3-drrp relative to the repo root.
+                data_dir
+                    .parent()
+                    .unwrap_or(data_dir)
+                    .join("models/deberta-v3-drrp")
+            });
+        if model_dir.join("model.int8.onnx").exists() || model_dir.join("model.onnx").exists() {
+            match fractalaw_ai::DrrpExtractor::load(&model_dir) {
+                Ok(e) => {
+                    tracing::info!(model_dir = %model_dir.display(), "loaded DRRP ONNX model");
+                    Some(e)
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, "failed to load DRRP ONNX model, falling back to Claude");
+                    None
+                }
+            }
+        } else {
+            tracing::debug!("no DRRP ONNX model found, using Claude API for inference");
+            None
+        }
+    };
+
+    // Open LanceDB for legislation_text queries/mutations.
+    let lance = LanceStore::open(&data_dir.join("lancedb")).await.ok();
+
     let opts = fractalaw_host::RunOptions {
         duck: Some(duck),
+        lance,
         inference,
+        extractor,
     };
     let result = fractalaw_host::run_component(component, fuel, opts).await?;
 
@@ -604,15 +674,34 @@ async fn cmd_taxa_enrich(data_dir: &std::path::Path, store: &DuckStore) -> anyho
             powers: Vec::new(),
         };
 
+        // Per-provision taxa results for LanceDB write.
+        struct ProvisionTaxa {
+            section_id: String,
+            drrp_types: Vec<String>,
+            governed_actors: Vec<String>,
+            government_actors: Vec<String>,
+            duty_family: Option<String>,
+            duty_sub_type: Option<String>,
+            popimar: Vec<String>,
+            purposes: Vec<String>,
+            clause_refined: String,
+            taxa_confidence: Option<f32>,
+        }
+        let mut provision_taxa: Vec<ProvisionTaxa> = Vec::new();
+
         for batch in &batches {
             let prov_col = batch.column_by_name("provision");
             let text_col = batch.column_by_name("text");
+            let sid_col = batch.column_by_name("section_id");
 
             for row in 0..batch.num_rows() {
                 let provision = prov_col
                     .and_then(|c| get_string_value(c.as_ref(), row))
                     .unwrap_or_default();
                 let text = text_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let section_id = sid_col
                     .and_then(|c| get_string_value(c.as_ref(), row))
                     .unwrap_or_default();
                 if text.trim().is_empty() {
@@ -625,6 +714,36 @@ async fn cmd_taxa_enrich(data_dir: &std::path::Path, store: &DuckStore) -> anyho
                     && record.government_actors.is_empty()
                 {
                     continue;
+                }
+
+                // Collect per-provision taxa for LanceDB.
+                if !section_id.is_empty() {
+                    let (duty_family, duty_sub_type, taxa_confidence) =
+                        if let Some(ref cls) = record.classification {
+                            (
+                                Some(format!("{:?}", cls.family)),
+                                Some(format!("{:?}", cls.sub_type)),
+                                Some(cls.confidence),
+                            )
+                        } else {
+                            (None, None, None)
+                        };
+                    provision_taxa.push(ProvisionTaxa {
+                        section_id,
+                        drrp_types: record
+                            .duty_types
+                            .iter()
+                            .map(|d| format!("{:?}", d))
+                            .collect(),
+                        governed_actors: record.governed_actors.clone(),
+                        government_actors: record.government_actors.clone(),
+                        duty_family,
+                        duty_sub_type,
+                        popimar: record.popimar.iter().map(|s| s.to_string()).collect(),
+                        purposes: record.purposes.iter().map(|s| s.to_string()).collect(),
+                        clause_refined: record.cleaned_text.clone(),
+                        taxa_confidence,
+                    });
                 }
 
                 // Aggregate actors into holder sets and role sets.
@@ -689,6 +808,119 @@ async fn cmd_taxa_enrich(data_dir: &std::path::Path, store: &DuckStore) -> anyho
             }
         }
 
+        // Write per-provision taxa to LanceDB.
+        if !provision_taxa.is_empty() {
+            use arrow::array::{
+                Float32Builder, ListBuilder, StringBuilder, TimestampNanosecondBuilder,
+            };
+            use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+
+            let mut section_ids = StringBuilder::new();
+            let mut drrp_types_b = ListBuilder::new(StringBuilder::new());
+            let mut governed_b = ListBuilder::new(StringBuilder::new());
+            let mut government_b = ListBuilder::new(StringBuilder::new());
+            let mut duty_family_b = StringBuilder::new();
+            let mut duty_sub_type_b = StringBuilder::new();
+            let mut popimar_b = ListBuilder::new(StringBuilder::new());
+            let mut purposes_b = ListBuilder::new(StringBuilder::new());
+            let mut clause_refined_b = StringBuilder::new();
+            let mut confidence_b = Float32Builder::new();
+            let mut classified_at_b = TimestampNanosecondBuilder::new().with_timezone("UTC");
+
+            let now_ns = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
+
+            for pt in &provision_taxa {
+                section_ids.append_value(&pt.section_id);
+
+                for v in &pt.drrp_types {
+                    drrp_types_b.values().append_value(v);
+                }
+                drrp_types_b.append(true);
+
+                for v in &pt.governed_actors {
+                    governed_b.values().append_value(v);
+                }
+                governed_b.append(true);
+
+                for v in &pt.government_actors {
+                    government_b.values().append_value(v);
+                }
+                government_b.append(true);
+
+                match &pt.duty_family {
+                    Some(v) => duty_family_b.append_value(v),
+                    None => duty_family_b.append_null(),
+                }
+                match &pt.duty_sub_type {
+                    Some(v) => duty_sub_type_b.append_value(v),
+                    None => duty_sub_type_b.append_null(),
+                }
+
+                for v in &pt.popimar {
+                    popimar_b.values().append_value(v);
+                }
+                popimar_b.append(true);
+
+                for v in &pt.purposes {
+                    purposes_b.values().append_value(v);
+                }
+                purposes_b.append(true);
+
+                clause_refined_b.append_value(&pt.clause_refined);
+                match pt.taxa_confidence {
+                    Some(c) => confidence_b.append_value(c),
+                    None => confidence_b.append_null(),
+                }
+                classified_at_b.append_value(now_ns);
+            }
+
+            let item_field = std::sync::Arc::new(Field::new("item", DataType::Utf8, true));
+            let taxa_schema = std::sync::Arc::new(Schema::new(vec![
+                Field::new("section_id", DataType::Utf8, false),
+                Field::new("drrp_types", DataType::List(item_field.clone()), true),
+                Field::new("governed_actors", DataType::List(item_field.clone()), true),
+                Field::new(
+                    "government_actors",
+                    DataType::List(item_field.clone()),
+                    true,
+                ),
+                Field::new("duty_family", DataType::Utf8, true),
+                Field::new("duty_sub_type", DataType::Utf8, true),
+                Field::new("popimar", DataType::List(item_field.clone()), true),
+                Field::new("purposes", DataType::List(item_field), true),
+                Field::new("clause_refined", DataType::Utf8, true),
+                Field::new("taxa_confidence", DataType::Float32, true),
+                Field::new(
+                    "taxa_classified_at",
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())),
+                    true,
+                ),
+            ]));
+
+            let taxa_batch = RecordBatch::try_new(
+                taxa_schema,
+                vec![
+                    std::sync::Arc::new(section_ids.finish()),
+                    std::sync::Arc::new(drrp_types_b.finish()),
+                    std::sync::Arc::new(governed_b.finish()),
+                    std::sync::Arc::new(government_b.finish()),
+                    std::sync::Arc::new(duty_family_b.finish()),
+                    std::sync::Arc::new(duty_sub_type_b.finish()),
+                    std::sync::Arc::new(popimar_b.finish()),
+                    std::sync::Arc::new(purposes_b.finish()),
+                    std::sync::Arc::new(clause_refined_b.finish()),
+                    std::sync::Arc::new(confidence_b.finish()),
+                    std::sync::Arc::new(classified_at_b.finish()),
+                ],
+            )
+            .context("building taxa RecordBatch")?;
+
+            lance
+                .update_taxa(taxa_batch)
+                .await
+                .with_context(|| format!("writing taxa to LanceDB for {law_name}"))?;
+        }
+
         // Skip laws where taxa found nothing.
         if taxa.duty_types.is_empty() && taxa.roles.is_empty() && taxa.roles_gvt.is_empty() {
             enriched += 1;
@@ -737,6 +969,313 @@ async fn cmd_taxa_enrich(data_dir: &std::path::Path, store: &DuckStore) -> anyho
     let filled_count = extract_i64(&filled[0], 0);
 
     println!("Processed {enriched} laws. LRT now has {filled_count} laws with DRRP taxa data.");
+    Ok(())
+}
+
+async fn cmd_export_training_data(
+    data_dir: &std::path::Path,
+    store: &DuckStore,
+    output: &std::path::Path,
+    val_laws_file: Option<&std::path::Path>,
+    test_law_count: usize,
+    min_match_ratio: f32,
+) -> anyhow::Result<()> {
+    use std::collections::{HashMap, HashSet};
+    use std::io::BufRead;
+
+    use fractalaw_core::training::{self, FlatDrrpEntry, TrainingExample};
+
+    println!("=== DRRP Training Data Export ===\n");
+
+    // 1. Extract flat DRRP entries from DuckDB.
+    let entry_batches = store.extract_flat_drrp_entries()?;
+    let mut entries: Vec<FlatDrrpEntry> = Vec::new();
+    for batch in &entry_batches {
+        for i in 0..batch.num_rows() {
+            let get = |name| {
+                batch
+                    .column_by_name(name)
+                    .and_then(|c| get_string_value(c.as_ref(), i))
+                    .unwrap_or_default()
+            };
+            entries.push(FlatDrrpEntry {
+                law_name: get("law_name"),
+                drrp_type: get("drrp_type"),
+                holder: get("holder"),
+                clause: get("clause"),
+                article: get("article"),
+            });
+        }
+    }
+    println!("  Total DRRP entries:     {:>8}", entries.len());
+
+    // 2. Group entries by law_name.
+    let mut by_law: HashMap<String, Vec<FlatDrrpEntry>> = HashMap::new();
+    for entry in entries {
+        by_law
+            .entry(entry.law_name.clone())
+            .or_default()
+            .push(entry);
+    }
+    let all_laws: Vec<String> = {
+        let mut v: Vec<String> = by_law.keys().cloned().collect();
+        v.sort();
+        v
+    };
+    println!("  Laws with DRRP data:    {:>8}", all_laws.len());
+
+    // 3. Load validation law set.
+    let val_laws: HashSet<String> = if let Some(path) = val_laws_file {
+        let file = std::fs::File::open(path)
+            .with_context(|| format!("opening val-laws file: {}", path.display()))?;
+        std::io::BufReader::new(file)
+            .lines()
+            .filter_map(|l| {
+                let l = l.ok()?;
+                let trimmed = l.trim().to_string();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed)
+                }
+            })
+            .collect()
+    } else {
+        HashSet::new()
+    };
+
+    // 4. Select test laws deterministically (hash-based, from non-val laws).
+    let test_laws: HashSet<String> = {
+        let mut candidates: Vec<&String> = all_laws
+            .iter()
+            .filter(|l| !val_laws.contains(l.as_str()))
+            .collect();
+        // Deterministic selection: sort by a hash-like key.
+        candidates.sort_by(|a, b| {
+            use std::hash::{Hash, Hasher};
+            let hash_of = |s: &str| -> u64 {
+                let mut h = std::hash::DefaultHasher::new();
+                s.hash(&mut h);
+                h.finish()
+            };
+            hash_of(a).cmp(&hash_of(b))
+        });
+        candidates
+            .into_iter()
+            .take(test_law_count)
+            .cloned()
+            .collect()
+    };
+
+    println!("  Validation laws:        {:>8}", val_laws.len());
+    println!("  Test laws:              {:>8}", test_laws.len());
+
+    // 5. Open LanceDB for source text.
+    let lance = LanceStore::open(&data_dir.join("lancedb"))
+        .await
+        .context("opening LanceDB")?;
+
+    // 6. Process law-by-law, generating silver labels.
+    let mut train_examples: Vec<TrainingExample> = Vec::new();
+    let mut val_examples: Vec<TrainingExample> = Vec::new();
+    let mut test_examples: Vec<TrainingExample> = Vec::new();
+    let mut unmatched_lat = 0usize;
+    let mut unparseable_article = 0usize;
+    let mut processed = 0usize;
+
+    for law_name in &all_laws {
+        let split = if val_laws.contains(law_name) {
+            "val"
+        } else if test_laws.contains(law_name) {
+            "test"
+        } else {
+            "train"
+        };
+
+        // Query LanceDB for all sections of this law.
+        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
+        let lat_batches = lance.query_legislation_text(&filter, 1000).await?;
+
+        // Build provision → text map.
+        let mut prov_text: HashMap<String, String> = HashMap::new();
+        for batch in &lat_batches {
+            let prov_col = batch.column_by_name("provision");
+            let text_col = batch.column_by_name("text");
+            for row in 0..batch.num_rows() {
+                let provision = prov_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let text = text_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                if !provision.is_empty() && !text.trim().is_empty() {
+                    prov_text.insert(provision, text);
+                }
+            }
+        }
+
+        // Process each entry for this law.
+        let law_entries = match by_law.get(law_name) {
+            Some(e) => e,
+            None => continue,
+        };
+
+        for entry in law_entries {
+            let provision = match training::parse_article_to_provision(&entry.article) {
+                Some(p) => p.to_string(),
+                None => {
+                    unparseable_article += 1;
+                    continue;
+                }
+            };
+
+            let source_text = match prov_text.get(&provision) {
+                Some(t) => t.as_str(),
+                None => {
+                    unmatched_lat += 1;
+                    continue;
+                }
+            };
+
+            let example = training::generate_silver_label(entry, source_text, &provision, split);
+
+            // Filter by minimum match ratio.
+            if example.match_ratio < min_match_ratio && example.clause_start >= 0 {
+                continue;
+            }
+
+            match split {
+                "val" => val_examples.push(example),
+                "test" => test_examples.push(example),
+                _ => train_examples.push(example),
+            }
+        }
+
+        processed += 1;
+        if processed.is_multiple_of(200) {
+            eprint!("\r  Processing laws... {processed}/{}", all_laws.len());
+        }
+    }
+    if processed >= 200 {
+        eprintln!();
+    }
+
+    // 7. Count holder categories.
+    let holder_categories: HashSet<&str> = train_examples
+        .iter()
+        .chain(val_examples.iter())
+        .chain(test_examples.iter())
+        .map(|e| e.holder_label.as_str())
+        .collect();
+
+    // 8. Match quality distribution.
+    let all_examples: Vec<&TrainingExample> = train_examples
+        .iter()
+        .chain(val_examples.iter())
+        .chain(test_examples.iter())
+        .collect();
+    let total_exported = all_examples.len();
+    let high = all_examples
+        .iter()
+        .filter(|e| e.match_quality == "high")
+        .count();
+    let medium = all_examples
+        .iter()
+        .filter(|e| e.match_quality == "medium")
+        .count();
+    let low = all_examples
+        .iter()
+        .filter(|e| e.match_quality == "low")
+        .count();
+    let with_qualifier = all_examples
+        .iter()
+        .filter(|e| e.qualifier_text.is_some())
+        .count();
+
+    // 9. Write Parquet files.
+    std::fs::create_dir_all(output)
+        .with_context(|| format!("creating output directory: {}", output.display()))?;
+
+    let write_parquet = |examples: &[TrainingExample], name: &str| -> anyhow::Result<()> {
+        if examples.is_empty() {
+            return Ok(());
+        }
+        let batch = training::examples_to_record_batch(examples)?;
+        let path = output.join(format!("{name}.parquet"));
+        let file = std::fs::File::create(&path)?;
+        let mut writer = parquet::arrow::ArrowWriter::try_new(file, batch.schema(), None)?;
+        writer.write(&batch)?;
+        writer.close()?;
+        Ok(())
+    };
+
+    write_parquet(&train_examples, "train")?;
+    write_parquet(&val_examples, "val")?;
+    write_parquet(&test_examples, "test")?;
+
+    // 10. Print statistics.
+    let total_entries: usize = by_law.values().map(|v| v.len()).sum();
+    println!(
+        "\n  Matched to LAT:         {:>8}  ({:.1}%)",
+        total_exported,
+        total_exported as f64 / total_entries as f64 * 100.0
+    );
+    println!(
+        "  Unmatched (no LAT):     {:>8}  ({:.1}%)",
+        unmatched_lat,
+        unmatched_lat as f64 / total_entries as f64 * 100.0
+    );
+    println!(
+        "  Unparseable article:    {:>8}  ({:.1}%)",
+        unparseable_article,
+        unparseable_article as f64 / total_entries as f64 * 100.0
+    );
+    println!("\n  Match quality distribution:");
+    println!(
+        "    High   (>0.8):        {:>8}  ({:.1}%)",
+        high,
+        high as f64 / total_exported.max(1) as f64 * 100.0
+    );
+    println!(
+        "    Medium (0.5-0.8):     {:>8}  ({:.1}%)",
+        medium,
+        medium as f64 / total_exported.max(1) as f64 * 100.0
+    );
+    println!(
+        "    Low    (<0.5):        {:>8}  ({:.1}%)",
+        low,
+        low as f64 / total_exported.max(1) as f64 * 100.0
+    );
+    println!(
+        "\n  With qualifier:         {:>8}  ({:.1}%)",
+        with_qualifier,
+        with_qualifier as f64 / total_exported.max(1) as f64 * 100.0
+    );
+    println!("\n  Holder categories:      {:>8}", holder_categories.len());
+    println!("\n  Split sizes:");
+    println!(
+        "    Train:                {:>8} examples",
+        train_examples.len()
+    );
+    println!(
+        "    Val:                  {:>8} examples",
+        val_examples.len()
+    );
+    println!(
+        "    Test:                 {:>8} examples",
+        test_examples.len()
+    );
+    println!("\n  Output:");
+    if !train_examples.is_empty() {
+        println!("    {}/train.parquet", output.display());
+    }
+    if !val_examples.is_empty() {
+        println!("    {}/val.parquet", output.display());
+    }
+    if !test_examples.is_empty() {
+        println!("    {}/test.parquet", output.display());
+    }
+
     Ok(())
 }
 

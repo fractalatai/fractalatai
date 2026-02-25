@@ -14,7 +14,7 @@ path = "src/main.rs"
 fractalaw-core = { path = "../fractalaw-core" }
 fractalaw-store = { path = "../fractalaw-store", features = ["duckdb", "datafusion", "lancedb"] }
 fractalaw-ai = { path = "../fractalaw-ai", features = ["onnx"] }
-fractalaw-host = { path = "../fractalaw-host", features = ["duckdb", "inference"] }
+fractalaw-host = { path = "../fractalaw-host", features = ["duckdb", "inference", "onnx", "lancedb"] }
 fractalaw-sync = { path = "../fractalaw-sync", features = ["http"] }
 arrow = { workspace = true, features = ["prettyprint"] }
 chrono = { workspace = true }
@@ -26,3 +26,4 @@ tracing-subscriber = { workspace = true }
 futures = { workspace = true }
 lancedb = { workspace = true }
 datafusion = { workspace = true }
+parquet = { workspace = true }

@@ -2,6 +2,7 @@ pub mod drrp;
 pub mod schema;
 pub mod sort_key;
 pub mod taxa;
+pub mod training;
 
 pub use drrp::{Annotation, PolishedEntry};
 pub use schema::esh;

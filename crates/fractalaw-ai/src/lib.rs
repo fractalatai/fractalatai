@@ -5,6 +5,11 @@ mod embedder;
 #[cfg(feature = "onnx")]
 pub use embedder::Embedder;
 
+#[cfg(feature = "onnx")]
+mod extractor;
+#[cfg(feature = "onnx")]
+pub use extractor::{DrrpExtraction, DrrpExtractor};
+
 pub mod classifier;
 pub mod labels;
 pub use classifier::{

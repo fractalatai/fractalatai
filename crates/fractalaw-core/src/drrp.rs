@@ -11,6 +11,8 @@ pub struct Annotation {
     pub provision: String,
     pub drrp_type: String,
     pub source_text: String,
+    /// Sertantai's regex best-effort extracted clause text.
+    pub regex_clause: String,
     pub confidence: f32,
     /// ISO 8601 timestamp string.
     pub scraped_at: String,
@@ -25,7 +27,8 @@ pub struct PolishedEntry {
     pub provision: String,
     pub drrp_type: String,
     pub holder: String,
-    pub text: String,
+    /// AI-refined clause text extracted by the polisher.
+    pub ai_clause: String,
     pub qualifier: Option<String>,
     pub clause_ref: String,
     pub confidence: f32,

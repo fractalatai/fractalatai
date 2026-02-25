@@ -267,8 +267,8 @@ This module will need the most careful porting. The windowed search optimisation
 | Implement confidence.rs | [x] | 6 tests. Scores: V2 capture, clean ending, adequate length, strong modal |
 | Implement mod.rs (orchestrator + TaxaRecord) | [x] | 5 tests. `TaxaRecord` struct + `parse()` pipeline |
 | Port Elixir test cases to Rust | [x] | 116 tests total, all passing |
-| Wire taxa parser into CLI | [ ] | |
-| Wire enriched annotations into drrp-polisher | [ ] | |
+| Wire taxa parser into CLI | [x] | `48bbf4e` — `fractalaw taxa show <law>` queries LanceDB text sections and runs taxa pipeline |
+| Wire enriched annotations into drrp-polisher | [x] | `f3d64a7` — `taxa enrich` pre-computes into DuckDB; guest queries taxa_classifications per annotation |
 
 ## Key Porting Issues
 
@@ -287,13 +287,632 @@ Elixir's `match_governed` order didn't work in Rust because domain-specific patt
 ### Description pattern flexibility
 `"to make provision for securing"` didn't match `"to make further provision for securing"` (real UK legislation text). Added variant patterns with "further" for both `provision_securing` and `provision_for`.
 
-## Commit
+## Commits
 
-`70accbd` — Implement DRRP/Taxa regex classification pipeline in pure Rust (#16) — 15 files, 3,332 insertions, 116 tests
+- `70accbd` — Implement DRRP/Taxa regex classification pipeline in pure Rust (#16) — 15 files, 3,332 insertions, 116 tests
+- `48bbf4e` — Wire taxa classifier into CLI as `fractalaw taxa show` command
+- `f3d64a7` — Wire taxa enrichment into drrp-polisher pipeline (`taxa enrich` + guest prompt enrichment)
 
-## Next Steps
+## Phase 4: DRRP Polisher Testing Against Real Laws
 
-1. Wire taxa parser into CLI (e.g. `fractalaw taxa <law_id>` command)
-2. Wire enriched annotations into drrp-polisher guest (taxa classifications as additional context for AI polishing)
-3. Explore `RegexSet` pre-filter optimisation for batch classification
-4. Consider `rayon` parallelism for classifying all sections of large Acts
+### Context
+
+The taxa regex parser (Phase 1–3) is complete and populates the DRRP Taxa columns (s1.9 in `docs/SCHEMA.md`). The next step is testing the DRRP polisher — the AI component that refines the `duties`, `rights`, `responsibilities`, `powers` JSONB detail columns (each containing `List<DRRPEntry>` with holder, duty_type, clause, article).
+
+### What the DRRP Polisher Does
+
+The polisher reviews each DRRP detail entry and takes one of five actions:
+1. **Accept** — the entry is correct as-is
+2. **Delete** — the entry is incorrect and should be removed
+3. **Expand front** — the clause is missing necessary context at the beginning; prepend it
+4. **Trim front** — the clause has bloat at the beginning; remove it
+5. **Expand/trim back** — same adjustments to the tail of the clause
+
+### Schema Addition: AI Output Columns
+
+To test polishing we need to preserve both the before (regex-extracted) and after (AI-polished) DRRP detail. New columns in the LRT schema alongside the existing `duties`, `rights`, `responsibilities`, `powers`:
+
+| Column | Arrow Type | Nullable | Description |
+|--------|-----------|----------|-------------|
+| `duties_ai` | List\<DRRPEntry\> | yes | AI-polished duty entries (post-polisher) |
+| `rights_ai` | List\<DRRPEntry\> | yes | AI-polished rights entries |
+| `responsibilities_ai` | List\<DRRPEntry\> | yes | AI-polished responsibility entries |
+| `powers_ai` | List\<DRRPEntry\> | yes | AI-polished power entries |
+
+This enables side-by-side comparison: the original regex-extracted entries in `duties`/`rights`/`responsibilities`/`powers` vs the AI-refined entries in `*_ai` columns. Once the AI model is validated, the `*_ai` columns may replace the originals — but during testing both are retained.
+
+### Architecture Decision: No Claude Code in Production
+
+The current drrp-polisher guest component uses Claude Code as the LLM backend via `fractal:ai/inference`. This was useful for prototyping but is **not aligned with the project's objectives** (see `docs/fractal-plan.md`):
+
+- **Local-first principle** — no mandatory cloud dependency; the system must be functional offline
+- **Fractal self-similarity** — the same architectural unit runs at every scale (edge, hub, cluster); a cloud LLM API breaks this
+- **Data sovereignty** — ESH regulatory data should not leave the organisation's infrastructure
+- **Cost and latency** — per-token API costs scale poorly for batch processing thousands of law sections
+
+Testing with Claude Code is not needed since this will not go into production using Claude Code.
+
+### Target Architecture: ONNX Structured Extraction Model
+
+The DRRP polishing task is a **structured extraction** problem, not a general-purpose reasoning task. It requires:
+1. Reading a clause of legislative text
+2. Deciding if the clause boundary is correct (accept/expand/trim/delete)
+3. If adjusting, identifying the exact text boundary
+
+This is well-suited to a focused, fine-tuned model running via ONNX Runtime (`fractalaw-ai` crate, `onnx` feature gate):
+
+**Training pipeline:**
+1. Use LanceDB LAT table as the source — it holds the full legislative text with embeddings
+2. Run the taxa regex classifier to produce initial DRRP annotations
+3. Generate a representative training sample by running the polisher on a diverse set of laws
+4. Curate the before/after pairs (`duties` vs `duties_ai`) as training data
+5. Fine-tune a small encoder model (e.g. DeBERTa-v3-base, ~86M params) for the structured extraction task
+6. Quantise to INT8 via ONNX Runtime for edge deployment
+7. Validate against held-out laws, measuring accept/delete/expand/trim accuracy
+
+**Why this works:**
+- The task is highly constrained — 5 possible actions on bounded text windows
+- Legislative text follows predictable structural patterns (the regex classifier already exploits this)
+- A fine-tuned small model will outperform a general LLM on this narrow task
+- INT8 quantised DeBERTa runs in <10ms per clause on CPU — fast enough for batch processing entire Acts
+- Fits the fractal architecture: same model binary runs on hub and edge nodes via ONNX Runtime
+
+### Testing Plan
+
+1. **Select representative laws** — pick a diverse sample from the LanceDB LAT table:
+   - Primary Acts (HSWA 1974, Environment Act 1995, CDM 2015)
+   - Statutory Instruments (MHSWR 1999, COSHH 2002, LOLER 1998)
+   - Mix of heavily-amended and clean laws
+   - Mix of government-duty and governed-entity provisions
+
+2. **Run taxa classifier** — produce `duties`/`rights`/`responsibilities`/`powers` entries for each section
+
+3. **Run polisher against sample** — store results in `*_ai` columns
+
+4. **Manual review** — examine before/after pairs for accuracy:
+   - Are deletions correct? (false positives removed)
+   - Are expansions capturing necessary context?
+   - Are trims removing genuine bloat?
+   - Are accepts genuinely correct entries?
+
+5. **Measure metrics:**
+   - Precision: what fraction of AI-accepted/modified entries are actually correct?
+   - Recall: what fraction of genuinely correct entries does the AI preserve?
+   - Boundary accuracy: when expanding/trimming, is the new boundary at the right position?
+
+6. **Iterate** — refine the model/prompts based on error analysis, re-run on the sample
+
+### Architecture Decision: Polisher Writes to LanceDB Only (Revised 2026-02-25)
+
+**Decision**: The drrp-polisher guest writes AI-refined results directly to `legislation_text` in LanceDB (per-provision `ai_*` columns). No `polished_drrp` intermediate table. No DuckDB writes.
+
+**Previous approach (superseded)**: The polisher wrote to a `polished_drrp` DuckDB table and aggregated into LRT `*_ai` columns. This was wrong because `legislation_text` lives in LanceDB — querying it via DuckDB silently failed. The intermediate table and law-level aggregation added unnecessary complexity.
+
+**Revised rationale:**
+
+1. **Co-location** — taxa data (the DRRP "map") and AI refinement live alongside the source text they were derived from. One table, one store, one query to get everything.
+
+2. **LanceDB is the AI working store** — it's designed for exactly this: storing embeddings, structured classifications, and AI outputs alongside source data. DuckDB is for analytical queries.
+
+3. **Locality of Logic** — the polisher has all context in one LanceDB row: source text, taxa classification, and writes AI results back to the same row. No cross-store joins needed.
+
+4. **DuckDB is a copy** — law-level aggregates in DuckDB are derived from LanceDB's per-provision data. Copying from LanceDB → DuckDB is a separate concern (future task), not the polisher's responsibility.
+
+### Implementation Steps
+
+**Phase A: Schema & Plumbing (complete, partially superseded by Phase C)**
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Add `duties_ai`, `rights_ai`, `responsibilities_ai`, `powers_ai` to LRT schema.rs | [x] | **Superseded by Phase C** — AI output now goes to per-provision `ai_*` columns in `legislation_text` (LanceDB), not law-level LRT columns (DuckDB). |
+| Add `*_ai` columns to DuckDB LRT table creation | [x] | **Superseded** — polisher no longer writes to DuckDB. The `ensure_drrp_ai_columns()` function remains but is unused by the polisher. |
+| Add `polished_drrp` to `docs/SCHEMA.md` | [x] | **Superseded** — `polished_drrp` table no longer used. Polisher writes directly to `legislation_text` in LanceDB. |
+| Rework drrp-polisher to read from LRT DRRP columns | [x] | **Superseded by Phase C rewrite** — polisher now reads/writes `legislation_text` in LanceDB exclusively. |
+| Create SCHEMA-DIAGRAM.md | [x] | Still valid for DuckDB analytical schema. LanceDB `legislation_text` additions documented in Phase C. |
+| Fix `polished_drrp` DDL bug (`text` → `ai_clause`) | [x] | **Superseded** — `polished_drrp` table no longer used. |
+| Select representative law sample from LAT | [x] | 12 laws selected — see sample table below. |
+
+**Phase B: Build ONNX model (next)**
+
+The polisher needs an inference backend. Claude Code is not appropriate for production (see `fractal-plan.md`). Build a focused ONNX model that runs locally via `fractalaw-ai`.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Design ONNX training pipeline | [x] | DeBERTa-v3-base extractive QA with 3 span heads (clause, holder, qualifier). Silver labels from fuzzy matching + gold labels for 12-law sample. See detailed design below. |
+| Curate training dataset from existing DRRP data | [x] | `fractalaw export-training-data` CLI command. LCS fuzzy matching for clause spans, regex qualifier detection (10 patterns), law-level train/val/test splits. See Phase B Task 2 notes below. |
+| Fine-tune and quantise ONNX model | [x] | Pipeline validated end-to-end. DistilBERT on 200-example CPU subset: clause_acc=60.5%, holder_acc=41.5%. ONNX export + INT8 quantisation working: 63.7MB model, 27.5ms/inference on CPU. See Phase B Task 3 notes below. |
+| Wire ONNX model into polisher guest | [x] | `DrrpExtractor` in fractalaw-ai, ONNX routing in host `generate_impl`, CLI auto-loads model. Guest unchanged. See Phase B Task 4 notes below. |
+
+**Phase C: DRRP Map in LanceDB + LanceDB-Only Polisher (2026-02-25)**
+
+The polisher was originally designed to query DuckDB for DRRP entries and LAT source text. This was architecturally wrong — `legislation_text` (LAT) lives in LanceDB, and the polisher is an AI refinement task that should work entirely within the AI working store.
+
+**Key architectural decision:** LanceDB is the AI working store. DuckDB is for analytical queries. The polisher works with LanceDB only — no DuckDB queries, no DuckDB writes. Copying polished results from LanceDB to DuckDB is a separate concern.
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Add 17 DRRP taxa + AI columns to `legislation_text` schema | [x] | 10 taxa columns + 7 ai_* columns. Field count 30→47. See schema details below. |
+| Add LanceStore taxa/polisher write methods | [x] | `update_taxa()`, `update_polished()`, `query_unpolished()` — all use `merge_insert` keyed on `section_id` |
+| Add LanceStore to host runtime with query/mutation routing | [x] | Free functions to avoid Send/Sync issues with DuckDB Connection. Routes `legislation_text` SQL to LanceDB. |
+| Update `taxa enrich` to write per-provision taxa to LanceDB | [x] | Per-provision RecordBatch with taxa columns written via `lance.update_taxa()`. DuckDB law-level aggregates kept. |
+| Wire LanceStore in CLI `cmd_run` | [x] | `lancedb` feature on host crate. LanceStore opened and passed in RunOptions. |
+| Rewrite polisher guest for LanceDB-only | [x] | Major rewrite — provision-level processing, no DuckDB queries/writes. See details below. |
+| All tests pass | [x] | 15 host tests, 188 core tests, workspace check clean. |
+
+#### Schema: New `legislation_text` Columns
+
+**Section 3.9 — DRRP Taxa** (per-provision classification from regex pipeline):
+
+| Column | Arrow Type | Description |
+|--------|-----------|-------------|
+| `drrp_types` | `List<Utf8>` | "Duty", "Right", "Responsibility", "Power" |
+| `governed_actors` | `List<Utf8>` | "Org: Employer", etc. |
+| `government_actors` | `List<Utf8>` | "Gov: Minister", etc. |
+| `duty_family` | `Utf8` | "Government", "Governed", "Unknown" |
+| `duty_sub_type` | `Utf8` | "RegulationMaking", "SfairpDuty", etc. |
+| `popimar` | `List<Utf8>` | "Policy", "Organising", etc. |
+| `purposes` | `List<Utf8>` | "Enforcement", "General", etc. |
+| `clause_refined` | `Utf8` | Modal-window extracted clause |
+| `taxa_confidence` | `Float32` | Regex clause confidence score |
+| `taxa_classified_at` | `Timestamp(ns, UTC)` | When taxa was run |
+
+**Section 3.10 — AI-Refined DRRP** (polisher output, stored back in LanceDB):
+
+| Column | Arrow Type | Description |
+|--------|-----------|-------------|
+| `ai_holder` | `Utf8` | AI-validated/corrected holder category |
+| `ai_clause` | `Utf8` | AI-refined clause text |
+| `ai_qualifier` | `Utf8` | Extracted qualifier phrase |
+| `ai_clause_ref` | `Utf8` | Normalised article reference |
+| `ai_confidence` | `Float32` | AI model confidence |
+| `ai_model` | `Utf8` | "onnx" or "claude" |
+| `ai_polished_at` | `Timestamp(ns, UTC)` | When AI refinement was run |
+
+#### Host: LanceDB Query/Mutation Routing
+
+The host's `data-query` and `data-mutate` WIT implementations now route `legislation_text` SQL to LanceDB when a LanceStore is attached:
+
+- **Query routing**: `sql.contains("legislation_text") && lance.is_some()` → `lance_query_impl()` free function. Parses WHERE/LIMIT, handles `TO_JSON()` (serialises row to JSON for guest IPC compat) and `COUNT()` patterns.
+- **Mutation routing**: `sql.contains("legislation_text") && lance.is_some()` → `lance_execute_impl()` free function. Parses `UPDATE ... SET ... WHERE ...`, calls LanceDB `table.update()` API.
+- **Free functions**: LanceDB query/mutation functions are free functions (not methods on HostState) to avoid borrowing `&self` across `.await` points — DuckDB's Connection is not Sync, which would prevent the futures from being Send.
+
+#### Polisher Guest: LanceDB-Only Rewrite
+
+The polisher was completely rewritten for provision-level LanceDB-only processing:
+
+**Old flow** (DuckDB-centric):
+1. Query `legislation` for laws with DRRP entries
+2. Unnest `duties[]/rights[]/etc.` struct arrays per law
+3. Fetch LAT source text from `legislation_text` (DuckDB) per provision
+4. Call AI, write to `polished_drrp` table
+5. Aggregate back to `*_ai` LRT columns
+
+**New flow** (LanceDB-only):
+1. Count unpolished provisions: `SELECT COUNT(*) FROM legislation_text WHERE drrp_types IS NOT NULL AND ai_clause IS NULL`
+2. Fetch each provision as JSON: `SELECT to_json(...) FROM legislation_text WHERE ... LIMIT 1 OFFSET N`
+3. Build prompt from co-located taxa data (drrp_types, governed_actors, government_actors, duty_family, clause_refined) + source text
+4. Call AI inference (ONNX local-first, Claude fallback)
+5. Write result back: `UPDATE legislation_text SET ai_holder=..., ai_clause=..., etc. WHERE section_id='...'`
+
+**No `polished_drrp` table. No `*_ai` columns on `legislation`. No DuckDB writes.** The polisher reads from and writes to LanceDB exclusively. DuckDB aggregation is a separate concern.
+
+#### Data Flow (Updated 2026-02-25)
+
+```
+sertantai scrapes + parses XML
+    │
+    │  (zenoh pub/sub — when built)
+    ▼
+LAT text in LanceDB (legislation_text)
+    │
+    ▼
+fractalaw taxa enrich (Rust regex)
+    │
+    ├─► LanceDB: per-provision taxa columns (drrp_types, actors, duty_family, etc.)
+    │   Co-located with the source text it was derived from.
+    │
+    └─► DuckDB: law-level aggregates (duty_holder[], duty_type[], role[], etc.)
+        For analytical queries and faceted search.
+    │
+    ▼
+fractalaw run drrp-polisher.wasm (ONNX local-first)
+    │
+    └─► LanceDB: per-provision AI columns (ai_holder, ai_clause, ai_qualifier, etc.)
+        Written back alongside the taxa data and source text.
+```
+
+**Key principle:** LanceDB holds per-provision text + per-provision DRRP map + per-provision AI refinement, all co-located. AI reads from one place, writes back to the same place. DuckDB holds law-level aggregates derived from LanceDB — a copy for fast analytical queries, not the AI working store.
+
+#### Files Modified in Phase C
+
+| File | Change |
+|------|--------|
+| `crates/fractalaw-core/src/schema.rs` | +17 columns to `legislation_text_schema()` (30→47 fields) |
+| `crates/fractalaw-store/src/lance.rs` | +`update_taxa()`, `update_polished()`, `query_unpolished()` |
+| `crates/fractalaw-host/Cargo.toml` | +`lancedb` feature with `fractalaw-store/lancedb` + `dep:serde_json` |
+| `crates/fractalaw-host/src/lib.rs` | LanceStore in HostState/RunOptions, query+mutation routing, 3 free functions, updated tests |
+| `crates/fractalaw-cli/Cargo.toml` | +`lancedb` feature on host dependency |
+| `crates/fractalaw-cli/src/main.rs` | `cmd_taxa_enrich` writes per-provision to LanceDB; `cmd_run` opens LanceStore |
+| `guests/drrp-polisher/src/lib.rs` | Complete rewrite for LanceDB-only, provision-level processing |
+
+### Phase B Task 1: ONNX Training Pipeline Design
+
+#### The Problem
+
+The regex taxa parser produces rough DRRPEntry records. Examining the data:
+
+```
+"shall be the duty of every employer,..."       (truncated at comma)
+"shall be the duty of every employer..."         (truncated with ellipsis)
+"safety representatives from amongst the         (mid-sentence fragment)
+ employees, and those representatives shall..."
+```
+
+These have three classes of defect:
+1. **Truncated clauses** — regex cut off at arbitrary boundaries (commas, ellipses, line breaks)
+2. **Misclassified holders** — regex assigns the wrong taxonomy category (e.g. `Org: Employer` when the provision actually targets `Gov: Inspector`)
+3. **Missing qualifiers** — phrases like "so far as is reasonably practicable" not captured separately
+
+The polisher's job: given the regex-extracted DRRPEntry and the full section text from LAT, produce a corrected entry with precise clause boundaries and separated qualifiers. The holder taxonomy (`Org: Employer`, `Org: Client`, `Gov: HSE`, etc.) is a fixed classification scheme that users query against — the 87 holder categories are an intentional faceted search dimension, not raw text to be replaced. The verbatim entity text ("every employer", "the employer concerned") is already visible in the clause. The holder head should **validate** the assigned category (flagging misclassifications) rather than extracting verbatim spans.
+
+#### Training Data Inventory
+
+| Metric | Value |
+|--------|-------|
+| Total DRRPEntry records | 110,366 (41K duties + 14K rights + 29K resp + 26K powers) |
+| Laws with DRRP data | ~2,600 |
+| Distinct holder categories | 87 |
+| Distinct article references | 1,922 |
+| Median clause length | 62 chars |
+| 95th percentile clause length | 270 chars |
+| Max clause length | 1,089 chars |
+| Article format | `section-N` (53%), `regulation/N` (27%), `rule/N` (12%), other (8%) |
+
+The 110K existing DRRPEntry records are the **input side** of the training data. We need to generate the **output side** (corrected entries) to create labelled pairs.
+
+#### Task Formulation
+
+This is a **hybrid extraction + validation** task with three outputs per entry:
+
+1. **clause** (span extraction) — extract the precise provision text with correct boundaries from the source text
+2. **qualifier** (span extraction) — extract any qualifying phrase (e.g. "so far as is reasonably practicable"), or null
+3. **holder** (classification) — validate the regex-assigned holder category against the source text; output the correct taxonomy category from the fixed 87-class set, or confirm the original
+
+The clause and qualifier outputs use **extractive QA** (SQuAD-style span extraction). The holder output is a **multi-class classification** over the fixed taxonomy — it preserves the faceted search dimension while correcting misclassifications.
+
+#### Model Architecture
+
+**Base model**: `deberta-v3-base` (86M params, 768-dim, 12 layers)
+
+**Why DeBERTa:**
+- State-of-the-art on extractive QA benchmarks (SQuAD 2.0)
+- Disentangled attention handles long legal text well
+- 86M params quantises cleanly to INT8 (~22MB ONNX file)
+- HuggingFace `tokenizers` crate already in `fractalaw-ai` deps
+
+**Task heads** (two span extraction + one classification):
+
+```
+Input:  [CLS] {drrp_type} : {regex_holder} [SEP] {section_text} [SEP]
+         ↓
+DeBERTa encoder (12 layers, 768-dim)
+         ↓
+    ┌────┴────┬──────────┐
+    ▼         ▼          ▼
+ clause    qualifier   holder
+ start/end start/end   87-class
+ (spans)   (or null)   (taxonomy)
+```
+
+- **Clause head**: linear layer over token embeddings producing start/end logit pairs — extracts the precise provision span from section text
+- **Qualifier head**: same architecture as clause head, plus a "no qualifier" class for entries without qualifying phrases
+- **Holder head**: linear layer over the `[CLS]` embedding producing logits over the 87 holder categories — validates or corrects the regex-assigned category
+
+**Token budget**: DeBERTa supports 512 tokens. Median clause is 62 chars (~20 tokens). The section text is the long part — 95% of LAT sections fit within 512 tokens. For the 5% that exceed, truncate from the end (the relevant provision is usually near the top of the section).
+
+#### Training Data Generation
+
+**Step 1: Match DRRPEntry to LAT sections**
+
+For each DRRPEntry in `duties[]/rights[]/etc.`:
+- Parse the `article` field to get the provision number (e.g. `section-2` → `2`)
+- Join to `legislation_text` on `law_name` + `provision`
+- This gives us `(regex_entry, source_text)` pairs
+
+**Step 2: Generate silver labels**
+
+For each pair, generate labels for the three heads:
+- **Clause span**: fuzzy string matching (Levenshtein or longest common substring) to align the regex clause to a span in the source text. The matched span boundaries become the silver label for clause start/end
+- **Holder category**: the regex-assigned taxonomy category (e.g. `Org: Employer`) is used as-is for the silver label. The 87 categories form the fixed label set. Misclassifications will be caught during gold curation
+- **Qualifier span**: regex for known qualifying patterns (`so far as is reasonably practicable`, `unless`, `except where`, `subject to`, etc.) applied to the source text around the clause span
+
+**Step 3: Gold label curation (subset)**
+
+For the 12-law sample (~700 entries), manually review and correct the silver labels. This is the validation set.
+
+**Expected dataset sizes:**
+- Silver training set: ~80K pairs (entries with successful LAT match)
+- Gold validation set: ~700 pairs (12 sample laws, manually reviewed)
+- Held-out test set: ~300 pairs (from 4-5 laws not in sample)
+
+#### Training Pipeline
+
+```
+1. Export training data
+   fractalaw export-training-data --output data/drrp-training/
+   → Parquet files: train.parquet, val.parquet, test.parquet
+
+2. Fine-tune (Python, outside fractalaw)
+   python scripts/train_drrp_model.py \
+     --base-model microsoft/deberta-v3-base \
+     --train data/drrp-training/train.parquet \
+     --val data/drrp-training/val.parquet \
+     --epochs 5 --batch-size 16 --lr 2e-5 \
+     --output models/deberta-v3-drrp/
+
+3. Export to ONNX
+   python scripts/export_onnx.py \
+     --model models/deberta-v3-drrp/ \
+     --output models/deberta-v3-drrp/model.onnx \
+     --quantize int8
+
+4. Validate
+   python scripts/validate_drrp_model.py \
+     --model models/deberta-v3-drrp/model.onnx \
+     --test data/drrp-training/test.parquet
+```
+
+**Training happens in Python** (PyTorch + HuggingFace Transformers). The resulting ONNX model is consumed by `fractalaw-ai` in Rust. This is the standard pattern — training in Python, inference in Rust via ONNX Runtime.
+
+#### Integration into fractalaw-ai
+
+Add a `DrrpExtractor` struct alongside the existing `Embedder`:
+
+```rust
+// crates/fractalaw-ai/src/extractor.rs
+pub struct DrrpExtractor {
+    session: Session,       // ONNX Runtime
+    tokenizer: Tokenizer,   // DeBERTa tokenizer
+}
+
+impl DrrpExtractor {
+    pub fn load(model_dir: &Path) -> Result<Self>;
+
+    /// Extract refined DRRP entry from regex input + source text.
+    pub fn extract(
+        &self,
+        drrp_type: &str,
+        regex_holder: &str,
+        regex_clause: &str,
+        source_text: &str,
+    ) -> Result<DrrpExtraction>;
+
+    pub fn extract_batch(...) -> Result<Vec<DrrpExtraction>>;
+}
+
+pub struct DrrpExtraction {
+    pub holder: String,      // taxonomy category (e.g. "Org: Employer") — validated/corrected
+    pub holder_changed: bool,// true if model corrected the regex-assigned category
+    pub clause: String,      // precise span from source text
+    pub qualifier: Option<String>,
+    pub clause_ref: String,  // normalised article reference
+    pub confidence: f32,     // min of clause span + holder classification confidence
+}
+```
+
+#### WIT Interface
+
+The existing `ai-classify` WIT interface is not the right fit. This is extraction, not classification. Options:
+
+1. **Use `ai-inference::generate`** — the current polisher approach. Works but means the WASM guest calls a generic "generate" function and the host routes to ONNX instead of Claude. Clean abstraction — guest doesn't care about the backend.
+
+2. **Add `ai-extract` interface** — more precise but more WIT surface area.
+
+**Recommendation**: Option 1. Keep `ai-inference::generate` as the interface. The host switches backend based on config: Claude API key present → Claude, ONNX model present → ONNX. The guest code doesn't change at all. The JSON request/response format stays the same.
+
+#### Performance Targets
+
+| Metric | Target |
+|--------|--------|
+| Inference latency | <10ms per entry (INT8, CPU) |
+| Model size | <25MB (INT8 quantised ONNX) |
+| Clause boundary accuracy | >90% exact match on gold set |
+| Holder classification accuracy | >95% on gold set (most regex assignments are already correct) |
+| Qualifier detection F1 | >80% |
+| Throughput | >100 entries/sec (batch of 32) |
+
+#### Risks and Mitigations
+
+| Risk | Mitigation |
+|------|-----------|
+| Silver labels too noisy | Fuzzy matching with confidence threshold; discard low-confidence pairs |
+| 512 token limit insufficient for long sections | Sliding window with stride; extract from the window containing the regex clause |
+| DeBERTa too large for edge | Try `deberta-v3-xsmall` (22M params) first; fall back to `base` if accuracy insufficient |
+| Training data domain shift (legacy sertantai vs new taxa) | Include both sertantai and taxa-generated entries in training set |
+
+### Phase B Task 2: Training Data Export Implementation (2026-02-25)
+
+**New files:**
+- `crates/fractalaw-core/src/training.rs` — Pure Rust module with all training data logic (29 unit tests)
+
+**Modified files:**
+- `crates/fractalaw-core/src/lib.rs` — Added `pub mod training;`
+- `crates/fractalaw-store/src/duck.rs` — Added `extract_flat_drrp_entries()` using DuckDB `UNNEST`
+- `crates/fractalaw-cli/src/main.rs` — Added `ExportTrainingData` command variant + handler
+- `crates/fractalaw-cli/Cargo.toml` — Added `parquet` workspace dep
+
+**Core logic in `training.rs`:**
+- `parse_article_to_provision()` — Parses `section/2`, `regulation-4` etc. to bare provision numbers
+- `find_clause_span()` — LCS (longest common substring) DP algorithm for fuzzy matching regex clauses against LAT source text. Case-insensitive. Returns char offsets + match ratio
+- `find_qualifier()` — 10 UK ESH qualifier patterns via `LazyLock<Vec<Regex>>`: SFAIRP, "so far as is practicable", "where reasonably practicable", "as far as possible", "to the extent that", "subject to", "provided that", "unless", "except where", "except in so far as". Returns nearest qualifier to clause span
+- `generate_silver_label()` — Orchestrates the above into a `TrainingExample` with identity, inputs, silver labels, quality metrics
+- `training_example_schema()` — 16-column Arrow schema for Parquet output
+- `examples_to_record_batch()` — Converts `Vec<TrainingExample>` to Arrow RecordBatch
+
+**DuckDB extraction:**
+- `extract_flat_drrp_entries()` — UNION ALL of four UNNEST queries over `duties/rights/responsibilities/powers` columns. Returns `(law_name, drrp_type, holder, clause, article)` flat rows
+
+**CLI command: `fractalaw export-training-data`:**
+- `--output` (default `./data/drrp-training`) — Parquet output directory
+- `--val-laws` — Optional file of validation law names (one per line)
+- `--test-laws` (default 5) — Number of laws for held-out test set
+- `--min-match-ratio` (default 0.3) — Minimum LCS match quality to include
+- Split strategy: by law (prevents information leakage). Val from file, test via deterministic hash selection, rest = train
+- Handler: DuckDB extraction → group by law → LanceDB join (one query per law) → silver label generation → Parquet write → statistics report
+
+**Parquet schema (16 columns):**
+`law_name, drrp_type, article, provision, split, regex_holder, regex_clause, source_text, clause_start, clause_end, holder_label, qualifier_start, qualifier_end, qualifier_text, match_ratio, match_quality`
+
+**First run results (2026-02-25):**
+
+```
+Total DRRP entries:       110,366
+Laws with DRRP data:        3,285
+Laws with LAT text:          ~400 (only scraped laws have text in LanceDB)
+
+Matched to LAT:             7,019  (6.4%)
+Unmatched (no LAT):         99,286  (90.0%)
+Unparseable article:            22  (0.0%)
+
+Match quality distribution:
+  High   (>0.8):            2,263  (32.2%)
+  Medium (0.5-0.8):           918  (13.1%)
+  Low    (<0.5):            3,838  (54.7%)
+
+With qualifier:               616  (8.8%)
+Holder categories:            119
+Distinct laws in output:      235
+
+Split sizes:
+  Train:  7,017 examples (no --val-laws file provided)
+  Test:       2 examples (5 test laws, but most had no LAT)
+```
+
+**Spot-check on HSWA 1974 (UK_ukpga_1974_37):**
+- s.2 "shall be the duty of every employer" — high (0.92), correct span
+- s.7 "shall be the duty of every employee" — high (0.92), correct span
+- s.8 "No person shall intentionally or recklessly interfere with..." — high (1.00), perfect match
+- s.9 "No employer shall levy or permit..." — high (1.00), perfect match
+- Low-quality matches are mostly too-short regex clauses ("an inspector shall ,...") that can't uniquely locate in source
+
+**Key observations:**
+1. Only 6.4% LAT coverage — most laws haven't been scraped yet. Training set will grow as more laws are scraped into LanceDB
+2. The 2,263 high-quality matches are solid training signal for clause span extraction
+3. 119 holder categories found (vs 87 predicted from DuckDB query) — some categories have prefix/suffix variants
+4. Low-quality matches (55%) are dominated by very short regex clauses (<15 chars) — the LCS minimum threshold filters out the worst
+5. Qualifier detection working: 616 entries with SFAIRP and similar patterns detected
+
+### Phase B Task 3: Fine-tune and Quantise ONNX Model (2026-02-25)
+
+**New files:**
+- `scripts/train_drrp_model.py` — PyTorch training script with 3-head model (clause span, qualifier span, holder classification)
+- `scripts/export_onnx.py` — ONNX export with INT8 quantisation and validation
+
+**Model outputs:**
+- `models/deberta-v3-drrp/final_model.pt` — Trained checkpoint (DistilBERT, 200 examples, 3 epochs)
+- `models/deberta-v3-drrp/model.onnx` — Full ONNX model (253.4 MB)
+- `models/deberta-v3-drrp/model.int8.onnx` — INT8 quantised (63.7 MB)
+- `models/deberta-v3-drrp/metadata.json` — Training metadata
+- `models/deberta-v3-drrp/holder_labels.json` — 27-class label mapping
+
+**Training architecture (`DrrpExtractorModel`):**
+- Encoder (DistilBERT for CPU validation; DeBERTa-v3-base for GPU production)
+- Clause head: Linear(hidden, 2) → start/end logits over sequence positions
+- Qualifier head: Linear(hidden, 2) + Linear(hidden, 2) → start/end logits + has_qualifier
+- Holder head: Linear(hidden, num_classes) → 87-class taxonomy classification from [CLS] token
+- Combined loss: clause (1.0) + qualifier (0.5) + holder (0.3) weighting
+- Differential learning rates: encoder at lr, heads at lr×10
+
+**Training data:**
+- 200-example high-quality subset (match_ratio > 0.8) from the 7,019 matched entries
+- max_length=128 tokens (CPU-feasible)
+- Train/val split: 80/20
+
+**CPU training results (DistilBERT, 200 examples, 3 epochs):**
+```
+Epoch 1: loss=4.91, clause_acc=0.500, holder_acc=0.268
+Epoch 2: loss=3.87, clause_acc=0.512, holder_acc=0.268
+Epoch 3: loss=3.41, clause_acc=0.605, holder_acc=0.415
+```
+
+Model is learning (loss decreasing, accuracy improving) but underfitting — needs more data and epochs. Full training on GPU with DeBERTa-v3-base on the complete 7K+ dataset will produce significantly better results.
+
+**ONNX export results:**
+- Full model: 253.4 MB (DistilBERT base)
+- INT8 quantised: 63.7 MB (75% compression)
+- Inference latency: 27.5 ms/inference on CPU (100 runs)
+- Smoke test: Correctly predicted `Org: Employer` for HSWA s.2 test case
+- Clause span head outputs `[13-8]` (start > end) — expected with minimal training
+
+**Key implementation decisions:**
+1. Used `dynamo=False` in `torch.onnx.export()` — the dynamo exporter had shape inference errors with multi-output model
+2. Opset version 17 (instead of 14) for better operator coverage
+3. ONNX Runtime dynamic quantisation (`QuantType.QInt8`) — no calibration dataset needed
+4. Legacy TorchScript exporter works reliably for this architecture
+
+**Production path:**
+- Train on GPU machine with DeBERTa-v3-base, full 7K+ silver labels, 5+ epochs, max_length=512
+- Expected INT8 model size: ~22MB (DeBERTa-v3-base quantised)
+- Expected latency: <10ms/clause on CPU with DeBERTa
+- Rerun `fractalaw export-training-data` as more laws are scraped into LanceDB for larger training set
+
+### Phase B Task 4: Wire ONNX Model into Polisher Guest (2026-02-25)
+
+**Design decision:** Keep `ai-inference::generate` as the single WIT interface. The host routes to ONNX when available, falls back to Claude. Guest code unchanged — it calls `generate()` and gets back JSON regardless of backend.
+
+**New files:**
+- `crates/fractalaw-ai/src/extractor.rs` — `DrrpExtractor` struct with ONNX inference pipeline (7 unit tests, all passing)
+
+**Modified files:**
+- `crates/fractalaw-ai/src/lib.rs` — Added `mod extractor; pub use DrrpExtractor, DrrpExtraction`
+- `crates/fractalaw-ai/Cargo.toml` — Added `serde`, `serde_json` deps
+- `crates/fractalaw-host/Cargo.toml` — Added `onnx = ["fractalaw-ai/onnx", "dep:serde_json"]` feature
+- `crates/fractalaw-host/src/lib.rs` — Added `extractor` to HostState/RunOptions, ONNX routing in `generate_impl`, `parse_drrp_prompt()` helper
+- `crates/fractalaw-cli/Cargo.toml` — Enabled `onnx` feature on host
+- `crates/fractalaw-cli/src/main.rs` — Auto-loads `DrrpExtractor` from `models/deberta-v3-drrp/` or `DRRP_MODEL_DIR` env var
+- `scripts/export_onnx.py` — Added `tokenizer.save_pretrained()` for Rust `tokenizers` crate compatibility
+- `models/deberta-v3-drrp/tokenizer.json` — Saved from HuggingFace cache
+
+**`DrrpExtractor` (`extractor.rs`):**
+- Loads `model.int8.onnx` (preferred) or `model.onnx` + `tokenizer.json` + `metadata.json` + `holder_labels.json`
+- `extract(drrp_type, regex_holder, source_text, article)` → `DrrpExtraction { holder, ai_clause, qualifier, clause_ref, confidence }`
+- Tokenizes as text pair: `[CLS] {drrp_type} : {holder} [SEP] {source_text} [SEP]` with `OnlySecond` truncation + fixed padding
+- 6 output tensors: clause start/end, qualifier start/end, has_qualifier, holder logits
+- Span decoding: argmax → clamp to source text region → `tokenizer.decode()`
+- Holder: softmax argmax → label lookup from `holder_labels.json`
+- `DrrpExtraction::to_json()` serialises to guest's expected `PolishedOutput` format
+
+**Host routing (`generate_impl`):**
+1. If ONNX extractor attached → parse user_prompt → extract structured fields → call `extractor.extract()` → return JSON as `GenerateResponse`
+2. If prompt doesn't match DRRP format → fall through to Claude (supports non-DRRP guests)
+3. If no extractor → Claude API path (unchanged)
+4. If neither → error
+
+**`parse_drrp_prompt()`:** Line-by-line parser for the known guest prompt format. Extracts `drrp_type`, `holder`, `article`, `source_text`. Returns `None` on parse failure → graceful fallthrough.
+
+**CLI model loading:** Checks `DRRP_MODEL_DIR` env var or default `models/deberta-v3-drrp`. Logs info on success, warns on failure (falls back to Claude), debug on not-found.
+
+**Test results:**
+- 7 extractor unit tests: all passing (load, extract HSWA s.2, JSON format, clause_ref variants, argmax, softmax, clamp_span)
+- 3 AI host tests: all passing (embed stubs, generate without config)
+- 9 data host tests: all passing (query, insert, execute, data-test guest, polisher no-data, polisher inference errors)
+- Workspace check: clean
+
+**Phase B complete.** All 4 tasks done. The ONNX pipeline is wired end-to-end:
+1. `fractalaw export-training-data` → Parquet with silver labels
+2. `scripts/train_drrp_model.py` → 3-head model training
+3. `scripts/export_onnx.py` → ONNX export + INT8 quantisation + tokenizer save
+4. `fractalaw-ai::DrrpExtractor` → Rust inference via ONNX Runtime
+5. `fractalaw-host::generate_impl` → routes polisher guest to local ONNX
+6. `fractalaw-cli::cmd_run` → auto-discovers and loads model
+
+## Backlog
+
+1. Explore `RegexSet` pre-filter optimisation for batch classification
+2. Consider `rayon` parallelism for classifying all sections of large Acts
+3. ~~LanceDB query host function for polisher~~ — **Done in Phase C**
+4. ~~In-memory pipeline optimisation: taxa → polisher without intermediate DuckDB write~~ — **Addressed in Phase C** (polisher works with LanceDB only, no DuckDB intermediary)
+5. Copy polished results from LanceDB → DuckDB for analytical queries (law-level aggregates)
+6. Run taxa → polisher end-to-end on 12-law sample with ONNX model
+7. Build comparison tooling (before/after diff for taxa vs AI-refined results in LanceDB)
+8. Clean up superseded Phase A artifacts: `polished_drrp` DDL in `duck.rs`, `ensure_drrp_ai_columns()`, `*_ai` LRT columns in `schema.rs`
