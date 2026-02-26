@@ -526,7 +526,7 @@ r"(?i)(?:shall be inserted|there is inserted|insert the following (?:after|befor
 - [x] Monitor skip rate on production data — DONE: 18.1% → 9.9% after switching to ALL strategy
 - [x] Validate no false negatives — DONE (automated, not manual): ran full DRRP classifier on all 189 gate-skipped provisions. Found 58 false negatives (30.7%) under ANY strategy, all in multi-purpose provisions. Switched to ALL strategy: 104 skips, 0 false negatives, 100% gate precision.
 - [x] Measure performance gain with benchmarks — DONE: gate saves 22.3 µs/provision (68.7%) on skipped provisions; overall 4.9% (2.3 ms per 1,046 provisions). Gate value is precision (preventing false DRRP), not performance.
-- [ ] Consider adding Liability and Offence to skip list (18.2% DRRP rate, small sample)
+- [x] Consider adding Liability and Offence to skip list — DECIDED NO: original 18.2% rate was from n=11. With 1,046 provisions: Liability 55.0% DRRP (n=20), Offence 58.3% DRRP (n=24). Both are DRRP-bearing. Current skip list (Interpretation 0%, Amendment 0%, Repeal 0%) is correct.
 - [ ] Build `taxa qa` command for purpose QA reporting — see [GH #15](https://github.com/fractalaw/fractalaw/issues/15)
 
 
