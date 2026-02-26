@@ -36,11 +36,12 @@ Rules:
 - If you cannot identify a clear provision, set holder to \"unknown\" and ai_clause to the most relevant sentence";
 
 fn build_user_prompt(prov: &ProvisionRow) -> String {
+    let provision_display = prov.provision.as_deref().unwrap_or(&prov.section_id);
     let mut prompt = format!(
         "Law: {law}\n\
          Provision: {provision}\n",
         law = prov.law_name,
-        provision = prov.provision,
+        provision = provision_display,
     );
 
     if !prov.drrp_types.is_empty() {
@@ -79,7 +80,8 @@ fn build_user_prompt(prov: &ProvisionRow) -> String {
 struct ProvisionRow {
     section_id: String,
     law_name: String,
-    provision: String,
+    #[serde(default)]
+    provision: Option<String>,
     text: String,
     #[serde(default)]
     drrp_types: Vec<String>,
@@ -204,6 +206,16 @@ impl Guest for DrrpPolisher {
                         continue;
                     }
                 };
+
+                // Skip provisions with empty drrp_types (LanceDB WHERE drrp_types IS NOT NULL
+                // matches empty lists, so we filter client-side).
+                if prov.drrp_types.is_empty() {
+                    audit(
+                        "skip-empty-drrp",
+                        &format!("{}: no drrp_types", prov.section_id),
+                    );
+                    continue;
+                }
 
                 match process_provision(&prov) {
                     Ok(tokens) => {

@@ -163,8 +163,10 @@ impl fractal::app::data_query::Host for HostState {
         if sql.contains("legislation_text")
             && let Some(ref lance) = self.lance
         {
+            tracing::info!(sql = %sql, "Routing query to LanceDB");
             return lance_query_impl(lance, &sql).await;
         }
+        tracing::info!(sql = %sql, "Routing query to DuckDB");
         self.query_impl(&sql)
     }
 }
@@ -210,16 +212,30 @@ async fn lance_query_impl(
         1000
     };
 
-    // Query LanceDB.
-    let batches = if filter.is_empty() {
-        lance.query_legislation_text("true", limit).await
+    // Extract OFFSET.
+    let offset = if let Some(offset_pos) = sql_upper.find("OFFSET ") {
+        let after_offset = &sql[offset_pos + 7..];
+        after_offset
+            .split_whitespace()
+            .next()
+            .and_then(|s| s.parse::<usize>().ok())
+            .unwrap_or(0)
     } else {
-        lance.query_legislation_text(&filter, limit).await
+        0
+    };
+
+    // Query LanceDB.
+    tracing::debug!(filter = %filter, limit = %limit, offset = %offset, "LanceDB query");
+    let batches = if filter.is_empty() {
+        lance.query_legislation_text("true", limit, offset).await
+    } else {
+        lance.query_legislation_text(&filter, limit, offset).await
     }
     .map_err(|e| fractal::app::data_query::QueryError {
         code: 2,
         message: format!("LanceDB query failed: {e}"),
     })?;
+    tracing::debug!(num_batches = %batches.len(), total_rows = %batches.iter().map(|b| b.num_rows()).sum::<usize>(), "LanceDB query result");
 
     // Check if the guest wants a to_json() result — single-string IPC.
     if sql_upper.contains("TO_JSON(") {
@@ -326,12 +342,14 @@ fn lance_to_json_result(
                     .downcast_ref::<arrow::array::ListArray>()
                     .unwrap();
                 let values = list_arr.value(0);
+                tracing::debug!(field = %field.name(), list_len = %values.len(), "processing List column");
                 if let Some(str_arr) = values.as_any().downcast_ref::<arrow::array::StringArray>() {
                     let items: Vec<serde_json::Value> = (0..str_arr.len())
                         .map(|j| serde_json::Value::String(str_arr.value(j).to_string()))
                         .collect();
                     serde_json::Value::Array(items)
                 } else {
+                    tracing::warn!(field = %field.name(), "List column is not StringArray");
                     serde_json::Value::Null
                 }
             }
@@ -341,6 +359,11 @@ fn lance_to_json_result(
             }
         };
         map.insert(field.name().clone(), value);
+    }
+
+    // Debug: log drrp_types from JSON
+    if let Some(serde_json::Value::Array(arr)) = map.get("drrp_types") {
+        tracing::debug!(drrp_types_len = %arr.len(), "lance_to_json drrp_types");
     }
 
     let json_str = serde_json::to_string(&serde_json::Value::Object(map)).map_err(|e| {
@@ -647,7 +670,17 @@ impl HostState {
         // Try ONNX backend first (local-first).
         #[cfg(feature = "onnx")]
         if let Some(ref mut extractor) = self.extractor {
+            tracing::debug!(prompt_len = %request.user_prompt.len(), "attempting to parse DRRP prompt");
+
+            // Debug: dump first prompt to file
+            static FIRST_PROMPT: std::sync::Once = std::sync::Once::new();
+            FIRST_PROMPT.call_once(|| {
+                let _ = std::fs::write("/tmp/drrp_prompt.txt", &request.user_prompt);
+                eprintln!("Dumped first prompt to /tmp/drrp_prompt.txt");
+            });
+
             if let Some(parsed) = parse_drrp_prompt(&request.user_prompt) {
+                tracing::debug!(drrp_type = %parsed.drrp_type, holder = %parsed.holder, "parsed DRRP prompt successfully");
                 let extraction = extractor
                     .extract(
                         &parsed.drrp_type,
@@ -792,36 +825,99 @@ struct ParsedDrrpPrompt {
 
 /// Parse a DRRP polisher user prompt into structured fields.
 ///
+/// Supports both Phase B format (single DRRP type + holder) and Phase C format
+/// (taxa context with DRRP types list, actors, refined clause).
+///
 /// Returns `None` if the prompt doesn't match the expected format,
 /// allowing fallthrough to the Claude API backend.
 #[cfg(feature = "onnx")]
 fn parse_drrp_prompt(user_prompt: &str) -> Option<ParsedDrrpPrompt> {
-    let mut drrp_type = None;
+    let mut drrp_types = Vec::new();
     let mut holder = None;
     let mut article = None;
     let mut source_text = None;
+    let mut refined_clause = None;
 
     let mut lines = user_prompt.lines().peekable();
     while let Some(line) = lines.next() {
+        // Phase B format: "DRRP type: Duty"
         if let Some(val) = line.strip_prefix("DRRP type: ") {
-            drrp_type = Some(val.to_string());
-        } else if let Some(val) = line.strip_prefix("Article reference: ") {
+            drrp_types.push(val.to_string());
+        }
+        // Phase C format: "DRRP types: Duty, Right"
+        else if let Some(val) = line.strip_prefix("DRRP types: ") {
+            drrp_types.extend(val.split(',').map(|s| s.trim().to_string()));
+        }
+        // Phase B format: "Article reference: s.2(1)"
+        else if let Some(val) = line.strip_prefix("Article reference: ") {
             article = Some(val.to_string());
-        } else if let Some(val) = line.strip_prefix("- Holder: ") {
+        }
+        // Phase C format: "Provision: s.2(1)"
+        else if let Some(val) = line.strip_prefix("Provision: ") {
+            article = Some(val.to_string());
+        }
+        // Phase B format: "- Holder: every employer"
+        else if let Some(val) = line.strip_prefix("- Holder: ") {
             holder = Some(val.to_string());
-        } else if line.starts_with("Full section text:") {
-            // Everything after this line is the source text.
+        }
+        // Phase C format: "Governed actors: Org: Employer, ..."
+        else if let Some(val) = line.strip_prefix("Governed actors: ") {
+            if holder.is_none() {
+                holder = Some(
+                    val.split(',')
+                        .next()
+                        .unwrap_or("unknown")
+                        .trim()
+                        .to_string(),
+                );
+            }
+        }
+        // Phase C format: "Government actors: Gov: Minister, ..."
+        else if let Some(val) = line.strip_prefix("Government actors: ") {
+            if holder.is_none() {
+                holder = Some(
+                    val.split(',')
+                        .next()
+                        .unwrap_or("unknown")
+                        .trim()
+                        .to_string(),
+                );
+            }
+        }
+        // Phase C format: "Regex-refined clause:"
+        else if line.starts_with("Regex-refined clause:") {
+            // Read until we hit "Full section text:" or end
+            let mut clause_lines = Vec::new();
+            while let Some(next_line) = lines.peek() {
+                if next_line.starts_with("Full section text:") {
+                    break;
+                }
+                clause_lines.push(lines.next().unwrap().to_string());
+            }
+            refined_clause = Some(clause_lines.join("\n").trim().to_string());
+        }
+        // Both formats: "Full section text:"
+        else if line.starts_with("Full section text:") {
             let rest: String = lines.collect::<Vec<_>>().join("\n");
-            source_text = Some(rest);
+            source_text = Some(rest.trim().to_string());
             break;
         }
     }
 
+    // Use refined clause as source if available (Phase C), otherwise fall back to full text
+    let text = refined_clause.or(source_text)?;
+
+    // If no DRRP types found, return None (can't run ONNX model without a type)
+    let drrp_type = drrp_types.first()?.clone();
+
+    // If no holder found from actors, can't run ONNX model
+    let holder = holder?;
+
     Some(ParsedDrrpPrompt {
-        drrp_type: drrp_type?,
-        holder: holder?,
-        article: article?,
-        source_text: source_text?,
+        drrp_type,
+        holder,
+        article: article.unwrap_or_else(|| "unknown".to_string()),
+        source_text: text,
     })
 }
 

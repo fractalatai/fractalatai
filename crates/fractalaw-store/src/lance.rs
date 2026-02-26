@@ -118,12 +118,14 @@ impl LanceStore {
         &self,
         filter: &str,
         limit: usize,
+        offset: usize,
     ) -> Result<Vec<RecordBatch>, StoreError> {
         let table = self.legislation_text().await?;
         let results: Vec<RecordBatch> = table
             .query()
             .only_if(filter)
             .limit(limit)
+            .offset(offset)
             .execute()
             .await?
             .try_collect()
@@ -141,7 +143,7 @@ impl LanceStore {
             "law_name = '{}' AND drrp_types IS NOT NULL AND ai_clause IS NULL",
             law_name.replace('\'', "''")
         );
-        self.query_legislation_text(&filter, limit).await
+        self.query_legislation_text(&filter, limit, 0).await
     }
 
     /// Write taxa classification results for provisions.
@@ -370,7 +372,7 @@ mod tests {
             .unwrap();
 
         let batches = store
-            .query_legislation_text("law_name = 'UK_ukpga_1974_37'", 1000)
+            .query_legislation_text("law_name = 'UK_ukpga_1974_37'", 1000, 0)
             .await
             .unwrap();
 

@@ -497,7 +497,7 @@ async fn cmd_text(data_dir: &std::path::Path, name: &str, limit: usize) -> anyho
         .context("opening LanceDB")?;
 
     let filter = format!("law_name = '{name}'");
-    let batches = lance.query_legislation_text(&filter, limit).await?;
+    let batches = lance.query_legislation_text(&filter, limit, 0).await?;
 
     let total: usize = batches.iter().map(|b| b.num_rows()).sum();
     if total == 0 {
@@ -520,7 +520,7 @@ async fn cmd_taxa_show(data_dir: &std::path::Path, name: &str, limit: usize) -> 
         .context("opening LanceDB")?;
 
     let filter = format!("law_name = '{}'", name.replace('\'', "''"));
-    let batches = lance.query_legislation_text(&filter, limit).await?;
+    let batches = lance.query_legislation_text(&filter, limit, 0).await?;
 
     let total: usize = batches.iter().map(|b| b.num_rows()).sum();
     if total == 0 {
@@ -658,7 +658,7 @@ async fn cmd_taxa_enrich(data_dir: &std::path::Path, store: &DuckStore) -> anyho
 
     for law_name in &law_names {
         let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
-        let batches = lance.query_legislation_text(&filter, 500).await?;
+        let batches = lance.query_legislation_text(&filter, 500, 0).await?;
 
         let mut taxa = LawTaxa {
             duty_holders: BTreeSet::new(),
@@ -1094,7 +1094,7 @@ async fn cmd_export_training_data(
 
         // Query LanceDB for all sections of this law.
         let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
-        let lat_batches = lance.query_legislation_text(&filter, 1000).await?;
+        let lat_batches = lance.query_legislation_text(&filter, 1000, 0).await?;
 
         // Build provision → text map.
         let mut prov_text: HashMap<String, String> = HashMap::new();

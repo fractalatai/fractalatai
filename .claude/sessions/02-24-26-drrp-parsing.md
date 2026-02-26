@@ -906,6 +906,36 @@ Model is learning (loss decreasing, accuracy improving) but underfitting — nee
 5. `fractalaw-host::generate_impl` → routes polisher guest to local ONNX
 6. `fractalaw-cli::cmd_run` → auto-discovers and loads model
 
+## Phase C Verification — BLOCKED (2026-02-25 18:40)
+
+**Status**: Waiting for LanceDB table recreation (~9 hours)
+
+**What happened**: During verification setup, the LanceDB `legislation_text` table was accidentally dropped, losing 97,522 rows of pre-computed embeddings (384-dim, 100% coverage as of Feb 20). The table is being recreated via `fractalaw embed`.
+
+**Current state**:
+- **Embed process**: PID 84328, started 2026-02-25 18:40 UTC
+- **Logs**: `/tmp/embed_full.log`
+- **Source**: `data/legislation_text.parquet` (7.3MB, 28 columns, no embeddings)
+- **Target**: `data/lancedb/legislation_text.lance` (47 columns with embeddings)
+- **Estimated completion**: 2026-02-26 ~03:40 UTC (9 hours for 97,522 rows)
+
+**Prevention measures added**:
+1. `.claude/settings.json` — deny rules block `drop_table`, `fractalaw embed`, `create_table_from_*` on `legislation_text`
+2. `scripts/backup_lancedb.py` — export LanceDB → Parquet (preserves embeddings)
+3. Updated `MEMORY.md` with LanceDB critical rules and backup strategy
+
+**Next steps** (after embed completes):
+1. **Verify table created**: `python3 -c "import lancedb; print(lancedb.connect('data/lancedb').open_table('legislation_text').count_rows())"`
+2. **BACKUP IMMEDIATELY**: `python scripts/backup_lancedb.py` → creates `backups/legislation_text_YYYYMMDD_HHMMSS.parquet`
+3. **Phase C Verification** (original plan):
+   - Run `fractalaw taxa enrich` → populate taxa columns in LanceDB
+   - Query LanceDB to verify taxa data (10 columns: drrp_types, governed_actors, government_actors, duty_family, duty_sub_type, popimar, purposes, clause_refined, taxa_confidence, taxa_classified_at)
+   - Run `fractalaw run guests/drrp-polisher/target/wasm32-wasip1/debug/drrp_polisher.wasm` → AI refinement
+   - Compare regex `clause_refined` vs AI `ai_clause` results
+   - Verify polisher writes to LanceDB-only (no DuckDB touches)
+
+**Commit status**: Phase C code changes already committed and pushed (f60ce6e)
+
 ## Backlog
 
 1. Explore `RegexSet` pre-filter optimisation for batch classification
@@ -913,6 +943,7 @@ Model is learning (loss decreasing, accuracy improving) but underfitting — nee
 3. ~~LanceDB query host function for polisher~~ — **Done in Phase C**
 4. ~~In-memory pipeline optimisation: taxa → polisher without intermediate DuckDB write~~ — **Addressed in Phase C** (polisher works with LanceDB only, no DuckDB intermediary)
 5. Copy polished results from LanceDB → DuckDB for analytical queries (law-level aggregates)
-6. Run taxa → polisher end-to-end on 12-law sample with ONNX model
+6. ~~Run taxa → polisher end-to-end on 12-law sample with ONNX model~~ — **Blocked, waiting for LanceDB restore**
 7. Build comparison tooling (before/after diff for taxa vs AI-refined results in LanceDB)
 8. Clean up superseded Phase A artifacts: `polished_drrp` DDL in `duck.rs`, `ensure_drrp_ai_columns()`, `*_ai` LRT columns in `schema.rs`
+9. **NEW**: Implement LanceDB `add_columns()` API wrapper for safe schema migrations (avoids drop-and-recreate)

@@ -4,3 +4,4 @@ guests/*/target
 /data
 .zed
 nohup.out
+backups/*.parquet

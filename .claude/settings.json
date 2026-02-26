@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(*drop_table*)",
+      "Bash(*fractalaw embed*)",
+      "Bash(*db.drop_table*)",
+      "Bash(*create_table_from_batches*legislation_text*)",
+      "Bash(*create_table_from_parquet*legislation_text*)"
+    ]
+  }
+}
