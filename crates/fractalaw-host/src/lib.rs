@@ -1043,8 +1043,9 @@ pub async fn run_component(
 
     let mut store = Store::new(&engine, state);
     store.set_fuel(fuel)?;
-    // Allow 100 epoch ticks before interruption (= 100 seconds with 1s ticker).
-    store.set_epoch_deadline(100);
+    // Allow 3600 epoch ticks before interruption (= 1 hour with 1s ticker).
+    // Long-running guests (e.g. polisher processing thousands of provisions) need this.
+    store.set_epoch_deadline(3600);
 
     // Spawn a background task to increment the epoch every second.
     let epoch_engine = engine.clone();
