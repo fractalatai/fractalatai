@@ -1151,9 +1151,46 @@ UK_asp_2019_15, section 1:
 
 **Files created**:
 - `data/sample-laws-12.txt` — 12-law representative sample
-- `data/evaluation_report_20260226.txt` — Full evaluation output
+- `data/evaluation_report_20260226.txt` — Full evaluation output (taxa only, AI not shown)
+- `data/evaluation_detailed_20260226.txt` — **Side-by-side comparison with critical findings**
 - `scripts/evaluate_polisher.sh` — Automated evaluation report generator
+
+### CRITICAL FINDING: AI Model Severely Truncating Clauses (2026-02-26 07:30)
+
+**Detailed side-by-side comparison revealed the AI polish is producing fragments, not complete clauses:**
+
+**Severity examples:**
+- Taxa 1697 chars → AI 310 chars (82% reduction)
+- Taxa 2543 chars → AI 320 chars (87% reduction)
+- Taxa 3095 chars → AI **27 chars** (99% reduction!)
+
+**Common AI outputs** (should be full clauses):
+- "the scottish ministers must" (27 chars)
+- "the department shall" (20 chars)
+- "the operator shall" (18 chars)
+- "shall" (5 chars)
+- "the" (3 chars)
+- "," (1 char)
+
+**Root cause:** Span extraction underfitting. The clause span head (start/end logits) is outputting positions very close together, extracting only a few tokens instead of the full clause.
+
+**Why:**
+1. Max sequence length: 128 tokens (too short for legislative text)
+2. Training data: Only 200 examples (7K+ available)
+3. Training epochs: 3 (validation loss still decreasing)
+4. Model: DistilBERT CPU (DeBERTa-v3-base better for this task)
+5. Clause span accuracy: Only 60.5% after 3 epochs
+
+**Infrastructure validated:** The WASM guest → Rust host → ONNX Runtime pipeline works perfectly (100% local inference, 0 API calls). The problem is purely model quality, not architecture.
+
+**Resolution path:**
+1. Retrain on GPU with DeBERTa-v3-base
+2. Full 7K+ dataset (not just 200 examples)
+3. Max length 512 tokens (handle longer provisions)
+4. Train 5+ epochs until convergence
+5. Add taxa `clause_refined` as additional training supervision for span extraction
 
 **Backlog updates**:
 - ~~Item 6: Run taxa → polisher end-to-end on 12-law sample~~ — **DONE** (172 provisions polished, evaluation report generated)
 - Item 7 expanded: Build CLI command to display AI polish results AND comparison tooling (taxa vs AI diff viewer)
+- **NEW Item 10**: Retrain ONNX model on GPU with DeBERTa-v3-base, full dataset, 512 tokens, until clause span extraction converges
