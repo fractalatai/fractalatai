@@ -733,9 +733,13 @@ async fn cmd_taxa_enrich(
                 }
 
                 let record = fractalaw_core::taxa::parse(&text);
+                // Skip provisions with no taxa signal at all (no DRRP, no actors, no purposes).
+                // We DO want to write provisions with purposes even if they have no DRRP content
+                // (e.g., Interpretation sections) so the purpose gate can work.
                 if record.duty_types.is_empty()
                     && record.governed_actors.is_empty()
                     && record.government_actors.is_empty()
+                    && record.purposes.is_empty()
                 {
                     continue;
                 }

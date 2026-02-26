@@ -642,3 +642,165 @@ Added 6 comprehensive unit tests (all passing):
 - [ ] Measure actual performance improvement with benchmarks
 - [ ] Update training data export to exclude skipped provisions
 
+---
+
+## Critical Bug Fix: Taxa Enrichment Skipping Provisions With Purposes (2026-02-26 08:30-09:00)
+
+### Problem Discovery
+
+**User intent**: "Review purpose regex patterns for precision" — to ensure Interpretation/Amendment sections are being tagged correctly.
+
+**Investigation sequence**:
+1. Ran `taxa enrich` on 7 UK ESH laws (1,162 provisions)
+2. Expected to see ~69% skip rate from purpose gate (based on Interpretation/Amendment/Repeal purposes)
+3. **ACTUAL RESULT**: Purpose gate **NEVER triggered** — 0 provisions skipped
+
+**Root cause investigation**:
+- Queried LanceDB for MHSWR 1999: **64/127 provisions had NULL purposes** (50.4%)
+- Provisions with text "In these Regulations—" had `purposes: None` in LanceDB
+- But purpose regex patterns **DO work** when tested in isolation (unit tests pass)
+- Problem was in **enrichment write logic**, not in the parser
+
+### The Bug
+
+**File**: `crates/fractalaw-cli/src/main.rs` — `cmd_taxa_enrich()` lines 737-741
+
+```rust
+let record = fractalaw_core::taxa::parse(&text);
+if record.duty_types.is_empty()
+    && record.governed_actors.is_empty()
+    && record.government_actors.is_empty()
+{
+    continue;  // ← BUG: Skips provisions with purposes but no DRRP
+}
+```
+
+**What happens**:
+1. Taxa parser runs, correctly detects `purposes: ["Interpretation+Definition"]`
+2. Purpose gate triggers early return: `duty_types: []`, `actors: []`, `purposes: ["Interpretation"]`
+3. **Enrichment logic skips this provision** because it has no DRRP/actors
+4. Purposes are **never written to LanceDB**
+
+**Effect**:
+- Provisions with purposes-only (Interpretation, Amendment, Enactment) are excluded from write
+- Purpose gate can't work because `purposes` field is NULL in LanceDB
+- The 69% "skip rate" we observed was NOT from the purpose gate — it was just provisions with no DRRP matches
+
+**Example**:
+```
+Text: "In these Regulations— 'the 1996 Act' means..."
+Parser output: { purposes: ["Interpretation"], duty_types: [], actors: [] }
+Enrichment logic: SKIP (no DRRP/actors)
+LanceDB result: purposes: NULL  ← BUG
+```
+
+### The Fix
+
+**File**: `crates/fractalaw-cli/src/main.rs` line 737
+
+**OLD**:
+```rust
+if record.duty_types.is_empty()
+    && record.governed_actors.is_empty()
+    && record.government_actors.is_empty()
+{
+    continue;
+}
+```
+
+**NEW**:
+```rust
+// Skip provisions with no taxa signal at all (no DRRP, no actors, no purposes).
+// We DO want to write provisions with purposes even if they have no DRRP content
+// (e.g., Interpretation sections) so the purpose gate can work.
+if record.duty_types.is_empty()
+    && record.governed_actors.is_empty()
+    && record.government_actors.is_empty()
+    && record.purposes.is_empty()
+{
+    continue;
+}
+```
+
+**Key change**: Added `&& record.purposes.is_empty()` to the skip condition.
+
+Now provisions are written if they have:
+- DRRP types (duty/right/responsibility/power), OR
+- Actors (governed/government), OR
+- **Purposes** (Interpretation, Amendment, Process, etc.) ← NEW
+
+### Validation Results
+
+**Before fix** (MHSWR 1999):
+- Total provisions: 127
+- With purposes: 63 (49.6%)
+- **Without purposes: 64 (50.4%)**
+- Interpretation provisions: 0
+
+**After fix** (MHSWR 1999):
+- Total provisions: 127
+- **With purposes: 127 (100.0%)**
+- Without purposes: 0
+- **Interpretation provisions: 17**
+
+**All 7 UK ESH laws** (after fix):
+| Law | Provisions | Skip Gate Triggered | Skip % |
+|-----|-----------|-------------------|--------|
+| HSWA 1974 | 234 | 52 | 22.2% |
+| MHSWR 1999 | 127 | 33 | 26.0% |
+| Electricity at Work 1989 | 85 | 27 | 31.8% |
+| CDM 2015 | 282 | 15 | 5.3% |
+| COSHH 2002 | 167 | 26 | 15.6% |
+| LOLER 1998 | 75 | 15 | 20.0% |
+| PPEWR 1992 | 76 | 21 | 27.6% |
+| **TOTAL** | **1,046** | **189** | **18.1%** |
+
+**Purpose gate now working correctly**:
+- 189 of 1,046 provisions (18.1%) will skip DRRP processing
+- These are Interpretation/Amendment/Repeal sections that have purposes but no DRRP content
+- **Performance improvement**: ~18% reduction in expensive DRRP regex processing
+
+### Impact Analysis
+
+**Before this fix**:
+- Purpose-based pre-filtering: ❌ **Never triggered** (purposes not in LanceDB)
+- False skip behavior: Provisions with no DRRP matches were silently excluded from write
+- Training data quality: Missing purpose labels for non-DRRP provisions
+
+**After this fix**:
+- Purpose-based pre-filtering: ✅ **Working** (18.1% skip rate)
+- All provisions with any taxa signal: ✅ **Written to LanceDB**
+- Training data quality: ✅ **Complete purpose labels**
+
+**Performance gain**:
+- Previous "skip rate" (69%) was misleading — provisions weren't being skipped, they had empty DRRP arrays
+- Actual purpose gate skip rate: **18.1%** (189/1,046 provisions)
+- Estimated time saved: 18-45ms per skipped provision × 189 = **3.4-8.5 seconds** per enrichment run on these 7 laws
+
+### Testing
+
+**Manual validation**:
+1. Tested taxa parser directly on "In these Regulations—" text: ✅ Returns `purposes: ["Interpretation"]`
+2. Queried LanceDB before fix: ❌ NULL purposes for Interpretation provisions
+3. Applied fix and re-enriched MHSWR: ✅ 17 Interpretation provisions now detected
+4. Re-enriched all 7 laws: ✅ 189 provisions will trigger purpose gate
+5. Verified Interpretation text samples: ✅ All have `purposes: ["Interpretation+Definition"]` in LanceDB
+
+**Commits**:
+- Fix: (pending commit)
+- Session doc update: (pending commit)
+
+### Lessons Learned
+
+**Architecture insight**: The taxa parser had TWO skip points:
+1. **Parser-level skip** (in `taxa::parse()`): Purpose gate returns early, skipping expensive DRRP regex
+2. **Enrichment-level skip** (in `cmd_taxa_enrich()`): Filters provisions before writing to LanceDB
+
+These two skips had **different logic** and were not aligned:
+- Parser: "Skip DRRP if purpose is Interpretation/Amendment/Repeal"
+- Enrichment: "Skip write if NO DRRP and NO actors" ← **BUG: didn't account for purposes-only**
+
+**Fix**: Aligned enrichment skip logic with parser design — provisions with purposes should be written even if they have no DRRP content.
+
+**Testing gap**: Unit tests validated parser behavior but didn't catch enrichment-level skip logic bug. Need integration tests for end-to-end enrichment pipeline.
+

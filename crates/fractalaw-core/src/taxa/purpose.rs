@@ -256,4 +256,51 @@ mod tests {
         sort_purposes(&mut purposes);
         assert_eq!(purposes, vec![ENACTMENT, PROCESS_RULE, AMENDMENT]);
     }
+
+    // ── Real-world pattern tests (from MHSWR 1999) ──────────────────
+
+    #[test]
+    fn classify_interpretation_real_world() {
+        // From UK_uksi_1999_3242:reg.1(2)
+        let text = r#"2 In these Regulations—
+"the 1996 Act" means the Employment Rights Act 1996 F4 ;
+"the assessment" means, in the case of an employer or self-employed person"#;
+        let result = classify(text);
+        assert!(
+            result.contains(&INTERPRETATION),
+            "Should detect 'In these Regulations—' as Interpretation"
+        );
+    }
+
+    #[test]
+    fn classify_interpretation_any_reference() {
+        // From UK_uksi_1999_3242:reg.1(3)
+        let text = "3 Any reference in these Regulations to—\n(a) a numbered regulation";
+        let result = classify(text);
+        assert!(
+            result.contains(&INTERPRETATION),
+            "Should detect 'Any reference in these Regulations' as Interpretation"
+        );
+    }
+
+    #[test]
+    fn classify_enactment_cited_as() {
+        // From UK_uksi_1999_3242:reg.1(1)
+        let text = "1.—(1) These Regulations may be cited as the Management of Health and Safety at Work Regulations 1999";
+        let result = classify(text);
+        assert!(
+            result.contains(&ENACTMENT),
+            "Should detect 'may be cited as' as Enactment"
+        );
+    }
+
+    #[test]
+    fn classify_enactment_come_into_force() {
+        let text = "shall come into force on 29th December 1999";
+        let result = classify(text);
+        assert!(
+            result.contains(&ENACTMENT),
+            "Should detect 'come into force' as Enactment"
+        );
+    }
 }
