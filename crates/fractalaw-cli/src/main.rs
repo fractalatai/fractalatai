@@ -175,9 +175,6 @@ enum TaxaAction {
         /// Maximum text sections to process
         #[arg(long, default_value_t = 200)]
         limit: usize,
-        /// Compare v1 (blunt gate) vs v2 (actor-anchored) DRRP patterns
-        #[arg(long)]
-        compare: bool,
         /// Show provisions that v2 missed, ranked by heat score (likelihood of genuine miss)
         #[arg(long)]
         misses: bool,
@@ -251,9 +248,8 @@ async fn main() -> anyhow::Result<()> {
             TaxaAction::Show {
                 name,
                 limit,
-                compare,
                 misses,
-            } => cmd_taxa_show(&data_dir, &name, limit, compare, misses).await,
+            } => cmd_taxa_show(&data_dir, &name, limit, misses).await,
             TaxaAction::Enrich { laws } => {
                 let law_filter = laws.as_ref().map(|s| {
                     s.split(',')
@@ -541,7 +537,6 @@ async fn cmd_taxa_show(
     data_dir: &std::path::Path,
     name: &str,
     limit: usize,
-    compare: bool,
     misses: bool,
 ) -> anyhow::Result<()> {
     let lance = LanceStore::open(&data_dir.join("lancedb"))
@@ -562,19 +557,10 @@ async fn cmd_taxa_show(
         return cmd_taxa_show_misses(name, total, &batches);
     }
 
-    if compare {
-        println!("=== Taxa v1/v2 Comparison: {name} ({total} sections) ===\n");
-    } else {
-        println!("=== Taxa Classification: {name} ({total} sections) ===\n");
-    }
+    println!("=== Taxa Classification: {name} ({total} sections) ===\n");
 
     let mut section_num = 0usize;
     let mut classified_num = 0usize;
-    let mut diff_count = 0usize;
-    let mut v1_only_count = 0usize;
-    let mut v2_only_count = 0usize;
-    let mut v1_drrp_count = 0usize;
-    let mut v2_drrp_count = 0usize;
 
     for batch in &batches {
         let provision_col = batch.column_by_name("provision");
@@ -594,162 +580,63 @@ async fn cmd_taxa_show(
 
             section_num += 1;
 
-            if compare {
-                let cmp = fractalaw_core::taxa::parse_compare(&text);
+            let record = fractalaw_core::taxa::parse_v2(&text);
 
-                if !cmp.v1.duty_types.is_empty() {
-                    v1_drrp_count += 1;
-                }
-                if !cmp.v2.duty_types.is_empty() {
-                    v2_drrp_count += 1;
-                }
-
-                // In compare mode, show everything that has any signal in either version
-                let has_v1 = !cmp.v1.duty_types.is_empty()
-                    || !cmp.v1.governed_actors.is_empty()
-                    || !cmp.v1.government_actors.is_empty();
-                let has_v2 = !cmp.v2.duty_types.is_empty()
-                    || !cmp.v2.governed_actors.is_empty()
-                    || !cmp.v2.government_actors.is_empty();
-
-                if !has_v1 && !has_v2 {
-                    continue;
-                }
-                classified_num += 1;
-
-                if cmp.differs {
-                    diff_count += 1;
-                    if !cmp.v1.duty_types.is_empty() && cmp.v2.duty_types.is_empty() {
-                        v1_only_count += 1;
-                    }
-                    if cmp.v1.duty_types.is_empty() && !cmp.v2.duty_types.is_empty() {
-                        v2_only_count += 1;
-                    }
-                }
-
-                // Only show detail for provisions that differ
-                if cmp.differs {
-                    println!("--- {provision} [DIFFERS] ---");
-                    let v1_types: Vec<&str> =
-                        cmp.v1.duty_types.iter().map(|d| d.as_str()).collect();
-                    let v2_types: Vec<&str> =
-                        cmp.v2.duty_types.iter().map(|d| d.as_str()).collect();
-                    println!(
-                        "  v1 DRRP: {}",
-                        if v1_types.is_empty() {
-                            "(none)".to_string()
-                        } else {
-                            v1_types.join(", ")
-                        }
-                    );
-                    println!(
-                        "  v2 DRRP: {}",
-                        if v2_types.is_empty() {
-                            "(none)".to_string()
-                        } else {
-                            v2_types.join(", ")
-                        }
-                    );
-                    if let Some(ref c1) = cmp.v1.classification {
-                        println!(
-                            "  v1 Pattern: {:?} / {:?} ({:.0}%)",
-                            c1.family,
-                            c1.sub_type,
-                            c1.confidence * 100.0,
-                        );
-                    }
-                    if let Some(ref c2) = cmp.v2.classification {
-                        println!(
-                            "  v2 Pattern: {:?} / {:?} ({:.0}%)",
-                            c2.family,
-                            c2.sub_type,
-                            c2.confidence * 100.0,
-                        );
-                    }
-                    if !cmp.v1.governed_actors.is_empty() {
-                        println!("  Governed:   {}", cmp.v1.governed_actors.join(", "));
-                    }
-                    if !cmp.v1.government_actors.is_empty() {
-                        println!("  Government: {}", cmp.v1.government_actors.join(", "));
-                    }
-                    let preview = if cmp.cleaned_text.len() > 120 {
-                        format!("{}...", &cmp.cleaned_text[..120])
-                    } else {
-                        cmp.cleaned_text.clone()
-                    };
-                    println!("  Text:    {preview}");
-                    println!();
-                }
-            } else {
-                let record = fractalaw_core::taxa::parse_v2(&text);
-
-                // Skip sections with no classification signal.
-                if record.duty_types.is_empty()
-                    && record.governed_actors.is_empty()
-                    && record.government_actors.is_empty()
-                {
-                    continue;
-                }
-
-                classified_num += 1;
-                println!("--- {provision} ---");
-
-                if !record.duty_types.is_empty() {
-                    let types: Vec<&str> = record.duty_types.iter().map(|d| d.as_str()).collect();
-                    println!("  DRRP:    {}", types.join(", "));
-                }
-
-                if let Some(ref class) = record.classification {
-                    println!(
-                        "  Pattern: {:?} / {:?} ({:.0}%)",
-                        class.family,
-                        class.sub_type,
-                        class.confidence * 100.0,
-                    );
-                }
-
-                if !record.governed_actors.is_empty() {
-                    println!("  Governed:   {}", record.governed_actors.join(", "));
-                }
-                if !record.government_actors.is_empty() {
-                    println!("  Government: {}", record.government_actors.join(", "));
-                }
-
-                if !record.popimar.is_empty() {
-                    println!("  POPIMAR: {}", record.popimar.join(", "));
-                }
-                if !record.purposes.is_empty() {
-                    println!("  Purpose: {}", record.purposes.join(", "));
-                }
-
-                // Show clause_refined if available, otherwise a text preview.
-                if let Some(ref clause) = record.clause_refined {
-                    println!("  Clause:  {clause}");
-                } else {
-                    let preview = if record.cleaned_text.len() > 120 {
-                        format!("{}...", &record.cleaned_text[..120])
-                    } else {
-                        record.cleaned_text.clone()
-                    };
-                    println!("  Text:    {preview}");
-                }
-                println!();
+            // Skip sections with no classification signal.
+            if record.duty_types.is_empty()
+                && record.governed_actors.is_empty()
+                && record.government_actors.is_empty()
+            {
+                continue;
             }
+
+            classified_num += 1;
+            println!("--- {provision} ---");
+
+            if !record.duty_types.is_empty() {
+                let types: Vec<&str> = record.duty_types.iter().map(|d| d.as_str()).collect();
+                println!("  DRRP:    {}", types.join(", "));
+            }
+
+            if let Some(ref class) = record.classification {
+                println!(
+                    "  Pattern: {:?} / {:?} ({:.0}%)",
+                    class.family,
+                    class.sub_type,
+                    class.confidence * 100.0,
+                );
+            }
+
+            if !record.governed_actors.is_empty() {
+                println!("  Governed:   {}", record.governed_actors.join(", "));
+            }
+            if !record.government_actors.is_empty() {
+                println!("  Government: {}", record.government_actors.join(", "));
+            }
+
+            if !record.popimar.is_empty() {
+                println!("  POPIMAR: {}", record.popimar.join(", "));
+            }
+            if !record.purposes.is_empty() {
+                println!("  Purpose: {}", record.purposes.join(", "));
+            }
+
+            // Show clause_refined if available, otherwise a text preview.
+            if let Some(ref clause) = record.clause_refined {
+                println!("  Clause:  {clause}");
+            } else {
+                let preview = if record.cleaned_text.len() > 120 {
+                    format!("{}...", &record.cleaned_text[..120])
+                } else {
+                    record.cleaned_text.clone()
+                };
+                println!("  Text:    {preview}");
+            }
+            println!();
         }
     }
 
-    if compare {
-        println!("=== Summary ===");
-        println!("  Sections processed: {section_num}");
-        println!("  With any signal:    {classified_num}");
-        println!("  v1 DRRP count:      {v1_drrp_count}");
-        println!("  v2 DRRP count:      {v2_drrp_count}");
-        println!("  Differences:        {diff_count}");
-        println!("    v1-only (false positives removed by v2): {v1_only_count}");
-        println!("    v2-only (new matches in v2):             {v2_only_count}");
-    } else {
-        println!("=== {section_num} sections processed, {classified_num} with classifications ===");
-    }
+    println!("=== {section_num} sections processed, {classified_num} with classifications ===");
     Ok(())
 }
 
@@ -994,7 +881,7 @@ async fn cmd_taxa_enrich(
                     continue;
                 }
 
-                let record = fractalaw_core::taxa::parse(&text);
+                let record = fractalaw_core::taxa::parse_v2(&text);
                 // Skip provisions with no taxa signal at all (no DRRP, no actors, no purposes).
                 // We DO want to write provisions with purposes even if they have no DRRP content
                 // (e.g., Interpretation sections) so the purpose gate can work.

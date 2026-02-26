@@ -1,12 +1,10 @@
 //! Pattern-matching rules for duty type classification.
 //!
-//! Merged from three Elixir modules:
-//! - `Taxa.DutyTypeDefnGovernment` (v1)
-//! - `Taxa.DutyTypeDefnGovernmentV2` (v2)
-//! - `Taxa.DutyTypeDefnGoverned`
+//! Government patterns (v1 + v2) live here. Governed patterns have moved
+//! to `duty_patterns_v2` which uses actor-anchored matching.
 //!
-//! Also includes the shared helper functions from `Taxa.DutyTypeLib`:
-//! actor detection, modal/obligation keyword checks, confidence utilities.
+//! Also includes shared helper functions: government-actor detection,
+//! modal/obligation keyword checks, confidence utilities.
 
 use std::sync::LazyLock;
 
@@ -120,25 +118,6 @@ static GOV_PARL_REPORTING: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\breport\b.*\bparliament\b|\blaid? before parliament\b").unwrap()
 });
 
-// Governed
-static GOVERNED_GENERAL_DUTY_1: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?i)\b(?:employer|every employer)\b.*\b(?:shall ensure|ensure|duty)\b.*\b(?:health|safety|welfare)\b",
-    )
-    .unwrap()
-});
-static GOVERNED_GENERAL_DUTY_2: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\bgeneral duty\b.*\b(?:employer|occupier)\b").unwrap());
-static GOVERNED_SFAIRP: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)so far as is reasonably practicable|sfairp").unwrap());
-static GOVERNED_INFO: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\b(?:provide|give)\b.*\binformation\b").unwrap());
-static GOVERNED_RISK: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\b(?:assess|assessment)\b.*\brisks?\b").unwrap());
-static GOVERNED_TRAINING: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\btraining?\b|\binstructions?\b|\bcompeten(?:t|ce|cy)\b").unwrap()
-});
-
 // Shared helpers
 static OBLIGATION: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\bshall\b|\bmust\b|\bis required to\b|\bhas a duty\b").unwrap()
@@ -172,36 +151,11 @@ const GOVERNMENT_ACTORS: &[&str] = &[
     "regulations made",
 ];
 
-const GOVERNED_ACTORS: &[&str] = &[
-    "employer",
-    "self-employed",
-    "employee",
-    "occupier",
-    "manufacturer",
-    "supplier",
-    "designer",
-    "importer",
-    "installer",
-    "contractor",
-    "client",
-    "a person must",
-    "person who",
-    "every person",
-    "no person",
-    "duty holder",
-    "responsible person",
-];
-
 // ── Shared helper functions ──────────────────────────────────────────
 
 /// True when downcased text mentions a government-side actor.
 pub fn has_government_actor(text: &str) -> bool {
     GOVERNMENT_ACTORS.iter().any(|frag| text.contains(frag))
-}
-
-/// True when downcased text mentions a governed-side actor.
-pub fn has_governed_actor(text: &str) -> bool {
-    GOVERNED_ACTORS.iter().any(|frag| text.contains(frag))
 }
 
 /// True if text contains a strong obligation modal.
@@ -342,89 +296,6 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::ParliamentaryReporting,
             confidence: 0.80,
-            span: None,
-        });
-    }
-    None
-}
-
-/// Try governed (regulated entity) duty patterns against downcased text.
-///
-/// Pattern ordering matters: specific patterns are tried first, generic
-/// fallbacks (prescriptive, enabling) last.
-pub fn match_governed(text: &str) -> Option<DutyClassification> {
-    // ── Specific composite patterns (most specific first) ────────
-    if GOVERNED_GENERAL_DUTY_1.is_match(text) {
-        return Some(DutyClassification {
-            family: DutyFamily::Governed,
-            sub_type: DutySubType::GeneralDuty,
-            confidence: 0.90,
-            span: None,
-        });
-    }
-    if GOVERNED_GENERAL_DUTY_2.is_match(text) {
-        return Some(DutyClassification {
-            family: DutyFamily::Governed,
-            sub_type: DutySubType::GeneralDuty,
-            confidence: 0.85,
-            span: None,
-        });
-    }
-    if has_governed_actor(text) && has_prohibition(text) {
-        return Some(DutyClassification {
-            family: DutyFamily::Governed,
-            sub_type: DutySubType::Prohibitive,
-            confidence: 0.80,
-            span: None,
-        });
-    }
-    // ── Domain-specific patterns (before generic obligation check) ─
-    if GOVERNED_SFAIRP.is_match(text) && has_governed_actor(text) {
-        return Some(DutyClassification {
-            family: DutyFamily::Governed,
-            sub_type: DutySubType::SfairpDuty,
-            confidence: 0.80,
-            span: None,
-        });
-    }
-    if GOVERNED_RISK.is_match(text) && has_governed_actor(text) {
-        return Some(DutyClassification {
-            family: DutyFamily::Governed,
-            sub_type: DutySubType::RiskAssessment,
-            confidence: 0.80,
-            span: None,
-        });
-    }
-    if GOVERNED_INFO.is_match(text) && has_governed_actor(text) {
-        return Some(DutyClassification {
-            family: DutyFamily::Governed,
-            sub_type: DutySubType::InformationDuty,
-            confidence: 0.70,
-            span: None,
-        });
-    }
-    if GOVERNED_TRAINING.is_match(text) && has_governed_actor(text) {
-        return Some(DutyClassification {
-            family: DutyFamily::Governed,
-            sub_type: DutySubType::TrainingDuty,
-            confidence: 0.75,
-            span: None,
-        });
-    }
-    // ── Generic fallbacks ────────────────────────────────────────
-    if has_governed_actor(text) && has_obligation(text) {
-        return Some(DutyClassification {
-            family: DutyFamily::Governed,
-            sub_type: DutySubType::Prescriptive,
-            confidence: 0.55,
-            span: None,
-        });
-    }
-    if has_governed_actor(text) && has_enabling(text) {
-        return Some(DutyClassification {
-            family: DutyFamily::Governed,
-            sub_type: DutySubType::Enabling,
-            confidence: 0.45,
             span: None,
         });
     }
@@ -586,84 +457,6 @@ mod tests {
         );
     }
 
-    // ── Governed ─────────────────────────────────────────────────────
-
-    #[test]
-    fn governed_general_duty() {
-        let text = "it shall be the duty of every employer to ensure, so far as is \
-                    reasonably practicable, the health, safety and welfare at work of \
-                    all his employees";
-        let result = match_governed(text).unwrap();
-        assert_eq!(result.family, DutyFamily::Governed);
-        assert_eq!(result.sub_type, DutySubType::GeneralDuty);
-        assert!((result.confidence - 0.90).abs() < 0.01);
-    }
-
-    #[test]
-    fn governed_general_duty_v2() {
-        let text = "the general duty of every employer and every occupier";
-        assert_eq!(
-            match_governed(text),
-            Some(dc(DutyFamily::Governed, DutySubType::GeneralDuty, 0.85))
-        );
-    }
-
-    #[test]
-    fn governed_prohibitive() {
-        let text =
-            "no person shall carry out work at height unless a risk assessment has been completed";
-        assert_eq!(
-            match_governed(text).map(|c| c.sub_type),
-            Some(DutySubType::Prohibitive)
-        );
-    }
-
-    #[test]
-    fn governed_sfairp() {
-        let text = "every employer shall, so far as is reasonably practicable, prevent exposure";
-        let result = match_governed(text).unwrap();
-        // GeneralDuty matches first (employer + shall ensure + health/safety pattern)
-        // but if that doesn't match, SFAIRP will. Let's just check it classifies.
-        assert_eq!(result.family, DutyFamily::Governed);
-    }
-
-    #[test]
-    fn governed_information_duty() {
-        let text = "the employer shall provide information to employees about the risks";
-        let result = match_governed(text).unwrap();
-        assert_eq!(result.family, DutyFamily::Governed);
-        assert_eq!(result.sub_type, DutySubType::InformationDuty);
-    }
-
-    #[test]
-    fn governed_risk_assessment() {
-        let text = "every employer shall make a suitable and sufficient assessment of the risks";
-        let result = match_governed(text).unwrap();
-        assert_eq!(result.family, DutyFamily::Governed);
-        assert_eq!(result.sub_type, DutySubType::RiskAssessment);
-    }
-
-    #[test]
-    fn governed_training_duty() {
-        let text = "the employer shall ensure that every employee receives adequate training";
-        let result = match_governed(text).unwrap();
-        assert_eq!(result.family, DutyFamily::Governed);
-        assert_eq!(result.sub_type, DutySubType::TrainingDuty);
-    }
-
-    #[test]
-    fn governed_prescriptive_generic() {
-        let text = "the employer shall comply with the requirements of this regulation";
-        let result = match_governed(text).unwrap();
-        assert_eq!(result.sub_type, DutySubType::Prescriptive);
-    }
-
-    #[test]
-    fn governed_no_match_unrelated() {
-        let text = "the quick brown fox jumped over the lazy dog";
-        assert!(match_governed(text).is_none());
-    }
-
     // ── Helper functions ─────────────────────────────────────────────
 
     #[test]
@@ -671,13 +464,6 @@ mod tests {
         assert!(has_government_actor("the secretary of state may"));
         assert!(has_government_actor("the inspector shall"));
         assert!(!has_government_actor("every employer shall"));
-    }
-
-    #[test]
-    fn governed_actor_detection() {
-        assert!(has_governed_actor("every employer shall ensure"));
-        assert!(has_governed_actor("the occupier must"));
-        assert!(!has_governed_actor("the secretary of state may"));
     }
 
     #[test]
@@ -707,99 +493,5 @@ mod tests {
         assert!((clamp01(-0.1) - 0.0).abs() < 0.001);
         assert!((clamp01(1.5) - 1.0).abs() < 0.001);
         assert!((clamp01(0.1234) - 0.123).abs() < 0.001);
-    }
-
-    // ── True-negative regression tests (Iteration 1: contractor) ─────
-    // These provisions mention "contractor" but should NOT match governed
-    // patterns because they lack obligation modals or are definitional.
-
-    #[test]
-    fn contractor_heading_no_match() {
-        // CDM 2015 heading — no modal verb, no DRRP
-        let text = "duties of contractors";
-        assert!(match_governed(text).is_none());
-    }
-
-    #[test]
-    fn contractor_cross_reference_no_match() {
-        // CDM 2015 reg 7(2) — cross-reference, no modal
-        let text = "if a domestic client fails to make the appointments required \
-                    by regulation 5— (a) the designer in control of the \
-                    pre-construction phase of the project is the principal \
-                    designer; (b) the contractor in control of the construction \
-                    phase of the project is the principal contractor";
-        assert!(match_governed(text).is_none());
-    }
-
-    #[test]
-    fn contractor_interpretation_no_match() {
-        // CDM 2015 reg 8(1) — transitional interpretation, no modal
-        let text = "where, immediately before 6th april 2015 there is a principal \
-                    contractor appointed for a relevant project under regulation \
-                    14(2) of the 2007 regulations, for the purposes of these \
-                    regulations that person is the principal contractor";
-        assert!(match_governed(text).is_none());
-    }
-
-    #[test]
-    fn contractor_numbered_list_item_no_match() {
-        // CDM 2015 schedule item — just a data field, no modal
-        let text = "13. the name and address of any contractor already appointed.";
-        assert!(match_governed(text).is_none());
-    }
-
-    // ── True-negative regression tests (Iteration 5: a person must) ────
-    // "a person" appears frequently as an object/beneficiary.
-    // Only "a person must" is in GOVERNED_ACTORS — bare "a person" is NOT.
-
-    #[test]
-    fn person_definitional_no_match() {
-        // MHSWR reg 7 — "a person shall be regarded as competent" is definitional
-        let text = "a person shall be regarded as competent for the purposes of \
-                    paragraphs (1) and (8) where he has sufficient training and \
-                    experience or knowledge and other qualities";
-        assert!(match_governed(text).is_none());
-    }
-
-    #[test]
-    fn person_as_object_no_match() {
-        // HSWA s.6 — person is the object of the exception, not duty-holder
-        let text = "nothing in the preceding provisions of this section shall be \
-                    taken to require a person to repeat any testing, examination \
-                    or research";
-        assert!(match_governed(text).is_none());
-    }
-
-    #[test]
-    fn person_scope_exclusion_no_match() {
-        // PUWER reg 3 — application/scope provision, person is object
-        let text = "the requirements imposed by these regulations shall not apply \
-                    to a person in respect of work equipment supplied by him by \
-                    way of sale";
-        assert!(match_governed(text).is_none());
-    }
-
-    // ── True-negative regression tests (Iteration 3: client) ─────────
-
-    #[test]
-    fn client_heading_no_match() {
-        // CDM 2015 heading — no modal verb
-        let text = "client duties in relation to managing projects";
-        assert!(match_governed(text).is_none());
-    }
-
-    #[test]
-    fn client_cross_reference_no_match() {
-        // CDM 2015 reg 7(3) — application/scope, no modal
-        let text = "regulation 5(3) and (4) does not apply to a domestic client.";
-        assert!(match_governed(text).is_none());
-    }
-
-    #[test]
-    fn client_schedule_item_no_match() {
-        // CDM 2015 schedule — data field, no modal
-        let text = "5. the following contact details of the client: name, address, \
-                    telephone number and (if available) an email address.";
-        assert!(match_governed(text).is_none());
     }
 }

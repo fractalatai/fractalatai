@@ -56,9 +56,9 @@ pub struct ClassificationResult {
 /// Classify a **downcased** legal text into DRRP duty types.
 ///
 /// Tries pattern tiers in order:
-/// 1. Government v1 (strong patterns)
-/// 2. Government v2 (extended patterns)
-/// 3. Governed patterns
+/// 1. Government v1 (strong patterns — embedded actor keywords)
+/// 2. Government v2 (extended patterns — embedded actor keywords)
+/// 3. Governed: actor-anchored patterns (actor keyword before modal within window)
 /// 4. Falls back to `Unknown` / empty
 ///
 /// The family determines DRRP mapping:
@@ -66,33 +66,7 @@ pub struct ClassificationResult {
 /// - `Government` + enabling   → Power
 /// - `Governed`   + obligation → Duty
 /// - `Governed`   + enabling   → Right
-pub fn classify(text: &str) -> ClassificationResult {
-    // Try government v1 first
-    if let Some(dc) = duty_patterns::match_government_v1(text) {
-        return to_result(dc);
-    }
-    // Then government v2
-    if let Some(dc) = duty_patterns::match_government_v2(text) {
-        return to_result(dc);
-    }
-    // Then governed
-    if let Some(dc) = duty_patterns::match_governed(text) {
-        return to_result(dc);
-    }
-    // No match
-    ClassificationResult {
-        duty_types: Vec::new(),
-        classification: None,
-    }
-}
-
-/// Classify using v2 actor-anchored patterns for the governed tier.
-///
-/// Government tiers still use v1 patterns (they are already actor-anchored
-/// by design — each government pattern embeds its actor keyword). Only the
-/// governed tier is replaced with actor-anchored matching from
-/// `duty_patterns_v2::match_governed_v2()`.
-pub fn classify_v2(
+pub fn classify(
     text: &str,
     governed_actors: &[ActorMatch],
     _government_actors: &[ActorMatch],
@@ -194,39 +168,50 @@ pub fn sort_duty_types(types: &mut Vec<DutyType>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::taxa::actors::ActorMatch;
+
+    fn actor(label: &str, keyword: &str) -> ActorMatch {
+        ActorMatch {
+            label: label.into(),
+            keyword: keyword.into(),
+            offset: 0,
+        }
+    }
 
     #[test]
     fn classify_employer_duty() {
         let text = "every employer shall ensure the health, safety and welfare of employees";
-        let result = classify(text);
+        let actors = vec![actor("Org: Employer", "employer")];
+        let result = classify(text, &actors, &[]);
         assert_eq!(result.duty_types, vec![DutyType::Duty]);
     }
 
     #[test]
     fn classify_government_responsibility() {
         let text = "the secretary of state shall have power to make regulations";
-        let result = classify(text);
+        let result = classify(text, &[], &[]);
         assert_eq!(result.duty_types, vec![DutyType::Responsibility]);
     }
 
     #[test]
     fn classify_government_power() {
         let text = "the commission may authorise any person to carry out";
-        let result = classify(text);
+        let result = classify(text, &[], &[]);
         assert_eq!(result.duty_types, vec![DutyType::Power]);
     }
 
     #[test]
     fn classify_governed_right() {
         let text = "the employee may request a review of the assessment";
-        let result = classify(text);
+        let actors = vec![actor("Ind: Employee", "employee")];
+        let result = classify(text, &actors, &[]);
         assert_eq!(result.duty_types, vec![DutyType::Right]);
     }
 
     #[test]
     fn classify_unknown_text() {
         let text = "the quick brown fox jumped over the lazy dog";
-        let result = classify(text);
+        let result = classify(text, &[], &[]);
         assert!(result.duty_types.is_empty());
         assert!(result.classification.is_none());
     }
@@ -234,17 +219,28 @@ mod tests {
     #[test]
     fn classify_prohibition_is_duty() {
         let text = "no person shall carry out work at height unless properly trained";
-        let result = classify(text);
+        let actors = vec![actor("Ind: Person", "person")];
+        let result = classify(text, &actors, &[]);
         assert_eq!(result.duty_types, vec![DutyType::Duty]);
     }
 
     #[test]
     fn classify_gov_direction_is_responsibility() {
         let text = "the secretary of state may give directions to the executive";
-        let result = classify(text);
-        // Direction is government v2 — maps to Responsibility (not Power)
-        // because it's an obligation on government to direct
+        let result = classify(text, &[], &[]);
         assert!(!result.duty_types.is_empty());
+    }
+
+    #[test]
+    fn classify_rejects_actor_as_object() {
+        let text = "information must be provided to the contractor before work begins";
+        let actors = vec![actor("SC: C: Contractor", "contractor")];
+        let result = classify(text, &actors, &[]);
+        assert!(
+            result.duty_types.is_empty(),
+            "actor-as-object should not produce DRRP, got: {:?}",
+            result.duty_types
+        );
     }
 
     #[test]
@@ -260,46 +256,6 @@ mod tests {
             types,
             vec![DutyType::Duty, DutyType::Right, DutyType::Power]
         );
-    }
-
-    // ── classify_v2 tests ─────────────────────────────────────────────
-
-    #[test]
-    fn classify_v2_employer_duty() {
-        use crate::taxa::actors::ActorMatch;
-        let text = "every employer shall ensure the health, safety and welfare of employees";
-        let actors = vec![ActorMatch {
-            label: "Org: Employer".into(),
-            keyword: "employer".into(),
-            offset: 6,
-        }];
-        let result = classify_v2(text, &actors, &[]);
-        assert_eq!(result.duty_types, vec![DutyType::Duty]);
-    }
-
-    #[test]
-    fn classify_v2_rejects_actor_as_object() {
-        use crate::taxa::actors::ActorMatch;
-        let text = "information must be provided to the contractor before work begins";
-        let actors = vec![ActorMatch {
-            label: "SC: C: Contractor".into(),
-            keyword: "contractor".into(),
-            offset: 35,
-        }];
-        let result = classify_v2(text, &actors, &[]);
-        assert!(
-            result.duty_types.is_empty(),
-            "actor-as-object should not produce DRRP, got: {:?}",
-            result.duty_types
-        );
-    }
-
-    #[test]
-    fn classify_v2_government_still_works() {
-        // Government patterns are unchanged in v2
-        let text = "the secretary of state shall have power to make regulations";
-        let result = classify_v2(text, &[], &[]);
-        assert_eq!(result.duty_types, vec![DutyType::Responsibility]);
     }
 
     #[test]

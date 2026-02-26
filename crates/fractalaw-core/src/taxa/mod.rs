@@ -67,77 +67,22 @@ pub struct TaxaRecord {
     pub clause_refined: Option<String>,
 }
 
-/// Side-by-side v1/v2 comparison result.
-#[derive(Debug, Clone)]
-pub struct CompareRecord {
-    /// Cleaned text that was analysed.
-    pub cleaned_text: String,
-    /// v1 (blunt gate) result.
-    pub v1: TaxaRecord,
-    /// v2 (actor-anchored) result.
-    pub v2: TaxaRecord,
-    /// Whether the DRRP types differ between v1 and v2.
-    pub differs: bool,
+/// Run the full Taxa classification pipeline on raw legislative text.
+///
+/// Delegates to `parse_v2()` — the actor-anchored pipeline is now the default.
+pub fn parse(raw_text: &str) -> TaxaRecord {
+    parse_v2(raw_text)
 }
 
-/// Run the full Taxa classification pipeline on raw legislative text.
+/// Run the actor-anchored Taxa classification pipeline on raw legislative text.
 ///
 /// Steps:
 /// 1. Clean the text (HTML strip, normalise whitespace)
 /// 2. Classify purpose (EARLY GATE — skip DRRP if non-DRRP purpose)
 /// 3. Extract actors (only if DRRP-bearing)
-/// 4. Classify duty type (DRRP) (only if DRRP-bearing)
+/// 4. Classify duty type via actor-anchored v2 patterns
 /// 5. Classify POPIMAR categories (only if DRRP-bearing)
-pub fn parse(raw_text: &str) -> TaxaRecord {
-    if raw_text.trim().is_empty() {
-        return TaxaRecord::default();
-    }
-
-    // Step 1: Clean
-    let cleaned = text_cleaner::clean(raw_text);
-
-    // Step 2: Purpose classification (EARLY GATE)
-    let purposes = purpose::classify(&cleaned);
-
-    // Step 3: Check if we should skip DRRP processing
-    if should_skip_drrp(&purposes) {
-        return TaxaRecord {
-            cleaned_text: cleaned,
-            purposes,
-            ..Default::default()
-        };
-    }
-
-    // Step 4: Extract actors (only for DRRP-bearing provisions)
-    let extracted = actors::extract_actors(&cleaned);
-
-    // Step 5: Classify duty type (DRRP)
-    let lower = cleaned.to_lowercase();
-    let cr = duty_type::classify(&lower);
-
-    // Step 6: POPIMAR (use duty type labels for default logic)
-    let dt_labels: Vec<&str> = cr.duty_types.iter().map(|d| d.as_str()).collect();
-    let popimar = popimar::classify_with_duty_types(&cleaned, &dt_labels);
-
-    let clause_refined = extract_clause(&cleaned, cr.classification.as_ref());
-
-    TaxaRecord {
-        cleaned_text: cleaned,
-        governed_actors: extracted.governed_labels(),
-        government_actors: extracted.government_labels(),
-        duty_types: cr.duty_types,
-        popimar,
-        purposes,
-        classification: cr.classification,
-        clause_refined,
-    }
-}
-
-/// Run the v2 (actor-anchored) Taxa classification pipeline.
-///
-/// Same stages as `parse()` but uses `classify_v2()` for the governed tier,
-/// which requires the actor keyword to appear before the modal verb within a
-/// character-distance window.
+/// 6. Extract focused clause from match span
 pub fn parse_v2(raw_text: &str) -> TaxaRecord {
     if raw_text.trim().is_empty() {
         return TaxaRecord::default();
@@ -156,7 +101,7 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
 
     let extracted = actors::extract_actors(&cleaned);
     let lower = cleaned.to_lowercase();
-    let cr = duty_type::classify_v2(&lower, &extracted.governed, &extracted.government);
+    let cr = duty_type::classify(&lower, &extracted.governed, &extracted.government);
 
     let dt_labels: Vec<&str> = cr.duty_types.iter().map(|d| d.as_str()).collect();
     let popimar = popimar::classify_with_duty_types(&cleaned, &dt_labels);
@@ -173,78 +118,6 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
         purposes,
         classification: cr.classification,
         clause_refined,
-    }
-}
-
-/// Run both v1 and v2 pipelines and return a side-by-side comparison.
-pub fn parse_compare(raw_text: &str) -> CompareRecord {
-    if raw_text.trim().is_empty() {
-        return CompareRecord {
-            cleaned_text: String::new(),
-            v1: TaxaRecord::default(),
-            v2: TaxaRecord::default(),
-            differs: false,
-        };
-    }
-
-    let cleaned = text_cleaner::clean(raw_text);
-    let purposes = purpose::classify(&cleaned);
-
-    if should_skip_drrp(&purposes) {
-        let rec = TaxaRecord {
-            cleaned_text: cleaned.clone(),
-            purposes,
-            ..Default::default()
-        };
-        return CompareRecord {
-            cleaned_text: cleaned,
-            v1: rec.clone(),
-            v2: rec,
-            differs: false,
-        };
-    }
-
-    let extracted = actors::extract_actors(&cleaned);
-    let lower = cleaned.to_lowercase();
-
-    // v1: blunt gate
-    let cr1 = duty_type::classify(&lower);
-    let dt1_labels: Vec<&str> = cr1.duty_types.iter().map(|d| d.as_str()).collect();
-    let popimar1 = popimar::classify_with_duty_types(&cleaned, &dt1_labels);
-
-    // v2: actor-anchored
-    let cr2 = duty_type::classify_v2(&lower, &extracted.governed, &extracted.government);
-    let dt2_labels: Vec<&str> = cr2.duty_types.iter().map(|d| d.as_str()).collect();
-    let popimar2 = popimar::classify_with_duty_types(&cleaned, &dt2_labels);
-
-    let differs = cr1.duty_types != cr2.duty_types;
-
-    let clause1 = extract_clause(&cleaned, cr1.classification.as_ref());
-    let clause2 = extract_clause(&cleaned, cr2.classification.as_ref());
-
-    CompareRecord {
-        cleaned_text: cleaned.clone(),
-        v1: TaxaRecord {
-            cleaned_text: cleaned.clone(),
-            governed_actors: extracted.governed_labels(),
-            government_actors: extracted.government_labels(),
-            duty_types: cr1.duty_types,
-            popimar: popimar1,
-            purposes: purposes.clone(),
-            classification: cr1.classification,
-            clause_refined: clause1,
-        },
-        v2: TaxaRecord {
-            cleaned_text: cleaned,
-            governed_actors: extracted.governed_labels(),
-            government_actors: extracted.government_labels(),
-            duty_types: cr2.duty_types,
-            popimar: popimar2,
-            purposes,
-            classification: cr2.classification,
-            clause_refined: clause2,
-        },
-        differs,
     }
 }
 
@@ -704,25 +577,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn parse_compare_detects_difference() {
-        // v1 blunt gate matches (contractor + must both present)
-        // v2 rejects (contractor appears AFTER must)
-        let cmp =
-            parse_compare("information must be provided to the contractor before work begins");
-        assert!(!cmp.v1.duty_types.is_empty(), "v1 should match");
-        assert!(cmp.v2.duty_types.is_empty(), "v2 should not match");
-        assert!(cmp.differs, "should detect difference");
-    }
-
-    #[test]
-    fn parse_compare_agrees_on_employer() {
-        let cmp = parse_compare("the employer shall ensure the health and safety of employees");
-        assert!(!cmp.v1.duty_types.is_empty());
-        assert!(!cmp.v2.duty_types.is_empty());
-        assert!(!cmp.differs, "both should agree on employer duty");
-    }
-
     // ── True-negative regression tests (Iteration 5: a person must) ───
 
     #[test]
@@ -758,7 +612,7 @@ mod tests {
     // ── True-negative regression tests (Iteration 1: contractor) ─────
     // Full-pipeline tests: provisions mentioning "contractor" that should
     // NOT produce DRRP output. These guard against false positives when
-    // expanding the GOVERNED_ACTORS list.
+    // expanding the governed actor patterns.
 
     #[test]
     fn contractor_definition_no_drrp() {
