@@ -1194,3 +1194,147 @@ UK_asp_2019_15, section 1:
 - ~~Item 6: Run taxa → polisher end-to-end on 12-law sample~~ — **DONE** (172 provisions polished, evaluation report generated)
 - Item 7 expanded: Build CLI command to display AI polish results AND comparison tooling (taxa vs AI diff viewer)
 - **NEW Item 10**: Retrain ONNX model on GPU with DeBERTa-v3-base, full dataset, 512 tokens, until clause span extraction converges
+
+---
+
+## Session Closure (2026-02-26 07:45)
+
+**Status**: ✅ **COMPLETE** — Stack validated, refinement work moved to new session
+
+### Achievements Summary
+
+This session successfully completed the migration of the sertantai DRRP/Taxa pipeline into fractalaw and validated the full Phase C architecture:
+
+**Phase A: Taxa Migration (Elixir → Rust)** ✅
+- Migrated 18 taxa modules (~4,500 lines) from Elixir to pure Rust
+- Implemented in `crates/fractalaw-core/src/taxa/` (no optional deps)
+- 64 unit tests, all passing
+- CLI command: `fractalaw taxa enrich` working
+- Performance: ~10-50ms per provision
+
+**Phase B: ONNX Model Training** ✅
+- Built 3-head model: clause span + qualifier span + holder classification
+- Trained on 200 examples (proof-of-concept)
+- Exported to ONNX with INT8 quantization (63.7 MB)
+- Model loading and inference working in `fractalaw-ai::DrrpExtractor`
+
+**Phase C: LanceDB-Only Polisher** ✅
+- Schema: Added 17 columns to `legislation_text` (10 taxa + 7 AI)
+- LanceStore: `update_taxa()`, `update_polished()`, `query_unpolished()` methods
+- Host: LanceDB query/mutation routing in `generate_impl()` and `execute_impl()`
+- Guest: Rewritten `drrp-polisher` for LanceDB-only (no DuckDB)
+- CLI: `fractalaw run drrp-polisher.wasm` working
+- **100% local inference validated** (0 API tokens used)
+
+**Phase C Evaluation** ✅
+- 12-law sample defined (5 laws with taxa data currently)
+- 172 provisions polished with ONNX model
+- Side-by-side comparison generated (taxa vs AI)
+- **Critical finding**: AI model severely truncating clauses (root cause identified)
+- Evaluation report: 680 lines with detailed analysis
+
+### Critical Finding
+
+The AI model is producing clause fragments (5-320 chars) instead of complete clauses (200-3000+ chars). Root cause is span extraction underfitting:
+- Only 200 training examples (7K+ available)
+- Max sequence length 128 tokens (too short)
+- Only 3 epochs (needs 5-10)
+- Clause span accuracy 60.5% (needs improvement)
+
+**Infrastructure is fully validated** — problem is purely model quality, not architecture.
+
+### What Works
+
+1. ✅ Taxa regex classification (fast, comprehensive DRRP taxonomy)
+2. ✅ WASM guest → Rust host → ONNX Runtime pipeline (100% local)
+3. ✅ LanceDB query/mutation routing from WASM guests
+4. ✅ ONNX model loading and inference (DeBERTa INT8)
+5. ✅ Taxa + AI data co-located in LanceDB
+6. ✅ CLI commands for enrichment and polishing
+
+### What Needs Improvement
+
+1. ⚠️ Taxa regex patterns (clause boundaries, actor extraction precision)
+2. ⚠️ AI model training (needs full dataset, 512 tokens, DeBERTa-v3-base, 5+ epochs)
+3. ⚠️ Evaluation methodology (need quantitative metrics: precision/recall/F1)
+4. ⚠️ Coverage (only 676 provisions with taxa data, 7 major UK ESH laws pending)
+
+### Files Created/Modified
+
+**New files** (17 total):
+- `crates/fractalaw-core/src/taxa/*.rs` (13 modules, ~2,800 lines)
+- `crates/fractalaw-ai/src/extractor.rs` (ONNX inference, ~400 lines)
+- `scripts/train_drrp_model.py` (PyTorch training script)
+- `scripts/export_onnx.py` (ONNX export + quantization)
+- `scripts/evaluate_polisher.sh` (evaluation report generator)
+- `data/sample-laws-12.txt` (12-law sample)
+- `data/evaluation_detailed_20260226.txt` (680-line side-by-side comparison)
+
+**Modified files** (12 core files):
+- `crates/fractalaw-core/src/schema.rs` — Added 17 columns
+- `crates/fractalaw-core/src/drrp.rs` — Taxa classification types
+- `crates/fractalaw-store/src/lance.rs` — Taxa/polish write methods
+- `crates/fractalaw-host/src/lib.rs` — ONNX routing, LanceDB queries
+- `crates/fractalaw-cli/src/main.rs` — `taxa enrich` command
+- `guests/drrp-polisher/src/lib.rs` — Rewritten for LanceDB-only
+- Multiple Cargo.toml files for feature gates
+
+**Commits** (11 total in this session):
+- `a0af20e` — Taxa enrichment with LRT DRRP columns
+- `f3d64a7` — Wire taxa enrichment into pipeline
+- `48bbf4e` — Wire taxa classifier into CLI
+- `70accbd` — Implement DRRP/Taxa regex pipeline (#16)
+- `b4583fe` — Implement DRRP polisher pipeline (#15)
+- `7782232` — Fix LanceDB OFFSET support
+- `ea3aedd` — Document Phase C validation
+- `48c26f7` — Add Phase C evaluation script
+- `dc466e6` — Document critical finding
+
+### Handoff to Next Session
+
+**New session**: [02-26-26-taxa-refinement.md](02-26-26-taxa-refinement.md)
+
+**Scope**: Refine taxa classification (regex + AI) to improve precision and reliability. Stack is proven — now finesse the technique.
+
+**Priorities**:
+1. Run taxa enrichment on 7 major UK ESH laws (expand dataset from 676 to ~5K+ provisions)
+2. Analyze taxa regex quality, identify improvement areas
+3. Refine regex patterns (clause boundaries, actor extraction)
+4. Prepare GPU training: Export full dataset, update script for 512 tokens + DeBERTa-v3-base
+5. Build quantitative evaluation framework (precision/recall/F1)
+
+**Out of scope for refinement**: Infrastructure changes (WIT, host functions, schema). Phase C architecture is complete and working.
+
+### Backlog Status
+
+**Completed this session**:
+- ~~Item 3: LanceDB query host function for polisher~~ ✅
+- ~~Item 4: In-memory pipeline optimization~~ ✅
+- ~~Item 6: Run taxa → polisher end-to-end on 12-law sample~~ ✅
+
+**Moved to refinement session**:
+- Item 1: `RegexSet` pre-filter optimization
+- Item 2: `rayon` parallelism for batch classification
+- Item 7: Build comparison tooling (CLI command for AI polish display)
+- Item 10: Retrain ONNX model on GPU with full dataset
+
+**Future phases** (not this session or refinement):
+- Item 5: Copy polished results from LanceDB → DuckDB (Phase D)
+- Item 8: Clean up Phase A artifacts (`polished_drrp` DDL, `*_ai` columns)
+- Item 9: Implement LanceDB `add_columns()` wrapper for safe migrations
+
+### Session Metrics
+
+**Duration**: 2026-02-24 → 2026-02-26 (3 days)
+**Lines of code**: ~4,500 migrated + ~1,200 new = ~5,700 total
+**Test coverage**: 64 unit tests (taxa), 7 integration tests (extractor)
+**Provisions processed**: 676 with taxa, 172 with AI polish
+**Model size**: 63.7 MB (INT8 quantized)
+**Inference**: 100% local (0 API tokens)
+**Commits**: 11
+**Session document**: 1,200+ lines
+
+---
+
+**Session closed**: 2026-02-26 07:45 GMT
+**Next session**: [02-26-26-taxa-refinement.md](02-26-26-taxa-refinement.md)
