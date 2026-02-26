@@ -163,12 +163,17 @@ fn extract_clause(
     let dc = classification?;
 
     if let Some(span) = dc.span {
-        // Span-based extraction — we know exactly where actor and modal are
+        // Span-based extraction — we know exactly where actor and modal are.
+        // Span offsets come from regex on lowercased text; snap to char
+        // boundaries in the original cleaned_text (safe for rare multi-byte chars).
         let text_len = cleaned_text.len();
+        let actor_start = snap_char_boundary_down(cleaned_text, span.actor_start);
+        let modal_end = snap_char_boundary_down(cleaned_text, span.modal_end);
 
         // Start: SUBJECT_WINDOW before actor, snapped to sentence start
-        let raw_start = span.actor_start.saturating_sub(SUBJECT_WINDOW);
-        let window_before = &cleaned_text[raw_start..span.actor_start];
+        let raw_start = actor_start.saturating_sub(SUBJECT_WINDOW);
+        let raw_start = snap_char_boundary_down(cleaned_text, raw_start);
+        let window_before = &cleaned_text[raw_start..actor_start];
         // Find last sentence boundary (. or ; followed by space+uppercase) in the window
         let start = if let Some(pos) = find_last_sentence_start(window_before) {
             raw_start + pos
@@ -180,11 +185,12 @@ fn extract_clause(
         };
 
         // End: ACTION_WINDOW after modal end, snapped to sentence end
-        let raw_end = (span.modal_end + ACTION_WINDOW).min(text_len);
-        let window_after = &cleaned_text[span.modal_end..raw_end];
+        let raw_end =
+            snap_char_boundary_down(cleaned_text, (modal_end + ACTION_WINDOW).min(text_len));
+        let window_after = &cleaned_text[modal_end..raw_end];
         let end = if let Some(pos) = find_first_sentence_end(window_after) {
             // Include the punctuation
-            (span.modal_end + pos + 1).min(text_len)
+            (modal_end + pos + 1).min(text_len)
         } else {
             snap_to_word_end(cleaned_text, raw_end)
         };
@@ -245,6 +251,15 @@ fn find_last_sentence_start(window: &str) -> Option<usize> {
 /// Find the position of the first sentence-ending punctuation in `window`.
 fn find_first_sentence_end(window: &str) -> Option<usize> {
     SENTENCE_END_RE.find(window).map(|m| m.start())
+}
+
+/// Snap a byte offset down to the nearest valid char boundary.
+fn snap_char_boundary_down(text: &str, offset: usize) -> usize {
+    let mut pos = offset.min(text.len());
+    while pos > 0 && !text.is_char_boundary(pos) {
+        pos -= 1;
+    }
+    pos
 }
 
 /// Snap a byte offset forward to the next word boundary (space).

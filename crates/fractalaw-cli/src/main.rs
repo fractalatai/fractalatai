@@ -188,6 +188,9 @@ enum TaxaAction {
         /// If not specified, enriches all laws without taxa data
         #[arg(long)]
         laws: Option<String>,
+        /// Re-enrich all laws (clear existing DuckDB taxa columns, re-process all LanceDB text)
+        #[arg(long)]
+        force: bool,
     },
 }
 
@@ -254,13 +257,13 @@ async fn main() -> anyhow::Result<()> {
                 misses,
                 clauses,
             } => cmd_taxa_show(&data_dir, &name, limit, misses, clauses).await,
-            TaxaAction::Enrich { laws } => {
+            TaxaAction::Enrich { laws, force } => {
                 let law_filter = laws.as_ref().map(|s| {
                     s.split(',')
                         .map(|l| l.trim().to_string())
                         .collect::<Vec<_>>()
                 });
-                cmd_taxa_enrich(&data_dir, &open_duck(&data_dir)?, law_filter).await
+                cmd_taxa_enrich(&data_dir, &open_duck(&data_dir)?, law_filter, force).await
             }
         },
 
@@ -634,7 +637,8 @@ async fn cmd_taxa_show(
                 println!("  Clause:  {clause}");
             } else {
                 let preview = if record.cleaned_text.len() > 120 {
-                    format!("{}...", &record.cleaned_text[..120])
+                    let end = truncate_at_char_boundary(&record.cleaned_text, 120);
+                    format!("{}...", &record.cleaned_text[..end])
                 } else {
                     record.cleaned_text.clone()
                 };
@@ -741,7 +745,8 @@ fn cmd_taxa_show_misses(
                 println!("  Purpose:  {}", m.purposes.join(", "));
             }
             let preview = if m.cleaned_text.len() > 200 {
-                format!("{}...", &m.cleaned_text[..200])
+                let end = truncate_at_char_boundary(&m.cleaned_text, 200);
+                format!("{}...", &m.cleaned_text[..end])
             } else {
                 m.cleaned_text.clone()
             };
@@ -953,6 +958,7 @@ async fn cmd_taxa_enrich(
     data_dir: &std::path::Path,
     store: &DuckStore,
     law_filter: Option<Vec<String>>,
+    force: bool,
 ) -> anyhow::Result<()> {
     use std::collections::BTreeSet;
 
@@ -960,10 +966,50 @@ async fn cmd_taxa_enrich(
         .await
         .context("opening LanceDB")?;
 
-    // If specific laws requested, use those; otherwise find all laws without taxa data
+    // --force: clear existing DuckDB taxa columns so all laws get re-enriched
+    if force && law_filter.is_none() {
+        eprintln!("--force: clearing DuckDB taxa columns for re-enrichment...");
+        store.execute(
+            "UPDATE legislation SET
+                duty_holder = NULL,
+                rights_holder = NULL,
+                responsibility_holder = NULL,
+                power_holder = NULL,
+                duty_type = NULL,
+                role = NULL,
+                role_gvt = NULL",
+        )?;
+        eprintln!("  Done — all taxa columns set to NULL.");
+    }
+
+    // Get distinct law names from LanceDB (only laws with full text can be enriched).
+    let lance_law_names: std::collections::BTreeSet<String> = {
+        let all_batches = lance.query_legislation_text("true", 200_000, 0).await?;
+        let mut names = std::collections::BTreeSet::new();
+        for batch in &all_batches {
+            if let Some(col) = batch.column_by_name("law_name") {
+                for i in 0..batch.num_rows() {
+                    if let Some(name) = get_string_value(col.as_ref(), i) {
+                        names.insert(name);
+                    }
+                }
+            }
+        }
+        names
+    };
+
+    // If specific laws requested, use those; otherwise find laws without taxa data
     let law_names: Vec<String> = if let Some(filter) = law_filter {
         println!("=== Taxa Enrichment: {} specified laws ===\n", filter.len());
         filter
+    } else if force {
+        // --force: re-enrich all laws that have LanceDB text
+        let names: Vec<String> = lance_law_names.iter().cloned().collect();
+        println!(
+            "=== Taxa Enrichment (--force): {} laws with LanceDB text ===\n",
+            names.len()
+        );
+        names
     } else {
         // Find laws that have NO DRRP taxa data yet (duty_holder is null or empty).
         let law_batches = store.query_arrow(
@@ -979,16 +1025,19 @@ async fn cmd_taxa_enrich(
                 (0..b.num_rows())
                     .filter_map(move |i| col.and_then(|c| get_string_value(c.as_ref(), i)))
             })
+            // Only process laws that actually have text in LanceDB
+            .filter(|name| lance_law_names.contains(name))
             .collect();
 
         if names.is_empty() {
-            println!("All laws already have DRRP taxa data.");
+            println!("All laws with LanceDB text already have DRRP taxa data.");
             return Ok(());
         }
 
         println!(
-            "=== Taxa Enrichment: {} laws without DRRP data ===\n",
-            names.len()
+            "=== Taxa Enrichment: {} laws without DRRP data (of {} with text) ===\n",
+            names.len(),
+            lance_law_names.len()
         );
         names
     };
@@ -1122,7 +1171,8 @@ async fn cmd_taxa_enrich(
 
                 // Map duty types to holder columns and DRRPEntry lists.
                 let clause_preview = if record.cleaned_text.len() > 200 {
-                    format!("{}...", &record.cleaned_text[..200])
+                    let end = truncate_at_char_boundary(&record.cleaned_text, 200);
+                    format!("{}...", &record.cleaned_text[..end])
                 } else {
                     record.cleaned_text.clone()
                 };
@@ -2279,6 +2329,15 @@ fn write_classifications(
 
     store.execute("DROP TABLE IF EXISTS _tmp_classifications")?;
     Ok(())
+}
+
+/// Find the largest byte offset <= `max_bytes` that is a valid char boundary.
+fn truncate_at_char_boundary(s: &str, max_bytes: usize) -> usize {
+    let mut end = max_bytes.min(s.len());
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    end
 }
 
 /// Format an iterator of strings as a DuckDB array literal: `['a', 'b']` or `NULL`.

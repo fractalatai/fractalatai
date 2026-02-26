@@ -85,7 +85,7 @@ fn find_last_modal(text: &str) -> Option<(usize, usize, String)> {
 // ── Subject extraction ───────────────────────────────────────────────
 
 fn extract_subject(text: &str, modal_start: usize) -> String {
-    let window_start = modal_start.saturating_sub(SUBJECT_WINDOW);
+    let window_start = snap_down(text, modal_start.saturating_sub(SUBJECT_WINDOW));
     let before_modal = &text[window_start..modal_start];
 
     // Find last sentence start (capital letter after period/semicolon)
@@ -117,7 +117,10 @@ fn clean_leading(text: &str) -> String {
 // ── Action extraction ────────────────────────────────────────────────
 
 fn extract_action(raw_clause: &str, modal_end: usize, section_text: Option<&str>) -> String {
-    let end = (modal_end + ACTION_WINDOW).min(raw_clause.len());
+    let end = snap_up(
+        raw_clause,
+        (modal_end + ACTION_WINDOW).min(raw_clause.len()),
+    );
     let after = &raw_clause[modal_end..end];
 
     if after.trim().is_empty() {
@@ -136,8 +139,8 @@ fn extract_action_from_section(raw_clause: &str, section_text: &str) -> String {
     let Some((modal_start, _modal_len, modal_text)) = find_last_modal(raw_clause) else {
         return String::new();
     };
-    let ctx_start = modal_start.saturating_sub(40);
-    let ctx_end = (modal_start + 60).min(raw_clause.len());
+    let ctx_start = snap_down(raw_clause, modal_start.saturating_sub(40));
+    let ctx_end = snap_up(raw_clause, (modal_start + 60).min(raw_clause.len()));
     let context = &raw_clause[ctx_start..ctx_end];
 
     // Try to find context in section text
@@ -145,7 +148,10 @@ fn extract_action_from_section(raw_clause: &str, section_text: &str) -> String {
         let section_context = &section_text[pos..];
         if let Some(modal_pos) = section_context.find(&modal_text) {
             let action_start = modal_pos + modal_text.len();
-            let action_end = (action_start + ACTION_WINDOW).min(section_context.len());
+            let action_end = snap_up(
+                section_context,
+                (action_start + ACTION_WINDOW).min(section_context.len()),
+            );
             return extract_to_sentence_end(&section_context[action_start..action_end]);
         }
     }
@@ -193,6 +199,26 @@ fn combine_clause(subject: &str, modal: &str, action: &str) -> String {
     truncate_smart(&clause, MAX_CLAUSE_LENGTH)
 }
 
+// ── Char-boundary helpers ────────────────────────────────────────────
+
+/// Snap a byte offset down to the nearest char boundary (for start of slices).
+fn snap_down(text: &str, offset: usize) -> usize {
+    let mut pos = offset.min(text.len());
+    while pos > 0 && !text.is_char_boundary(pos) {
+        pos -= 1;
+    }
+    pos
+}
+
+/// Snap a byte offset up to the nearest char boundary (for end of slices).
+fn snap_up(text: &str, offset: usize) -> usize {
+    let mut pos = offset.min(text.len());
+    while pos < text.len() && !text.is_char_boundary(pos) {
+        pos += 1;
+    }
+    pos
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 fn ensure_clean_ending(text: &str) -> String {
@@ -219,7 +245,8 @@ fn truncate_smart(text: &str, max_len: usize) -> String {
     if text.len() <= max_len {
         return text.to_string();
     }
-    let truncated = &text[..max_len.saturating_sub(3)];
+    let cut = snap_down(text, max_len.saturating_sub(3));
+    let truncated = &text[..cut];
     // Try to find a sentence boundary
     if let Some(m) = SENTENCE_END_RE.find_iter(truncated).last()
         && m.start() > max_len / 2
