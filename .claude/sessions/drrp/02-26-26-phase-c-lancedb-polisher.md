@@ -31,7 +31,7 @@ Most of Phase C was implemented in earlier sessions (`f60ce6e`, `7782232`):
 cd guests/drrp-polisher && cargo component build --release
 ```
 
-The guest source was updated in `7782232` (LanceDB OFFSET fix) but the WASM binary predates it.
+The guest was **completely rewritten** for LanceDB-only mode (`f60ce6e`, `7782232`) — new data model (`ProvisionRow` vs old `Annotation`), queries `legislation_text` instead of `drrp_annotations`, writes `ai_*` columns back to LanceDB instead of inserting into `polished_drrp` in DuckDB. The compiled WASM on disk still has the old DuckDB code. Must rebuild before running.
 
 ### 2. Fix pre-existing host test
 
