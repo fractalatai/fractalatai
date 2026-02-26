@@ -512,15 +512,21 @@ r"(?i)(?:shall be inserted|there is inserted|insert the following (?:after|befor
 
 ### Next Actions
 
-- [ ] Implement `should_skip_drrp()` gate in `taxa::parse()`
-- [ ] Add unit tests for pre-filtering logic
-- [ ] Review purpose regex patterns for precision
-- [ ] Rebuild taxa classifier with new pipeline order
-- [ ] Run `taxa enrich` on test dataset (UK_asp_2019_15)
-- [ ] Compare results: provisions skipped vs. classified
-- [ ] Validate no false negatives (true DRRP provisions skipped)
-- [ ] Document improvement in session log
-- [ ] Measure performance gain (time per provision)
+**Purpose-Based Pre-Filtering** (COMPLETED 2026-02-26):
+- [x] Implement `should_skip_drrp()` gate in `taxa::parse()` — DONE (commit fbf35ae)
+- [x] Add unit tests for pre-filtering logic — DONE (6 tests, all 194 pass)
+- [x] Rebuild taxa classifier with new pipeline order — DONE (purpose → gate → DRRP)
+- [x] Run `taxa enrich` on test dataset (UK_asp_2019_15) — DONE (25 of 152 provisions will be skipped)
+- [x] Compare results: provisions skipped vs. classified — DONE (16.4% skip rate validated)
+- [x] Document improvement in session log — DONE (commit 0a36024)
+
+**Remaining Actions**:
+- [ ] Review purpose regex patterns for precision (ensure no over-matching)
+- [ ] Validate no false negatives (manual review of skipped provisions)
+- [ ] Measure performance gain with benchmarks (time per provision before/after)
+- [ ] Run taxa enrich on 7 major UK ESH laws (HSWA, MHSWR, Electricity at Work, CDM, COSHH, LOLER, PPEWR)
+- [ ] Monitor skip rate on production data (confirm 15-20% expectation)
+- [ ] Consider adding Liability and Offence to skip list (18.2% DRRP rate, small sample)
 
 
 ---
