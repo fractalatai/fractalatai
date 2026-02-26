@@ -1,7 +1,7 @@
 # Session: 2026-02-26 — v2 Parser Validation at Scale + Clause Extraction
 
 **Parent sessions**: [02-26-26-drrp-parser-v2.md](02-26-26-drrp-parser-v2.md), [02-26-26-taxa-regex-patterns.md](02-26-26-taxa-regex-patterns.md)
-**Status**: Active
+**Status**: Complete
 
 ## Objectives
 
@@ -25,26 +25,6 @@
 | **Total** | | **797** |
 
 Previously tested (Sample 1): HSWA, MHSWR, CDM, PUWER, Manual Handling, LOLER, COSHH (996 sections).
-
-## Clause Extraction: Current State
-
-**Problem**: The taxa pipeline returns `cleaned_text` (full HTML-stripped provision) as `clause_refined`. This is the entire provision — often 500+ chars of context that drowns the actual DRRP signal. The AI polisher and downstream consumers need a **laser-focused snippet**: who must do what.
-
-**`clause_refiner.rs` exists but is orphaned** — ported from Elixir, never wired into the pipeline. It does modal-window extraction (100 chars before modal, 200 chars after), capped at 300 chars. Reasonable approach but:
-- Uses the *last* modal verb — should use the one anchored to the actor
-- No awareness of which actor was matched
-- v2 parser knows *exactly* where actor and modal matched but discards the positions
-
-**Opportunity**: v2's `match_governed_v2()` already finds the actor keyword position and the modal verb position via regex. If we capture and return those byte offsets, we can extract a **tight clause span** directly from the match — no separate heuristic needed.
-
-### Proposed Approach
-
-1. Add `clause_span: Option<(usize, usize)>` to `DutyClassification` — byte offsets into the cleaned text
-2. In `match_actor_anchored()`, when a pattern matches, capture `(actor_start, action_end)` from the regex match
-3. In `parse_v2()`, use the span to extract a focused clause: `text[span.0..span.1]`
-4. Fall back to `clause_refiner::refine()` for government patterns (which don't use v2 anchoring)
-
-This gives us: `"every employer shall ensure, so far as is reasonably practicable, the health, safety and welfare at work of all his employees."` instead of the entire 2000-char section.
 
 ## Plan
 
@@ -338,9 +318,30 @@ Test suite: 202 → 282 (8 new clause extraction tests + 72 pre-existing). 282 p
 
 | File | Role |
 |------|------|
-| `crates/fractalaw-core/src/taxa/duty_patterns_v2.rs` | v2 actor-anchored patterns |
+| `crates/fractalaw-core/src/taxa/duty_patterns.rs` | DutyClassification + MatchSpan structs, government patterns |
+| `crates/fractalaw-core/src/taxa/duty_patterns_v2.rs` | v2 actor-anchored patterns with span capture |
 | `crates/fractalaw-core/src/taxa/duty_type.rs` | classify / classify_v2 orchestrator |
-| `crates/fractalaw-core/src/taxa/mod.rs` | parse / parse_v2 / parse_compare / analyse_miss pipeline |
-| `crates/fractalaw-core/src/taxa/clause_refiner.rs` | Modal-window clause extraction (orphaned) |
+| `crates/fractalaw-core/src/taxa/mod.rs` | parse / parse_v2 / extract_clause / analyse_miss pipeline |
+| `crates/fractalaw-core/src/taxa/clause_refiner.rs` | Modal-window clause extraction (fallback for government patterns) |
 | `crates/fractalaw-core/src/taxa/actors.rs` | Actor extraction |
-| `crates/fractalaw-cli/src/main.rs` | CLI: taxa show --compare / --misses |
+| `crates/fractalaw-cli/src/main.rs` | CLI: taxa show (--compare / --misses), taxa enrich |
+
+## Commits
+
+| Hash | Description |
+|------|-------------|
+| `cd829f4` | Phase 2+4: miss analysis tool + extended window + passive-by pattern fixes |
+| `616ba66` | Phase 3: span-based clause extraction for focused DRRP snippets |
+
+## Final Test Suite
+
+282 tests pass, 0 fail. Breakdown:
+- 202 pre-existing taxa tests (including 5 added in Phase 4)
+- 8 new clause extraction tests
+- 72 other fractalaw-core tests
+
+## Remaining Work (Not This Session)
+
+- **GH#16 "Rule" classifier** — thing-subject obligations (~50 provisions) need a separate pattern that doesn't require a person/org actor
+- **Provision-chain inference** — elaboration sub-provisions (~25) inherit duties from parent provisions; requires section hierarchy parsing or AI polisher context
+- **taxa enrich → parse_v2** — the `taxa enrich` command still uses `parse()` (v1) for the DuckDB aggregate write path; should switch to `parse_v2()` when v2 is promoted to default
