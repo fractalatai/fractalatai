@@ -225,7 +225,25 @@ No false-positive risk. "Client" is specific, no compound-word collisions.
 
 Test suite: 141 → 147.
 
+### Iteration 4 — Assess "competent person" for GOVERNED_ACTORS
+
+**Target**: Gap A — provisions with `Ind: Competent Person` actor label but no DRRP.
+
+**Step 1b (audit)**:
+- 15 provisions mention "competent person" across 7 ESH laws
+- 12 already have DRRP (true positive — working)
+- 2 had modal + no DRRP, but 1 was fixed by re-enriching with current code
+- 1 remaining miss: CDM reg 5(2) "The CDM co-ordinator must not...unless the worker is competent or under the supervision of a competent person"
+
+**Finding**: The duty is on "CDM co-ordinator", not the competent person. Same false-attribution problem as "worker". And only 1 provision would benefit.
+
+**Bonus discovery**: Re-enriching MHSWR and CDM with the current code (contractor + client) fixed 6 additional provisions that the previous enrichment had missed — overall 217 → 211.
+
+**Decision: SKIP.** Only 1 remaining miss, and duty is misattributed. Not worth the risk.
+
+**Running totals**: 243 → 211 misses (43.5% → 37.8%). 32 fixed (13.2%). Test suite: 147.
+
 ---
 
 **Session started**: 2026-02-26
-**Status**: Active — ready for Iteration 4
+**Status**: Active — ready for Iteration 5
