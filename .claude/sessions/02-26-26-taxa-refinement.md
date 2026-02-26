@@ -637,11 +637,9 @@ Added 6 comprehensive unit tests (all passing):
 
 ### Next Steps
 
-- [ ] Monitor skip rate on production data (7 major UK ESH laws)
-- [ ] Review skipped provisions to confirm no false negatives
-- [ ] Consider adding Liability and Offence to skip list (18.2% DRRP rate)
-- [ ] Measure actual performance improvement with benchmarks
-- [ ] Update training data export to exclude skipped provisions
+All items moved to the main Remaining Actions list above. Completed.
+
+**Future consideration**: Update `export-training-data` to exclude gate-skipped provisions from DRRP training examples (pure Interpretation/Amendment/Repeal should not generate silver labels). Currently the export works from DuckDB law-level aggregates, not per-provision taxa, so it's a separate concern.
 
 ---
 
