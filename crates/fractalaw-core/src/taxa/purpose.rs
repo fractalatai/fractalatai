@@ -53,7 +53,10 @@ pub const ALL_PURPOSES: &[&str] = &[
 const RAW_PATTERNS: &[(&str, &str)] = &[
     (
         ENACTMENT,
-        r"(?i)(?:(?:Act|Regulations?|Order) may be cited as|(?:Act|Regulations?|Order).*?shall have effect|(?:Act|Regulations?|Order) shall come into (?:force|operation)|comes? into force|has effect.*?on or after|commencement)",
+        // "Commencement Information" is editorial metadata from legislation.gov.uk, not
+        // actual commencement content. Use negative lookahead to exclude it, and require
+        // "commencement" to appear near citation/force context or as a heading.
+        r"(?i)(?:(?:Act|Regulations?|Order) may be cited as|(?:Act|Regulations?|Order).*?shall have effect|(?:Act|Regulations?|Order) shall come into (?:force|operation)|comes? into force|has effect.*?on or after|[Cc]itation and commencement|commencement (?:date|order|provision|of this)|[Cc]ommencement\s*$)",
     ),
     (
         INTERPRETATION,
@@ -87,7 +90,12 @@ const RAW_PATTERNS: &[(&str, &str)] = &[
         OFFENCE,
         r"(?i)(?:[Oo]ffences?[\s.,\u{2014}:]|(?:[Ff]ixed|liable to a) penalty)",
     ),
-    (ENFORCEMENT, r"(?i)(?:proceedings|conviction)"),
+    (
+        ENFORCEMENT,
+        // "proceedings" alone is too broad (matches tribunal, disclosure contexts).
+        // Require enforcement-specific context.
+        r"(?i)(?:(?:criminal|summary|enforcement|prosecut\w+) proceedings|proceedings for (?:an )?offence|on (?:summary )?conviction|[Ee]nforcement)",
+    ),
     (
         DEFENCE_APPEAL,
         r"(?i)(?:\b[Aa]ppeal\b|[Ii]t is a defence for a|may not rely on a defence|shall not be (?:guilty|liable)|[Ii]t shall (?:also )?.*?be a defence|rebuttable)",
@@ -301,6 +309,52 @@ mod tests {
         assert!(
             result.contains(&ENACTMENT),
             "Should detect 'come into force' as Enactment"
+        );
+    }
+
+    // ── False-positive regression tests ──────────────────────────────
+
+    #[test]
+    fn commencement_information_not_enactment() {
+        // "Commencement Information" is editorial metadata from legislation.gov.uk
+        let text = "4. Every employer shall ensure that lifting equipment is of adequate strength and stability for each load. Commencement Information I1 Reg. 4 in force at 5.12.1998";
+        let result = classify(text);
+        assert!(
+            !result.contains(&ENACTMENT),
+            "Editorial 'Commencement Information' should NOT trigger Enactment; got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn citation_and_commencement_heading_is_enactment() {
+        let text = "Citation and commencement";
+        let result = classify(text);
+        assert!(
+            result.contains(&ENACTMENT),
+            "'Citation and commencement' heading should be Enactment"
+        );
+    }
+
+    #[test]
+    fn proceedings_alone_not_enforcement() {
+        // "proceedings" in general tribunal context is not enforcement
+        let text = "One or more assessors may be appointed for the purposes of any proceedings brought before an employment tribunal.";
+        let result = classify(text);
+        assert!(
+            !result.contains(&ENFORCEMENT),
+            "Tribunal proceedings should NOT trigger Enforcement; got {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn summary_conviction_is_enforcement() {
+        let text = "A person guilty of an offence is liable on summary conviction to a fine.";
+        let result = classify(text);
+        assert!(
+            result.contains(&ENFORCEMENT),
+            "'on summary conviction' should trigger Enforcement"
         );
     }
 }
