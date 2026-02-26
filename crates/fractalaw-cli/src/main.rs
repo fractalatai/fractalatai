@@ -681,7 +681,7 @@ async fn cmd_taxa_show(
                     println!();
                 }
             } else {
-                let record = fractalaw_core::taxa::parse(&text);
+                let record = fractalaw_core::taxa::parse_v2(&text);
 
                 // Skip sections with no classification signal.
                 if record.duty_types.is_empty()
@@ -722,13 +722,17 @@ async fn cmd_taxa_show(
                     println!("  Purpose: {}", record.purposes.join(", "));
                 }
 
-                // Show a truncated preview of the cleaned text.
-                let preview = if record.cleaned_text.len() > 120 {
-                    format!("{}...", &record.cleaned_text[..120])
+                // Show clause_refined if available, otherwise a text preview.
+                if let Some(ref clause) = record.clause_refined {
+                    println!("  Clause:  {clause}");
                 } else {
-                    record.cleaned_text.clone()
-                };
-                println!("  Text:    {preview}");
+                    let preview = if record.cleaned_text.len() > 120 {
+                        format!("{}...", &record.cleaned_text[..120])
+                    } else {
+                        record.cleaned_text.clone()
+                    };
+                    println!("  Text:    {preview}");
+                }
                 println!();
             }
         }
@@ -1027,7 +1031,10 @@ async fn cmd_taxa_enrich(
                         duty_sub_type,
                         popimar: record.popimar.iter().map(|s| s.to_string()).collect(),
                         purposes: record.purposes.iter().map(|s| s.to_string()).collect(),
-                        clause_refined: record.cleaned_text.clone(),
+                        clause_refined: record
+                            .clause_refined
+                            .clone()
+                            .unwrap_or_else(|| record.cleaned_text.clone()),
                         taxa_confidence,
                     });
                 }

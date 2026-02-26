@@ -14,7 +14,7 @@ use std::sync::{LazyLock, Mutex};
 use regex::Regex;
 
 use super::actors::ActorMatch;
-use super::duty_patterns::{DutyClassification, DutyFamily, DutySubType};
+use super::duty_patterns::{DutyClassification, DutyFamily, DutySubType, MatchSpan};
 
 // ── Configuration ────────────────────────────────────────────────────
 
@@ -39,6 +39,11 @@ static PERSON_QUALIFIERS: LazyLock<Regex> = LazyLock::new(|| {
 /// Labels for which bare keyword anchoring is too broad.
 /// These require a compound predicate match instead.
 const BROAD_LABELS: &[&str] = &["Ind: Person"];
+
+/// Modal regex used to locate modal position within an already-matched span.
+static MODAL_LOCATOR: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b(?:shall not|must not|shall|must|is required to|has a duty|may not|may|power to|entitled to|authorise|authorize)\b").unwrap()
+});
 
 // ── Sub-type pattern templates ───────────────────────────────────────
 // Each pattern is tried against the text with the actor keyword interpolated.
@@ -191,18 +196,29 @@ fn match_duty_of_pattern(text: &str, keyword: &str) -> Option<DutyClassification
     ))
     .ok()?;
 
-    if !re.is_match(text) {
-        return None;
-    }
+    let full_match = re.find(text)?;
 
-    // Find where the actor appears after "duty of" and classify from there
+    // "shall" is at the start of the match
+    let modal_re = Regex::new(r"(?i)\bshall\b").ok()?;
+    let modal_in_text = modal_re.find(&text[full_match.start()..])?;
+    let modal_start = full_match.start() + modal_in_text.start();
+    let modal_end = full_match.start() + modal_in_text.end();
+
+    // Find where the actor keyword appears within the match
     let actor_re = Regex::new(&format!(r"(?i)\b{kw_escaped}\b")).ok()?;
-    if let Some(actor_match) = actor_re.find(text) {
-        let after_actor = &text[actor_match.end()..];
-        // High confidence — "shall be the duty of" is an explicit duty assignment
-        return classify_after_modal(after_actor, 0.80);
-    }
-    None
+    let actor_in_match = actor_re.find(&text[full_match.start()..])?;
+    let actor_start = full_match.start() + actor_in_match.start();
+
+    let after_actor = &text[full_match.start() + actor_in_match.end()..];
+    let span = MatchSpan {
+        actor_start,
+        modal_start,
+        modal_end,
+    };
+    // High confidence — "shall be the duty of" is an explicit duty assignment
+    let mut dc = classify_after_modal(after_actor, 0.80)?;
+    dc.span = Some(span);
+    Some(dc)
 }
 
 /// Detect passive voice "must/shall be {past participle} by the {actor}" —
@@ -219,14 +235,28 @@ fn match_passive_by_pattern(text: &str, keyword: &str) -> Option<DutyClassificat
     ))
     .ok()?;
 
-    if !re.is_match(text) {
-        return None;
-    }
+    let full_match = re.find(text)?;
+
+    // Modal is at the start of the match; actor is at the end
+    let modal_start = full_match.start();
+    let modal_m = MODAL_LOCATOR.find(&text[modal_start..])?;
+    let modal_end = modal_start + modal_m.end();
+
+    // Actor keyword is near the end of the match
+    let actor_re = Regex::new(&format!(r"(?i)\b{kw_escaped}\b")).ok()?;
+    // Search from the match start to find the actor occurrence within this match
+    let actor_m = actor_re.find(&text[full_match.start()..full_match.end()])?;
+    let actor_start = full_match.start() + actor_m.start();
 
     Some(DutyClassification {
         family: DutyFamily::Governed,
         sub_type: DutySubType::Prescriptive,
         confidence: 0.65,
+        span: Some(MatchSpan {
+            actor_start,
+            modal_start,
+            modal_end,
+        }),
     })
 }
 
@@ -245,11 +275,13 @@ fn match_actor_anchored(text: &str, keyword: &str) -> Option<DutyClassification>
     // Try primary window first (higher confidence)
     for pat in SUB_TYPE_PATTERNS {
         let re = cached_anchored(keyword, pat.obligation, pat.idx, PRIMARY_WINDOW);
-        if re.is_match(text) {
+        if let Some(m) = re.find(text) {
+            let span = extract_span_from_anchored(text, m.start(), m.end());
             return Some(DutyClassification {
                 family: DutyFamily::Governed,
                 sub_type: pat.sub_type,
                 confidence: pat.confidence,
+                span: Some(span),
             });
         }
     }
@@ -257,17 +289,39 @@ fn match_actor_anchored(text: &str, keyword: &str) -> Option<DutyClassification>
     // Try extended window at reduced confidence
     for pat in SUB_TYPE_PATTERNS {
         let re = cached_anchored(keyword, pat.obligation, pat.idx, EXTENDED_WINDOW);
-        if re.is_match(text) {
+        if let Some(m) = re.find(text) {
+            let span = extract_span_from_anchored(text, m.start(), m.end());
             return Some(DutyClassification {
                 family: DutyFamily::Governed,
                 sub_type: pat.sub_type,
                 // Reduce confidence by 0.15 for extended window matches
                 confidence: (pat.confidence - 0.15).max(0.30),
+                span: Some(span),
             });
         }
     }
 
     None
+}
+
+/// Extract a `MatchSpan` from an anchored regex match.
+///
+/// The anchored regex is `\b{keyword}\b.{0,window}{obligation}`, so:
+/// - `match_start` = actor keyword start
+/// - Modal verb is somewhere between actor and the end of the match
+fn extract_span_from_anchored(text: &str, match_start: usize, match_end: usize) -> MatchSpan {
+    let matched_text = &text[match_start..match_end];
+    let (modal_start, modal_end) = if let Some(m) = MODAL_LOCATOR.find(matched_text) {
+        (match_start + m.start(), match_start + m.end())
+    } else {
+        // Shouldn't happen — the anchored regex requires a modal — but be safe
+        (match_end, match_end)
+    };
+    MatchSpan {
+        actor_start: match_start,
+        modal_start,
+        modal_end,
+    }
 }
 
 /// Match "Ind: Person" using compound predicates.
@@ -283,29 +337,57 @@ fn match_person_compound(text: &str) -> Option<DutyClassification> {
     // First check if any compound predicate matches
     let m = PERSON_QUALIFIERS.find(text)?;
     let compound_lower = m.as_str().to_lowercase();
+    let actor_start = m.start();
 
     // The text after the compound is where obligation language lives
     let after_compound = &text[m.end()..];
     let after_lower = after_compound.to_lowercase();
 
+    // Helper: build a span given a modal found within the compound or after it.
+    // `modal_offset` is relative to text[m.start()..].
+    let make_span = |modal_rel_start: usize, modal_rel_end: usize| -> MatchSpan {
+        MatchSpan {
+            actor_start,
+            modal_start: m.start() + modal_rel_start,
+            modal_end: m.start() + modal_rel_end,
+        }
+    };
+
     // "the duty of every/any person" — the modal has already been consumed
     // upstream ("shall be the duty of"), so classify from what follows the actor
     if compound_lower.starts_with("the duty of") {
-        return classify_after_modal(&after_lower, 0.80);
+        // Modal "shall" is before the compound — search backwards
+        let before = &text[..m.start()];
+        let span = MODAL_LOCATOR.find(before).map(|modal_m| MatchSpan {
+            actor_start,
+            modal_start: modal_m.start(),
+            modal_end: modal_m.end(),
+        });
+        let mut dc = classify_after_modal(&after_lower, 0.80)?;
+        dc.span = span;
+        return Some(dc);
     }
 
     // For compounds that already include the modal ("a person must", "no person"),
     // classify based on what follows
     if compound_lower.starts_with("no person") {
-        // "no person shall..." → Prohibition
+        // "no person shall..." → Prohibition — locate "shall/must" in or after compound
+        let span = MODAL_LOCATOR
+            .find(&text[m.start()..])
+            .map(|modal_m| make_span(modal_m.start(), modal_m.end()));
         return Some(DutyClassification {
             family: DutyFamily::Governed,
             sub_type: DutySubType::Prohibitive,
             confidence: 0.80,
+            span,
         });
     }
 
     if compound_lower.contains("must") || compound_lower.contains("shall") {
+        // Modal is embedded in the compound match itself
+        let modal_in_compound = MODAL_LOCATOR.find(m.as_str());
+        let span = modal_in_compound.map(|modal_m| make_span(modal_m.start(), modal_m.end()));
+
         // "a person must/shall [not]..." — check if negated
         let trimmed = after_lower.trim_start();
         if trimmed.starts_with("not ") {
@@ -313,6 +395,7 @@ fn match_person_compound(text: &str) -> Option<DutyClassification> {
                 family: DutyFamily::Governed,
                 sub_type: DutySubType::Prohibitive,
                 confidence: 0.80,
+                span,
             });
         }
         // Exclude definitional constructions: "shall be regarded as", "shall be treated as"
@@ -320,17 +403,25 @@ fn match_person_compound(text: &str) -> Option<DutyClassification> {
             return None;
         }
         // "a person must/shall [do something]" — classify the obligation type
-        return classify_after_modal(&after_lower, 0.75);
+        let mut dc = classify_after_modal(&after_lower, 0.75)?;
+        dc.span = span;
+        return Some(dc);
     }
 
     // For compounds without a modal ("a person who", "every person"),
     // look for a modal in the text after the compound
-    let modal_re = Regex::new(r"(?i)\b(?:shall not|must not)\b").unwrap();
-    if modal_re.is_match(&after_lower) {
+    let prohibition_re = Regex::new(r"(?i)\b(?:shall not|must not)\b").unwrap();
+    if let Some(prohib_m) = prohibition_re.find(&after_lower) {
+        let span = Some(MatchSpan {
+            actor_start,
+            modal_start: m.end() + prohib_m.start(),
+            modal_end: m.end() + prohib_m.end(),
+        });
         return Some(DutyClassification {
             family: DutyFamily::Governed,
             sub_type: DutySubType::Prohibitive,
             confidence: 0.80,
+            span,
         });
     }
 
@@ -343,6 +434,11 @@ fn match_person_compound(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Governed,
             sub_type: DutySubType::Enabling,
             confidence: 0.50,
+            span: Some(MatchSpan {
+                actor_start,
+                modal_start: m.end() + enabling_match.start(),
+                modal_end: m.end() + enabling_match.end(),
+            }),
         });
     }
 
@@ -351,14 +447,28 @@ fn match_person_compound(text: &str) -> Option<DutyClassification> {
     if let Some(modal_match) = modal_re.find(&after_lower)
         && modal_match.start() <= PRIMARY_WINDOW
     {
-        return classify_after_modal(&after_lower[modal_match.end()..], 0.65);
+        let span = Some(MatchSpan {
+            actor_start,
+            modal_start: m.end() + modal_match.start(),
+            modal_end: m.end() + modal_match.end(),
+        });
+        let mut dc = classify_after_modal(&after_lower[modal_match.end()..], 0.65)?;
+        dc.span = span;
+        return Some(dc);
     }
 
     // Extended window fallback at reduced confidence (same pattern as match_actor_anchored)
     if let Some(modal_match) = modal_re.find(&after_lower)
         && modal_match.start() <= EXTENDED_WINDOW
     {
-        return classify_after_modal(&after_lower[modal_match.end()..], 0.50);
+        let span = Some(MatchSpan {
+            actor_start,
+            modal_start: m.end() + modal_match.start(),
+            modal_end: m.end() + modal_match.end(),
+        });
+        let mut dc = classify_after_modal(&after_lower[modal_match.end()..], 0.50)?;
+        dc.span = span;
+        return Some(dc);
     }
 
     None
@@ -390,6 +500,7 @@ fn classify_after_modal(
             family: DutyFamily::Governed,
             sub_type: DutySubType::GeneralDuty,
             confidence: base_confidence + 0.10,
+            span: None,
         });
     }
     if SFAIRP_RE.is_match(text_after_modal) {
@@ -397,6 +508,7 @@ fn classify_after_modal(
             family: DutyFamily::Governed,
             sub_type: DutySubType::SfairpDuty,
             confidence: base_confidence + 0.05,
+            span: None,
         });
     }
     if RISK_RE.is_match(text_after_modal) {
@@ -404,6 +516,7 @@ fn classify_after_modal(
             family: DutyFamily::Governed,
             sub_type: DutySubType::RiskAssessment,
             confidence: base_confidence + 0.05,
+            span: None,
         });
     }
     if INFO_RE.is_match(text_after_modal) {
@@ -411,6 +524,7 @@ fn classify_after_modal(
             family: DutyFamily::Governed,
             sub_type: DutySubType::InformationDuty,
             confidence: base_confidence,
+            span: None,
         });
     }
     if TRAINING_RE.is_match(text_after_modal) {
@@ -418,6 +532,7 @@ fn classify_after_modal(
             family: DutyFamily::Governed,
             sub_type: DutySubType::TrainingDuty,
             confidence: base_confidence,
+            span: None,
         });
     }
 
@@ -426,6 +541,7 @@ fn classify_after_modal(
         family: DutyFamily::Governed,
         sub_type: DutySubType::Prescriptive,
         confidence: base_confidence,
+        span: None,
     })
 }
 

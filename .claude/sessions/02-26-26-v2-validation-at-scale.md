@@ -288,6 +288,52 @@ Investigation showed RIDDOR "responsible person" provisions have heat=3, not hea
 
 Test suite: 197 → 202 (5 new tests). 202 pass, 0 fail.
 
+## Phase 3: Clause Extraction (Span-Based)
+
+**Goal**: Replace the full `cleaned_text` with a focused "who must do what" clause snippet.
+
+**Problem**: `clause_refiner.rs` was orphaned (ported from Elixir, never wired in). `clause_refined` was just `cleaned_text`. The v2 parser knows exact match positions but discarded them via `is_match()`.
+
+### Design
+
+1. Added `MatchSpan { actor_start, modal_start, modal_end }` to `DutyClassification`
+2. Replaced `is_match()` with `find()` across all v2 pattern functions to capture positions
+3. New `extract_clause()` in `mod.rs` uses spans to extract a window:
+   - Start: ~100 chars before actor, snapped to sentence boundary
+   - End: ~200 chars after modal, snapped to sentence boundary
+   - Max 300 chars total
+4. For government patterns (no span), falls back to `clause_refiner::refine()`
+5. Added `clause_refined: Option<String>` to `TaxaRecord`
+
+### Functions Updated for Span Capture
+
+| Function | Change |
+|----------|--------|
+| `match_actor_anchored()` | `is_match()` → `find()`, uses `extract_span_from_anchored()` |
+| `match_duty_of_pattern()` | `is_match()` → `find()`, locates modal + actor positions |
+| `match_passive_by_pattern()` | `is_match()` → `find()`, captures modal and actor spans |
+| `match_person_compound()` | All branches now build `MatchSpan` from compound/modal positions |
+| `classify_after_modal()` | Returns `span: None`, callers set span post-hoc |
+
+### Quality Assessment (Real Laws)
+
+Tested on HSWA, Noise at Work, COMAH:
+
+| Pattern | Example Clause | Quality |
+|---------|---------------|---------|
+| Standard anchor | "An employer who carries out work...shall make a suitable and sufficient assessment of the risk..." | Excellent — actor + modal + full action |
+| Duty-of pattern | "It shall be the duty of every employer to ensure, so far as is reasonably practicable, the health, safety and welfare..." | Excellent — captures reverse formulation |
+| Passive-by | "A major accident prevention policy must be prepared by the operator..." | Good — captures obligation with agent |
+| Person compound | "A person must not ride, or be required or permitted to ride, on any vehicle..." | Good — prohibition with context |
+| Government fallback | "The Secretary of State shall have power to make regulations." | Adequate — clause_refiner handles |
+
+Test suite: 202 → 282 (8 new clause extraction tests + 72 pre-existing). 282 pass, 0 fail.
+
+### CLI Updates
+
+- `taxa show` now uses `parse_v2()` (was `parse()`) and displays `Clause:` instead of truncated `Text:` when clause_refined is available
+- `taxa enrich` now writes `record.clause_refined` to LanceDB/DuckDB instead of full `cleaned_text`
+
 ## Key Files
 
 | File | Role |

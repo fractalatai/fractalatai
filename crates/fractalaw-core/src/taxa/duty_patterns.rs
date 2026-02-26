@@ -51,12 +51,28 @@ pub enum DutySubType {
     Unclassified,
 }
 
+/// Character-level span of the matched DRRP pattern within the text.
+///
+/// Records the positions of the actor keyword and modal verb that formed the
+/// anchored match. Used to extract a focused clause window around the match.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MatchSpan {
+    /// Byte offset where the actor keyword starts.
+    pub actor_start: usize,
+    /// Byte offset where the modal verb starts.
+    pub modal_start: usize,
+    /// Byte offset where the modal verb ends.
+    pub modal_end: usize,
+}
+
 /// Result of a pattern match attempt.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DutyClassification {
     pub family: DutyFamily,
     pub sub_type: DutySubType,
     pub confidence: f32,
+    /// Where in the text the pattern matched (if position was captured).
+    pub span: Option<MatchSpan>,
 }
 
 impl DutyClassification {
@@ -65,6 +81,7 @@ impl DutyClassification {
             family: DutyFamily::Unknown,
             sub_type: DutySubType::Unclassified,
             confidence: 0.0,
+            span: None,
         }
     }
 }
@@ -216,6 +233,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::RegulationMaking,
             confidence: 0.90,
+            span: None,
         });
     }
     if GOV_REG_MAKING_2.is_match(text) {
@@ -223,6 +241,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::RegulationMaking,
             confidence: 0.85,
+            span: None,
         });
     }
     if GOV_CODE_APPROVAL.is_match(text) {
@@ -230,6 +249,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::CodeApproval,
             confidence: 0.85,
+            span: None,
         });
     }
     if GOV_ENFORCEMENT_1.is_match(text) {
@@ -237,6 +257,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Enforcement,
             confidence: 0.85,
+            span: None,
         });
     }
     if GOV_ENFORCEMENT_2.is_match(text) {
@@ -244,6 +265,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Enforcement,
             confidence: 0.80,
+            span: None,
         });
     }
     if has_government_actor(text) && has_obligation(text) {
@@ -251,6 +273,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Prescriptive,
             confidence: 0.60,
+            span: None,
         });
     }
     if has_government_actor(text) && has_enabling(text) {
@@ -258,6 +281,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Enabling,
             confidence: 0.55,
+            span: None,
         });
     }
     None
@@ -270,6 +294,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Direction,
             confidence: 0.80,
+            span: None,
         });
     }
     if GOV_GUIDANCE.is_match(text) && has_government_actor(text) {
@@ -277,6 +302,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Guidance,
             confidence: 0.75,
+            span: None,
         });
     }
     if GOV_CONSULTATION.is_match(text) {
@@ -284,6 +310,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::ConsultationObligation,
             confidence: 0.75,
+            span: None,
         });
     }
     if GOV_APPOINTMENT.is_match(text) {
@@ -291,6 +318,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Appointment,
             confidence: 0.80,
+            span: None,
         });
     }
     if GOV_DELEGATION.is_match(text) && has_government_actor(text) {
@@ -298,6 +326,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Delegation,
             confidence: 0.70,
+            span: None,
         });
     }
     if GOV_FEES.is_match(text) && has_government_actor(text) {
@@ -305,6 +334,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Fees,
             confidence: 0.65,
+            span: None,
         });
     }
     if GOV_PARL_REPORTING.is_match(text) {
@@ -312,6 +342,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::ParliamentaryReporting,
             confidence: 0.80,
+            span: None,
         });
     }
     None
@@ -328,6 +359,7 @@ pub fn match_governed(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Governed,
             sub_type: DutySubType::GeneralDuty,
             confidence: 0.90,
+            span: None,
         });
     }
     if GOVERNED_GENERAL_DUTY_2.is_match(text) {
@@ -335,6 +367,7 @@ pub fn match_governed(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Governed,
             sub_type: DutySubType::GeneralDuty,
             confidence: 0.85,
+            span: None,
         });
     }
     if has_governed_actor(text) && has_prohibition(text) {
@@ -342,6 +375,7 @@ pub fn match_governed(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Governed,
             sub_type: DutySubType::Prohibitive,
             confidence: 0.80,
+            span: None,
         });
     }
     // ── Domain-specific patterns (before generic obligation check) ─
@@ -350,6 +384,7 @@ pub fn match_governed(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Governed,
             sub_type: DutySubType::SfairpDuty,
             confidence: 0.80,
+            span: None,
         });
     }
     if GOVERNED_RISK.is_match(text) && has_governed_actor(text) {
@@ -357,6 +392,7 @@ pub fn match_governed(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Governed,
             sub_type: DutySubType::RiskAssessment,
             confidence: 0.80,
+            span: None,
         });
     }
     if GOVERNED_INFO.is_match(text) && has_governed_actor(text) {
@@ -364,6 +400,7 @@ pub fn match_governed(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Governed,
             sub_type: DutySubType::InformationDuty,
             confidence: 0.70,
+            span: None,
         });
     }
     if GOVERNED_TRAINING.is_match(text) && has_governed_actor(text) {
@@ -371,6 +408,7 @@ pub fn match_governed(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Governed,
             sub_type: DutySubType::TrainingDuty,
             confidence: 0.75,
+            span: None,
         });
     }
     // ── Generic fallbacks ────────────────────────────────────────
@@ -379,6 +417,7 @@ pub fn match_governed(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Governed,
             sub_type: DutySubType::Prescriptive,
             confidence: 0.55,
+            span: None,
         });
     }
     if has_governed_actor(text) && has_enabling(text) {
@@ -386,6 +425,7 @@ pub fn match_governed(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Governed,
             sub_type: DutySubType::Enabling,
             confidence: 0.45,
+            span: None,
         });
     }
     None
@@ -402,6 +442,7 @@ mod tests {
             family,
             sub_type,
             confidence,
+            span: None,
         }
     }
 

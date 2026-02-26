@@ -61,6 +61,10 @@ pub struct TaxaRecord {
 
     /// Pattern classification detail (if any).
     pub classification: Option<duty_patterns::DutyClassification>,
+
+    /// Focused clause extract — the "who must do what" snippet.
+    /// Extracted from the matched span (v2) or via modal-window refiner (v1/government).
+    pub clause_refined: Option<String>,
 }
 
 /// Side-by-side v1/v2 comparison result.
@@ -115,6 +119,8 @@ pub fn parse(raw_text: &str) -> TaxaRecord {
     let dt_labels: Vec<&str> = cr.duty_types.iter().map(|d| d.as_str()).collect();
     let popimar = popimar::classify_with_duty_types(&cleaned, &dt_labels);
 
+    let clause_refined = extract_clause(&cleaned, cr.classification.as_ref());
+
     TaxaRecord {
         cleaned_text: cleaned,
         governed_actors: extracted.governed_labels(),
@@ -123,6 +129,7 @@ pub fn parse(raw_text: &str) -> TaxaRecord {
         popimar,
         purposes,
         classification: cr.classification,
+        clause_refined,
     }
 }
 
@@ -154,6 +161,9 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
     let dt_labels: Vec<&str> = cr.duty_types.iter().map(|d| d.as_str()).collect();
     let popimar = popimar::classify_with_duty_types(&cleaned, &dt_labels);
 
+    // Extract focused clause from match span or fall back to modal-window refiner
+    let clause_refined = extract_clause(&cleaned, cr.classification.as_ref());
+
     TaxaRecord {
         cleaned_text: cleaned,
         governed_actors: extracted.governed_labels(),
@@ -162,6 +172,7 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
         popimar,
         purposes,
         classification: cr.classification,
+        clause_refined,
     }
 }
 
@@ -208,6 +219,9 @@ pub fn parse_compare(raw_text: &str) -> CompareRecord {
 
     let differs = cr1.duty_types != cr2.duty_types;
 
+    let clause1 = extract_clause(&cleaned, cr1.classification.as_ref());
+    let clause2 = extract_clause(&cleaned, cr2.classification.as_ref());
+
     CompareRecord {
         cleaned_text: cleaned.clone(),
         v1: TaxaRecord {
@@ -218,6 +232,7 @@ pub fn parse_compare(raw_text: &str) -> CompareRecord {
             popimar: popimar1,
             purposes: purposes.clone(),
             classification: cr1.classification,
+            clause_refined: clause1,
         },
         v2: TaxaRecord {
             cleaned_text: cleaned,
@@ -227,9 +242,145 @@ pub fn parse_compare(raw_text: &str) -> CompareRecord {
             popimar: popimar2,
             purposes,
             classification: cr2.classification,
+            clause_refined: clause2,
         },
         differs,
     }
+}
+
+// ── Clause extraction ────────────────────────────────────────────────
+
+/// Maximum length for a refined clause.
+const MAX_CLAUSE_LEN: usize = 300;
+
+/// How far before the actor to start the clause window.
+const SUBJECT_WINDOW: usize = 100;
+
+/// How far after the modal to extend the clause window.
+const ACTION_WINDOW: usize = 200;
+
+/// Sentence-end pattern for truncation.
+static SENTENCE_END_RE: LazyLock<regex::Regex> =
+    LazyLock::new(|| regex::Regex::new(r"[.;]").unwrap());
+
+/// Extract a focused clause from the cleaned text using match span data.
+///
+/// If a `MatchSpan` is available (governed v2 patterns), extracts a window:
+/// - Start: up to `SUBJECT_WINDOW` chars before actor, snapped to sentence boundary
+/// - End: up to `ACTION_WINDOW` chars after modal end, snapped to sentence boundary
+/// - Capped at `MAX_CLAUSE_LEN` total
+///
+/// If no span (government patterns or v1), falls back to `clause_refiner::refine()`.
+fn extract_clause(
+    cleaned_text: &str,
+    classification: Option<&duty_patterns::DutyClassification>,
+) -> Option<String> {
+    let dc = classification?;
+
+    if let Some(span) = dc.span {
+        // Span-based extraction — we know exactly where actor and modal are
+        let text_len = cleaned_text.len();
+
+        // Start: SUBJECT_WINDOW before actor, snapped to sentence start
+        let raw_start = span.actor_start.saturating_sub(SUBJECT_WINDOW);
+        let window_before = &cleaned_text[raw_start..span.actor_start];
+        // Find last sentence boundary (. or ; followed by space+uppercase) in the window
+        let start = if let Some(pos) = find_last_sentence_start(window_before) {
+            raw_start + pos
+        } else if raw_start == 0 {
+            0
+        } else {
+            // Snap to next word boundary
+            snap_to_word_start(cleaned_text, raw_start)
+        };
+
+        // End: ACTION_WINDOW after modal end, snapped to sentence end
+        let raw_end = (span.modal_end + ACTION_WINDOW).min(text_len);
+        let window_after = &cleaned_text[span.modal_end..raw_end];
+        let end = if let Some(pos) = find_first_sentence_end(window_after) {
+            // Include the punctuation
+            (span.modal_end + pos + 1).min(text_len)
+        } else {
+            snap_to_word_end(cleaned_text, raw_end)
+        };
+
+        // Cap at MAX_CLAUSE_LEN
+        let effective_end = if end - start > MAX_CLAUSE_LEN {
+            let capped = start + MAX_CLAUSE_LEN;
+            snap_to_word_end(cleaned_text, capped)
+        } else {
+            end
+        };
+
+        let clause = cleaned_text[start..effective_end].trim().to_string();
+        if clause.is_empty() {
+            return None;
+        }
+
+        // Add ellipsis if we truncated
+        let clause = if start > 0 && !clause.starts_with(|c: char| c.is_uppercase()) {
+            format!("...{clause}")
+        } else {
+            clause
+        };
+        let clause = if effective_end < text_len && !clause.ends_with(['.', ';', '!', '?']) {
+            format!("{clause}...")
+        } else {
+            clause
+        };
+
+        Some(clause)
+    } else {
+        // No span — fall back to clause_refiner for government patterns
+        let refined = clause_refiner::refine(cleaned_text, Some(cleaned_text), None);
+        if refined.is_empty() {
+            None
+        } else {
+            Some(refined)
+        }
+    }
+}
+
+/// Find the position of the last sentence start in `window` (after `. ` or `; ` + uppercase).
+fn find_last_sentence_start(window: &str) -> Option<usize> {
+    let mut last_pos = None;
+    for (i, _) in window.match_indices(['.', ';']) {
+        // Check if followed by whitespace + uppercase
+        let rest = &window[i + 1..];
+        let trimmed = rest.trim_start();
+        if !trimmed.is_empty() && trimmed.starts_with(|c: char| c.is_uppercase()) {
+            // Position of the uppercase char in the original window
+            let ws_len = rest.len() - trimmed.len();
+            last_pos = Some(i + 1 + ws_len);
+        }
+    }
+    last_pos
+}
+
+/// Find the position of the first sentence-ending punctuation in `window`.
+fn find_first_sentence_end(window: &str) -> Option<usize> {
+    SENTENCE_END_RE.find(window).map(|m| m.start())
+}
+
+/// Snap a byte offset forward to the next word boundary (space).
+fn snap_to_word_start(text: &str, offset: usize) -> usize {
+    if offset >= text.len() {
+        return text.len();
+    }
+    // Find next space after offset, then skip it
+    text[offset..].find(' ').map_or(offset, |p| {
+        let pos = offset + p + 1;
+        pos.min(text.len())
+    })
+}
+
+/// Snap a byte offset backward to the previous word boundary (space).
+fn snap_to_word_end(text: &str, offset: usize) -> usize {
+    if offset >= text.len() {
+        return text.len();
+    }
+    // Find last space before offset
+    text[..offset].rfind(' ').map_or(offset, |p| p)
 }
 
 // ── Miss analysis ────────────────────────────────────────────────────
@@ -762,6 +913,126 @@ mod tests {
             record.duty_types.contains(&DutyType::Duty),
             "client obligation should classify as Duty, got: {:?}",
             record.duty_types
+        );
+    }
+
+    // ── Clause extraction tests ─────────────────────────────────────
+
+    #[test]
+    fn clause_refined_simple_employer_duty() {
+        let record = parse_v2("The employer shall ensure the health and safety of employees.");
+        let clause = record.clause_refined.unwrap();
+        assert!(
+            clause.contains("employer"),
+            "clause should contain actor: {clause}"
+        );
+        assert!(
+            clause.contains("shall"),
+            "clause should contain modal: {clause}"
+        );
+        assert!(
+            clause.contains("ensure"),
+            "clause should contain action: {clause}"
+        );
+    }
+
+    #[test]
+    fn clause_refined_long_provision_is_truncated() {
+        let text = "It shall be the duty of every employer to ensure, so far as \
+                    is reasonably practicable, the health, safety and welfare at \
+                    work of all his employees. The matters to which that duty \
+                    extends include in particular the provision and maintenance \
+                    of plant and systems of work that are, so far as is reasonably \
+                    practicable, safe and without risks to health. The arrangement \
+                    for ensuring, so far as is reasonably practicable, safety and \
+                    absence of risks to health in connection with the use, handling, \
+                    storage and transport of articles and substances.";
+        let record = parse_v2(text);
+        let clause = record.clause_refined.unwrap();
+        assert!(
+            clause.len() <= 320,
+            "clause too long: {} chars",
+            clause.len()
+        ); // 300 + ellipsis
+        assert!(
+            clause.contains("employer"),
+            "clause should contain actor: {clause}"
+        );
+    }
+
+    #[test]
+    fn clause_refined_person_compound() {
+        let text = "A person must not ride, or be required or permitted to ride, \
+                    on any vehicle being used for the purposes of construction work.";
+        let record = parse_v2(text);
+        let clause = record.clause_refined.unwrap();
+        assert!(
+            clause.contains("person"),
+            "clause should contain actor: {clause}"
+        );
+        assert!(
+            clause.contains("must not"),
+            "clause should contain modal: {clause}"
+        );
+    }
+
+    #[test]
+    fn clause_refined_government_fallback() {
+        let text = "The Secretary of State shall have power to make regulations.";
+        let record = parse_v2(text);
+        let clause = record.clause_refined.unwrap();
+        assert!(
+            clause.contains("Secretary"),
+            "clause should contain actor: {clause}"
+        );
+        assert!(
+            clause.contains("shall"),
+            "clause should contain modal: {clause}"
+        );
+    }
+
+    #[test]
+    fn clause_refined_none_for_empty() {
+        let record = parse_v2("");
+        assert!(record.clause_refined.is_none());
+    }
+
+    #[test]
+    fn clause_refined_none_for_no_drrp() {
+        let record = parse_v2("the quick brown fox jumped over the lazy dog");
+        assert!(record.clause_refined.is_none());
+    }
+
+    #[test]
+    fn clause_refined_passive_by_pattern() {
+        let text = "An internal emergency plan must be prepared by the operator \
+                    before the establishment is put into operation.";
+        let record = parse_v2(text);
+        let clause = record.clause_refined.unwrap();
+        assert!(
+            clause.contains("operator"),
+            "clause should contain actor: {clause}"
+        );
+        assert!(
+            clause.contains("must"),
+            "clause should contain modal: {clause}"
+        );
+    }
+
+    #[test]
+    fn clause_refined_duty_of_pattern() {
+        let text = "It shall be the duty of every employer to ensure, so far as \
+                    is reasonably practicable, the health, safety and welfare at \
+                    work of all his employees.";
+        let record = parse_v2(text);
+        let clause = record.clause_refined.unwrap();
+        assert!(
+            clause.contains("employer"),
+            "clause should contain actor: {clause}"
+        );
+        assert!(
+            clause.contains("shall"),
+            "clause should contain modal: {clause}"
         );
     }
 }
