@@ -47,6 +47,13 @@ The Phase C validation (parent session) successfully:
 
 ## Refinement Opportunities
 
+- [x] **Purpose pre-filtering** — gate to skip DRRP on Interpretation/Amendment/Repeal provisions. ALL strategy, 104/1,046 skips (9.9%), 0 false negatives, 100% gate precision. Includes enrichment bug fix, Enactment/Enforcement pattern precision fixes, benchmark validation.
+- [ ] **Taxa regex patterns** — clause boundaries, actor extraction, confidence scoring (see §1 below)
+- [ ] **AI model training** — DeBERTa-v3-base, 512 tokens, full 7K+ dataset (see §2 below)
+- [ ] **Evaluation methodology** — quantitative metrics framework, gold standard annotations (see §3 below)
+- [ ] **Taxa QA command** — `taxa qa` for automated purpose/DRRP quality reporting — [GH #15](https://github.com/fractalaw/fractalaw/issues/15)
+- [ ] **Training data hygiene** — exclude gate-skipped provisions from DRRP silver labels
+
 ### 1. Taxa Regex Patterns
 
 **Current implementation**: `crates/fractalaw-core/src/taxa/` (18 modules migrated from Elixir)
