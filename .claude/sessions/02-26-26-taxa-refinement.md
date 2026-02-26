@@ -521,12 +521,13 @@ r"(?i)(?:shall be inserted|there is inserted|insert the following (?:after|befor
 - [x] Document improvement in session log — DONE (commit 0a36024)
 
 **Remaining Actions**:
-- [ ] Review purpose regex patterns for precision (ensure no over-matching)
-- [ ] Validate no false negatives (manual review of skipped provisions)
+- [x] Review purpose regex patterns for precision (ensure no over-matching) — DONE: Enactment 111→23 (-79%), Enforcement 29→26. See [Pattern Precision Fix](#critical-bug-fix-taxa-enrichment-skipping-provisions-with-purposes-2026-02-26-0830-0900) section below.
+- [x] Run taxa enrich on 7 major UK ESH laws — DONE: 1,046 provisions enriched, 100% purpose coverage
+- [x] Monitor skip rate on production data — DONE: 18.1% → 9.9% after switching to ALL strategy
+- [x] Validate no false negatives — DONE (automated, not manual): ran full DRRP classifier on all 189 gate-skipped provisions. Found 58 false negatives (30.7%) under ANY strategy, all in multi-purpose provisions. Switched to ALL strategy: 104 skips, 0 false negatives, 100% gate precision.
 - [ ] Measure performance gain with benchmarks (time per provision before/after)
-- [ ] Run taxa enrich on 7 major UK ESH laws (HSWA, MHSWR, Electricity at Work, CDM, COSHH, LOLER, PPEWR)
-- [ ] Monitor skip rate on production data (confirm 15-20% expectation)
 - [ ] Consider adding Liability and Offence to skip list (18.2% DRRP rate, small sample)
+- [ ] Build `taxa qa` command for purpose QA reporting — see [GH #15](https://github.com/fractalaw/fractalaw/issues/15)
 
 
 ---

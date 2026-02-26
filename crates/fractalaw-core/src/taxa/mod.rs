@@ -114,13 +114,15 @@ pub fn parse(raw_text: &str) -> TaxaRecord {
 
 /// Determine if DRRP classification should be skipped based on purpose.
 ///
-/// Provisions with these purposes are structural/administrative and
-/// rarely contain actionable duties/rights/responsibilities/powers:
-/// - Interpretation/Definition (36.4% DRRP rate in current data)
-/// - Amendment (37.0% DRRP rate)
-/// - Repeal/Revocation (62.5% DRRP rate)
+/// Only skips when ALL purposes are structural/administrative — pure
+/// definitions, amendments, or repeals. Multi-purpose provisions (e.g.,
+/// Interpretation + Process+Rule) still get DRRP processing because
+/// they often contain genuine duties alongside definitional framing.
 ///
-/// Skipping these reduces false positives and improves performance.
+/// Uses ALL strategy (not ANY) after false-negative validation showed
+/// 85/189 skipped provisions had mixed purposes with real DRRP content.
+/// ALL gives 104 clean skips (9.9%) with no false negatives, vs ANY's
+/// 189 skips (18.1%) with 58 false negatives (30.7% error rate).
 fn should_skip_drrp(purposes: &[&str]) -> bool {
     const SKIP_PURPOSES: &[&str] = &[
         purpose::INTERPRETATION,
@@ -128,7 +130,7 @@ fn should_skip_drrp(purposes: &[&str]) -> bool {
         purpose::REPEAL_REVOCATION,
     ];
 
-    purposes.iter().any(|p| SKIP_PURPOSES.contains(p))
+    !purposes.is_empty() && purposes.iter().all(|p| SKIP_PURPOSES.contains(p))
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -244,25 +246,50 @@ mod tests {
     }
 
     #[test]
-    fn amendment_with_modal_verbs_skipped() {
-        // This is the false positive case: amendment text contains "shall"
-        // but it's structural (inserting text), not a primary duty
+    fn amendment_with_modal_verbs_not_skipped() {
+        // Amendment text containing "shall" also triggers Process+Rule.
+        // With ALL strategy, mixed purposes are NOT skipped — the duty
+        // content in the quoted substitution text gets DRRP-parsed.
         let text = r#"In section 3, for subsection (2) substitute— "The Scottish Ministers shall ensure targets are met.""#;
         let record = parse(text);
-        // Purpose: Amendment detected
         assert!(record.purposes.contains(&purpose::AMENDMENT));
-        // DRRP: Skipped (even though "shall" is present)
+        assert!(record.purposes.contains(&purpose::PROCESS_RULE));
+        // NOT skipped — mixed purposes, DRRP runs
+        assert!(!record.duty_types.is_empty());
+    }
+
+    #[test]
+    fn pure_amendment_skipped() {
+        // A pure amendment provision with no modal verbs — only Amendment purpose.
+        let text = "In section 3, for subsection (2) substitute the following provisions.";
+        let record = parse(text);
+        assert!(record.purposes.contains(&purpose::AMENDMENT));
+        assert!(!record.purposes.contains(&purpose::PROCESS_RULE));
+        // Pure amendment — gate skips DRRP
         assert!(record.duty_types.is_empty());
     }
 
     #[test]
-    fn multiple_purposes_with_skip_purpose() {
-        // If ANY purpose is in SKIP list, entire provision is skipped
+    fn mixed_purposes_not_skipped() {
+        // Multi-purpose provisions (Interpretation + Process+Rule) should NOT be
+        // skipped — they often contain genuine duties alongside definitional framing.
+        // Gate uses ALL strategy: only skips when ALL purposes are skip-purposes.
         let text = r#"For the purposes of interpretation, "employer" means a person who shall ensure safety."#;
         let record = parse(text);
-        // Multiple purposes may be detected
         assert!(record.purposes.contains(&purpose::INTERPRETATION));
-        // But presence of INTERPRETATION triggers skip
+        assert!(record.purposes.contains(&purpose::PROCESS_RULE));
+        // NOT skipped — DRRP classification runs because Process+Rule is present
+        assert!(!record.duty_types.is_empty());
+    }
+
+    #[test]
+    fn pure_skip_purposes_skipped() {
+        // Provision with ONLY skip-purposes should still be skipped.
+        let text =
+            r#"In these Regulations— "employer" means a person who employs one or more employees."#;
+        let record = parse(text);
+        assert!(record.purposes.contains(&purpose::INTERPRETATION));
+        // No non-skip purposes present — gate triggers
         assert!(record.duty_types.is_empty());
     }
 }
