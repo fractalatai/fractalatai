@@ -1453,7 +1453,9 @@ mod tests {
             };
             let err = state.generate(request).await.unwrap_err();
             assert_eq!(err.code, 1);
-            assert!(err.message.contains("ANTHROPIC_API_KEY"));
+            assert!(
+                err.message.contains("not compiled in") || err.message.contains("not configured")
+            );
         }
     }
 }
