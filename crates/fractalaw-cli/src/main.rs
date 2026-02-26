@@ -178,6 +178,9 @@ enum TaxaAction {
         /// Show provisions that v2 missed, ranked by heat score (likelihood of genuine miss)
         #[arg(long)]
         misses: bool,
+        /// Evaluate clause extraction quality: confidence distribution + low-quality samples
+        #[arg(long)]
+        clauses: bool,
     },
     /// Enrich LRT DRRP columns for laws missing taxa data (from LanceDB text)
     Enrich {
@@ -249,7 +252,8 @@ async fn main() -> anyhow::Result<()> {
                 name,
                 limit,
                 misses,
-            } => cmd_taxa_show(&data_dir, &name, limit, misses).await,
+                clauses,
+            } => cmd_taxa_show(&data_dir, &name, limit, misses, clauses).await,
             TaxaAction::Enrich { laws } => {
                 let law_filter = laws.as_ref().map(|s| {
                     s.split(',')
@@ -538,6 +542,7 @@ async fn cmd_taxa_show(
     name: &str,
     limit: usize,
     misses: bool,
+    clauses: bool,
 ) -> anyhow::Result<()> {
     let lance = LanceStore::open(&data_dir.join("lancedb"))
         .await
@@ -555,6 +560,9 @@ async fn cmd_taxa_show(
 
     if misses {
         return cmd_taxa_show_misses(name, total, &batches);
+    }
+    if clauses {
+        return cmd_taxa_show_clauses(name, total, &batches);
     }
 
     println!("=== Taxa Classification: {name} ({total} sections) ===\n");
@@ -767,6 +775,180 @@ fn cmd_taxa_show_misses(
     Ok(())
 }
 
+fn cmd_taxa_show_clauses(
+    name: &str,
+    total: usize,
+    batches: &[arrow::record_batch::RecordBatch],
+) -> anyhow::Result<()> {
+    struct ClauseEntry {
+        provision: String,
+        confidence: f32,
+        clause: String,
+        family: String,
+        sub_type: String,
+        has_span: bool,
+    }
+
+    let mut entries: Vec<ClauseEntry> = Vec::new();
+    let mut no_clause_count = 0usize;
+    let mut no_drrp_count = 0usize;
+
+    for batch in batches {
+        let provision_col = batch.column_by_name("provision");
+        let text_col = batch.column_by_name("text");
+
+        for row in 0..batch.num_rows() {
+            let provision = provision_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+            let text = text_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+
+            if text.trim().is_empty() {
+                continue;
+            }
+
+            let record = fractalaw_core::taxa::parse_v2(&text);
+
+            if record.duty_types.is_empty() {
+                no_drrp_count += 1;
+                continue;
+            }
+
+            let (family, sub_type, has_span) = match &record.classification {
+                Some(c) => (
+                    format!("{:?}", c.family),
+                    format!("{:?}", c.sub_type),
+                    c.span.is_some(),
+                ),
+                None => ("Unknown".into(), "Unclassified".into(), false),
+            };
+
+            if let Some(clause) = &record.clause_refined {
+                entries.push(ClauseEntry {
+                    provision,
+                    confidence: record.taxa_confidence,
+                    clause: clause.clone(),
+                    family,
+                    sub_type,
+                    has_span,
+                });
+            } else {
+                no_clause_count += 1;
+            }
+        }
+    }
+
+    let classified = entries.len() + no_clause_count;
+
+    println!(
+        "=== Clause Quality: {name} ({total} sections, {classified} classified, {} with clauses) ===\n",
+        entries.len()
+    );
+
+    // Confidence distribution — buckets of 0.1
+    let mut buckets = [0usize; 10]; // [0.0-0.1), [0.1-0.2), ..., [0.8-0.9), [0.9-1.0]
+    for e in &entries {
+        let idx = ((e.confidence * 10.0).floor() as usize).min(9);
+        buckets[idx] += 1;
+    }
+    println!("Confidence distribution:");
+    for (i, &count) in buckets.iter().enumerate() {
+        if count == 0 {
+            continue;
+        }
+        let lo = i as f32 / 10.0;
+        let hi = lo + 0.1;
+        let bar = "#".repeat(count.min(60));
+        println!("  {lo:.1}-{hi:.1}: {count:>3}  {bar}");
+    }
+    println!();
+
+    // Span coverage
+    let span_count = entries.iter().filter(|e| e.has_span).count();
+    let refiner_count = entries.len() - span_count;
+    println!(
+        "Extraction method:  span-based: {span_count}  refiner-fallback: {refiner_count}  no-clause: {no_clause_count}"
+    );
+
+    // Average confidence
+    if !entries.is_empty() {
+        let avg: f32 = entries.iter().map(|e| e.confidence).sum::<f32>() / entries.len() as f32;
+        println!("Average confidence:  {avg:.2}");
+    }
+    println!();
+
+    // Show low-quality clauses (confidence < 0.45) sorted ascending
+    let mut low: Vec<&ClauseEntry> = entries.iter().filter(|e| e.confidence < 0.45).collect();
+    low.sort_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap());
+
+    if low.is_empty() {
+        println!("No low-quality clauses (all >= 0.45 confidence).");
+    } else {
+        println!(
+            "--- Low-quality clauses (confidence < 0.45): {} ---\n",
+            low.len()
+        );
+        for e in &low {
+            println!(
+                "--- {} [conf={:.2}, {}/{}{}] ---",
+                e.provision,
+                e.confidence,
+                e.family,
+                e.sub_type,
+                if e.has_span { "" } else { ", no-span" }
+            );
+            println!("  {}", e.clause);
+            println!();
+        }
+    }
+
+    // Show a sample of high-quality clauses (confidence >= 0.80)
+    let high: Vec<&ClauseEntry> = entries.iter().filter(|e| e.confidence >= 0.80).collect();
+    if !high.is_empty() {
+        let sample_count = high.len().min(5);
+        println!(
+            "--- High-quality sample ({} of {} with conf >= 0.80) ---\n",
+            sample_count,
+            high.len()
+        );
+        for e in high.iter().take(sample_count) {
+            println!(
+                "--- {} [conf={:.2}, {}/{}] ---",
+                e.provision, e.confidence, e.family, e.sub_type
+            );
+            println!("  {}", e.clause);
+            println!();
+        }
+    }
+
+    // Summary
+    println!("=== Summary ===");
+    println!("  Total sections:      {total}");
+    println!("  No DRRP:             {no_drrp_count}");
+    println!("  Classified:          {classified}");
+    println!("  With clause:         {}", entries.len());
+    println!("  No clause extracted: {no_clause_count}");
+    println!(
+        "  High (>= 0.60):     {}",
+        entries.iter().filter(|e| e.confidence >= 0.60).count()
+    );
+    println!(
+        "  Medium (0.45-0.59): {}",
+        entries
+            .iter()
+            .filter(|e| (0.45..0.60).contains(&e.confidence))
+            .count()
+    );
+    println!(
+        "  Low (< 0.45):       {}",
+        entries.iter().filter(|e| e.confidence < 0.45).count()
+    );
+
+    Ok(())
+}
+
 async fn cmd_taxa_enrich(
     data_dir: &std::path::Path,
     store: &DuckStore,
@@ -895,16 +1077,20 @@ async fn cmd_taxa_enrich(
 
                 // Collect per-provision taxa for LanceDB.
                 if !section_id.is_empty() {
-                    let (duty_family, duty_sub_type, taxa_confidence) =
-                        if let Some(ref cls) = record.classification {
-                            (
-                                Some(format!("{:?}", cls.family)),
-                                Some(format!("{:?}", cls.sub_type)),
-                                Some(cls.confidence),
-                            )
-                        } else {
-                            (None, None, None)
-                        };
+                    let (duty_family, duty_sub_type) = if let Some(ref cls) = record.classification
+                    {
+                        (
+                            Some(format!("{:?}", cls.family)),
+                            Some(format!("{:?}", cls.sub_type)),
+                        )
+                    } else {
+                        (None, None)
+                    };
+                    let taxa_confidence = if record.taxa_confidence > 0.0 {
+                        Some(record.taxa_confidence)
+                    } else {
+                        None
+                    };
                     provision_taxa.push(ProvisionTaxa {
                         section_id,
                         drrp_types: record

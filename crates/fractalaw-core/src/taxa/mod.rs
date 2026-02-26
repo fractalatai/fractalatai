@@ -65,6 +65,10 @@ pub struct TaxaRecord {
     /// Focused clause extract — the "who must do what" snippet.
     /// Extracted from the matched span (v2) or via modal-window refiner (v1/government).
     pub clause_refined: Option<String>,
+
+    /// Confidence score for the extracted clause (0.0..=1.0).
+    /// Based on heuristics: span capture, clean ending, length, modal strength.
+    pub taxa_confidence: f32,
 }
 
 /// Run the full Taxa classification pipeline on raw legislative text.
@@ -109,6 +113,13 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
     // Extract focused clause from match span or fall back to modal-window refiner
     let clause_refined = extract_clause(&cleaned, cr.classification.as_ref());
 
+    // Score clause confidence
+    let has_span = cr.classification.as_ref().is_some_and(|c| c.span.is_some());
+    let taxa_confidence = clause_refined
+        .as_deref()
+        .map(|c| confidence::score(c, has_span))
+        .unwrap_or(0.0);
+
     TaxaRecord {
         cleaned_text: cleaned,
         governed_actors: extracted.governed_labels(),
@@ -118,6 +129,7 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
         purposes,
         classification: cr.classification,
         clause_refined,
+        taxa_confidence,
     }
 }
 
