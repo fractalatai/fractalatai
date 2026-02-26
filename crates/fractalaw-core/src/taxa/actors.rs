@@ -395,7 +395,11 @@ pub fn extract_government(text: &str) -> Vec<String> {
 // ── Internals ────────────────────────────────────────────────────────
 
 fn run_patterns(text: &str, patterns: &[(&str, Regex)]) -> Vec<String> {
-    let mut remaining = text.to_string();
+    // Pad with spaces so boundary patterns (?:[\s[:punct:]]) match at
+    // start/end of string. text_cleaner::clean() trims whitespace, so
+    // keywords like "Employer shall..." at position 0 would otherwise
+    // fail the leading boundary check.
+    let mut remaining = format!(" {text} ");
     let mut found = Vec::new();
     for (label, regex) in patterns {
         if regex.is_match(&remaining) {
@@ -470,6 +474,30 @@ mod tests {
     fn extract_local_authority() {
         let actors = extract_actors(" The local authority may issue a notice. ");
         assert!(actors.government.iter().any(|a| a.contains("Local")));
+    }
+
+    // ── Boundary matching tests ─────────────────────────────────────
+
+    #[test]
+    fn keyword_at_start_of_string() {
+        // After text_cleaner strips "(1) ", text can start with the keyword.
+        // The boundary pattern (?:[\s[:punct:]]) requires a char before the keyword.
+        let actors = extract_actors("Employer shall ensure safety.");
+        assert!(
+            actors.governed.contains(&"Org: Employer".to_string()),
+            "keyword at start of string should still be extracted, got: {:?}",
+            actors.governed
+        );
+    }
+
+    #[test]
+    fn keyword_at_end_of_string() {
+        let actors = extract_actors(" duties of the employer");
+        assert!(
+            actors.governed.contains(&"Org: Employer".to_string()),
+            "keyword at end of string should still be extracted, got: {:?}",
+            actors.governed
+        );
     }
 
     #[test]
