@@ -292,4 +292,79 @@ mod tests {
         // No non-skip purposes present — gate triggers
         assert!(record.duty_types.is_empty());
     }
+
+    // ── True-negative regression tests (Iteration 1: contractor) ─────
+    // Full-pipeline tests: provisions mentioning "contractor" that should
+    // NOT produce DRRP output. These guard against false positives when
+    // expanding the GOVERNED_ACTORS list.
+
+    #[test]
+    fn contractor_definition_no_drrp() {
+        // CDM 2015 reg 2 interpretation — defines "contractor", not a duty
+        let text = r#"In these Regulations— "contractor" means any person (including a non-domestic client) who, in the course or furtherance of a business, carries out, manages or controls construction work."#;
+        let record = parse(text);
+        assert!(record.purposes.contains(&purpose::INTERPRETATION));
+        assert!(record.duty_types.is_empty());
+    }
+
+    #[test]
+    fn contractor_appointment_cross_ref_no_drrp() {
+        // CDM 2015 reg 8(1) — transitional, states who IS principal contractor
+        let text = "Where, immediately before 6th April 2015 there is a principal \
+                    contractor appointed for a relevant project under regulation \
+                    14(2) of the 2007 Regulations, for the purposes of these \
+                    Regulations that person is the principal contractor.";
+        let record = parse(text);
+        // No modal verb — no DRRP even though "contractor" is present
+        assert!(record.duty_types.is_empty());
+    }
+
+    // ── True-positive tests (Iteration 1: contractor) ────────────────
+    // These provisions have "contractor" + obligation modal and SHOULD
+    // produce DRRP output. Written as failing tests first (step 2),
+    // then the pattern change makes them pass (step 3).
+
+    #[test]
+    fn contractor_duty_plan_manage_monitor() {
+        // CDM 2015 reg 15(2) — clear duty on contractor
+        let text = "a contractor must plan, manage and monitor construction work \
+                    carried out either by the contractor or by workers under the \
+                    contractor's control, to ensure that, so far as is reasonably \
+                    practicable, it is carried out without risks to health and safety.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.contains(&DutyType::Duty),
+            "contractor obligation should classify as Duty, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn principal_contractor_duty_construction_phase_plan() {
+        // CDM 2015 reg 12(1) — duty on principal contractor
+        let text = "during the pre-construction phase, and before setting up a \
+                    construction site, the principal contractor must draw up a \
+                    construction phase plan, or make arrangements for a \
+                    construction phase plan to be drawn up.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.contains(&DutyType::Duty),
+            "principal contractor obligation should classify as Duty, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn contractor_prohibition() {
+        // CDM 2015 reg 15(1) — prohibition on contractor
+        let text = "a contractor must not carry out construction work in relation \
+                    to a project unless satisfied that the client is aware of the \
+                    duties owed by the client under these regulations.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.contains(&DutyType::Duty),
+            "contractor prohibition should classify as Duty, got: {:?}",
+            record.duty_types
+        );
+    }
 }

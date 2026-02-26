@@ -165,6 +165,7 @@ const GOVERNED_ACTORS: &[&str] = &[
     "designer",
     "importer",
     "installer",
+    "contractor",
     "person who",
     "every person",
     "no person",
@@ -663,5 +664,44 @@ mod tests {
         assert!((clamp01(-0.1) - 0.0).abs() < 0.001);
         assert!((clamp01(1.5) - 1.0).abs() < 0.001);
         assert!((clamp01(0.1234) - 0.123).abs() < 0.001);
+    }
+
+    // ── True-negative regression tests (Iteration 1: contractor) ─────
+    // These provisions mention "contractor" but should NOT match governed
+    // patterns because they lack obligation modals or are definitional.
+
+    #[test]
+    fn contractor_heading_no_match() {
+        // CDM 2015 heading — no modal verb, no DRRP
+        let text = "duties of contractors";
+        assert!(match_governed(text).is_none());
+    }
+
+    #[test]
+    fn contractor_cross_reference_no_match() {
+        // CDM 2015 reg 7(2) — cross-reference, no modal
+        let text = "if a domestic client fails to make the appointments required \
+                    by regulation 5— (a) the designer in control of the \
+                    pre-construction phase of the project is the principal \
+                    designer; (b) the contractor in control of the construction \
+                    phase of the project is the principal contractor";
+        assert!(match_governed(text).is_none());
+    }
+
+    #[test]
+    fn contractor_interpretation_no_match() {
+        // CDM 2015 reg 8(1) — transitional interpretation, no modal
+        let text = "where, immediately before 6th april 2015 there is a principal \
+                    contractor appointed for a relevant project under regulation \
+                    14(2) of the 2007 regulations, for the purposes of these \
+                    regulations that person is the principal contractor";
+        assert!(match_governed(text).is_none());
+    }
+
+    #[test]
+    fn contractor_numbered_list_item_no_match() {
+        // CDM 2015 schedule item — just a data field, no modal
+        let text = "13. the name and address of any contractor already appointed.";
+        assert!(match_governed(text).is_none());
     }
 }

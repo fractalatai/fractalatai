@@ -48,7 +48,7 @@ The Phase C validation (parent session) successfully:
 ## Refinement Opportunities
 
 - [x] **Purpose pre-filtering** — gate to skip DRRP on Interpretation/Amendment/Repeal provisions. ALL strategy, 104/1,046 skips (9.9%), 0 false negatives, 100% gate precision. Includes enrichment bug fix, Enactment/Enforcement pattern precision fixes, benchmark validation.
-- [ ] **Taxa regex patterns** — clause boundaries, actor extraction, confidence scoring (see §1 below)
+- [ ] **Taxa regex patterns** — [child session](02-26-26-taxa-regex-patterns.md): 43.5% miss rate baseline, test-driven iteration in progress
 - [ ] **AI model training** — DeBERTa-v3-base, 512 tokens, full 7K+ dataset (see §2 below)
 - [ ] **Evaluation methodology** — quantitative metrics framework, gold standard annotations (see §3 below)
 - [ ] **Taxa QA command** — `taxa qa` for automated purpose/DRRP quality reporting — [GH #15](https://github.com/fractalaw/fractalaw/issues/15)
@@ -56,26 +56,9 @@ The Phase C validation (parent session) successfully:
 
 ### 1. Taxa Regex Patterns
 
-**Current implementation**: `crates/fractalaw-core/src/taxa/` (18 modules migrated from Elixir)
+**Child session**: [02-26-26-taxa-regex-patterns.md](02-26-26-taxa-regex-patterns.md)
 
-**Known issues from evaluation**:
-- Some clauses too verbose (include preamble, context)
-- Actor extraction sometimes misses nuanced categories
-- Confidence scoring could be more granular
-- Purpose classification overlaps (multiple purposes per clause common)
-
-**Improvement areas**:
-- Refine modal verb window boundaries (currently fixed-width around "shall"/"must"/"may")
-- Add more actor patterns for specialized roles (inspectors, commissioners, etc.)
-- Improve clause refinement to strip boilerplate ("For the purposes of...", "Subject to...")
-- Better handling of nested clauses (subclauses with their own modal verbs)
-- Add pattern variants for Scottish/Northern Ireland legislative style
-
-**Files to modify**:
-- `crates/fractalaw-core/src/taxa/duty_type_lib.rs` — Core engine for modal search
-- `crates/fractalaw-core/src/taxa/clause_refiner.rs` — Clause extraction window logic
-- `crates/fractalaw-core/src/taxa/actor_definitions.rs` — Actor pattern library
-- `crates/fractalaw-core/src/taxa/duty_type_defn_*.rs` — Duty type pattern sets
+Baseline measured: 243/558 modal provisions (43.5%) miss DRRP classification across 7 ESH laws. Three gap categories identified (actor-present no-DRRP, boundary matching, truly actor-less). Test-driven iteration strategy defined. See child session for full analysis, gap taxonomy, and iteration log.
 
 ### 2. AI Model Training
 
