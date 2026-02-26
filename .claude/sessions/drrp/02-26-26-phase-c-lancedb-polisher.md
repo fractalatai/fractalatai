@@ -2,7 +2,7 @@
 
 **Parent sessions**: [02-26-26-v2-promotion-enrichment.md](02-26-26-v2-promotion-enrichment.md), [02-26-26-v2-validation-at-scale.md](02-26-26-v2-validation-at-scale.md)
 **GitHub issue**: [#19](https://github.com/fractalaw/fractalaw/issues/19)
-**Status**: Active
+**Status**: Complete
 
 ## Objective
 
@@ -133,12 +133,34 @@ The ONNX prompt parser (`parse_drrp_prompt()`) requires both a DRRP type and an 
 - `clause_refined` in `cmd_taxa_enrich` uses `.unwrap_or_else(|| record.cleaned_text.clone())` — this writes section headings ("Citation and commencement", "Interpretation") as clause_refined for 50k+ non-DRRP provisions. Should be `None`/null for non-DRRP provisions.
 - The polisher's OFFSET pagination is fragile: as rows get polished (`ai_clause` set), the `WHERE ai_clause IS NULL` result shrinks, shifting offsets. Works but inefficient.
 
+### ONNX vs Regex Clause Quality Comparison
+
+Applied `confidence::score()` to both `clause_refined` (regex) and `ai_clause` (ONNX) for the 340 polished provisions:
+
+|                  | Regex `clause_refined` | ONNX `ai_clause` |
+|------------------|----------------------|-------------------|
+| High (>= 0.60)  | 174 (51.2%)          | 49 (14.4%)        |
+| Medium (0.40-0.59) | 77 (22.6%)        | 149 (43.8%)       |
+| Low (< 0.40)    | 89 (26.2%)           | 142 (41.8%)       |
+| **Average**      | **0.49**             | **0.37**          |
+
+**Head-to-head**: ONNX worse 71.5%, better 28.5%, same 0%.
+
+Worst ONNX outputs are stubs: "the scottish ministers may", "the". The DeBERTa model is a classifier trained for holder extraction, not clause extraction — it truncates instead of extracting meaningful text.
+
+**Conclusion**: ONNX adds no value for the polisher task. The regex pipeline with span-based extraction already produces better clauses. Future polisher improvements should focus on improving regex clause quality (sentence boundaries, clean endings) rather than AI refinement.
+
 ### Commits
 
 | Hash | Description |
 |------|-------------|
 | `d4c8e92` | Fix host test: update inference error assertion for no-feature build |
 | `a4b5f9f` | Increase WASM epoch deadline to 3600s for long-running polisher guests |
+| `13ea81c` | Update Phase C session doc with end-to-end polisher results |
+
+## Next Session
+
+[02-26-26-clause-quality-improvement.md](02-26-26-clause-quality-improvement.md) — Improve regex clause extraction quality: fix mid-sentence starts, truncated endings, sentence boundary snapping.
 
 ## Related Issues
 
