@@ -100,6 +100,46 @@ DuckDB (legislation) ← law-level aggregates from taxa enrich (separate concern
 | `guests/drrp-polisher/src/lib.rs` | LanceDB-only polisher: queries text+taxa, calls AI, writes ai_* back |
 | `guests/drrp-polisher/src/ipc.rs` | Arrow IPC deserialization helpers for guest |
 
+## End-to-End Results
+
+### Tasks Completed
+
+1. **WASM rebuilt** — guest recompiled with LanceDB-only code
+2. **Host test fixed** — `generate_without_config_errors` assertion updated for no-feature build (`d4c8e92`)
+3. **Epoch deadline increased** — 100s → 3600s for long-running guests (`a4b5f9f`)
+4. **Pipeline validated** — full `run drrp-polisher.wasm` with ONNX inference
+
+### Pipeline Output
+
+| Metric | Value |
+|--------|-------|
+| Provisions with DRRP taxa | 18,139 |
+| Provisions polished (ONNX) | 340 |
+| Provision errors | 8 |
+| Empty-drrp skips | 1,820 |
+| Tokens used (Claude API) | 0 |
+| AI model | onnx (DeBERTa v3) |
+
+### Coverage Gap: 340 / 18,139 = 1.9%
+
+The ONNX prompt parser (`parse_drrp_prompt()`) requires both a DRRP type and an actor from the prompt text. It silently falls through when it can't parse, and with no Claude API configured there's no fallback. Reasons for low coverage:
+
+1. **Empty `drrp_types` lists matching `IS NOT NULL`** — taxa enrich writes `[]` (empty list) for non-DRRP provisions, which LanceDB treats as not null. The guest skips these client-side.
+2. **`clause_refined` written for all provisions** — falls back to `cleaned_text` when no DRRP match, inflating the apparent taxa data count.
+3. **ONNX model format mismatch** — the DeBERTa model was trained for holder/clause extraction but may not handle all prompt variations from the new Phase C format.
+
+### Observations
+
+- `clause_refined` in `cmd_taxa_enrich` uses `.unwrap_or_else(|| record.cleaned_text.clone())` — this writes section headings ("Citation and commencement", "Interpretation") as clause_refined for 50k+ non-DRRP provisions. Should be `None`/null for non-DRRP provisions.
+- The polisher's OFFSET pagination is fragile: as rows get polished (`ai_clause` set), the `WHERE ai_clause IS NULL` result shrinks, shifting offsets. Works but inefficient.
+
+### Commits
+
+| Hash | Description |
+|------|-------------|
+| `d4c8e92` | Fix host test: update inference error assertion for no-feature build |
+| `a4b5f9f` | Increase WASM epoch deadline to 3600s for long-running polisher guests |
+
 ## Related Issues
 
 - #19 — Phase C: DRRP map in LanceDB + LanceDB-only polisher (this work)
