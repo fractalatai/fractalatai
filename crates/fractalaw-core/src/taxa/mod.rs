@@ -66,10 +66,10 @@ pub struct TaxaRecord {
 ///
 /// Steps:
 /// 1. Clean the text (HTML strip, normalise whitespace)
-/// 2. Extract actors
-/// 3. Classify duty type (DRRP)
-/// 4. Classify POPIMAR categories
-/// 5. Classify purpose
+/// 2. Classify purpose (EARLY GATE — skip DRRP if non-DRRP purpose)
+/// 3. Extract actors (only if DRRP-bearing)
+/// 4. Classify duty type (DRRP) (only if DRRP-bearing)
+/// 5. Classify POPIMAR categories (only if DRRP-bearing)
 pub fn parse(raw_text: &str) -> TaxaRecord {
     if raw_text.trim().is_empty() {
         return TaxaRecord::default();
@@ -78,19 +78,28 @@ pub fn parse(raw_text: &str) -> TaxaRecord {
     // Step 1: Clean
     let cleaned = text_cleaner::clean(raw_text);
 
-    // Step 2: Extract actors
+    // Step 2: Purpose classification (EARLY GATE)
+    let purposes = purpose::classify(&cleaned);
+
+    // Step 3: Check if we should skip DRRP processing
+    if should_skip_drrp(&purposes) {
+        return TaxaRecord {
+            cleaned_text: cleaned,
+            purposes,
+            ..Default::default()
+        };
+    }
+
+    // Step 4: Extract actors (only for DRRP-bearing provisions)
     let extracted = actors::extract_actors(&cleaned);
 
-    // Step 3: Classify duty type
+    // Step 5: Classify duty type (DRRP)
     let lower = cleaned.to_lowercase();
     let cr = duty_type::classify(&lower);
 
-    // Step 4: POPIMAR (use duty type labels for default logic)
+    // Step 6: POPIMAR (use duty type labels for default logic)
     let dt_labels: Vec<&str> = cr.duty_types.iter().map(|d| d.as_str()).collect();
     let popimar = popimar::classify_with_duty_types(&cleaned, &dt_labels);
-
-    // Step 5: Purpose
-    let purposes = purpose::classify(&cleaned);
 
     TaxaRecord {
         cleaned_text: cleaned,
@@ -101,6 +110,25 @@ pub fn parse(raw_text: &str) -> TaxaRecord {
         purposes,
         classification: cr.classification,
     }
+}
+
+/// Determine if DRRP classification should be skipped based on purpose.
+///
+/// Provisions with these purposes are structural/administrative and
+/// rarely contain actionable duties/rights/responsibilities/powers:
+/// - Interpretation/Definition (36.4% DRRP rate in current data)
+/// - Amendment (37.0% DRRP rate)
+/// - Repeal/Revocation (62.5% DRRP rate)
+///
+/// Skipping these reduces false positives and improves performance.
+fn should_skip_drrp(purposes: &[&str]) -> bool {
+    const SKIP_PURPOSES: &[&str] = &[
+        purpose::INTERPRETATION,
+        purpose::AMENDMENT,
+        purpose::REPEAL_REVOCATION,
+    ];
+
+    purposes.iter().any(|p| SKIP_PURPOSES.contains(p))
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -163,5 +191,78 @@ mod tests {
         assert!(record.duty_types.contains(&DutyType::Duty));
         assert!(!record.popimar.is_empty());
         assert!(!record.purposes.is_empty());
+    }
+
+    // ── Purpose-based pre-filtering tests ───────────────────────────
+
+    #[test]
+    fn skip_interpretation_section() {
+        let text =
+            r#"In these Regulations— "employer" means a person who employs one or more employees."#;
+        let record = parse(text);
+        // Purpose detected
+        assert!(record.purposes.contains(&purpose::INTERPRETATION));
+        // DRRP classification skipped
+        assert!(record.duty_types.is_empty());
+        assert!(record.governed_actors.is_empty());
+        assert!(record.government_actors.is_empty());
+        assert!(record.popimar.is_empty());
+    }
+
+    #[test]
+    fn skip_amendment_section() {
+        let text = "In section 3, for subsection (2) substitute the following provisions.";
+        let record = parse(text);
+        // Purpose detected
+        assert!(record.purposes.contains(&purpose::AMENDMENT));
+        // DRRP classification skipped
+        assert!(record.duty_types.is_empty());
+        assert!(record.governed_actors.is_empty());
+        assert!(record.government_actors.is_empty());
+        assert!(record.popimar.is_empty());
+    }
+
+    #[test]
+    fn skip_repeal_section() {
+        let text = "The following Acts shall cease to have effect and are hereby repealed.";
+        let record = parse(text);
+        // Purpose detected
+        assert!(record.purposes.contains(&purpose::REPEAL_REVOCATION));
+        // DRRP classification skipped
+        assert!(record.duty_types.is_empty());
+    }
+
+    #[test]
+    fn process_drrp_section() {
+        let text = "Every employer shall ensure the health and safety of employees.";
+        let record = parse(text);
+        // Purpose detected (Process+Rule)
+        assert!(record.purposes.contains(&purpose::PROCESS_RULE));
+        // DRRP classification runs
+        assert!(!record.duty_types.is_empty());
+        assert!(!record.governed_actors.is_empty());
+    }
+
+    #[test]
+    fn amendment_with_modal_verbs_skipped() {
+        // This is the false positive case: amendment text contains "shall"
+        // but it's structural (inserting text), not a primary duty
+        let text = r#"In section 3, for subsection (2) substitute— "The Scottish Ministers shall ensure targets are met.""#;
+        let record = parse(text);
+        // Purpose: Amendment detected
+        assert!(record.purposes.contains(&purpose::AMENDMENT));
+        // DRRP: Skipped (even though "shall" is present)
+        assert!(record.duty_types.is_empty());
+    }
+
+    #[test]
+    fn multiple_purposes_with_skip_purpose() {
+        // If ANY purpose is in SKIP list, entire provision is skipped
+        let text = r#"For the purposes of interpretation, "employer" means a person who shall ensure safety."#;
+        let record = parse(text);
+        // Multiple purposes may be detected
+        assert!(record.purposes.contains(&purpose::INTERPRETATION));
+        // But presence of INTERPRETATION triggers skip
+        assert!(record.duty_types.is_empty());
     }
 }
