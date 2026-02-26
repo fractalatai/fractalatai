@@ -177,7 +177,12 @@ enum TaxaAction {
         limit: usize,
     },
     /// Enrich LRT DRRP columns for laws missing taxa data (from LanceDB text)
-    Enrich,
+    Enrich {
+        /// Specific laws to enrich (comma-separated, e.g., UK_ukpga_1974_37,UK_uksi_1999_3242)
+        /// If not specified, enriches all laws without taxa data
+        #[arg(long)]
+        laws: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -238,7 +243,14 @@ async fn main() -> anyhow::Result<()> {
         // Taxa classification.
         Command::Taxa { action } => match action {
             TaxaAction::Show { name, limit } => cmd_taxa_show(&data_dir, &name, limit).await,
-            TaxaAction::Enrich => cmd_taxa_enrich(&data_dir, &open_duck(&data_dir)?).await,
+            TaxaAction::Enrich { laws } => {
+                let law_filter = laws.as_ref().map(|s| {
+                    s.split(',')
+                        .map(|l| l.trim().to_string())
+                        .collect::<Vec<_>>()
+                });
+                cmd_taxa_enrich(&data_dir, &open_duck(&data_dir)?, law_filter).await
+            }
         },
 
         // Training data export.
@@ -606,37 +618,49 @@ async fn cmd_taxa_show(data_dir: &std::path::Path, name: &str, limit: usize) -> 
     Ok(())
 }
 
-async fn cmd_taxa_enrich(data_dir: &std::path::Path, store: &DuckStore) -> anyhow::Result<()> {
+async fn cmd_taxa_enrich(
+    data_dir: &std::path::Path,
+    store: &DuckStore,
+    law_filter: Option<Vec<String>>,
+) -> anyhow::Result<()> {
     use std::collections::BTreeSet;
 
     let lance = LanceStore::open(&data_dir.join("lancedb"))
         .await
         .context("opening LanceDB")?;
 
-    // Find laws that have NO DRRP taxa data yet (duty_holder is null or empty).
-    let law_batches = store.query_arrow(
-        "SELECT name FROM legislation
-         WHERE duty_holder IS NULL OR len(duty_holder) = 0
-         ORDER BY name",
-    )?;
+    // If specific laws requested, use those; otherwise find all laws without taxa data
+    let law_names: Vec<String> = if let Some(filter) = law_filter {
+        println!("=== Taxa Enrichment: {} specified laws ===\n", filter.len());
+        filter
+    } else {
+        // Find laws that have NO DRRP taxa data yet (duty_holder is null or empty).
+        let law_batches = store.query_arrow(
+            "SELECT name FROM legislation
+             WHERE duty_holder IS NULL OR len(duty_holder) = 0
+             ORDER BY name",
+        )?;
 
-    let law_names: Vec<String> = law_batches
-        .iter()
-        .flat_map(|b| {
-            let col = b.column_by_name("name");
-            (0..b.num_rows()).filter_map(move |i| col.and_then(|c| get_string_value(c.as_ref(), i)))
-        })
-        .collect();
+        let names: Vec<String> = law_batches
+            .iter()
+            .flat_map(|b| {
+                let col = b.column_by_name("name");
+                (0..b.num_rows())
+                    .filter_map(move |i| col.and_then(|c| get_string_value(c.as_ref(), i)))
+            })
+            .collect();
 
-    if law_names.is_empty() {
-        println!("All laws already have DRRP taxa data.");
-        return Ok(());
-    }
+        if names.is_empty() {
+            println!("All laws already have DRRP taxa data.");
+            return Ok(());
+        }
 
-    println!(
-        "=== Taxa Enrichment: {} laws without DRRP data ===\n",
-        law_names.len()
-    );
+        println!(
+            "=== Taxa Enrichment: {} laws without DRRP data ===\n",
+            names.len()
+        );
+        names
+    };
 
     // Per-law aggregation containers.
     struct LawTaxa {
