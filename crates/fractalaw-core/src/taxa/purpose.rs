@@ -56,7 +56,7 @@ const RAW_PATTERNS: &[(&str, &str)] = &[
         // "Commencement Information" is editorial metadata from legislation.gov.uk, not
         // actual commencement content. Use negative lookahead to exclude it, and require
         // "commencement" to appear near citation/force context or as a heading.
-        r"(?i)(?:(?:Act|Regulations?|Order) may be cited as|(?:Act|Regulations?|Order).*?shall have effect|(?:Act|Regulations?|Order) shall come into (?:force|operation)|comes? into force|has effect.*?on or after|[Cc]itation and commencement|commencement (?:date|order|provision|of this)|[Cc]ommencement\s*$)",
+        r"(?i)(?:(?:Act|Regulations?|Order) may be cited as|(?:Act|Regulations?|Order).*?shall have effect|(?:Act|Regulations?|Order) shall come into (?:force|operation)|comes? into force|has effect.*?on or after|[Cc]itation and commencement|commencement (?:date|order|provision|of this)|[Cc]ommencement\s*$|^(?:\s*)Statutory Instruments|hereby makes the following|Signed by (?:authority|order) of the Secretary)",
     ),
     (
         INTERPRETATION,

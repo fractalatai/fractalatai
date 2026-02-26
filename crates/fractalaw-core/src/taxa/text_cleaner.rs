@@ -20,8 +20,21 @@ static HTML_TAG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"<[^>]+>").unwra
 static HTML_NAMED_ENTITY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"&[a-z]+;").unwrap());
 static HTML_NUMERIC_ENTITY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"&#\d+;").unwrap());
 static MULTI_WHITESPACE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").unwrap());
-static LEADING_NUMBERING: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^\s*\(?\d+[a-z]?\)?\s*\.?\s*").unwrap());
+// Matches leading provision numbering in UK legislation:
+//   (1)            — sub-paragraph
+//   2.             — regulation with dot
+//   9.-(1)         — regulation.paragraph
+//   -(1)           — dash-paragraph
+//   - [F3 (1)      — dash, editorial footnote, paragraph
+//   5. - [F3 (1)   — regulation, dash, editorial footnote, paragraph
+//   5.- [F13 (1)   — regulation, editorial footnote, paragraph
+//   [F18 5         — editorial footnote then bare sub-paragraph number
+static LEADING_NUMBERING: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"^\s*(?:\d+[a-z]?\s*\.?\s*)?-?\s*(?:\[F\d+\s*]?\s*)?-?\s*(?:\d+[a-z]?\s*\.?\s*)?(?:\(\d+[a-z]?\)\s*\.?\s*)?",
+    )
+    .unwrap()
+});
 
 // ── Public API ───────────────────────────────────────────────────────
 
@@ -179,6 +192,55 @@ mod tests {
     fn already_clean_text_unchanged() {
         let text = "Every employer shall ensure the safety of employees";
         assert_eq!(clean(text), text);
+    }
+
+    #[test]
+    fn strips_dash_paragraph_number() {
+        assert_eq!(
+            clean("-(1) An employer who carries out work"),
+            "An employer who carries out work"
+        );
+    }
+
+    #[test]
+    fn strips_editorial_footnote_paragraph() {
+        assert_eq!(
+            clean("- [F3 (1) Where a person is a user"),
+            "Where a person is a user"
+        );
+    }
+
+    #[test]
+    fn strips_regulation_dot_dash_paragraph() {
+        assert_eq!(
+            clean("9.-(1) If the risk assessment indicates"),
+            "If the risk assessment indicates"
+        );
+    }
+
+    #[test]
+    fn strips_bare_number_prefix() {
+        assert_eq!(
+            clean("2 The employer shall ensure"),
+            "The employer shall ensure"
+        );
+    }
+
+    #[test]
+    fn strips_editorial_footnote_f5() {
+        assert_eq!(
+            clean("- [F5 (1) Where a person is employed"),
+            "Where a person is employed"
+        );
+    }
+
+    #[test]
+    fn strips_editorial_footnote_then_bare_number() {
+        // [F18 5 Where... — editorial footnote followed by bare sub-paragraph number
+        assert_eq!(
+            clean("[F18 5 Where the responsible person"),
+            "Where the responsible person"
+        );
     }
 
     #[test]

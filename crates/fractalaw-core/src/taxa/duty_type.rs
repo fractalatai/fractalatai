@@ -71,16 +71,18 @@ pub fn classify(
     governed_actors: &[ActorMatch],
     _government_actors: &[ActorMatch],
 ) -> ClassificationResult {
-    // Government v1 first (already actor-anchored)
+    // Governed v2 first — actor-anchored patterns (actor in subject position
+    // relative to modal verb).  These are the most precise and should win
+    // over unanchored government patterns that just check for keyword presence.
+    if let Some(dc) = duty_patterns_v2::match_governed_v2(text, governed_actors) {
+        return to_result(dc);
+    }
+    // Government v1 (keyword-based, not actor-anchored)
     if let Some(dc) = duty_patterns::match_government_v1(text) {
         return to_result(dc);
     }
-    // Government v2 (extended patterns, also already actor-anchored)
+    // Government v2 (extended patterns)
     if let Some(dc) = duty_patterns::match_government_v2(text) {
-        return to_result(dc);
-    }
-    // Governed: use v2 actor-anchored patterns
-    if let Some(dc) = duty_patterns_v2::match_governed_v2(text, governed_actors) {
         return to_result(dc);
     }
     // No match

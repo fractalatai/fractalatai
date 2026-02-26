@@ -28,7 +28,8 @@ static STRONG_MODAL: LazyLock<Regex> =
 ///
 /// - `has_captured_action`: Whether a V2 capture group matched.
 ///
-/// Returns a float between `0.0` and `1.0`.
+/// Returns a float between `0.0` and `0.85`.  Max 0.85 from regex alone;
+/// the remaining 0.15 headroom is reserved for AI refinement.
 pub fn score(clause: &str, has_captured_action: bool) -> f32 {
     if clause.is_empty() {
         return 0.0;
@@ -39,7 +40,7 @@ pub fn score(clause: &str, has_captured_action: bool) -> f32 {
     if has_captured_action {
         s += 0.25;
     }
-    if !clause.ends_with("...") {
+    if clause.ends_with(['.', ';']) {
         s += 0.25;
     }
     if clause.len() > 30 {
@@ -64,15 +65,16 @@ mod tests {
     }
 
     #[test]
-    fn short_truncated_no_capture() {
-        // < 30 chars, ends with ..., no capture, no modal
-        assert_eq!(score("employer may...", false), 0.0);
+    fn short_no_ending_no_capture() {
+        // < 30 chars, no sentence-end punctuation, no capture, no modal
+        assert_eq!(score("employer may do things", false), 0.0);
     }
 
     #[test]
     fn full_quality_clause() {
         let clause = "The employer shall ensure the health and safety of all employees.";
         let s = score(clause, true);
+        // span + clean ending + adequate length + strong modal = 0.25 + 0.25 + 0.20 + 0.15
         assert!((s - 0.85).abs() < 0.01);
     }
 
@@ -85,8 +87,8 @@ mod tests {
     }
 
     #[test]
-    fn truncated_with_capture() {
-        let clause = "The employer shall ensure safety and welfare...";
+    fn no_sentence_end_with_capture() {
+        let clause = "The employer shall ensure safety and welfare for all";
         let s = score(clause, true);
         // capture + adequate length + strong modal = 0.25 + 0.20 + 0.15 = 0.60
         assert!((s - 0.60).abs() < 0.01);

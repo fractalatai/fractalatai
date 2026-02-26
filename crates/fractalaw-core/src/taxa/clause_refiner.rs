@@ -15,10 +15,6 @@ use regex::Regex;
 
 // ── Constants ────────────────────────────────────────────────────────
 
-const MAX_CLAUSE_LENGTH: usize = 300;
-const SUBJECT_WINDOW: usize = 100;
-const ACTION_WINDOW: usize = 200;
-
 static MODAL_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\b(shall|must|may(?:\s+(?:not|only))?)\b").unwrap());
 static SENTENCE_END_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[.;]|\n\n").unwrap());
@@ -50,16 +46,15 @@ pub fn refine(
 
     match modal_match {
         None => {
-            // No modal found — might be V2 capture group output
-            let cleaned = ensure_clean_ending(raw_clause);
-            truncate_smart(&cleaned, MAX_CLAUSE_LENGTH)
+            // No modal found — return as-is
+            raw_clause.trim().to_string()
         }
         Some((modal_start, modal_len, modal_text)) => {
             let subject = extract_subject(raw_clause, modal_start);
 
             let action = if let Some(ca) = captured_action {
                 if !ca.is_empty() {
-                    ensure_clean_ending(ca)
+                    ca.trim().to_string()
                 } else {
                     extract_action(raw_clause, modal_start + modal_len, section_text)
                 }
@@ -85,11 +80,9 @@ fn find_last_modal(text: &str) -> Option<(usize, usize, String)> {
 // ── Subject extraction ───────────────────────────────────────────────
 
 fn extract_subject(text: &str, modal_start: usize) -> String {
-    let window_start = snap_down(text, modal_start.saturating_sub(SUBJECT_WINDOW));
-    let before_modal = &text[window_start..modal_start];
+    let before_modal = &text[..modal_start];
 
-    // Find last sentence start (capital letter after period/semicolon)
-    // SENTENCE_START_RE captures the uppercase char in group 1.
+    // Scan all text before the modal for the last sentence start
     let mut last_cap_start = None;
     for caps in SENTENCE_START_RE.captures_iter(before_modal) {
         if let Some(m) = caps.get(1) {
@@ -97,8 +90,11 @@ fn extract_subject(text: &str, modal_start: usize) -> String {
         }
     }
     if let Some(pos) = last_cap_start {
-        before_modal[pos..].trim_start().to_string()
-    } else if before_modal
+        return before_modal[pos..].trim_start().to_string();
+    }
+
+    // No boundary — use start of text
+    if before_modal
         .trim_start()
         .starts_with(|c: char| c.is_ascii_uppercase())
     {
@@ -117,11 +113,7 @@ fn clean_leading(text: &str) -> String {
 // ── Action extraction ────────────────────────────────────────────────
 
 fn extract_action(raw_clause: &str, modal_end: usize, section_text: Option<&str>) -> String {
-    let end = snap_up(
-        raw_clause,
-        (modal_end + ACTION_WINDOW).min(raw_clause.len()),
-    );
-    let after = &raw_clause[modal_end..end];
+    let after = &raw_clause[modal_end..];
 
     if after.trim().is_empty() {
         if let Some(section) = section_text {
@@ -148,20 +140,32 @@ fn extract_action_from_section(raw_clause: &str, section_text: &str) -> String {
         let section_context = &section_text[pos..];
         if let Some(modal_pos) = section_context.find(&modal_text) {
             let action_start = modal_pos + modal_text.len();
-            let action_end = snap_up(
-                section_context,
-                (action_start + ACTION_WINDOW).min(section_context.len()),
-            );
-            return extract_to_sentence_end(&section_context[action_start..action_end]);
+            return extract_to_sentence_end(&section_context[action_start..]);
         }
     }
     String::new()
 }
 
 fn extract_to_sentence_end(text: &str) -> String {
-    if let Some(m) = SENTENCE_END_RE.find(text)
-        && m.start() > 0
-    {
+    for m in SENTENCE_END_RE.find_iter(text) {
+        if m.start() == 0 {
+            continue;
+        }
+        let ch = &text[m.start()..m.start() + 1];
+        if ch == "." {
+            return text[..m.start() + 1].to_string();
+        }
+        // ch == ";" — skip if followed by sub-paragraph marker
+        let rest = &text[m.start() + 1..];
+        let trimmed = rest.trim_start();
+        if trimmed.starts_with('(') {
+            continue;
+        }
+        if (trimmed.starts_with("and ") || trimmed.starts_with("or "))
+            && trimmed[3..].trim_start().starts_with('(')
+        {
+            continue;
+        }
         return text[..m.start() + 1].to_string();
     }
     truncate_at_word(text).to_string()
@@ -191,12 +195,7 @@ fn combine_clause(subject: &str, modal: &str, action: &str) -> String {
         clause = clause.replace("  ", " ");
     }
 
-    // Add ellipsis if action is missing or truncated
-    if (action.is_empty() || !clause.ends_with(['.', ';', '!', '?'])) && !clause.ends_with("...") {
-        clause.push_str("...");
-    }
-
-    truncate_smart(&clause, MAX_CLAUSE_LENGTH)
+    clause
 }
 
 // ── Char-boundary helpers ────────────────────────────────────────────
@@ -217,48 +216,6 @@ fn snap_up(text: &str, offset: usize) -> usize {
         pos += 1;
     }
     pos
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-fn ensure_clean_ending(text: &str) -> String {
-    let trimmed = text.trim();
-    if trimmed.ends_with(['.', ';', '!', '?', ')']) {
-        return trimmed.to_string();
-    }
-    // Try to find last sentence boundary
-    if let Some(m) = SENTENCE_END_RE.find_iter(trimmed).last()
-        && m.start() > trimmed.len() / 2
-    {
-        return trimmed[..m.start() + 1].to_string();
-    }
-    // No good boundary — truncate at word and add ellipsis
-    let word_end = truncate_at_word(trimmed);
-    if word_end.ends_with(['.', ';', '!', '?', ')']) {
-        word_end.to_string()
-    } else {
-        format!("{word_end}...")
-    }
-}
-
-fn truncate_smart(text: &str, max_len: usize) -> String {
-    if text.len() <= max_len {
-        return text.to_string();
-    }
-    let cut = snap_down(text, max_len.saturating_sub(3));
-    let truncated = &text[..cut];
-    // Try to find a sentence boundary
-    if let Some(m) = SENTENCE_END_RE.find_iter(truncated).last()
-        && m.start() > max_len / 2
-    {
-        return truncated[..m.start() + 1].to_string();
-    }
-    let word_end = truncate_at_word(truncated);
-    if word_end.ends_with(['.', ';', '!', '?']) {
-        word_end.to_string()
-    } else {
-        format!("{word_end}...")
-    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -303,18 +260,25 @@ mod tests {
     }
 
     #[test]
-    fn refine_long_preamble_truncated() {
+    fn refine_long_preamble_finds_sentence_start() {
         let preamble = "a ".repeat(200);
         let raw = format!("{preamble}The employer shall ensure safety.");
         let result = refine(&raw, None, None);
-        assert!(result.len() <= MAX_CLAUSE_LENGTH);
+        assert!(
+            result.contains("employer"),
+            "should contain actor: {result}"
+        );
+        assert!(result.contains("shall"), "should contain modal: {result}");
     }
 
     #[test]
-    fn max_length_enforced() {
-        let long_text = "The employer shall ".to_string() + &"ensure safety and ".repeat(50);
-        let result = refine(&long_text, None, None);
-        assert!(result.len() <= MAX_CLAUSE_LENGTH);
+    fn refine_long_action_not_truncated() {
+        let long_text = "The employer shall ensure safety and welfare. Done.";
+        let result = refine(long_text, None, None);
+        assert!(
+            result.contains("ensure safety and welfare."),
+            "should reach sentence end: {result}"
+        );
     }
 
     #[test]

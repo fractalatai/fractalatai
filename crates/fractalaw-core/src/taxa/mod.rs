@@ -95,7 +95,7 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
     let cleaned = text_cleaner::clean(raw_text);
     let purposes = purpose::classify(&cleaned);
 
-    if should_skip_drrp(&purposes) {
+    if should_skip_drrp(&purposes) || is_descriptive_summary(&cleaned) {
         return TaxaRecord {
             cleaned_text: cleaned,
             purposes,
@@ -135,25 +135,15 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
 
 // ── Clause extraction ────────────────────────────────────────────────
 
-/// Maximum length for a refined clause.
-const MAX_CLAUSE_LEN: usize = 300;
-
-/// How far before the actor to start the clause window.
-const SUBJECT_WINDOW: usize = 100;
-
-/// How far after the modal to extend the clause window.
-const ACTION_WINDOW: usize = 200;
-
 /// Sentence-end pattern for truncation.
 static SENTENCE_END_RE: LazyLock<regex::Regex> =
     LazyLock::new(|| regex::Regex::new(r"[.;]").unwrap());
 
 /// Extract a focused clause from the cleaned text using match span data.
 ///
-/// If a `MatchSpan` is available (governed v2 patterns), extracts a window:
-/// - Start: up to `SUBJECT_WINDOW` chars before actor, snapped to sentence boundary
-/// - End: up to `ACTION_WINDOW` chars after modal end, snapped to sentence boundary
-/// - Capped at `MAX_CLAUSE_LEN` total
+/// If a `MatchSpan` is available (governed v2 patterns), scans backward from
+/// the actor for the sentence start and forward from the modal for the sentence
+/// end.  No artificial window limits — the text is already in memory.
 ///
 /// If no span (government patterns or v1), falls back to `clause_refiner::refine()`.
 fn extract_clause(
@@ -163,62 +153,28 @@ fn extract_clause(
     let dc = classification?;
 
     if let Some(span) = dc.span {
-        // Span-based extraction — we know exactly where actor and modal are.
-        // Span offsets come from regex on lowercased text; snap to char
-        // boundaries in the original cleaned_text (safe for rare multi-byte chars).
         let text_len = cleaned_text.len();
         let actor_start = snap_char_boundary_down(cleaned_text, span.actor_start);
         let modal_end = snap_char_boundary_down(cleaned_text, span.modal_end);
 
-        // Start: SUBJECT_WINDOW before actor, snapped to sentence start
-        let raw_start = actor_start.saturating_sub(SUBJECT_WINDOW);
-        let raw_start = snap_char_boundary_down(cleaned_text, raw_start);
-        let window_before = &cleaned_text[raw_start..actor_start];
-        // Find last sentence boundary (. or ; followed by space+uppercase) in the window
-        let start = if let Some(pos) = find_last_sentence_start(window_before) {
-            raw_start + pos
-        } else if raw_start == 0 {
-            0
-        } else {
-            // Snap to next word boundary
-            snap_to_word_start(cleaned_text, raw_start)
-        };
+        // Start: scan all text before actor for the last sentence boundary
+        let before_actor = &cleaned_text[..actor_start];
+        let start = find_last_sentence_start(before_actor).unwrap_or(0);
 
-        // End: ACTION_WINDOW after modal end, snapped to sentence end
-        let raw_end =
-            snap_char_boundary_down(cleaned_text, (modal_end + ACTION_WINDOW).min(text_len));
-        let window_after = &cleaned_text[modal_end..raw_end];
-        let end = if let Some(pos) = find_first_sentence_end(window_after) {
+        // End: scan all text after modal for the first sentence boundary
+        let after_modal = &cleaned_text[modal_end..];
+        let end = if let Some(pos) = find_first_sentence_end(after_modal) {
             // Include the punctuation
             (modal_end + pos + 1).min(text_len)
         } else {
-            snap_to_word_end(cleaned_text, raw_end)
+            // No sentence end found — use the full remaining text
+            text_len
         };
 
-        // Cap at MAX_CLAUSE_LEN
-        let effective_end = if end - start > MAX_CLAUSE_LEN {
-            let capped = start + MAX_CLAUSE_LEN;
-            snap_to_word_end(cleaned_text, capped)
-        } else {
-            end
-        };
-
-        let clause = cleaned_text[start..effective_end].trim().to_string();
+        let clause = cleaned_text[start..end].trim().to_string();
         if clause.is_empty() {
             return None;
         }
-
-        // Add ellipsis if we truncated
-        let clause = if start > 0 && !clause.starts_with(|c: char| c.is_uppercase()) {
-            format!("...{clause}")
-        } else {
-            clause
-        };
-        let clause = if effective_end < text_len && !clause.ends_with(['.', ';', '!', '?']) {
-            format!("{clause}...")
-        } else {
-            clause
-        };
 
         Some(clause)
     } else {
@@ -248,9 +204,32 @@ fn find_last_sentence_start(window: &str) -> Option<usize> {
     last_pos
 }
 
-/// Find the position of the first sentence-ending punctuation in `window`.
+/// Find the position of the first real sentence-ending punctuation in `window`.
+///
+/// Skips `;` when followed by a sub-paragraph marker like `(a)`, `(b)`, `(i)`,
+/// `(ii)` etc. — these are list separators in UK legislation, not sentence ends.
 fn find_first_sentence_end(window: &str) -> Option<usize> {
-    SENTENCE_END_RE.find(window).map(|m| m.start())
+    for m in SENTENCE_END_RE.find_iter(window) {
+        let ch = &window[m.start()..m.start() + 1];
+        if ch == "." {
+            return Some(m.start());
+        }
+        // ch == ";" — check what follows
+        let rest = &window[m.start() + 1..];
+        let trimmed = rest.trim_start();
+        // Skip if followed by sub-paragraph marker: (a), (b), (i), (1), (aa), etc.
+        if trimmed.starts_with('(') {
+            continue;
+        }
+        // Skip if followed by "and" or "or" then sub-paragraph (e.g. "; and (b)")
+        if (trimmed.starts_with("and ") || trimmed.starts_with("or "))
+            && trimmed[3..].trim_start().starts_with('(')
+        {
+            continue;
+        }
+        return Some(m.start());
+    }
+    None
 }
 
 /// Snap a byte offset down to the nearest valid char boundary.
@@ -260,27 +239,6 @@ fn snap_char_boundary_down(text: &str, offset: usize) -> usize {
         pos -= 1;
     }
     pos
-}
-
-/// Snap a byte offset forward to the next word boundary (space).
-fn snap_to_word_start(text: &str, offset: usize) -> usize {
-    if offset >= text.len() {
-        return text.len();
-    }
-    // Find next space after offset, then skip it
-    text[offset..].find(' ').map_or(offset, |p| {
-        let pos = offset + p + 1;
-        pos.min(text.len())
-    })
-}
-
-/// Snap a byte offset backward to the previous word boundary (space).
-fn snap_to_word_end(text: &str, offset: usize) -> usize {
-    if offset >= text.len() {
-        return text.len();
-    }
-    // Find last space before offset
-    text[..offset].rfind(' ').map_or(offset, |p| p)
 }
 
 // ── Miss analysis ────────────────────────────────────────────────────
@@ -412,12 +370,57 @@ pub fn analyse_miss(raw_text: &str) -> MissRecord {
 /// 189 skips (18.1%) with 58 false negatives (30.7% error rate).
 fn should_skip_drrp(purposes: &[&str]) -> bool {
     const SKIP_PURPOSES: &[&str] = &[
+        purpose::ENACTMENT,
         purpose::INTERPRETATION,
         purpose::AMENDMENT,
         purpose::REPEAL_REVOCATION,
     ];
 
-    !purposes.is_empty() && purposes.iter().all(|p| SKIP_PURPOSES.contains(p))
+    if purposes.is_empty() {
+        return false;
+    }
+
+    // ALL strategy: skip when every detected purpose is a skip-purpose.
+    if purposes.iter().all(|p| SKIP_PURPOSES.contains(p)) {
+        return true;
+    }
+
+    // Interpretation-primary: if Interpretation is first (highest priority)
+    // purpose, skip DRRP.  Modal verbs inside definition blocks (e.g.
+    // `"exposure limit value" means... which must not be exceeded`) trigger
+    // PROCESS_RULE but aren't real duties.
+    if purposes.first() == Some(&purpose::INTERPRETATION) {
+        return true;
+    }
+
+    // Enactment-primary: title blocks and signed blocks always skip.
+    if purposes.first() == Some(&purpose::ENACTMENT) {
+        return true;
+    }
+
+    false
+}
+
+/// Descriptive/meta-regulatory summary pattern.
+///
+/// Matches text that describes what the Regulations/Act do in general terms
+/// (e.g. "The Regulations impose duties on employers to protect employees...")
+/// rather than directly creating obligations. These appear in Reg 1 of most
+/// SIs as a descriptive overview and should not produce DRRP output.
+static DESCRIPTIVE_SUMMARY: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(
+        r"(?i)^(?:the(?:se)?|this) (?:regulations?|act|order|rules?)\s+(?:impose|require|provide|give effect|implement|extend|place|create|establish|set out|supplement|make provision)",
+    )
+    .unwrap()
+});
+
+/// Check if cleaned text is a descriptive meta-regulatory summary.
+///
+/// These provisions describe what the instrument does as a whole — they don't
+/// themselves create obligations. Example: "The Regulations impose duties on
+/// employers to protect employees who may be exposed to risk..."
+fn is_descriptive_summary(text: &str) -> bool {
+    DESCRIPTIVE_SUMMARY.is_match(text)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -533,16 +536,16 @@ mod tests {
     }
 
     #[test]
-    fn amendment_with_modal_verbs_not_skipped() {
-        // Amendment text containing "shall" also triggers Process+Rule.
-        // With ALL strategy, mixed purposes are NOT skipped — the duty
-        // content in the quoted substitution text gets DRRP-parsed.
+    fn amendment_with_quoted_duty_skipped() {
+        // Amendment text containing "shall" in quoted substitution text.
+        // The duty belongs to the destination section, not this amendment
+        // provision.  Interpretation pattern also fires on the quoted text,
+        // making Interpretation primary — correctly skipped.
         let text = r#"In section 3, for subsection (2) substitute— "The Scottish Ministers shall ensure targets are met.""#;
         let record = parse(text);
         assert!(record.purposes.contains(&purpose::AMENDMENT));
-        assert!(record.purposes.contains(&purpose::PROCESS_RULE));
-        // NOT skipped — mixed purposes, DRRP runs
-        assert!(!record.duty_types.is_empty());
+        // Interpretation-primary due to quoted text — DRRP skipped
+        assert!(record.duty_types.is_empty());
     }
 
     #[test]
@@ -557,16 +560,14 @@ mod tests {
     }
 
     #[test]
-    fn mixed_purposes_not_skipped() {
-        // Multi-purpose provisions (Interpretation + Process+Rule) should NOT be
-        // skipped — they often contain genuine duties alongside definitional framing.
-        // Gate uses ALL strategy: only skips when ALL purposes are skip-purposes.
+    fn interpretation_primary_skipped() {
+        // When Interpretation is the primary (first) purpose, skip DRRP even
+        // if modal verbs inside definitions trigger Process+Rule.
         let text = r#"For the purposes of interpretation, "employer" means a person who shall ensure safety."#;
         let record = parse(text);
         assert!(record.purposes.contains(&purpose::INTERPRETATION));
-        assert!(record.purposes.contains(&purpose::PROCESS_RULE));
-        // NOT skipped — DRRP classification runs because Process+Rule is present
-        assert!(!record.duty_types.is_empty());
+        // Interpretation-primary — DRRP skipped
+        assert!(record.duty_types.is_empty());
     }
 
     #[test]
@@ -578,6 +579,72 @@ mod tests {
         assert!(record.purposes.contains(&purpose::INTERPRETATION));
         // No non-skip purposes present — gate triggers
         assert!(record.duty_types.is_empty());
+    }
+
+    // ── Descriptive summary filter tests ────────────────────────────
+
+    #[test]
+    fn descriptive_regulations_impose_duties_no_drrp() {
+        // UK_uksi_2005_1093 Reg 1 — descriptive summary of what the Regulations do
+        let text = "The Regulations impose duties on employers to protect \
+                    employees who may be exposed to risk from exposure to \
+                    vibration at work, and other persons who might be affected \
+                    by the work, whether they are at work or not.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.is_empty(),
+            "descriptive summary should not produce DRRP, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn descriptive_regulations_require_no_drrp() {
+        let text = "These Regulations require employers to make a suitable and \
+                    sufficient assessment of the risks to the health and safety \
+                    of employees.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.is_empty(),
+            "descriptive 'require' summary should not produce DRRP, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn descriptive_act_provides_no_drrp() {
+        let text = "This Act provides for the making of health, safety and \
+                    welfare regulations and the issuing of approved codes of practice.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.is_empty(),
+            "descriptive 'provides' summary should not produce DRRP, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn descriptive_regulations_implement_no_drrp() {
+        let text = "The Regulations implement Council Directive 89/391/EEC on \
+                    the introduction of measures to encourage improvements in \
+                    the safety and health of workers at work.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.is_empty(),
+            "descriptive 'implement' summary should not produce DRRP, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn direct_duty_the_employer_shall_not_filtered() {
+        // "The" + employer + modal is a direct duty, not a descriptive summary
+        let text = "The employer shall ensure the health and safety of employees.";
+        let record = parse(text);
+        assert!(
+            !record.duty_types.is_empty(),
+            "direct duty starting with 'The employer' should still produce DRRP"
+        );
     }
 
     // ── parse_v2 tests ────────────────────────────────────────────────
@@ -831,13 +898,13 @@ mod tests {
         let record = parse_v2(text);
         let clause = record.clause_refined.unwrap();
         assert!(
-            clause.len() <= 320,
-            "clause too long: {} chars",
-            clause.len()
-        ); // 300 + ellipsis
-        assert!(
             clause.contains("employer"),
             "clause should contain actor: {clause}"
+        );
+        // Should end at the first sentence boundary, not truncate mid-sentence
+        assert!(
+            clause.ends_with('.') || clause.ends_with(';'),
+            "clause should end at sentence boundary: {clause}"
         );
     }
 
@@ -914,6 +981,48 @@ mod tests {
         assert!(
             clause.contains("shall"),
             "clause should contain modal: {clause}"
+        );
+    }
+
+    // ── Sentence-start regression tests ─────────────────────────────
+
+    #[test]
+    fn clause_no_mid_sentence_start_long_preamble() {
+        // Real-world case: actor is >100 chars from the sentence start.
+        // The clause should NOT start mid-word or mid-sentence.
+        let text = "Subject to the provisions of this Part, for any activity to \
+                    which paragraph 7(3)(c) of Schedule 3 applies, but the \
+                    appropriate registration authority shall enter in its register \
+                    the particulars furnished to it pursuant to that provision.";
+        let record = parse_v2(text);
+        let clause = record.clause_refined.unwrap();
+        assert!(
+            !clause.starts_with("..."),
+            "clause should not start mid-sentence: {clause}"
+        );
+        assert!(
+            clause.starts_with("Subject") || clause.starts_with("the appropriate"),
+            "clause should start at sentence boundary: {clause}"
+        );
+    }
+
+    #[test]
+    fn clause_finds_sentence_start_after_period() {
+        // Sentence boundary `. ` is >100 chars before the actor.
+        let text = "This regulation applies to all installations covered by these \
+                    Regulations and to all operators thereof. Where an installation \
+                    which contains an existing SED installation is subject to a permit, \
+                    the operator of the installation shall by the SED date make an \
+                    application under regulation 17 of the principal Regulations.";
+        let record = parse_v2(text);
+        let clause = record.clause_refined.unwrap();
+        assert!(
+            !clause.starts_with("..."),
+            "clause should not start mid-sentence: {clause}"
+        );
+        assert!(
+            clause.contains("operator"),
+            "clause should contain actor: {clause}"
         );
     }
 }

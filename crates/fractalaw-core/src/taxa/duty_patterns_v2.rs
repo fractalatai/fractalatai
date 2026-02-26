@@ -260,6 +260,48 @@ fn match_passive_by_pattern(text: &str, keyword: &str) -> Option<DutyClassificat
     })
 }
 
+/// Words that follow epistemic "may" (= might), not deontic "may" (= is permitted to).
+/// When "may" is followed by one of these, it expresses possibility, not permission.
+static EPISTEMIC_MAY: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\bmay\s+(?:be\b|need\b|have\b|require\b|also\s+be\b)").unwrap()
+});
+
+/// Check if the actor keyword sits inside a subordinate "Where/If/Unless..."
+/// clause rather than being the main subject.
+///
+/// Pattern: `Where {actor} {condition}, {real subject} shall {action}`
+/// The actor appears before the modal but is in the conditional clause.
+/// Detected by: a comma exists between the actor and the modal, AND the
+/// text before the actor (within the match) starts with a subordinating
+/// conjunction.
+fn is_actor_in_subordinate(text: &str, actor_start: usize, modal_start: usize) -> bool {
+    // Look for a subordinating conjunction before the actor
+    let before_actor = &text[..actor_start];
+    let before_trimmed = before_actor.trim_start();
+    let starts_with_subordinator =
+        before_trimmed.len() < 30 && SUBORDINATE_CLAUSE_START.is_match(before_trimmed);
+    if !starts_with_subordinator {
+        return false;
+    }
+    // Check for a comma between actor and modal (the clause boundary)
+    let between = &text[actor_start..modal_start];
+    between.contains(',')
+}
+
+static SUBORDINATE_CLAUSE_START: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)^(?:where|if|unless|when|in any case where)\b").unwrap());
+
+/// Check if an Enabling match on "may" is actually epistemic (= might).
+/// Returns true if the match should be rejected.
+fn is_epistemic_may(text: &str, match_end: usize) -> bool {
+    // Find where "may" is in the matched text — it's near the end of the match
+    // The matched span is `{keyword}.{0,window}{may|power to|...}`, so "may" is
+    // at the tail. Search backwards from match_end for "may".
+    let search_start = match_end.saturating_sub(20);
+    let region = &text[search_start..text.len().min(match_end + 30)];
+    EPISTEMIC_MAY.is_match(region)
+}
+
 /// Match a specific actor keyword against all sub-type patterns.
 fn match_actor_anchored(text: &str, keyword: &str) -> Option<DutyClassification> {
     // First check the "shall be the duty of" reverse pattern (HSWA formulation)
@@ -276,7 +318,15 @@ fn match_actor_anchored(text: &str, keyword: &str) -> Option<DutyClassification>
     for pat in SUB_TYPE_PATTERNS {
         let re = cached_anchored(keyword, pat.obligation, pat.idx, PRIMARY_WINDOW);
         if let Some(m) = re.find(text) {
+            // Reject epistemic "may be/need/have/require" for Enabling matches
+            if pat.sub_type == DutySubType::Enabling && is_epistemic_may(text, m.end()) {
+                continue;
+            }
             let span = extract_span_from_anchored(text, m.start(), m.end());
+            // Reject actor in subordinate clause ("Where {actor} ..., {subject} shall")
+            if is_actor_in_subordinate(text, span.actor_start, span.modal_start) {
+                continue;
+            }
             return Some(DutyClassification {
                 family: DutyFamily::Governed,
                 sub_type: pat.sub_type,
@@ -290,7 +340,13 @@ fn match_actor_anchored(text: &str, keyword: &str) -> Option<DutyClassification>
     for pat in SUB_TYPE_PATTERNS {
         let re = cached_anchored(keyword, pat.obligation, pat.idx, EXTENDED_WINDOW);
         if let Some(m) = re.find(text) {
+            if pat.sub_type == DutySubType::Enabling && is_epistemic_may(text, m.end()) {
+                continue;
+            }
             let span = extract_span_from_anchored(text, m.start(), m.end());
+            if is_actor_in_subordinate(text, span.actor_start, span.modal_start) {
+                continue;
+            }
             return Some(DutyClassification {
                 family: DutyFamily::Governed,
                 sub_type: pat.sub_type,
@@ -429,6 +485,7 @@ fn match_person_compound(text: &str) -> Option<DutyClassification> {
     let enabling_re = Regex::new(r"(?i)\b(?:may|power to|entitled to)\b").unwrap();
     if let Some(enabling_match) = enabling_re.find(&after_lower)
         && enabling_match.start() <= PRIMARY_WINDOW
+        && !EPISTEMIC_MAY.is_match(&after_lower[enabling_match.start()..])
     {
         return Some(DutyClassification {
             family: DutyFamily::Governed,
@@ -637,6 +694,90 @@ mod tests {
         let actors = vec![actor("Ind: Employee", "employee")];
         let dc = match_governed_v2(text, &actors).unwrap();
         assert_eq!(dc.sub_type, DutySubType::Enabling);
+    }
+
+    // ── Subordinate clause rejection ──────────────────────────────
+
+    #[test]
+    fn actor_in_where_clause_no_match() {
+        // "Where an employee is required..., an individual record shall be made"
+        // The employee is in the subordinate clause, not the main subject.
+        let text = "where an employee is required by regulation 10 to be under \
+                     medical surveillance, an individual record of any monitoring \
+                     carried out in accordance with this regulation shall be made, \
+                     maintained and kept in respect of that employee";
+        let actors = vec![actor("Ind: Employee", "employee")];
+        let result = match_governed_v2(text, &actors);
+        assert!(
+            result.is_none(),
+            "actor in Where-clause should not match, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn actor_after_where_clause_matches() {
+        // "Where the risk assessment shows..., the employer shall ensure..."
+        // The employer is the main subject AFTER the comma.
+        let text = "where the risk assessment shows it to be necessary, \
+                     the employer shall ensure that employees are provided \
+                     with suitable health surveillance";
+        let actors = vec![actor("Org: Employer", "employer")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+    }
+
+    // ── Epistemic "may" rejection ───────────────────────────────────
+
+    #[test]
+    fn epistemic_may_be_not_enabling() {
+        // "employer may need" is epistemic (= might need), not permission
+        let text = "the risk assessment shall include such additional information \
+                     as the employer may need in order to complete the risk assessment";
+        let actors = vec![actor("Org: Employer", "employer")];
+        let result = match_governed_v2(text, &actors);
+        assert!(
+            result.is_none() || result.as_ref().unwrap().sub_type != DutySubType::Enabling,
+            "epistemic 'may need' should not produce Enabling, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn epistemic_may_be_reduced_not_enabling() {
+        // "the frequency of monitoring may be reduced" — epistemic, not permission
+        let text = "biological monitoring shall be carried out at intervals not \
+                     exceeding those set out below- (a) in respect of an employee \
+                     other than a young person or a woman of reproductive capacity, \
+                     at least every 6 months, but where the results of the \
+                     measurements for individuals or for groups of workers have \
+                     shown on the previous two consecutive occasions on which \
+                     monitoring was carried out a lead in air exposure greater \
+                     than 0.075 mg/m 3 but less than 0.100 mg/m 3 and where the \
+                     blood-lead concentration of any individual employee is less \
+                     than 30, the frequency of monitoring may be reduced to once \
+                     a year";
+        let actors = vec![actor("Ind: Employee", "employee")];
+        let result = match_governed_v2(text, &actors);
+        assert!(
+            result.is_none() || result.as_ref().unwrap().sub_type != DutySubType::Enabling,
+            "epistemic 'may be reduced' should not produce Enabling, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn epistemic_may_be_exposed_not_enabling() {
+        // "employees who may be exposed" — epistemic, not permission
+        let text = "the regulations impose duties on employers to protect \
+                     employees who may be exposed to risk from vibration";
+        let actors = vec![actor("Org: Employer", "employer")];
+        let result = match_governed_v2(text, &actors);
+        assert!(
+            result.is_none() || result.as_ref().unwrap().sub_type != DutySubType::Enabling,
+            "epistemic 'may be' should not produce Enabling, got: {:?}",
+            result
+        );
     }
 
     // ── Actor-as-object (should NOT match) ──────────────────────────
