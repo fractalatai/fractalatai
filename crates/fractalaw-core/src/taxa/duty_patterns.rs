@@ -166,6 +166,7 @@ const GOVERNED_ACTORS: &[&str] = &[
     "importer",
     "installer",
     "contractor",
+    "client",
     "person who",
     "every person",
     "no person",
@@ -702,6 +703,30 @@ mod tests {
     fn contractor_numbered_list_item_no_match() {
         // CDM 2015 schedule item — just a data field, no modal
         let text = "13. the name and address of any contractor already appointed.";
+        assert!(match_governed(text).is_none());
+    }
+
+    // ── True-negative regression tests (Iteration 3: client) ─────────
+
+    #[test]
+    fn client_heading_no_match() {
+        // CDM 2015 heading — no modal verb
+        let text = "client duties in relation to managing projects";
+        assert!(match_governed(text).is_none());
+    }
+
+    #[test]
+    fn client_cross_reference_no_match() {
+        // CDM 2015 reg 7(3) — application/scope, no modal
+        let text = "regulation 5(3) and (4) does not apply to a domestic client.";
+        assert!(match_governed(text).is_none());
+    }
+
+    #[test]
+    fn client_schedule_item_no_match() {
+        // CDM 2015 schedule — data field, no modal
+        let text = "5. the following contact details of the client: name, address, \
+                    telephone number and (if available) an email address.";
         assert!(match_governed(text).is_none());
     }
 }

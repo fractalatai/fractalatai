@@ -171,7 +171,61 @@ All 3 failed as expected (empty duty_types).
 
 22 CDM provisions now correctly classified. Zero false positives introduced. Test suite grew from 132 to 141.
 
+### Iteration 2 — Assess "worker" for GOVERNED_ACTORS
+
+**Target**: Gap A — 18 provisions with `Ind: Worker` actor label but no DRRP.
+
+**Step 1b (audit)**:
+- 37 provisions mention "worker" across 7 ESH laws
+- 13 have modal + no DRRP (would be affected)
+- Examined obligation subjects in all 13
+
+**Finding: "worker" is almost always the object/beneficiary, NOT the duty-holder.**
+- MHSWR reg 16A/17A/18A: "the **hirer** shall..." — hirer has duty toward agency worker
+- CDM reg 4: "changing rooms **must be provided**...if a worker" — passive, worker is a condition
+- CDM reg 6: "The **notice** must...be read by any worker" — notice is subject
+- CDM reg 23: "A **cofferdam** must be...workers can gain shelter" — cofferdam is subject
+
+Only 0/13 provisions have worker as the actual duty-holder. Adding "worker" would misattribute obligations — classifying these as "Governed / Prescriptive" when the duty is on the hirer, employer, or is an impersonal passive.
+
+**Decision: SKIP.** "Worker" is a Gap C pattern (passive voice / actor-less), not Gap A (actor missing from list). No change made.
+
+### Iteration 3 — Add "client" to GOVERNED_ACTORS
+
+**Target**: Gap A — 9 provisions with `SC: Client` actor label but no DRRP.
+
+**Step 1b (audit)**:
+- 44 provisions mention "client" across 7 ESH laws (all CDM 2015)
+- 27 already have DRRP (true positive — working)
+- 4 have modal + no DRRP (would be affected)
+- 13 no modal (unaffected)
+
+All 4 affected provisions have client as the **subject** of the obligation:
+- Reg 4(1): "A client **must** make suitable arrangements"
+- Reg 4(3): "A client **must** ensure these arrangements are maintained"
+- Reg 8(7): "duties...must be carried out" (domestic client context)
+- Reg 16(3): "A domestic client...must comply"
+
+No false-positive risk. "Client" is specific, no compound-word collisions.
+
+**True-negative regression tests** (3 in duty_patterns, 1 in mod.rs): all passed before change.
+**Failing true-positive tests** (2 in mod.rs): confirmed failing.
+
+**Step 3 (change)**: Added `"client"` to `GOVERNED_ACTORS`.
+
+**Step 4 (full suite)**: 147 passed, 0 failed.
+
+**Step 5 (measurement)**:
+
+| Metric | Before | After | Delta |
+|--------|--------|-------|-------|
+| CDM 2015 miss rate | 86/159 (54%) | 82/159 (52%) | -4 provisions |
+| Overall miss rate | 221/558 (39.6%) | 217/558 (38.9%) | -4 provisions |
+| Cumulative from baseline | 243 → 221 | 243 → 217 | 26 fixed (10.7%) |
+
+Test suite: 141 → 147.
+
 ---
 
 **Session started**: 2026-02-26
-**Status**: Active — ready for Iteration 2
+**Status**: Active — ready for Iteration 4

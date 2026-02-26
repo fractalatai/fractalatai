@@ -367,4 +367,45 @@ mod tests {
             record.duty_types
         );
     }
+
+    // ── True-negative regression tests (Iteration 3: client) ─────────
+
+    #[test]
+    fn client_definition_no_drrp() {
+        // CDM 2015 reg 4(8) — definitional, no modal
+        let text = "Where there is more than one client in relation to a project, \
+                    one or more of the clients may agree in writing to be treated \
+                    for the purposes of these Regulations as the only client.";
+        let record = parse(text);
+        assert!(record.duty_types.is_empty());
+    }
+
+    // ── True-positive tests (Iteration 3: client) ────────────────────
+
+    #[test]
+    fn client_duty_manage_project() {
+        // CDM 2015 reg 4(1) — clear duty on client
+        let text = "a client must make suitable arrangements for managing a \
+                    project, including the allocation of sufficient time and \
+                    other resources.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.contains(&DutyType::Duty),
+            "client obligation should classify as Duty, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn client_duty_maintain_arrangements() {
+        // CDM 2015 reg 4(3) — duty on client
+        let text = "a client must ensure that these arrangements are maintained \
+                    and reviewed throughout the project.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.contains(&DutyType::Duty),
+            "client obligation should classify as Duty, got: {:?}",
+            record.duty_types
+        );
+    }
 }
