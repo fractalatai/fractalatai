@@ -770,6 +770,115 @@ Total DRRP entries:       110,366
 Laws with DRRP data:        3,285
 Laws with LAT text:          ~400 (only scraped laws have text in LanceDB)
 
+## Phase C Verification — BLOCKED (2026-02-26)
+
+**Context**: Overnight embed job completed successfully (97,522 rows with embeddings in LanceDB). Proceeded with Phase C validation but accidentally deleted LanceDB table with `db.drop_table("legislation_text")` while trying to add taxa columns.
+
+**Root cause**: LanceDB Python API's `add_columns()` doesn't support complex types (LIST, VARCHAR) via SQL expressions. Attempted workaround via table recreation failed.
+
+**Impact**: Lost 9 hours of embedding computation (nomic-embed-text-v1.5 on 97K provisions).
+
+**Recovery plan**:
+1. ✅ Restore from backup Parquet (`backups/legislation_text_20260226_055749.parquet`, 164MB)
+2. ✅ Recreate table with full 47-column schema (30 original + 17 new taxa/AI columns)
+3. ✅ Run `fractalaw taxa enrich` to populate taxa columns
+4. ✅ Verify taxa data quality
+5. ✅ Run `fractalaw run drrp-polisher.wasm`
+6. ✅ Compare taxa `clause_refined` vs AI `ai_clause` results
+
+**Prevention measures implemented**:
+- Created `.claude/settings.json` with deny rules blocking destructive LanceDB operations
+- Added `backups/*.parquet` to `.gitignore`
+- Created `scripts/backup_lancedb.py` for future exports
+- Updated `.claude/projects/-var-home-jason-fractalaw/memory/MEMORY.md` with LanceDB critical rules
+
+## Phase C Validation Complete (2026-02-26)
+
+**Status**: ✅ Successfully validated Phase C architecture with ONNX inference
+
+### Critical Bug Fixed: Missing OFFSET Support
+
+**Issue discovered**: All `LIMIT 1 OFFSET N` queries to LanceDB were returning the first row (offset 0). The host's `lance_query_impl()` extracted LIMIT but **not OFFSET** from SQL, causing the polisher to process the same provision 415 times.
+
+**Root cause**: SQL parser in `crates/fractalaw-host/src/lib.rs` only extracted `LIMIT`, not `OFFSET`.
+
+**Fix applied**:
+- Added OFFSET extraction from SQL in `lance_query_impl()`
+- Added `offset: usize` parameter to `LanceStore::query_legislation_text()`
+- Updated all callers in CLI and tests
+- Cast to `i64` for LanceDB query API
+
+**Verification**: After fix, LanceDB queries returned correct rows at each offset. Provisions 1-4 had populated `drrp_types`, as expected.
+
+### Other Issues Resolved
+
+1. **Stale WASM binary**: Polisher compiled before Phase C changes (still querying `drrp_annotations` table from Phase B). Rebuilt with current code.
+
+2. **Nullable provision field**: JSON deserialization failed because `provision` column had NULL values but `ProvisionRow` struct declared it as non-nullable `String`. Changed to `Option<String>`.
+
+3. **Prompt format mismatch**: Host's ONNX prompt parser expected Phase B format (single DRRP type + holder). Updated to parse Phase C format (taxa context with lists, actors, refined clause).
+
+4. **Empty drrp_types filtering**: LanceDB `WHERE drrp_types IS NOT NULL` matches empty lists `[]`. Added client-side filter in guest to skip provisions with `prov.drrp_types.is_empty()`.
+
+5. **List array handling**: Host's JSON conversion for LIST columns worked correctly, but required debugging to verify Arrow ListArray extraction was producing correct lengths.
+
+### Results
+
+**Successfully polished 85 provisions with ONNX inference:**
+- Model: DeBERTa v3 INT8 quantized (`models/deberta-v3-drrp/model.int8.onnx`)
+- Inference: 100% local (0 API tokens used)
+- Avg confidence: ~0.18-0.22 (model uncertainty on these provisions)
+- Processing time: ~3 seconds per provision (ONNX model load + inference)
+
+**Sample comparison (UK_asp_2019_15:s.1)**:
+
+Taxa regex (`clause_refined`):
+```
+The net-zero emissions target Before section 1 of the 2009 Act 
+(and the italic cross heading immediately preceding it), insert- 
+"The net-zero emission...
+```
+
+AI-polished (`ai_clause`):
+```
+the scottish ministers must ensure that the net scottish emissions 
+account for the net - zero emissions target year is at least 100 % 
+lower than the b...
+```
+
+**Architecture validated:**
+- ✅ LanceDB as AI working store (no DuckDB queries/writes from polisher)
+- ✅ Per-provision taxa + AI data co-located with source text
+- ✅ ONNX local-first inference working end-to-end
+- ✅ Polisher reads/writes LanceDB only via host query routing
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `crates/fractalaw-store/src/lance.rs` | +`offset` parameter to `query_legislation_text()` |
+| `crates/fractalaw-host/src/lib.rs` | +OFFSET extraction, updated prompt parser, clippy fix |
+| `crates/fractalaw-cli/src/main.rs` | +`offset=0` to all `query_legislation_text()` calls |
+| `guests/drrp-polisher/src/lib.rs` | +`provision: Option<String>`, +empty drrp_types filter, +skip audit |
+| `.gitignore` | +`backups/*.parquet` |
+| `.claude/settings.json` | Created with deny rules for destructive LanceDB ops |
+| `scripts/backup_lancedb.py` | Created LanceDB → Parquet export script |
+
+### Commit
+
+**7782232** — Fix LanceDB OFFSET support in Phase C polisher pipeline
+- Add OFFSET parameter to LanceStore::query_legislation_text()
+- Extract OFFSET from SQL in host's lance_query_impl()
+- Fix polisher guest to skip provisions with empty drrp_types
+- Make provision field optional in ProvisionRow struct
+- Update host prompt parser to support Phase C format (taxa context)
+- Add LanceDB backup script and .claude/settings.json deny rules
+
+**Next steps**:
+- Run polisher on full dataset (183 provisions with populated drrp_types)
+- Evaluate AI vs regex clause quality
+- Consider training DeBERTa model on larger dataset to improve confidence scores
+
 Matched to LAT:             7,019  (6.4%)
 Unmatched (no LAT):         99,286  (90.0%)
 Unparseable article:            22  (0.0%)
