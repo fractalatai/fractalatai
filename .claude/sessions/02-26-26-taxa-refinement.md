@@ -269,3 +269,256 @@ This session focuses on **refinement and improvement**, not building new infrast
 
 **Session started**: 2026-02-26
 **Status**: Active
+
+---
+
+## Critical Improvement 1: Purpose-Based Pre-filtering (2026-02-26)
+
+### Problem Statement
+
+The taxa regex parser currently runs DRRP classification on **all provisions**, including sections that structurally cannot contain duties/rights/responsibilities/powers:
+
+- **Interpretation/Definition sections** — vocabulary, not obligations
+- **Amendment sections** — modifying other laws, not creating duties
+- **Repeal/Revocation sections** — removing provisions
+- **Enactment/Citation sections** — naming and commencement
+- **Offence/Liability sections** — consequences, not primary duties
+
+This creates three issues:
+1. **Performance waste** — running expensive modal verb pattern matching on non-DRRP text
+2. **False positives** — detecting DRRP where none exists (e.g., "shall be inserted" in amendments)
+3. **Wasted AI inference** — polishing provisions that have no meaningful DRRP content
+
+### Current Evidence (676 provisions with taxa data)
+
+**Purpose distribution**:
+- Process+Rule+Constraint+Condition: 339 (50%)
+- Application+Scope: 119 (18%)
+- Interpretation+Definition: 77 (11%)
+- Amendment: 27 (4%)
+- Enactment+Citation+Commencement: 14 (2%)
+- Defence+Appeal: 12 (2%)
+- Offence: 11 (2%)
+- Liability: 11 (2%)
+
+**DRRP detection rate by purpose**:
+| Purpose | DRRP Rate | Count | Should Skip? |
+|---------|-----------|-------|--------------|
+| Offence | 18.2% | 11 | ✅ Consider |
+| Liability | 18.2% | 11 | ✅ Consider |
+| Interpretation+Definition | 36.4% | 77 | ✅ Yes |
+| Amendment | 37.0% | 27 | ✅ Yes |
+| Enforcement+Prosecution | 40.0% | 10 | ⚠️ Maybe |
+| Application+Scope | 42.0% | 119 | ⚠️ Maybe |
+| Process+Rule+Constraint+Condition | 49.0% | 339 | ❌ No (core DRRP) |
+| Power Conferred | 50.0% | 6 | ❌ No |
+| Repeal+Revocation | 62.5% | 8 | ⚠️ Maybe |
+| Defence+Appeal | 66.7% | 12 | ❌ No |
+| Enactment+Citation+Commencement | 71.4% | 14 | ❌ No |
+
+**Key insight**: 
+- **Interpretation+Definition** (36.4%) and **Amendment** (37.0%) have DRRP rates **below 40%**
+- These are strong candidates for **pre-filtering** (skip DRRP classification entirely)
+- Would reduce DRRP processing by ~104 provisions (15% of current dataset)
+
+### Example False Positive: Amendment with DRRP Detected
+
+**Provision**: UK_asp_2019_15:s.1  
+**Source text**: "The net-zero emissions target Before section 1 of the 2009 Act... insert..."  
+**Purposes detected**: Interpretation+Definition, Process+Rule+Constraint+Condition, **Amendment**
+
+**Taxa output**:
+- DRRP Types: **Responsibility** ❌ (false positive)
+- Duty Family: Government
+- Duty Sub-Type: Prescriptive
+- Refined Clause: "The net-zero emissions target Before section 1 of the 2009 Act..."
+
+**Problem**: This is an **amendment provision** (inserting new text into another Act), not a primary duty. The regex detected "shall" in the text being inserted and classified it as a Responsibility. But the provision itself is Amendment-purpose, not DRRP-bearing.
+
+### Current Pipeline Order (WRONG)
+
+```
+Legislative text
+  ↓
+1. Text cleaner
+2. Actor extraction
+3. DRRP duty type classification ← RUNS ON ALL TEXT
+4. POPIMAR classifier
+5. Purpose classifier ← RUNS AFTER DRRP
+  ↓
+Taxa record (all fields populated)
+```
+
+**Problem**: Purpose is classified **after** DRRP, so we can't use it to filter.
+
+### Proposed Pipeline Order (CORRECT)
+
+```
+Legislative text
+  ↓
+1. Text cleaner
+2. Purpose classifier ← EARLY GATE
+  ↓
+  [If purpose is SKIP_DRRP_PURPOSES] → Return minimal TaxaRecord (no DRRP)
+  [Else continue...]
+  ↓
+3. Actor extraction
+4. DRRP duty type classification ← ONLY ON DRRP-BEARING TEXT
+5. POPIMAR classifier
+  ↓
+Taxa record (DRRP fields only if purpose allows)
+```
+
+### Proposed SKIP_DRRP_PURPOSES Set
+
+Based on current evidence, propose **strict skipping** for:
+
+1. **Interpretation+Definition** (36.4% DRRP rate, n=77)
+   - Definitional text, vocabulary
+   - Example: "In these Regulations— 'employer' means..."
+   
+2. **Amendment** (37.0% DRRP rate, n=27)
+   - Modifying other legislation
+   - Example: "In section 3, for subsection (2) substitute..."
+   
+3. **Repeal+Revocation** (62.5% DRRP rate, n=8)
+   - Removing provisions
+   - Example: "The following Acts shall cease to have effect..."
+
+**Potential additions** (lower confidence, need more data):
+- **Liability** (18.2%, n=11) — small sample
+- **Offence** (18.2%, n=11) — small sample
+
+### Implementation Plan
+
+**Step 1**: Move `purpose::classify()` to run **first** in `taxa::parse()`
+
+**File**: `crates/fractalaw-core/src/taxa/mod.rs` — `parse()` function
+
+```rust
+pub fn parse(raw_text: &str) -> TaxaRecord {
+    if raw_text.trim().is_empty() {
+        return TaxaRecord::default();
+    }
+
+    // Step 1: Clean
+    let cleaned = text_cleaner::clean(raw_text);
+
+    // Step 2: Purpose (EARLY GATE)
+    let purposes = purpose::classify(&cleaned);
+    
+    // Step 3: Check if we should skip DRRP processing
+    if should_skip_drrp(&purposes) {
+        return TaxaRecord {
+            cleaned_text: cleaned,
+            purposes,
+            ..Default::default()
+        };
+    }
+
+    // Step 4: Extract actors (only if DRRP-bearing)
+    let extracted = actors::extract_actors(&cleaned);
+
+    // Step 5: Classify duty type
+    let lower = cleaned.to_lowercase();
+    let cr = duty_type::classify(&lower);
+
+    // Step 6: POPIMAR
+    let dt_labels: Vec<&str> = cr.duty_types.iter().map(|d| d.as_str()).collect();
+    let popimar = popimar::classify_with_duty_types(&cleaned, &dt_labels);
+
+    TaxaRecord {
+        cleaned_text: cleaned,
+        governed_actors: extracted.governed,
+        government_actors: extracted.government,
+        duty_types: cr.duty_types,
+        popimar,
+        purposes,
+        classification: cr.classification,
+    }
+}
+
+fn should_skip_drrp(purposes: &[&str]) -> bool {
+    const SKIP_PURPOSES: &[&str] = &[
+        purpose::INTERPRETATION,
+        purpose::AMENDMENT,
+        purpose::REPEAL_REVOCATION,
+    ];
+    
+    purposes.iter().any(|p| SKIP_PURPOSES.contains(p))
+}
+```
+
+**Step 2**: Add unit tests for pre-filtering
+
+```rust
+#[test]
+fn skip_interpretation_section() {
+    let text = r#"In these Regulations— "employer" means a person who employs one or more employees."#;
+    let record = parse(text);
+    assert!(record.purposes.contains(&purpose::INTERPRETATION));
+    assert!(record.duty_types.is_empty()); // No DRRP classification
+}
+
+#[test]
+fn skip_amendment_section() {
+    let text = "In section 3, for subsection (2) substitute the following provisions.";
+    let record = parse(text);
+    assert!(record.purposes.contains(&purpose::AMENDMENT));
+    assert!(record.duty_types.is_empty());
+}
+
+#[test]
+fn process_drrp_section() {
+    let text = "Every employer shall ensure the health and safety of employees.";
+    let record = parse(text);
+    assert!(record.purposes.contains(&purpose::PROCESS_RULE));
+    assert!(!record.duty_types.is_empty()); // DRRP classification runs
+}
+```
+
+**Step 3**: Review purpose regex patterns for precision
+
+**File**: `crates/fractalaw-core/src/taxa/purpose.rs`
+
+Current patterns are comprehensive but may have overlaps. Need to ensure:
+- **Interpretation** pattern doesn't over-match
+- **Amendment** pattern is specific enough
+- **Process+Rule** (the default) doesn't dominate
+
+Example potential improvement for Amendment:
+```rust
+// Current:
+r"(?i)(?:shall be inserted|there is inserted|insert the following after|...)"
+
+// Consider: More specific to avoid matching operational "insert" verbs
+r"(?i)(?:shall be inserted|there is inserted|insert the following (?:after|before|in)|for.*?substitute|omit the (?:words?|entr(?:y|ies))|shall be amended|[Aa]mendments?|[Aa]mended as follows)"
+```
+
+### Expected Impact
+
+**Performance**:
+- Reduce DRRP regex processing by ~15-20% (skip ~100 provisions per 676)
+- Reduce AI polisher load by same amount (fewer provisions to polish)
+
+**Precision**:
+- Eliminate false positives from Amendment/Interpretation sections
+- Cleaner training data for ONNX model (no DRRP labels on non-DRRP provisions)
+
+**Validation**:
+- Run `taxa enrich` on 7 major UK ESH laws with new pipeline
+- Compare before/after: provisions with DRRP classification
+- Spot-check skipped provisions to ensure no true positives lost
+
+### Next Actions
+
+- [ ] Implement `should_skip_drrp()` gate in `taxa::parse()`
+- [ ] Add unit tests for pre-filtering logic
+- [ ] Review purpose regex patterns for precision
+- [ ] Rebuild taxa classifier with new pipeline order
+- [ ] Run `taxa enrich` on test dataset (UK_asp_2019_15)
+- [ ] Compare results: provisions skipped vs. classified
+- [ ] Validate no false negatives (true DRRP provisions skipped)
+- [ ] Document improvement in session log
+- [ ] Measure performance gain (time per provision)
+
