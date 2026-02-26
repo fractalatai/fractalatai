@@ -243,7 +243,54 @@ Test suite: 141 → 147.
 
 **Running totals**: 243 → 211 misses (43.5% → 37.8%). 32 fixed (13.2%). Test suite: 147.
 
+### Iteration 5 — Add "a person must" to GOVERNED_ACTORS
+
+**Target**: Gap A — provisions where "a person must" is the grammatical subject of a prohibition/obligation.
+
+**Step 1 (audit)**:
+- "a person" appears in 59 provisions across 7 laws (not matched by existing predicates)
+- Bare "a person" would affect 13 provisions — but 8 are false positives (62% FP rate). Too broad.
+- Compound "a person must" appears in exactly 3 provisions — all genuine prohibitions. 100% precision.
+- "a person shall" appears in 5 provisions — 3 already have DRRP, 2 are definitional ("shall be regarded"). Not safe.
+
+The 3 provisions:
+- CDM reg 28(1): "A person **must not** ride...on any vehicle"
+- CDM reg 28(2): "A person **must not** remain...on any vehicle"
+- CDM reg 32(2): "a person **must not** carry out work unless suitably instructed"
+
+**Step 1b (true-negative regression tests)**:
+- `person_definitional_no_match` — "a person shall be regarded as competent" (duty_patterns.rs)
+- `person_as_object_no_match` — "require a person to repeat" (duty_patterns.rs)
+- `person_scope_exclusion_no_match` — "shall not apply to a person" (duty_patterns.rs)
+- `person_regarded_as_competent_no_drrp` — full pipeline (mod.rs)
+- `person_scope_exclusion_no_drrp` — full pipeline (mod.rs)
+
+All 5 passed before the change.
+
+**Step 2 (failing tests)**:
+- `person_must_not_ride_prohibition` — CDM reg 28(1)
+- `person_must_not_remain_prohibition` — CDM reg 28(2)
+- `person_must_not_carry_out_work_prohibition` — CDM reg 32(2)
+
+All 3 failed as expected (empty duty_types).
+
+**Step 3 (change)**: Added `"a person must"` to `GOVERNED_ACTORS`. Compound predicate — only matches when "a person" is immediately followed by "must", avoiding false positives from "a person" as object.
+
+**Step 4 (full suite)**: 155 passed, 0 failed.
+
+**Step 5 (measurement)**:
+
+| Metric | Before | After | Delta |
+|--------|--------|-------|-------|
+| CDM 2015 DRRP count | 82 | 85 | +3 provisions |
+| Overall DRRP count | 483 | 486 | +3 provisions |
+| Test suite | 152 | 155 | +8 tests (5 TN + 3 TP) |
+
+Note: miss rate measurement via `taxa show` is unreliable because the Text field is truncated and only classified provisions are shown. DRRP count is the trustworthy metric.
+
+**Running totals**: Baseline 424 DRRP → 486 DRRP (+62, +14.6%). Test suite: 132 → 155.
+
 ---
 
 **Session started**: 2026-02-26
-**Status**: Active — ready for Iteration 5
+**Status**: Active — ready for Iteration 6

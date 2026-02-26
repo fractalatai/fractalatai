@@ -167,6 +167,7 @@ const GOVERNED_ACTORS: &[&str] = &[
     "installer",
     "contractor",
     "client",
+    "a person must",
     "person who",
     "every person",
     "no person",
@@ -703,6 +704,37 @@ mod tests {
     fn contractor_numbered_list_item_no_match() {
         // CDM 2015 schedule item — just a data field, no modal
         let text = "13. the name and address of any contractor already appointed.";
+        assert!(match_governed(text).is_none());
+    }
+
+    // ── True-negative regression tests (Iteration 5: a person must) ────
+    // "a person" appears frequently as an object/beneficiary.
+    // Only "a person must" is in GOVERNED_ACTORS — bare "a person" is NOT.
+
+    #[test]
+    fn person_definitional_no_match() {
+        // MHSWR reg 7 — "a person shall be regarded as competent" is definitional
+        let text = "a person shall be regarded as competent for the purposes of \
+                    paragraphs (1) and (8) where he has sufficient training and \
+                    experience or knowledge and other qualities";
+        assert!(match_governed(text).is_none());
+    }
+
+    #[test]
+    fn person_as_object_no_match() {
+        // HSWA s.6 — person is the object of the exception, not duty-holder
+        let text = "nothing in the preceding provisions of this section shall be \
+                    taken to require a person to repeat any testing, examination \
+                    or research";
+        assert!(match_governed(text).is_none());
+    }
+
+    #[test]
+    fn person_scope_exclusion_no_match() {
+        // PUWER reg 3 — application/scope provision, person is object
+        let text = "the requirements imposed by these regulations shall not apply \
+                    to a person in respect of work equipment supplied by him by \
+                    way of sale";
         assert!(match_governed(text).is_none());
     }
 

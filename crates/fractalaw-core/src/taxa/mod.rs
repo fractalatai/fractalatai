@@ -293,6 +293,38 @@ mod tests {
         assert!(record.duty_types.is_empty());
     }
 
+    // ── True-negative regression tests (Iteration 5: a person must) ───
+
+    #[test]
+    fn person_regarded_as_competent_no_drrp() {
+        // MHSWR reg 7 — definitional: "a person shall be regarded as competent"
+        let text = "A person shall be regarded as competent for the purposes of \
+                    paragraphs (1) and (8) where he has sufficient training and \
+                    experience or knowledge and other qualities to enable him \
+                    properly to assist in undertaking the measures referred to \
+                    in that paragraph.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.is_empty(),
+            "definitional 'shall be regarded' should not produce DRRP, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn person_scope_exclusion_no_drrp() {
+        // PUWER reg 3 — application/scope: "shall not apply to a person"
+        let text = "The requirements imposed by these Regulations shall not apply \
+                    to a person in respect of work equipment supplied by him by \
+                    way of sale, agreement for sale or hire-purchase agreement.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.is_empty(),
+            "scope exclusion mentioning 'a person' should not produce DRRP, got: {:?}",
+            record.duty_types
+        );
+    }
+
     // ── True-negative regression tests (Iteration 1: contractor) ─────
     // Full-pipeline tests: provisions mentioning "contractor" that should
     // NOT produce DRRP output. These guard against false positives when
@@ -378,6 +410,51 @@ mod tests {
                     for the purposes of these Regulations as the only client.";
         let record = parse(text);
         assert!(record.duty_types.is_empty());
+    }
+
+    // ── True-positive tests (Iteration 5: a person must) ──────────────
+
+    #[test]
+    fn person_must_not_ride_prohibition() {
+        // CDM 2015 reg 28(1) — "a person must not ride"
+        let text = "A person must not ride, or be required or permitted to ride, \
+                    on any vehicle being used for the purposes of construction \
+                    work unless that vehicle is suitable for carrying that person.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.contains(&DutyType::Duty),
+            "person prohibition should classify as Duty, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn person_must_not_remain_prohibition() {
+        // CDM 2015 reg 28(2) — "a person must not remain"
+        let text = "A person must not remain, or be required or permitted to \
+                    remain, on any vehicle during the loading or unloading of \
+                    any loose material unless a safe place of work is provided \
+                    and maintained for that person.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.contains(&DutyType::Duty),
+            "person prohibition should classify as Duty, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn person_must_not_carry_out_work_prohibition() {
+        // CDM 2015 reg 32(2) — "a person must not carry out work"
+        let text = "Where a work activity may give rise to a particular risk of \
+                    fire, a person must not carry out work unless suitably \
+                    instructed.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.contains(&DutyType::Duty),
+            "person fire prohibition should classify as Duty, got: {:?}",
+            record.duty_types
+        );
     }
 
     // ── True-positive tests (Iteration 3: client) ────────────────────
