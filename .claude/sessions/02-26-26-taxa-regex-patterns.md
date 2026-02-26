@@ -290,7 +290,21 @@ Note: miss rate measurement via `taxa show` is unreliable because the Text field
 
 **Running totals**: Baseline 424 DRRP → 486 DRRP (+62, +14.6%). Test suite: 132 → 155.
 
+### Iteration 6 — actors.rs fixes: agency worker false positive + boundary matching
+
+**Two issues found during government actor survey:**
+
+**6a — "agency worker" false positive**: The generic `[Aa]gency` pattern in `actors.rs` matched "agency worker" and "temporary work agency" as `Gvt: Agency`. These are employment terms, not government agencies. Fix: added both to the blacklist. Named government agencies (HSE, Environment Agency, etc.) unaffected — they have specific patterns.
+
+**6b — Boundary matching at start/end of string**: All ~40 actor patterns use `(?:[\s[:punct:]])` as word boundaries, requiring a character before/after the keyword. After `text_cleaner::clean()` trims whitespace, keywords at position 0 or end-of-string silently fail. Fix: pad text with spaces in `run_patterns()`.
+
+**Government actor survey result**: Zero actionable gaps. Every provision with a government actor + modal verb already gets DRRP. The 60 no-DRRP government provisions are all correctly unclassified (headings, definitions, amendments).
+
+**Measurement**: DRRP count unchanged at 486 (boundary fix adds 11 newly-visible actor extractions but no new DRRP for this sample). Test suite: 155 → 159.
+
+**Commits**: `f0fb35a` (agency blacklist), `72cd58a` (boundary fix).
+
 ---
 
 **Session started**: 2026-02-26
-**Status**: Active — ready for Iteration 6
+**Status**: Active — ready for Iteration 7
