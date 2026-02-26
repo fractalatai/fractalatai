@@ -304,7 +304,36 @@ Note: miss rate measurement via `taxa show` is unreliable because the Text field
 
 **Commits**: `f0fb35a` (agency blacklist), `72cd58a` (boundary fix).
 
+### Gap C Analysis — Actor-less Obligations
+
+**Target**: 257 provisions without DRRP classification. What's left after Gaps A and B are addressed?
+
+**Breakdown** (743 total provisions across 7 laws):
+
+| Category | Count | Action |
+|----------|-------|--------|
+| With DRRP (classified) | 486 | Done |
+| Headings (section titles) | 34 | Correctly no DRRP |
+| Structural (amendments/scope/definitions) | 83 | Correctly no DRRP |
+| Penalties/offences | 6 | Correctly no DRRP |
+| Schedules/tables | 26 | Correctly no DRRP |
+| **Passive rules (thing-subject + modal)** | **42** | **GH #16 — new "Rule" type** |
+| Genuine remainder | ~66 | Mostly more structural; ~10 actionable |
+
+**Key finding — "Rules"**: 42 provisions have modal verbs but a **thing** as the grammatical subject, not a person. Examples: "Steps must be taken", "Traffic routes must be suitable", "A cofferdam must be of suitable design". These are genuine obligations where the duty-holder is implicit. Raised as [GH #16](https://github.com/fractalaw/fractalaw/issues/16) to add "Rule" as a new classification type.
+
+**SFAIRP truncation artefact**: Initial analysis suggested 29 SFAIRP provisions lacked modal verbs, appearing to be sub-provisions inheriting modals from parents. Investigation of full LanceDB text revealed this was a `taxa show` truncation issue — text is cut at 120 chars, and the modal verb appears later in long qualifying preambles like "Where necessary in the interests of health or safety of a person on a construction site, suitable and sufficient [thing] **must**...". The taxa parser sees the full text and classifies correctly.
+
+**Actionable remainder (~10 provisions)**:
+- CDM s.8: "A person with a duty... must cooperate" — pattern "a person with... must" not in GOVERNED_ACTORS
+- CDM s.8: "A person working on a project... must report" — same pattern
+- HSWA s.5: "It shall be the duty of the person having control..." — "shall be the duty of" formulation
+- HSWA s.6: "Where a person designs, manufactures, imports or supplies..." — s.6 duties
+- MHSWR s.16A: agency worker provision with "is required to"
+
+These are diminishing-returns territory for regex — good candidates for AI polisher or future GOVERNED_ACTORS iteration.
+
 ---
 
 **Session started**: 2026-02-26
-**Status**: Active — ready for Iteration 7
+**Status**: Active — Gap C analysed, GH #16 raised. Ready for next direction.

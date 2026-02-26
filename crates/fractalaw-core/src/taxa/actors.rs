@@ -12,11 +12,43 @@ use regex::Regex;
 
 // ── Types ────────────────────────────────────────────────────────────
 
+/// A single actor match: the structured label plus the raw keyword that matched.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActorMatch {
+    /// Structured label, e.g. "Org: Employer", "Gvt: Minister".
+    pub label: String,
+    /// The raw keyword text that the regex matched, e.g. "employer", "Secretary of State".
+    /// Lowercased and trimmed of boundary characters.
+    pub keyword: String,
+    /// Byte offset of the keyword in the (padded) text.
+    pub offset: usize,
+}
+
 /// Extraction result: governed + government actor labels found in text.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ExtractedActors {
-    pub governed: Vec<String>,
-    pub government: Vec<String>,
+    /// Governed actor matches (businesses, individuals, supply-chain).
+    pub governed: Vec<ActorMatch>,
+    /// Government actor matches (authorities, agencies, ministers).
+    pub government: Vec<ActorMatch>,
+}
+
+impl ExtractedActors {
+    /// Governed actor labels only (backward-compatible with Vec<String> consumers).
+    pub fn governed_labels(&self) -> Vec<String> {
+        let mut labels: Vec<String> = self.governed.iter().map(|m| m.label.clone()).collect();
+        labels.sort();
+        labels.dedup();
+        labels
+    }
+
+    /// Government actor labels only (backward-compatible with Vec<String> consumers).
+    pub fn government_labels(&self) -> Vec<String> {
+        let mut labels: Vec<String> = self.government.iter().map(|m| m.label.clone()).collect();
+        labels.sort();
+        labels.dedup();
+        labels
+    }
 }
 
 // ── Blacklist ────────────────────────────────────────────────────────
@@ -381,35 +413,46 @@ pub fn extract_actors(text: &str) -> ExtractedActors {
 }
 
 /// Extract only governed actors from text.
-pub fn extract_governed(text: &str) -> Vec<String> {
+pub fn extract_governed(text: &str) -> Vec<ActorMatch> {
     let cleaned = apply_blacklist(text);
     run_patterns(&cleaned, &GOVERNED_COMPILED)
 }
 
 /// Extract only government actors from text.
-pub fn extract_government(text: &str) -> Vec<String> {
+pub fn extract_government(text: &str) -> Vec<ActorMatch> {
     let cleaned = apply_blacklist(text);
     run_patterns(&cleaned, &GOVERNMENT_COMPILED)
 }
 
 // ── Internals ────────────────────────────────────────────────────────
 
-fn run_patterns(text: &str, patterns: &[(&str, Regex)]) -> Vec<String> {
+fn run_patterns(text: &str, patterns: &[(&str, Regex)]) -> Vec<ActorMatch> {
     // Pad with spaces so boundary patterns (?:[\s[:punct:]]) match at
     // start/end of string. text_cleaner::clean() trims whitespace, so
     // keywords like "Employer shall..." at position 0 would otherwise
     // fail the leading boundary check.
-    let mut remaining = format!(" {text} ");
+    let padded = format!(" {text} ");
+    let mut remaining = padded.clone();
     let mut found = Vec::new();
     for (label, regex) in patterns {
-        if regex.is_match(&remaining) {
-            found.push(label.to_string());
+        if let Some(m) = regex.find(&remaining) {
+            // The match includes boundary chars — trim them to get the keyword.
+            let raw = m.as_str();
+            let keyword = raw.trim().trim_matches(|c: char| c.is_ascii_punctuation());
+            // Offset in the original padded text (approximate — good enough for
+            // distance calculations since we pad with 1 space).
+            let offset = padded.find(keyword).unwrap_or(m.start());
+            found.push(ActorMatch {
+                label: label.to_string(),
+                keyword: keyword.to_lowercase(),
+                offset,
+            });
             // Remove first match to prevent duplicate detection
             remaining = regex.replace(&remaining, "").to_string();
         }
     }
-    found.sort();
-    found.dedup();
+    found.sort_by(|a, b| a.label.cmp(&b.label));
+    found.dedup_by(|a, b| a.label == b.label);
     found
 }
 
@@ -419,42 +462,72 @@ fn run_patterns(text: &str, patterns: &[(&str, Regex)]) -> Vec<String> {
 mod tests {
     use super::*;
 
+    /// Helper: check if an actor list contains a label.
+    fn has_label(actors: &[ActorMatch], label: &str) -> bool {
+        actors.iter().any(|a| a.label == label)
+    }
+
+    /// Helper: check if any actor label contains a substring.
+    fn any_label_contains(actors: &[ActorMatch], substr: &str) -> bool {
+        actors.iter().any(|a| a.label.contains(substr))
+    }
+
     #[test]
     fn extract_employer() {
         let actors = extract_actors(" The employer shall ensure safety. ");
-        assert!(actors.governed.contains(&"Org: Employer".to_string()));
+        assert!(has_label(&actors.governed, "Org: Employer"));
+    }
+
+    #[test]
+    fn extract_employer_captures_keyword() {
+        let actors = extract_actors(" The employer shall ensure safety. ");
+        let m = actors
+            .governed
+            .iter()
+            .find(|a| a.label == "Org: Employer")
+            .unwrap();
+        assert_eq!(m.keyword, "employer");
     }
 
     #[test]
     fn extract_secretary_of_state() {
         let actors = extract_actors(" The Secretary of State may make regulations. ");
-        assert!(actors.government.contains(&"Gvt: Minister".to_string()));
+        assert!(has_label(&actors.government, "Gvt: Minister"));
+    }
+
+    #[test]
+    fn extract_secretary_of_state_captures_keyword() {
+        let actors = extract_actors(" The Secretary of State may make regulations. ");
+        let m = actors
+            .government
+            .iter()
+            .find(|a| a.label == "Gvt: Minister")
+            .unwrap();
+        assert_eq!(m.keyword, "secretary of state");
     }
 
     #[test]
     fn extract_hse() {
         let actors = extract_actors(" The Health and Safety Executive shall. ");
-        assert!(
-            actors
-                .government
-                .iter()
-                .any(|a| a.contains("Health and Safety Executive"))
-        );
+        assert!(any_label_contains(
+            &actors.government,
+            "Health and Safety Executive"
+        ));
     }
 
     #[test]
     fn extract_multiple_actors() {
         let text = " The employer shall consult the inspector and the employee. ";
         let actors = extract_actors(text);
-        assert!(actors.governed.contains(&"Org: Employer".to_string()));
-        assert!(actors.governed.contains(&"Ind: Employee".to_string()));
+        assert!(has_label(&actors.governed, "Org: Employer"));
+        assert!(has_label(&actors.governed, "Ind: Employee"));
     }
 
     #[test]
     fn blacklist_removes_false_positives() {
         // "public interest" should be blacklisted
         let actors = extract_actors(" This is in the public interest. ");
-        assert!(!actors.governed.contains(&"Public".to_string()));
+        assert!(!has_label(&actors.governed, "Public"));
     }
 
     #[test]
@@ -467,24 +540,32 @@ mod tests {
     #[test]
     fn extract_contractor() {
         let actors = extract_actors(" The contractor shall comply with requirements. ");
-        assert!(actors.governed.iter().any(|a| a.contains("Contractor")));
+        assert!(any_label_contains(&actors.governed, "Contractor"));
     }
 
     #[test]
     fn extract_local_authority() {
         let actors = extract_actors(" The local authority may issue a notice. ");
-        assert!(actors.government.iter().any(|a| a.contains("Local")));
+        assert!(any_label_contains(&actors.government, "Local"));
+    }
+
+    // ── Backward-compat label accessors ─────────────────────────────
+
+    #[test]
+    fn governed_labels_returns_sorted_strings() {
+        let actors = extract_actors(" The employer shall consult the employee. ");
+        let labels = actors.governed_labels();
+        assert!(labels.contains(&"Org: Employer".to_string()));
+        assert!(labels.contains(&"Ind: Employee".to_string()));
     }
 
     // ── Boundary matching tests ─────────────────────────────────────
 
     #[test]
     fn keyword_at_start_of_string() {
-        // After text_cleaner strips "(1) ", text can start with the keyword.
-        // The boundary pattern (?:[\s[:punct:]]) requires a char before the keyword.
         let actors = extract_actors("Employer shall ensure safety.");
         assert!(
-            actors.governed.contains(&"Org: Employer".to_string()),
+            has_label(&actors.governed, "Org: Employer"),
             "keyword at start of string should still be extracted, got: {:?}",
             actors.governed
         );
@@ -494,7 +575,7 @@ mod tests {
     fn keyword_at_end_of_string() {
         let actors = extract_actors(" duties of the employer");
         assert!(
-            actors.governed.contains(&"Org: Employer".to_string()),
+            has_label(&actors.governed, "Org: Employer"),
             "keyword at end of string should still be extracted, got: {:?}",
             actors.governed
         );
@@ -502,14 +583,12 @@ mod tests {
 
     #[test]
     fn agency_worker_not_government_agency() {
-        // "agency worker" / "temporary work agency" are employment terms,
-        // not government agencies — blacklist should prevent false positive
         let actors = extract_actors(
             " Where, in the case of an individual agency worker, the taking \
               of any other action the hirer is required to take. ",
         );
         assert!(
-            !actors.government.iter().any(|a| a == "Gvt: Agency"),
+            !has_label(&actors.government, "Gvt: Agency"),
             "agency worker should not be classified as Gvt: Agency, got: {:?}",
             actors.government
         );
@@ -522,7 +601,7 @@ mod tests {
               then end the supply of the agency worker. ",
         );
         assert!(
-            !actors.government.iter().any(|a| a == "Gvt: Agency"),
+            !has_label(&actors.government, "Gvt: Agency"),
             "temporary work agency should not be classified as Gvt: Agency, got: {:?}",
             actors.government
         );

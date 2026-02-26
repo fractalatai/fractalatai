@@ -9,7 +9,9 @@
 //!
 //! Ported from `Taxa.DutyType` + `Taxa.DutyTypeLib`.
 
+use super::actors::ActorMatch;
 use super::duty_patterns::{self, DutyClassification, DutyFamily, DutySubType};
+use super::duty_patterns_v2;
 
 /// The four DRRP duty-type labels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -75,6 +77,36 @@ pub fn classify(text: &str) -> ClassificationResult {
     }
     // Then governed
     if let Some(dc) = duty_patterns::match_governed(text) {
+        return to_result(dc);
+    }
+    // No match
+    ClassificationResult {
+        duty_types: Vec::new(),
+        classification: None,
+    }
+}
+
+/// Classify using v2 actor-anchored patterns for the governed tier.
+///
+/// Government tiers still use v1 patterns (they are already actor-anchored
+/// by design — each government pattern embeds its actor keyword). Only the
+/// governed tier is replaced with actor-anchored matching from
+/// `duty_patterns_v2::match_governed_v2()`.
+pub fn classify_v2(
+    text: &str,
+    governed_actors: &[ActorMatch],
+    _government_actors: &[ActorMatch],
+) -> ClassificationResult {
+    // Government v1 first (already actor-anchored)
+    if let Some(dc) = duty_patterns::match_government_v1(text) {
+        return to_result(dc);
+    }
+    // Government v2 (extended patterns, also already actor-anchored)
+    if let Some(dc) = duty_patterns::match_government_v2(text) {
+        return to_result(dc);
+    }
+    // Governed: use v2 actor-anchored patterns
+    if let Some(dc) = duty_patterns_v2::match_governed_v2(text, governed_actors) {
         return to_result(dc);
     }
     // No match
@@ -228,6 +260,46 @@ mod tests {
             types,
             vec![DutyType::Duty, DutyType::Right, DutyType::Power]
         );
+    }
+
+    // ── classify_v2 tests ─────────────────────────────────────────────
+
+    #[test]
+    fn classify_v2_employer_duty() {
+        use crate::taxa::actors::ActorMatch;
+        let text = "every employer shall ensure the health, safety and welfare of employees";
+        let actors = vec![ActorMatch {
+            label: "Org: Employer".into(),
+            keyword: "employer".into(),
+            offset: 6,
+        }];
+        let result = classify_v2(text, &actors, &[]);
+        assert_eq!(result.duty_types, vec![DutyType::Duty]);
+    }
+
+    #[test]
+    fn classify_v2_rejects_actor_as_object() {
+        use crate::taxa::actors::ActorMatch;
+        let text = "information must be provided to the contractor before work begins";
+        let actors = vec![ActorMatch {
+            label: "SC: C: Contractor".into(),
+            keyword: "contractor".into(),
+            offset: 35,
+        }];
+        let result = classify_v2(text, &actors, &[]);
+        assert!(
+            result.duty_types.is_empty(),
+            "actor-as-object should not produce DRRP, got: {:?}",
+            result.duty_types
+        );
+    }
+
+    #[test]
+    fn classify_v2_government_still_works() {
+        // Government patterns are unchanged in v2
+        let text = "the secretary of state shall have power to make regulations";
+        let result = classify_v2(text, &[], &[]);
+        assert_eq!(result.duty_types, vec![DutyType::Responsibility]);
     }
 
     #[test]

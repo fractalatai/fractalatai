@@ -30,6 +30,7 @@ pub mod actors;
 pub mod clause_refiner;
 pub mod confidence;
 pub mod duty_patterns;
+pub mod duty_patterns_v2;
 pub mod duty_type;
 pub mod making;
 pub mod popimar;
@@ -60,6 +61,19 @@ pub struct TaxaRecord {
 
     /// Pattern classification detail (if any).
     pub classification: Option<duty_patterns::DutyClassification>,
+}
+
+/// Side-by-side v1/v2 comparison result.
+#[derive(Debug, Clone)]
+pub struct CompareRecord {
+    /// Cleaned text that was analysed.
+    pub cleaned_text: String,
+    /// v1 (blunt gate) result.
+    pub v1: TaxaRecord,
+    /// v2 (actor-anchored) result.
+    pub v2: TaxaRecord,
+    /// Whether the DRRP types differ between v1 and v2.
+    pub differs: bool,
 }
 
 /// Run the full Taxa classification pipeline on raw legislative text.
@@ -103,12 +117,118 @@ pub fn parse(raw_text: &str) -> TaxaRecord {
 
     TaxaRecord {
         cleaned_text: cleaned,
-        governed_actors: extracted.governed,
-        government_actors: extracted.government,
+        governed_actors: extracted.governed_labels(),
+        government_actors: extracted.government_labels(),
         duty_types: cr.duty_types,
         popimar,
         purposes,
         classification: cr.classification,
+    }
+}
+
+/// Run the v2 (actor-anchored) Taxa classification pipeline.
+///
+/// Same stages as `parse()` but uses `classify_v2()` for the governed tier,
+/// which requires the actor keyword to appear before the modal verb within a
+/// character-distance window.
+pub fn parse_v2(raw_text: &str) -> TaxaRecord {
+    if raw_text.trim().is_empty() {
+        return TaxaRecord::default();
+    }
+
+    let cleaned = text_cleaner::clean(raw_text);
+    let purposes = purpose::classify(&cleaned);
+
+    if should_skip_drrp(&purposes) {
+        return TaxaRecord {
+            cleaned_text: cleaned,
+            purposes,
+            ..Default::default()
+        };
+    }
+
+    let extracted = actors::extract_actors(&cleaned);
+    let lower = cleaned.to_lowercase();
+    let cr = duty_type::classify_v2(&lower, &extracted.governed, &extracted.government);
+
+    let dt_labels: Vec<&str> = cr.duty_types.iter().map(|d| d.as_str()).collect();
+    let popimar = popimar::classify_with_duty_types(&cleaned, &dt_labels);
+
+    TaxaRecord {
+        cleaned_text: cleaned,
+        governed_actors: extracted.governed_labels(),
+        government_actors: extracted.government_labels(),
+        duty_types: cr.duty_types,
+        popimar,
+        purposes,
+        classification: cr.classification,
+    }
+}
+
+/// Run both v1 and v2 pipelines and return a side-by-side comparison.
+pub fn parse_compare(raw_text: &str) -> CompareRecord {
+    if raw_text.trim().is_empty() {
+        return CompareRecord {
+            cleaned_text: String::new(),
+            v1: TaxaRecord::default(),
+            v2: TaxaRecord::default(),
+            differs: false,
+        };
+    }
+
+    let cleaned = text_cleaner::clean(raw_text);
+    let purposes = purpose::classify(&cleaned);
+
+    if should_skip_drrp(&purposes) {
+        let rec = TaxaRecord {
+            cleaned_text: cleaned.clone(),
+            purposes,
+            ..Default::default()
+        };
+        return CompareRecord {
+            cleaned_text: cleaned,
+            v1: rec.clone(),
+            v2: rec,
+            differs: false,
+        };
+    }
+
+    let extracted = actors::extract_actors(&cleaned);
+    let lower = cleaned.to_lowercase();
+
+    // v1: blunt gate
+    let cr1 = duty_type::classify(&lower);
+    let dt1_labels: Vec<&str> = cr1.duty_types.iter().map(|d| d.as_str()).collect();
+    let popimar1 = popimar::classify_with_duty_types(&cleaned, &dt1_labels);
+
+    // v2: actor-anchored
+    let cr2 = duty_type::classify_v2(&lower, &extracted.governed, &extracted.government);
+    let dt2_labels: Vec<&str> = cr2.duty_types.iter().map(|d| d.as_str()).collect();
+    let popimar2 = popimar::classify_with_duty_types(&cleaned, &dt2_labels);
+
+    let differs = cr1.duty_types != cr2.duty_types;
+
+    CompareRecord {
+        cleaned_text: cleaned.clone(),
+        v1: TaxaRecord {
+            cleaned_text: cleaned.clone(),
+            governed_actors: extracted.governed_labels(),
+            government_actors: extracted.government_labels(),
+            duty_types: cr1.duty_types,
+            popimar: popimar1,
+            purposes: purposes.clone(),
+            classification: cr1.classification,
+        },
+        v2: TaxaRecord {
+            cleaned_text: cleaned,
+            governed_actors: extracted.governed_labels(),
+            government_actors: extracted.government_labels(),
+            duty_types: cr2.duty_types,
+            popimar: popimar2,
+            purposes,
+            classification: cr2.classification,
+        },
+        differs,
     }
 }
 
@@ -291,6 +411,49 @@ mod tests {
         assert!(record.purposes.contains(&purpose::INTERPRETATION));
         // No non-skip purposes present — gate triggers
         assert!(record.duty_types.is_empty());
+    }
+
+    // ── parse_v2 tests ────────────────────────────────────────────────
+
+    #[test]
+    fn parse_v2_employer_duty() {
+        let record = parse_v2("The employer shall ensure the health and safety of employees.");
+        assert!(record.duty_types.contains(&DutyType::Duty));
+        assert!(
+            record
+                .governed_actors
+                .iter()
+                .any(|a| a.contains("Employer"))
+        );
+    }
+
+    #[test]
+    fn parse_v2_rejects_actor_as_object() {
+        let record = parse_v2("information must be provided to the contractor before work begins");
+        assert!(
+            record.duty_types.is_empty(),
+            "v2 should reject contractor-as-object, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn parse_compare_detects_difference() {
+        // v1 blunt gate matches (contractor + must both present)
+        // v2 rejects (contractor appears AFTER must)
+        let cmp =
+            parse_compare("information must be provided to the contractor before work begins");
+        assert!(!cmp.v1.duty_types.is_empty(), "v1 should match");
+        assert!(cmp.v2.duty_types.is_empty(), "v2 should not match");
+        assert!(cmp.differs, "should detect difference");
+    }
+
+    #[test]
+    fn parse_compare_agrees_on_employer() {
+        let cmp = parse_compare("the employer shall ensure the health and safety of employees");
+        assert!(!cmp.v1.duty_types.is_empty());
+        assert!(!cmp.v2.duty_types.is_empty());
+        assert!(!cmp.differs, "both should agree on employer duty");
     }
 
     // ── True-negative regression tests (Iteration 5: a person must) ───
