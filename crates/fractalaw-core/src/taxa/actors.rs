@@ -25,6 +25,8 @@ static BLACKLIST: &[&str] = &[
     r"local authority collected municipal waste",
     r"[Pp]ublic (?:nature|sewer|importance|functions?|interest|[Ss]ervices)",
     r"[Rr]epresentatives? of",
+    r"(?i)agency workers?",
+    r"(?i)temporary work agency",
 ];
 
 static BLACKLIST_COMPILED: LazyLock<Vec<Regex>> =
@@ -468,5 +470,33 @@ mod tests {
     fn extract_local_authority() {
         let actors = extract_actors(" The local authority may issue a notice. ");
         assert!(actors.government.iter().any(|a| a.contains("Local")));
+    }
+
+    #[test]
+    fn agency_worker_not_government_agency() {
+        // "agency worker" / "temporary work agency" are employment terms,
+        // not government agencies — blacklist should prevent false positive
+        let actors = extract_actors(
+            " Where, in the case of an individual agency worker, the taking \
+              of any other action the hirer is required to take. ",
+        );
+        assert!(
+            !actors.government.iter().any(|a| a == "Gvt: Agency"),
+            "agency worker should not be classified as Gvt: Agency, got: {:?}",
+            actors.government
+        );
+    }
+
+    #[test]
+    fn temporary_work_agency_not_government_agency() {
+        let actors = extract_actors(
+            " the hirer shall inform the temporary work agency, who shall \
+              then end the supply of the agency worker. ",
+        );
+        assert!(
+            !actors.government.iter().any(|a| a == "Gvt: Agency"),
+            "temporary work agency should not be classified as Gvt: Agency, got: {:?}",
+            actors.government
+        );
     }
 }
