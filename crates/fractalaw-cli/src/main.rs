@@ -178,6 +178,9 @@ enum TaxaAction {
         /// Compare v1 (blunt gate) vs v2 (actor-anchored) DRRP patterns
         #[arg(long)]
         compare: bool,
+        /// Show provisions that v2 missed, ranked by heat score (likelihood of genuine miss)
+        #[arg(long)]
+        misses: bool,
     },
     /// Enrich LRT DRRP columns for laws missing taxa data (from LanceDB text)
     Enrich {
@@ -249,7 +252,8 @@ async fn main() -> anyhow::Result<()> {
                 name,
                 limit,
                 compare,
-            } => cmd_taxa_show(&data_dir, &name, limit, compare).await,
+                misses,
+            } => cmd_taxa_show(&data_dir, &name, limit, compare, misses).await,
             TaxaAction::Enrich { laws } => {
                 let law_filter = laws.as_ref().map(|s| {
                     s.split(',')
@@ -538,6 +542,7 @@ async fn cmd_taxa_show(
     name: &str,
     limit: usize,
     compare: bool,
+    misses: bool,
 ) -> anyhow::Result<()> {
     let lance = LanceStore::open(&data_dir.join("lancedb"))
         .await
@@ -551,6 +556,10 @@ async fn cmd_taxa_show(
         println!("No text sections found for '{name}'.");
         println!("(Ensure LanceDB has been populated via `fractalaw embed`)");
         return Ok(());
+    }
+
+    if misses {
+        return cmd_taxa_show_misses(name, total, &batches);
     }
 
     if compare {
@@ -737,6 +746,133 @@ async fn cmd_taxa_show(
     } else {
         println!("=== {section_num} sections processed, {classified_num} with classifications ===");
     }
+    Ok(())
+}
+
+fn cmd_taxa_show_misses(
+    name: &str,
+    total: usize,
+    batches: &[arrow::record_batch::RecordBatch],
+) -> anyhow::Result<()> {
+    // Phase 1: Run v2 on every provision, collect misses with heat scores.
+    struct MissEntry {
+        provision: String,
+        miss: fractalaw_core::taxa::MissRecord,
+    }
+
+    let mut v2_count = 0usize;
+    let mut gov_count = 0usize;
+    let mut miss_entries: Vec<MissEntry> = Vec::new();
+
+    for batch in batches {
+        let provision_col = batch.column_by_name("provision");
+        let text_col = batch.column_by_name("text");
+
+        for row in 0..batch.num_rows() {
+            let provision = provision_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+            let text = text_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+
+            if text.trim().is_empty() {
+                continue;
+            }
+
+            let record = fractalaw_core::taxa::parse_v2(&text);
+            if !record.duty_types.is_empty() {
+                v2_count += 1;
+                continue;
+            }
+            // Check if it was a government match (these are correctly handled)
+            if !record.government_actors.is_empty() && record.classification.is_some() {
+                gov_count += 1;
+                continue;
+            }
+
+            let miss = fractalaw_core::taxa::analyse_miss(&text);
+            miss_entries.push(MissEntry { provision, miss });
+        }
+    }
+
+    // Phase 2: Sort by heat descending, then by provision for stability.
+    miss_entries.sort_by(|a, b| {
+        b.miss
+            .heat
+            .cmp(&a.miss.heat)
+            .then_with(|| a.provision.cmp(&b.provision))
+    });
+
+    // Phase 3: Display.
+    println!(
+        "=== v2 Misses: {name} ({total} sections, {v2_count} classified, {} missed) ===\n",
+        miss_entries.len()
+    );
+
+    // Heat distribution summary.
+    let mut heat_counts = std::collections::BTreeMap::new();
+    for entry in &miss_entries {
+        *heat_counts.entry(entry.miss.heat).or_insert(0usize) += 1;
+    }
+    println!("Heat distribution:");
+    for (heat, count) in heat_counts.iter().rev() {
+        let bar = "#".repeat((*count).min(60));
+        println!("  {heat:>3}: {count:>3}  {bar}");
+    }
+    println!();
+
+    // Detail for hot misses (heat >= 3).
+    let hot: Vec<&MissEntry> = miss_entries.iter().filter(|e| e.miss.heat >= 3).collect();
+    if hot.is_empty() {
+        println!("No hot misses (heat >= 3).");
+    } else {
+        println!("--- Hot misses (heat >= 3): {} provisions ---\n", hot.len());
+        for entry in &hot {
+            let m = &entry.miss;
+            println!("--- {} [heat={}] ---", entry.provision, m.heat);
+            println!("  Signals:  {}", m.signals.join(", "));
+            if !m.governed_actors.is_empty() {
+                println!("  Governed: {}", m.governed_actors.join(", "));
+            }
+            if !m.government_actors.is_empty() {
+                println!("  Government: {}", m.government_actors.join(", "));
+            }
+            if !m.purposes.is_empty() {
+                println!("  Purpose:  {}", m.purposes.join(", "));
+            }
+            let preview = if m.cleaned_text.len() > 200 {
+                format!("{}...", &m.cleaned_text[..200])
+            } else {
+                m.cleaned_text.clone()
+            };
+            println!("  Text:     {preview}");
+            println!();
+        }
+    }
+
+    // Summary table.
+    println!("=== Summary ===");
+    println!("  Total sections:  {total}");
+    println!("  v2 classified:   {v2_count}");
+    println!("  Government-only: {gov_count}");
+    println!("  Missed:          {}", miss_entries.len());
+    println!(
+        "  Hot (heat >= 3): {}",
+        miss_entries.iter().filter(|e| e.miss.heat >= 3).count()
+    );
+    println!(
+        "  Warm (heat 1-2): {}",
+        miss_entries
+            .iter()
+            .filter(|e| (1..=2).contains(&e.miss.heat))
+            .count()
+    );
+    println!(
+        "  Cold (heat <= 0): {}",
+        miss_entries.iter().filter(|e| e.miss.heat <= 0).count()
+    );
+
     Ok(())
 }
 

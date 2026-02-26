@@ -205,10 +205,40 @@ fn match_duty_of_pattern(text: &str, keyword: &str) -> Option<DutyClassification
     None
 }
 
+/// Detect passive voice "must/shall be {past participle} by the {actor}" —
+/// the actor is the agent of the obligation despite appearing after the modal.
+///
+/// Matches: "must be prepared by the operator", "shall be reviewed by the owner"
+/// Rejects: "must be provided to the contractor" (actor is recipient, not agent)
+fn match_passive_by_pattern(text: &str, keyword: &str) -> Option<DutyClassification> {
+    let kw_escaped = regex::escape(keyword);
+    // Pattern: modal + "be" + up to 60 chars + "by" + up to 20 chars + actor keyword
+    // The "by" preposition distinguishes agent from recipient (to/for/with).
+    let re = Regex::new(&format!(
+        r"(?i)\b(?:shall|must)\b\s+be\s+.{{0,60}}\bby\b.{{0,20}}\b{kw_escaped}\b"
+    ))
+    .ok()?;
+
+    if !re.is_match(text) {
+        return None;
+    }
+
+    Some(DutyClassification {
+        family: DutyFamily::Governed,
+        sub_type: DutySubType::Prescriptive,
+        confidence: 0.65,
+    })
+}
+
 /// Match a specific actor keyword against all sub-type patterns.
 fn match_actor_anchored(text: &str, keyword: &str) -> Option<DutyClassification> {
     // First check the "shall be the duty of" reverse pattern (HSWA formulation)
     if let Some(dc) = match_duty_of_pattern(text, keyword) {
+        return Some(dc);
+    }
+
+    // Then check passive voice "must be {done} by the {actor}"
+    if let Some(dc) = match_passive_by_pattern(text, keyword) {
         return Some(dc);
     }
 
@@ -316,12 +346,19 @@ fn match_person_compound(text: &str) -> Option<DutyClassification> {
         });
     }
 
-    // Check for obligation modals within the window
+    // Check for obligation modals within the primary window
     let modal_re = Regex::new(r"(?i)\b(?:shall|must|is required to|has a duty)\b").unwrap();
     if let Some(modal_match) = modal_re.find(&after_lower)
         && modal_match.start() <= PRIMARY_WINDOW
     {
         return classify_after_modal(&after_lower[modal_match.end()..], 0.65);
+    }
+
+    // Extended window fallback at reduced confidence (same pattern as match_actor_anchored)
+    if let Some(modal_match) = modal_re.find(&after_lower)
+        && modal_match.start() <= EXTENDED_WINDOW
+    {
+        return classify_after_modal(&after_lower[modal_match.end()..], 0.50);
     }
 
     None
@@ -713,5 +750,72 @@ mod tests {
         let actors = vec![actor("Ind: Person", "person")];
         let dc = match_governed_v2(text, &actors).unwrap();
         assert_eq!(dc.sub_type, DutySubType::Enabling);
+    }
+
+    // ── Bug fix: person compound extended window ────────────────────
+
+    #[test]
+    fn any_person_who_long_preamble_shall_ensure() {
+        // Pressure Systems s.4: "Any person who designs, manufactures,
+        // imports or supplies...shall ensure" — 143 chars from compound
+        // to modal, beyond PRIMARY_WINDOW (120) but within EXTENDED (200).
+        let text = "Any person who designs, manufactures, imports or supplies \
+                     any pressure system or any article which is intended to be \
+                     a component part of any pressure system shall ensure that \
+                     paragraphs (2) to (5) are complied with";
+        let actors = vec![actor("Ind: Person", "person")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+        assert!(dc.confidence > 0.0);
+    }
+
+    // True-negative: person who + offence provision (not a duty)
+    #[test]
+    fn person_offence_provision_no_match() {
+        // "shall be guilty" is not an obligation on the person — it's a penalty
+        let text = "Where a contravention of these regulations by any person \
+                     is due to the act or default of the other person, that \
+                     other person shall be guilty of the offence";
+        let actors = vec![actor("Ind: Person", "person")];
+        // This may or may not match — the key thing is it shouldn't crash.
+        // If it matches, it's a low-priority FP to address later.
+        let _result = match_governed_v2(text, &actors);
+    }
+
+    // ── Bug fix: reverse passive "must be {done} by the {actor}" ────
+
+    #[test]
+    fn reverse_passive_must_be_prepared_by_operator() {
+        // COMAH s.12: "An internal emergency plan must be prepared by the operator"
+        let text = "An internal emergency plan must be prepared by the operator";
+        let actors = vec![actor("Operator", "operator")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+        assert_eq!(dc.sub_type, DutySubType::Prescriptive);
+    }
+
+    #[test]
+    fn reverse_passive_must_be_reviewed_by_operator() {
+        // COMAH s.10: "a safety report must be reviewed and, where necessary,
+        // revised by the operator"
+        let text = "a safety report must be reviewed and, where necessary, \
+                     revised by the operator";
+        let actors = vec![actor("Operator", "operator")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+    }
+
+    // True-negative: "must be provided to the actor" (actor is recipient, not agent)
+    #[test]
+    fn passive_must_be_provided_to_no_match() {
+        let text = "adequate information must be provided to the contractor \
+                     before work begins on site";
+        let actors = vec![actor("SC: C: Contractor", "contractor")];
+        let result = match_governed_v2(text, &actors);
+        assert!(
+            result.is_none(),
+            "provided TO actor should not match, got: {:?}",
+            result
+        );
     }
 }

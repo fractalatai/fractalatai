@@ -232,6 +232,122 @@ pub fn parse_compare(raw_text: &str) -> CompareRecord {
     }
 }
 
+// ── Miss analysis ────────────────────────────────────────────────────
+
+use std::sync::LazyLock;
+
+static MODAL_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r"(?i)\b(?:shall|must|is required to|has a duty)\b").unwrap()
+});
+
+static ENABLING_MODAL_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r"(?i)\b(?:may|power to|entitled to|authorise|authorize)\b").unwrap()
+});
+
+/// A provision that v2 did not classify, with diagnostic metadata.
+#[derive(Debug, Clone)]
+pub struct MissRecord {
+    /// Cleaned text.
+    pub cleaned_text: String,
+    /// Heat score (higher = more likely to be a genuine missed duty).
+    pub heat: i8,
+    /// Breakdown of what contributed to the heat score.
+    pub signals: Vec<&'static str>,
+    /// Governed actors extracted by actors.rs.
+    pub governed_actors: Vec<String>,
+    /// Government actors extracted by actors.rs.
+    pub government_actors: Vec<String>,
+    /// Purposes detected.
+    pub purposes: Vec<&'static str>,
+    /// Whether a modal verb is present in the text.
+    pub has_modal: bool,
+    /// Whether an enabling modal is present.
+    pub has_enabling: bool,
+}
+
+/// Analyse a provision that v2 did NOT classify — compute a heat score
+/// indicating how likely it is to be a genuine missed duty.
+///
+/// Heat scoring:
+/// - +3 obligation modal present (shall/must/is required to)
+/// - +2 governed actor extracted
+/// - +1 enabling modal present (may/power to/entitled to)
+/// - +1 government actor extracted
+/// - +1 operative purpose (Process+Rule)
+/// - −2 structural purpose only (Interpretation/Amendment/Repeal)
+/// - −1 very short text (< 50 chars — likely heading)
+pub fn analyse_miss(raw_text: &str) -> MissRecord {
+    let cleaned = text_cleaner::clean(raw_text);
+    let purposes = purpose::classify(&cleaned);
+    let extracted = actors::extract_actors(&cleaned);
+    let lower = cleaned.to_lowercase();
+
+    let has_modal = MODAL_RE.is_match(&lower);
+    let has_enabling = ENABLING_MODAL_RE.is_match(&lower);
+
+    let governed_labels = extracted.governed_labels();
+    let government_labels = extracted.government_labels();
+
+    let mut heat: i8 = 0;
+    let mut signals: Vec<&'static str> = Vec::new();
+
+    if has_modal {
+        heat += 3;
+        signals.push("modal");
+    }
+
+    if !governed_labels.is_empty() {
+        heat += 2;
+        signals.push("governed_actor");
+    }
+
+    if has_enabling {
+        heat += 1;
+        signals.push("enabling_modal");
+    }
+
+    if !government_labels.is_empty() {
+        heat += 1;
+        signals.push("government_actor");
+    }
+
+    if purposes.contains(&purpose::PROCESS_RULE) {
+        heat += 1;
+        signals.push("operative_purpose");
+    }
+
+    let is_structural = !purposes.is_empty()
+        && purposes.iter().all(|p| {
+            [
+                purpose::INTERPRETATION,
+                purpose::AMENDMENT,
+                purpose::REPEAL_REVOCATION,
+                purpose::TRANSITIONAL,
+            ]
+            .contains(p)
+        });
+    if is_structural {
+        heat -= 2;
+        signals.push("structural_purpose");
+    }
+
+    if cleaned.len() < 50 {
+        heat -= 1;
+        signals.push("short_text");
+    }
+
+    MissRecord {
+        cleaned_text: cleaned,
+        heat,
+        signals,
+        governed_actors: governed_labels,
+        government_actors: government_labels,
+        purposes,
+        has_modal,
+        has_enabling,
+    }
+}
+
 /// Determine if DRRP classification should be skipped based on purpose.
 ///
 /// Only skips when ALL purposes are structural/administrative — pure
