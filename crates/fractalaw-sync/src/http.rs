@@ -125,7 +125,7 @@ mod tests {
             clause_ref: "s.2(1)".into(),
             confidence: 0.95,
             polished_at: "2026-02-21T13:00:00Z".into(),
-            model: "claude-sonnet-4-5-20250929".into(),
+            model: "deberta-v3-drrp".into(),
         };
         let json = serde_json::to_string(&entry).unwrap();
         let parsed: PolishedEntry = serde_json::from_str(&json).unwrap();
@@ -148,7 +148,7 @@ mod tests {
             "clause_ref": "s.3",
             "confidence": 0.90,
             "polished_at": "2026-02-21T13:00:00Z",
-            "model": "claude-sonnet-4-5-20250929"
+            "model": "deberta-v3-drrp"
         }"#;
         let parsed: PolishedEntry = serde_json::from_str(json).unwrap();
         assert!(parsed.qualifier.is_none());

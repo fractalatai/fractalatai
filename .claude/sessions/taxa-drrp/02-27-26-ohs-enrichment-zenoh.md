@@ -238,50 +238,8 @@ Confidence distribution held steady — no degradation. Zero actor-led false pos
 
 ---
 
-## Zenoh research notes (for future dedicated session)
+## Session closed
 
-### Current sync infrastructure
+Zenoh research notes moved to dedicated session: `zenoh/02-27-26-zenoh-sync.md`
 
-| Component | Status |
-|-----------|--------|
-| HTTP sync (reqwest) | Working — `sync pull` / `sync push` with sertantai REST API |
-| Arrow Flight | Feature-gated in `fractalaw-sync`, not implemented |
-| Zenoh | Planned (`.claude/plans/zenoh.md`), not implemented |
-| Loro CRDTs | Dependency present in `fractalaw-sync/Cargo.toml`, not wired up |
-
-### Zenoh plan (from `.claude/plans/zenoh.md`)
-
-- **Phase A**: ZenohSync struct, pub/sub, query/reply, Arrow IPC serialization
-- **Phase B**: CRDT integration with Loro
-- **Phase C**: Hive router, lifecycle, CLI commands
-- **Phase D**: Sertantai integration (Elixir zenohex NIF)
-- **Phase E**: Multi-tenancy & mTLS
-- **Phase F**: Edge Bees
-
-### Topology
-
-- **Sertantai** (always-on Elixir/Phoenix): Peer in zenoh mesh, publishes legislation updates and annotations
-- **Hive** (intermittent Rust hub): Router mode, runs zenohd, hosts DuckDB/LanceDB
-- **Bees** (field devices): Clients or peers, connect to Hive or Sertantai
-- Key expressions: `fractalaw/@{tenant}/taxa/enrichment/{law_name}`
-
-### For LAN testing, we need:
-
-1. `zenoh` crate added to `fractalaw-sync/Cargo.toml` (feature-gated)
-2. A publisher in fractalaw that emits enrichment results as Arrow IPC over zenoh pub/sub
-3. Sertantai subscriber (Elixir side, using `zenohex` NIF or a sidecar)
-
-### Current sertantai integration
-
-- **Pull**: `GET /api/outbox/annotations?since={timestamp}` → `Vec<Annotation>`
-- **Push**: `POST /api/inbox/polished` → `Vec<PolishedEntry>`, returns `{ accepted: u64 }`
-- Implemented in `crates/fractalaw-sync/src/http.rs`
-
-### fractalaw-sync dependencies (`Cargo.toml`)
-
-```toml
-[features]
-flight = ["dep:arrow-flight", "dep:tonic", "dep:prost"]
-http = ["dep:reqwest", "dep:serde", "dep:serde_json", "dep:chrono"]
-# zenoh = ... (to be added)
-```
+Also in this session: removed Anthropic/Claude inference backend from codebase (fractalaw-host, fractalaw-cli, drrp-polisher guest). All AI inference now uses ONNX only. The `inference` feature gate and `reqwest` dependency were removed from fractalaw-host.

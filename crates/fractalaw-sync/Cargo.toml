@@ -44,7 +44,12 @@ optional = true
 workspace = true
 optional = true
 
+[dependencies.zenoh]
+workspace = true
+optional = true
+
 [features]
 default = []
 flight = ["dep:arrow-flight", "dep:tonic", "dep:prost"]
 http = ["dep:reqwest", "dep:serde", "dep:serde_json", "dep:chrono"]
+zenoh = ["dep:zenoh", "dep:serde_json"]

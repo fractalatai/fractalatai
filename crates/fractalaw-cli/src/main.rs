@@ -4,6 +4,7 @@ mod embed;
 use std::path::PathBuf;
 
 use anyhow::Context;
+use arrow::array::Array;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::print_batches;
 use clap::{Parser, Subcommand};
@@ -164,6 +165,58 @@ enum SyncAction {
         #[arg(long, env = "SERTANTAI_URL")]
         url: String,
     },
+    /// Publish taxa enrichment to zenoh mesh
+    Publish {
+        /// Tenant namespace
+        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
+        tenant: String,
+        /// Specific laws to publish (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Publish all laws in a DuckDB family
+        #[arg(long)]
+        family: Option<String>,
+        /// Publish ALL laws with taxa data (must be explicit)
+        #[arg(long)]
+        all: bool,
+    },
+    /// CRDT document management and sync
+    Crdt {
+        #[command(subcommand)]
+        action: CrdtAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum CrdtAction {
+    /// Show status of persisted CRDT documents
+    Status {
+        /// Tenant namespace
+        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
+        tenant: String,
+    },
+    /// Create a new empty CRDT document
+    Create {
+        /// Document ID
+        doc_id: String,
+        /// Tenant namespace
+        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
+        tenant: String,
+    },
+    /// Inspect a CRDT document's current state
+    Inspect {
+        /// Document ID
+        doc_id: String,
+        /// Tenant namespace
+        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
+        tenant: String,
+    },
+    /// Save all loaded CRDT documents to disk
+    Save {
+        /// Tenant namespace
+        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
+        tenant: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -262,6 +315,22 @@ async fn main() -> anyhow::Result<()> {
         Command::Sync { action } => match action {
             SyncAction::Pull { url } => cmd_sync_pull(&data_dir, &url).await,
             SyncAction::Push { url } => cmd_sync_push(&data_dir, &url).await,
+            SyncAction::Publish {
+                tenant,
+                laws,
+                family,
+                all,
+            } => cmd_sync_publish(&data_dir, &tenant, laws, family, all).await,
+            SyncAction::Crdt { action } => match action {
+                CrdtAction::Status { tenant } => cmd_crdt_status(&data_dir, &tenant).await,
+                CrdtAction::Create { doc_id, tenant } => {
+                    cmd_crdt_create(&data_dir, &tenant, &doc_id).await
+                }
+                CrdtAction::Inspect { doc_id, tenant } => {
+                    cmd_crdt_inspect(&data_dir, &tenant, &doc_id).await
+                }
+                CrdtAction::Save { tenant } => cmd_crdt_save(&data_dir, &tenant).await,
+            },
         },
 
         // Taxa classification.
@@ -383,13 +452,7 @@ async fn cmd_run(
 ) -> anyhow::Result<()> {
     let duck = open_duck(data_dir)?;
 
-    let inference = std::env::var("ANTHROPIC_API_KEY").ok().map(|key| {
-        let model = std::env::var("ANTHROPIC_MODEL")
-            .unwrap_or_else(|_| "claude-sonnet-4-5-20250929".into());
-        fractalaw_host::InferenceConfig::new(key, model)
-    });
-
-    // Try to load local ONNX DRRP model (local-first).
+    // Try to load local ONNX DRRP model.
     let extractor = {
         let model_dir = std::env::var("DRRP_MODEL_DIR")
             .map(std::path::PathBuf::from)
@@ -407,12 +470,12 @@ async fn cmd_run(
                     Some(e)
                 }
                 Err(e) => {
-                    tracing::warn!(error = %e, "failed to load DRRP ONNX model, falling back to Claude");
+                    tracing::warn!(error = %e, "failed to load DRRP ONNX model");
                     None
                 }
             }
         } else {
-            tracing::debug!("no DRRP ONNX model found, using Claude API for inference");
+            tracing::debug!(model_dir = %model_dir.display(), "no DRRP ONNX model found");
             None
         }
     };
@@ -423,7 +486,6 @@ async fn cmd_run(
     let opts = fractalaw_host::RunOptions {
         duck: Some(duck),
         lance,
-        inference,
         extractor,
     };
     let result = fractalaw_host::run_component(component, fuel, opts).await?;
@@ -503,6 +565,196 @@ async fn cmd_sync_push(data_dir: &std::path::Path, url: &str) -> anyhow::Result<
         entries.len(),
         accepted
     );
+    Ok(())
+}
+
+async fn cmd_sync_publish(
+    data_dir: &std::path::Path,
+    tenant: &str,
+    laws: Option<String>,
+    family: Option<String>,
+    all: bool,
+) -> anyhow::Result<()> {
+    let store = open_duck(data_dir)?;
+
+    // Resolve law names: --family, --laws, or --all (must be explicit).
+    let law_names: Vec<String> = if let Some(ref fam) = family {
+        let names = laws_in_family(&store, fam)?;
+        if names.is_empty() {
+            anyhow::bail!("No laws found with family '{fam}'");
+        }
+        println!("Family '{}': {} laws", fam, names.len());
+        names
+    } else if let Some(ref l) = laws {
+        l.split(',').map(|s| s.trim().to_string()).collect()
+    } else if all {
+        let batches = store.query_arrow(
+            "SELECT name FROM legislation \
+             WHERE duty_holder IS NOT NULL AND len(duty_holder) > 0 \
+             ORDER BY name",
+        )?;
+        let mut names = Vec::new();
+        for batch in &batches {
+            if let Some(col) = batch.column_by_name("name")
+                && let Some(arr) = col.as_any().downcast_ref::<arrow::array::StringArray>()
+            {
+                for i in 0..arr.len() {
+                    if !arr.is_null(i) {
+                        names.push(arr.value(i).to_string());
+                    }
+                }
+            }
+        }
+        println!("Publishing ALL {} laws with taxa data", names.len());
+        names
+    } else {
+        anyhow::bail!(
+            "Specify --family, --laws, or --all to select laws to publish.\n\
+             Example: fractalaw sync publish --family \"OH&S: Occupational / Personal Safety\" --tenant dev"
+        );
+    };
+
+    if law_names.is_empty() {
+        println!("No laws with taxa data to publish.");
+        return Ok(());
+    }
+
+    println!(
+        "Publishing taxa for {} laws to zenoh (tenant: {tenant})...",
+        law_names.len()
+    );
+
+    let sync = fractalaw_sync::ZenohSync::new(tenant)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+
+    let mut published = 0usize;
+    for law_name in &law_names {
+        let sql = format!(
+            "SELECT name, duty_holder, rights_holder, responsibility_holder, power_holder, \
+                    duty_type, role, role_gvt, \
+                    duties, rights, responsibilities, powers \
+             FROM legislation WHERE name = '{}'",
+            law_name.replace('\'', "''")
+        );
+        let batches = store.query_arrow(&sql)?;
+        if batches.is_empty() || batches.iter().all(|b| b.num_rows() == 0) {
+            eprintln!("  {law_name}: no data, skipping");
+            continue;
+        }
+
+        sync.publish_taxa(law_name, &batches)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to publish {law_name}: {e}"))?;
+
+        published += 1;
+    }
+
+    println!("Published {published}/{} laws.", law_names.len());
+    Ok(())
+}
+
+// ── CRDT commands ──
+
+fn crdt_persist_dir(data_dir: &std::path::Path) -> std::path::PathBuf {
+    data_dir.join("crdt")
+}
+
+fn generate_peer_id() -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    std::process::id().hash(&mut hasher);
+    if let Ok(hostname) = std::env::var("HOSTNAME") {
+        hostname.hash(&mut hasher);
+    }
+    hasher.finish()
+}
+
+async fn cmd_crdt_status(data_dir: &std::path::Path, tenant: &str) -> anyhow::Result<()> {
+    let persist_dir = crdt_persist_dir(data_dir);
+    let sync = fractalaw_sync::CrdtSync::new(tenant, generate_peer_id(), &persist_dir)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open CRDT session: {e}"))?;
+
+    let persisted = sync
+        .list_persisted_docs()
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    println!("Tenant: {tenant}");
+    println!("Persist dir: {}", persist_dir.display());
+    println!("Persisted documents: {}", persisted.len());
+    for doc_id in &persisted {
+        let path = persist_dir.join(format!("{doc_id}.loro"));
+        let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+        println!("  {doc_id} ({size} bytes)");
+    }
+    Ok(())
+}
+
+async fn cmd_crdt_create(
+    data_dir: &std::path::Path,
+    tenant: &str,
+    doc_id: &str,
+) -> anyhow::Result<()> {
+    let persist_dir = crdt_persist_dir(data_dir);
+    let sync = fractalaw_sync::CrdtSync::new(tenant, generate_peer_id(), &persist_dir)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open CRDT session: {e}"))?;
+
+    sync.create_doc(doc_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    sync.save_snapshot(doc_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    println!("Created and saved CRDT document: {doc_id}");
+    Ok(())
+}
+
+async fn cmd_crdt_inspect(
+    data_dir: &std::path::Path,
+    tenant: &str,
+    doc_id: &str,
+) -> anyhow::Result<()> {
+    let persist_dir = crdt_persist_dir(data_dir);
+    let sync = fractalaw_sync::CrdtSync::new(tenant, generate_peer_id(), &persist_dir)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open CRDT session: {e}"))?;
+
+    sync.open_or_create(doc_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let value = sync
+        .get_doc_value(doc_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    println!("{value:?}");
+    Ok(())
+}
+
+async fn cmd_crdt_save(data_dir: &std::path::Path, tenant: &str) -> anyhow::Result<()> {
+    let persist_dir = crdt_persist_dir(data_dir);
+    let sync = fractalaw_sync::CrdtSync::new(tenant, generate_peer_id(), &persist_dir)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open CRDT session: {e}"))?;
+
+    // Load all persisted docs first
+    let doc_ids = sync
+        .list_persisted_docs()
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    for doc_id in &doc_ids {
+        sync.open_or_create(doc_id)
+            .await
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+    }
+
+    let paths = sync
+        .save_all_snapshots()
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    println!("Saved {} document(s).", paths.len());
+    for p in &paths {
+        println!("  {}", p.display());
+    }
     Ok(())
 }
 

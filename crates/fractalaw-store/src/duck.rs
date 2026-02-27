@@ -771,7 +771,7 @@ mod tests {
                     'UK_ukpga_1974_37', 's.2(1)', 'duty', 'every employer',
                     'ensure health safety and welfare of employees',
                     'so far as is reasonably practicable', 's.2(1)',
-                    0.95, '2026-02-21T13:00:00Z', 'claude-sonnet-4-5-20250929', false
+                    0.95, '2026-02-21T13:00:00Z', 'deberta-v3-drrp', false
                 )",
             )
             .unwrap();
@@ -788,7 +788,7 @@ mod tests {
                     'UK_ukpga_1974_37', 's.3', 'duty', 'every employer',
                     'conduct undertaking without risk to persons',
                     NULL, 's.3',
-                    0.90, '2026-02-21T13:00:00Z', 'claude-sonnet-4-5-20250929', false
+                    0.90, '2026-02-21T13:00:00Z', 'deberta-v3-drrp', false
                 )",
             )
             .unwrap();
@@ -918,13 +918,13 @@ mod tests {
                 "INSERT INTO polished_drrp VALUES
                     ('UK_ukpga_1974_37', 's.2(1)', 'duty', 'every employer',
                      'ensure health safety', 'so far as is reasonably practicable', 's.2(1)',
-                     0.95, '2026-02-21T13:00:00Z', 'claude-sonnet-4-5-20250929', false),
+                     0.95, '2026-02-21T13:00:00Z', 'deberta-v3-drrp', false),
                     ('UK_ukpga_1974_37', 's.7(a)', 'duty', 'every employee',
                      'take reasonable care', NULL, 's.7(a)',
-                     0.90, '2026-02-21T13:00:00Z', 'claude-sonnet-4-5-20250929', false),
+                     0.90, '2026-02-21T13:00:00Z', 'deberta-v3-drrp', false),
                     ('UK_ukpga_1974_37', 's.3', 'duty', 'every employer',
                      'conduct undertaking', NULL, 's.3',
-                     0.88, '2026-02-21T13:00:00Z', 'claude-sonnet-4-5-20250929', true)",
+                     0.88, '2026-02-21T13:00:00Z', 'deberta-v3-drrp', true)",
             )
             .unwrap();
 
@@ -948,7 +948,7 @@ mod tests {
                 "INSERT INTO polished_drrp VALUES
                     ('UK_ukpga_1974_37', 's.2(1)', 'duty', 'every employer',
                      'ensure health safety', NULL, 's.2(1)',
-                     0.95, '2026-02-21T13:00:00Z', 'claude-sonnet-4-5-20250929', false)",
+                     0.95, '2026-02-21T13:00:00Z', 'deberta-v3-drrp', false)",
             )
             .unwrap();
 

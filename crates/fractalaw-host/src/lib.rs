@@ -33,25 +33,6 @@ pub struct RunResult {
     pub fuel_consumed: u64,
 }
 
-/// Configuration for the Claude API inference backend.
-#[cfg(feature = "inference")]
-pub struct InferenceConfig {
-    pub api_key: String,
-    pub model: String,
-    pub client: reqwest::Client,
-}
-
-#[cfg(feature = "inference")]
-impl InferenceConfig {
-    pub fn new(api_key: String, model: String) -> Self {
-        Self {
-            api_key,
-            model,
-            client: reqwest::Client::new(),
-        }
-    }
-}
-
 /// State held in the Wasmtime [`Store`](wasmtime::Store) for each guest execution.
 pub struct HostState {
     pub audit_entries: Vec<AuditRecord>,
@@ -61,8 +42,6 @@ pub struct HostState {
     pub duck: Option<DuckStore>,
     #[cfg(feature = "lancedb")]
     pub lance: Option<LanceStore>,
-    #[cfg(feature = "inference")]
-    pub inference: Option<InferenceConfig>,
     #[cfg(feature = "onnx")]
     pub extractor: Option<fractalaw_ai::DrrpExtractor>,
 }
@@ -87,8 +66,6 @@ impl HostState {
             duck: None,
             #[cfg(feature = "lancedb")]
             lance: None,
-            #[cfg(feature = "inference")]
-            inference: None,
             #[cfg(feature = "onnx")]
             extractor: None,
         }
@@ -105,13 +82,6 @@ impl HostState {
     #[cfg(feature = "lancedb")]
     pub fn with_lance(mut self, store: LanceStore) -> Self {
         self.lance = Some(store);
-        self
-    }
-
-    /// Attach an inference backend for ai-inference host functions.
-    #[cfg(feature = "inference")]
-    pub fn with_inference(mut self, config: InferenceConfig) -> Self {
-        self.inference = Some(config);
         self
     }
 
@@ -708,107 +678,18 @@ impl HostState {
                     confidence,
                 });
             }
-            // Prompt doesn't match DRRP format — fall through to Claude.
-            tracing::debug!("prompt does not match DRRP format, falling through to Claude");
-        }
-
-        #[cfg(feature = "inference")]
-        {
-            let config = self
-                .inference
-                .as_ref()
-                .ok_or(fractal::app::ai_embeddings::AiError {
-                    code: 1,
-                    message: "no inference backend configured (set ANTHROPIC_API_KEY)".into(),
-                })?;
-
-            // Build Claude Messages API request body.
-            let mut body = serde_json::json!({
-                "model": config.model,
-                "max_tokens": request.max_tokens,
-                "messages": [
-                    { "role": "user", "content": request.user_prompt }
-                ],
-            });
-
-            if let Some(system) = &request.system_prompt {
-                body["system"] = serde_json::json!(system);
-            }
-            if request.temperature > 0.0 {
-                body["temperature"] = serde_json::json!(request.temperature);
-            }
-
-            let resp = config
-                .client
-                .post("https://api.anthropic.com/v1/messages")
-                .header("x-api-key", &config.api_key)
-                .header("anthropic-version", "2023-06-01")
-                .header("content-type", "application/json")
-                .json(&body)
-                .send()
-                .await
-                .map_err(|e| fractal::app::ai_embeddings::AiError {
-                    code: 2,
-                    message: format!("HTTP request failed: {e}"),
-                })?;
-
-            let status = resp.status();
-            let resp_text =
-                resp.text()
-                    .await
-                    .map_err(|e| fractal::app::ai_embeddings::AiError {
-                        code: 2,
-                        message: format!("failed to read response body: {e}"),
-                    })?;
-
-            if !status.is_success() {
-                return Err(fractal::app::ai_embeddings::AiError {
-                    code: 2,
-                    message: format!("Claude API error ({}): {}", status, resp_text),
-                });
-            }
-
-            let parsed: serde_json::Value = serde_json::from_str(&resp_text).map_err(|e| {
-                fractal::app::ai_embeddings::AiError {
-                    code: 3,
-                    message: format!("failed to parse response JSON: {e}"),
-                }
-            })?;
-
-            let text = parsed["content"][0]["text"]
-                .as_str()
-                .ok_or(fractal::app::ai_embeddings::AiError {
-                    code: 3,
-                    message: format!(
-                        "unexpected response structure (no content[0].text): {}",
-                        &resp_text[..resp_text.len().min(200)]
-                    ),
-                })?
-                .to_string();
-
-            let tokens_used = parsed["usage"]["output_tokens"].as_u64().unwrap_or(0) as u32;
-
-            tracing::info!(
-                model = %config.model,
-                tokens_used,
-                "inference complete"
+            // Prompt doesn't match DRRP format — no other backend available.
+            tracing::debug!(
+                "prompt does not match DRRP format, no other inference backend available"
             );
-
-            Ok(fractal::app::ai_inference::GenerateResponse {
-                text,
-                tokens_used,
-                confidence: 1.0, // API responses don't have intrinsic confidence; guest decides
-            })
         }
 
-        #[cfg(not(feature = "inference"))]
-        {
-            let _ = request;
-            Err(fractal::app::ai_embeddings::AiError {
-                code: 1,
-                message: "inference support not compiled in".into(),
-            })
-        }
+        // No ONNX extractor or prompt not in DRRP format — error.
+        let _ = request;
+        Err(fractal::app::ai_embeddings::AiError {
+            code: 1,
+            message: "no inference backend configured (ONNX model not loaded)".into(),
+        })
     }
 }
 
@@ -828,8 +709,7 @@ struct ParsedDrrpPrompt {
 /// Supports both Phase B format (single DRRP type + holder) and Phase C format
 /// (taxa context with DRRP types list, actors, refined clause).
 ///
-/// Returns `None` if the prompt doesn't match the expected format,
-/// allowing fallthrough to the Claude API backend.
+/// Returns `None` if the prompt doesn't match the expected format.
 #[cfg(feature = "onnx")]
 fn parse_drrp_prompt(user_prompt: &str) -> Option<ParsedDrrpPrompt> {
     let mut drrp_types = Vec::new();
@@ -924,6 +804,7 @@ fn parse_drrp_prompt(user_prompt: &str) -> Option<ParsedDrrpPrompt> {
 // ── Arrow IPC encoding/decoding ──
 
 /// Encode Arrow RecordBatches into IPC streaming format bytes.
+#[allow(dead_code)]
 fn encode_ipc(
     batches: &[arrow::record_batch::RecordBatch],
 ) -> Result<Vec<u8>, arrow::error::ArrowError> {
@@ -1005,8 +886,6 @@ pub struct RunOptions {
     pub duck: Option<DuckStore>,
     #[cfg(feature = "lancedb")]
     pub lance: Option<LanceStore>,
-    #[cfg(feature = "inference")]
-    pub inference: Option<InferenceConfig>,
     #[cfg(feature = "onnx")]
     pub extractor: Option<fractalaw_ai::DrrpExtractor>,
 }
@@ -1017,12 +896,13 @@ pub struct RunOptions {
 pub async fn run_component(
     wasm_path: &Path,
     fuel: u64,
-    opts: RunOptions,
+    #[allow(unused_variables)] opts: RunOptions,
 ) -> anyhow::Result<RunResult> {
     let engine = create_engine()?;
     let component = load_component(&engine, wasm_path).await?;
     let linker = create_linker(&engine)?;
 
+    #[allow(unused_mut)]
     let mut state = HostState::new();
     #[cfg(feature = "duckdb")]
     if let Some(store) = opts.duck {
@@ -1031,10 +911,6 @@ pub async fn run_component(
     #[cfg(feature = "lancedb")]
     if let Some(store) = opts.lance {
         state = state.with_lance(store);
-    }
-    #[cfg(feature = "inference")]
-    if let Some(config) = opts.inference {
-        state = state.with_inference(config);
     }
     #[cfg(feature = "onnx")]
     if let Some(extractor) = opts.extractor {
@@ -1272,8 +1148,6 @@ mod tests {
                 duck: Some(duck),
                 #[cfg(feature = "lancedb")]
                 lance: None,
-                #[cfg(feature = "inference")]
-                inference: None,
                 #[cfg(feature = "onnx")]
                 extractor: None,
             };
@@ -1343,8 +1217,6 @@ mod tests {
                 duck: Some(duck),
                 #[cfg(feature = "lancedb")]
                 lance: None,
-                #[cfg(feature = "inference")]
-                inference: None,
                 #[cfg(feature = "onnx")]
                 extractor: None,
             };
@@ -1392,10 +1264,8 @@ mod tests {
                 duck: Some(duck),
                 #[cfg(feature = "lancedb")]
                 lance: None,
-                #[cfg(feature = "inference")]
-                inference: None, // no API key → inference calls will error
                 #[cfg(feature = "onnx")]
-                extractor: None, // no ONNX model → falls through to Claude → errors
+                extractor: None, // no ONNX model → inference calls will error
             };
             let result = run_component(&drrp_polisher_wasm(), 1_000_000_000, opts)
                 .await
@@ -1455,9 +1325,9 @@ mod tests {
             let err = state.generate(request).await.unwrap_err();
             assert_eq!(err.code, 1);
             assert!(
-                err.message.contains("not compiled in")
-                    || err.message.contains("not configured")
-                    || err.message.contains("no inference backend configured"),
+                err.message.contains("ONNX model not loaded"),
+                "unexpected error message: {}",
+                err.message,
             );
         }
     }

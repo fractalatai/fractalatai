@@ -243,7 +243,7 @@ impl Guest for DrrpPolisher {
 fn process_provision(prov: &ProvisionRow) -> Result<u32, String> {
     let user_prompt = build_user_prompt(prov);
 
-    // Call AI inference (ONNX local-first, falls through to Claude).
+    // Call AI inference (ONNX local).
     let response = ai_inference::generate(&ai_inference::GenerateRequest {
         system_prompt: Some(SYSTEM_PROMPT.to_string()),
         user_prompt,
@@ -266,11 +266,7 @@ fn process_provision(prov: &ProvisionRow) -> Result<u32, String> {
         None => "NULL".to_string(),
     };
 
-    let model = if response.tokens_used == 0 {
-        "onnx"
-    } else {
-        "claude"
-    };
+    let model = "onnx";
 
     execute(&format!(
         "UPDATE legislation_text SET \
