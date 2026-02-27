@@ -64,6 +64,10 @@ Heavy C/C++ dependencies are behind optional features on library crates. The CLI
 - Logging: tracing
 - Tests live next to source (`#[cfg(test)] mod tests`)
 
+## Data Stores
+
+Law metadata lives in **DuckDB** (`legislation` table, queried via `fractalaw query`). Per-provision text and taxa enrichment data lives in **LanceDB** (`legislation_text` table, NOT accessible via the CLI query command). See `.claude/skills/lancedb-validation/SKILL.md` for query patterns, cross-referencing workflows, and pyarrow recipes.
+
 ## Environment
 
 - OS: Fedora Bluefin DX (atomic/immutable Linux)

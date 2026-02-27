@@ -398,6 +398,12 @@ fn should_skip_drrp(purposes: &[&str]) -> bool {
         return true;
     }
 
+    // Application+Scope-primary: "These Regulations shall apply to..." describes
+    // how/when/to whom the law applies, not what actors must do. GH #20.
+    if purposes.first() == Some(&purpose::APPLICATION_SCOPE) {
+        return true;
+    }
+
     false
 }
 
@@ -990,8 +996,8 @@ mod tests {
     fn clause_no_mid_sentence_start_long_preamble() {
         // Real-world case: actor is >100 chars from the sentence start.
         // The clause should NOT start mid-word or mid-sentence.
-        let text = "Subject to the provisions of this Part, for any activity to \
-                    which paragraph 7(3)(c) of Schedule 3 applies, but the \
+        let text = "Subject to the provisions of Part II, for any activity to \
+                    which the conditions of Schedule 3 relate, the \
                     appropriate registration authority shall enter in its register \
                     the particulars furnished to it pursuant to that provision.";
         let record = parse_v2(text);
@@ -1009,11 +1015,12 @@ mod tests {
     #[test]
     fn clause_finds_sentence_start_after_period() {
         // Sentence boundary `. ` is >100 chars before the actor.
-        let text = "This regulation applies to all installations covered by these \
-                    Regulations and to all operators thereof. Where an installation \
-                    which contains an existing SED installation is subject to a permit, \
-                    the operator of the installation shall by the SED date make an \
-                    application under regulation 17 of the principal Regulations.";
+        let text = "The preceding provisions of the Act set out general requirements \
+                    for all installations covered by the framework and for all operators \
+                    thereof. Where an installation which contains an existing SED \
+                    installation is subject to a permit, the operator of the installation \
+                    shall by the SED date make an application under regulation 17 of \
+                    the principal framework.";
         let record = parse_v2(text);
         let clause = record.clause_refined.unwrap();
         assert!(
@@ -1023,6 +1030,179 @@ mod tests {
         assert!(
             clause.contains("operator"),
             "clause should contain actor: {clause}"
+        );
+    }
+
+    // ── Application+Scope gating tests (GH #20) ─────────────────────
+
+    #[test]
+    fn scope_extension_like_duty_skipped() {
+        // Noise 2005 Reg 3 — scope extension, not a new duty
+        let text = "Where a duty is placed by these Regulations on an employer in \
+                    respect of his employees, the employer shall, so far as is reasonably \
+                    practicable, be under a like duty in respect of any other person at \
+                    work who may be affected by the work carried out by the employer.";
+        let record = parse(text);
+        assert!(
+            record.purposes.contains(&purpose::APPLICATION_SCOPE),
+            "should detect Application+Scope, got: {:?}",
+            record.purposes
+        );
+        assert!(
+            record.duty_types.is_empty(),
+            "scope extension should not produce DRRP, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn scope_extension_self_employed_skipped() {
+        // Noise 2005 / Vibration 2005 / Lead 2002 Reg 3
+        let text = "These Regulations shall apply to a self-employed person as they \
+                    apply to an employer and an employee and as if that self-employed \
+                    person were both an employer and an employee, except that regulation \
+                    9 shall not apply to a self-employed person.";
+        let record = parse(text);
+        assert!(
+            record.purposes.contains(&purpose::APPLICATION_SCOPE),
+            "should detect Application+Scope, got: {:?}",
+            record.purposes
+        );
+        assert!(
+            record.duty_types.is_empty(),
+            "scope extension to self-employed should not produce DRRP, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn transitional_non_application_skipped() {
+        // Vibration 2005 Reg 3(2) — transitional scope
+        let text = "Subject to paragraph (3), regulation 6(4) shall not apply until \
+                    6th July 2010 where work equipment is used which was first provided \
+                    to employees prior to 6th July 2007 by any employer.";
+        let record = parse(text);
+        assert!(
+            record.purposes.contains(&purpose::APPLICATION_SCOPE),
+            "should detect Application+Scope, got: {:?}",
+            record.purposes
+        );
+        assert!(
+            record.duty_types.is_empty(),
+            "transitional non-application should not produce DRRP, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn requirement_extends_to_self_employed_skipped() {
+        // Pressure Systems Reg 3(1) — scope extension
+        let text = "Any requirement or prohibition imposed by these Regulations on an \
+                    employer in respect of the activities of his employees shall also \
+                    extend to a self-employed person in respect of his own activities \
+                    at work.";
+        let record = parse(text);
+        assert!(
+            record.purposes.contains(&purpose::APPLICATION_SCOPE),
+            "should detect Application+Scope, got: {:?}",
+            record.purposes
+        );
+        assert!(
+            record.duty_types.is_empty(),
+            "requirement-extends scope should not produce DRRP, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    #[test]
+    fn genuine_employer_duty_not_application_scope() {
+        // Genuine duty — mentions "these Regulations" incidentally but the
+        // core text is an obligation on the employer to DO something.
+        let text = "The employer shall ensure that risk from the exposure of his \
+                    employees to noise is either eliminated at source or, where this \
+                    is not reasonably practicable, reduced to as low a level as is \
+                    reasonably practicable.";
+        let record = parse(text);
+        assert!(
+            !record.duty_types.is_empty(),
+            "genuine employer duty should produce DRRP, got empty"
+        );
+    }
+
+    #[test]
+    fn genuine_employer_risk_assessment_not_application_scope() {
+        // Genuine duty that mentions "requirements of these Regulations"
+        let text = "An employer who carries out work which is liable to expose any \
+                    employees to noise at or above a lower exposure action value shall \
+                    make a suitable and sufficient assessment of the risk from that \
+                    noise to the health and safety of those employees, and the risk \
+                    assessment shall identify the measures which need to be taken to \
+                    meet the requirements of these Regulations.";
+        let record = parse(text);
+        assert!(
+            !record.duty_types.is_empty(),
+            "genuine risk assessment duty should produce DRRP, got empty"
+        );
+    }
+
+    // ── Relative-clause Application+Scope false-positive regressions ──
+
+    #[test]
+    fn employee_to_whom_this_reg_applies_produces_drrp() {
+        // Health surveillance duty — "to whom this regulation applies" is a
+        // relative clause qualifying the actor, not a scope statement.
+        let text = "An employee to whom this regulation applies shall, when required \
+                    by his employer and at the cost of the employer, present himself \
+                    during his working hours for such health surveillance procedures \
+                    as may be required for the purposes of paragraph (1).";
+        let record = parse(text);
+        assert!(
+            !record.duty_types.is_empty(),
+            "'to whom this regulation applies' duty should produce DRRP, got empty"
+        );
+    }
+
+    #[test]
+    fn operator_to_which_these_regs_apply_produces_drrp() {
+        // COMAH operator notification — "to which these Regulations apply" is
+        // a relative clause, not scope.
+        let text = "The operator of any establishment to which these Regulations \
+                    apply must notify the competent authority in advance of a \
+                    significant increase or decrease in the quantity of dangerous \
+                    substances notified under this regulation.";
+        let record = parse(text);
+        assert!(
+            !record.duty_types.is_empty(),
+            "'to which these Regulations apply' duty should produce DRRP, got empty"
+        );
+    }
+
+    #[test]
+    fn employer_fumigation_to_which_this_reg_applies_produces_drrp() {
+        // Fumigation prohibition — "to which this regulation applies" is a
+        // relative clause, not scope.
+        let text = "An employer shall not undertake fumigation to which this \
+                    regulation applies unless he has notified the persons specified \
+                    in Part I of Schedule 9 of his intention to undertake the \
+                    fumigation.";
+        let record = parse(text);
+        assert!(
+            !record.duty_types.is_empty(),
+            "'to which this regulation applies' prohibition should produce DRRP, got empty"
+        );
+    }
+
+    #[test]
+    fn employer_requirement_of_these_regs_which_applies_produces_drrp() {
+        // Workplace compliance duty — "requirement of these Regulations which
+        // applies" is a relative clause on "requirement", not scope.
+        let text = "Every employer shall ensure that every workplace under his \
+                    control complies with any requirement of these Regulations \
+                    which applies to that workplace.";
+        let record = parse(text);
+        assert!(
+            !record.duty_types.is_empty(),
+            "'requirement of these Regulations which applies' duty should produce DRRP, got empty"
         );
     }
 }

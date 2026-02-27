@@ -64,7 +64,28 @@ const RAW_PATTERNS: &[(&str, &str)] = &[
     ),
     (
         APPLICATION_SCOPE,
-        r"(?i)(?:Application|(?:Act|Part|Chapter|[Ss]ections?|[Rr]egulations?|[Pp]aragraphs?|Article).*?apply?i?e?s?|(?:Act|Part|Chapter|[Ss]ections?|[Rr]egulations?|[Pp]aragraphs?|[Ss]chedules?).*?has effect|does not apply|shall.*?apply|shall have effect|shall have no effect|ceases to have effect|provisions of.*?apply|apply to any work outside|apply to a self-employed person|shall bind the Crown)",
+        // Tightened for GH #20: only match genuine application/scope provisions,
+        // not duty text that incidentally mentions "shall apply".
+        // Key constraint: the LAW must be the subject that applies/has effect,
+        // not an actor applying something.
+        //
+        // Branches:
+        // 1. "Application" as a heading (start of text)
+        // 2. Self-referencing: "These/This Regulations shall [not] apply"
+        //    Requires these/this at text-start, after a paragraph number,
+        //    or after a sentence boundary / comma. This prevents matching
+        //    relative clauses like "to whom this regulation applies" or
+        //    "requirement of these Regulations which applies" where
+        //    the law reference is inside a subordinate clause.
+        // 3. Numbered provision non-application: "regulation 6(4) shall not apply"
+        // 4. Scope extension: "shall apply to X as they apply to Y"
+        // 5. Like duty: "be under a like duty"
+        // 6. Requirement extends: "Any requirement...shall also extend to"
+        // 7. Does not apply with preposition
+        // 8. Effect statements
+        // 9. Provisions-referencing apply
+        // 10. Crown application
+        r"(?i)(?:^Application\b|(?:^|[.;,]\s+|\d\s+)(?:these|this) (?:Regulations?|Act|Order|Part|Rules?|section).{0,60}(?:shall |do(?:es)? )?(?:not )?appl(?:y|ies)|(?:regulation|section|paragraph|article) \d.{0,40}shall not apply|shall apply to .{0,60} as they apply to|be under a like duty|(?:any )?(?:requirement|prohibition|duty).{0,150}(?:shall (?:also )?extend|shall extend only)|shall extend only to|does not apply (?:to|where|until|in|unless)|shall have (?:no )?effect|ceases? to have effect|provisions of .{0,40}(?:shall )?apply|shall bind the Crown)",
     ),
     (
         EXTENT,
@@ -199,7 +220,95 @@ mod tests {
     fn classify_application_scope() {
         let result =
             classify("These Regulations apply to every employer and self-employed person.");
-        assert!(result.contains(&APPLICATION_SCOPE));
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "self-referencing applicability should match, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn classify_application_scope_shall_apply_to_self_employed() {
+        let text = "These Regulations shall apply to a self-employed person as they \
+                    apply to an employer and an employee.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "scope extension should match, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn classify_application_scope_like_duty() {
+        let text = "Where a duty is placed by these Regulations on an employer, \
+                    he shall be under a like duty in respect of any other person.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "'be under a like duty' should match, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn classify_application_scope_regulation_shall_not_apply() {
+        let text = "regulation 6(4) shall not apply until 6th July 2010 where \
+                    work equipment is used.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "transitional non-application should match, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn classify_application_scope_requirement_extends() {
+        let text = "Any requirement imposed by these Regulations on an employer \
+                    shall also extend to a self-employed person.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "requirement-extends should match, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn classify_application_scope_does_not_apply_to() {
+        let text = "This regulation does not apply to work equipment which is \
+                    provided for use in normal ship-board activities.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "'does not apply to' should match, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn classify_no_false_application_scope_genuine_duty() {
+        // Genuine duty — "shall ensure" is an obligation, not applicability
+        let text = "The employer shall ensure the health and safety of employees.";
+        let result = classify(text);
+        assert!(
+            !result.contains(&APPLICATION_SCOPE),
+            "genuine duty should NOT match Application+Scope, got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn classify_no_false_application_scope_shall_apply_precautionary() {
+        // "shall apply" where an actor applies a principle — not scope
+        let text = "The employer shall apply the general principles of prevention.";
+        let result = classify(text);
+        assert!(
+            !result.contains(&APPLICATION_SCOPE),
+            "actor applying a principle should NOT match Application+Scope, got: {:?}",
+            result
+        );
     }
 
     #[test]
@@ -355,6 +464,103 @@ mod tests {
         assert!(
             result.contains(&ENFORCEMENT),
             "'on summary conviction' should trigger Enforcement"
+        );
+    }
+
+    // ── Application+Scope relative-clause regression tests ──────────
+
+    #[test]
+    fn no_false_scope_employee_to_whom_this_reg_applies() {
+        // Health surveillance duty with relative clause qualifier
+        let text = "An employee to whom this regulation applies shall, when required \
+                    by his employer and at the cost of the employer, present himself \
+                    during his working hours for such health surveillance procedures.";
+        let result = classify(text);
+        assert!(
+            !result.contains(&APPLICATION_SCOPE),
+            "'to whom this regulation applies' is a relative clause, not scope; got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn no_false_scope_establishment_to_which_these_regs_apply() {
+        // COMAH operator notification duty with relative clause qualifier
+        let text = "The operator of any establishment to which these Regulations \
+                    apply must notify the competent authority in advance of a \
+                    significant increase or decrease in the quantity of dangerous \
+                    substances.";
+        let result = classify(text);
+        assert!(
+            !result.contains(&APPLICATION_SCOPE),
+            "'to which these Regulations apply' is a relative clause, not scope; got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn no_false_scope_fumigation_to_which_this_reg_applies() {
+        // Fumigation duty with relative clause qualifier
+        let text = "An employer shall not undertake fumigation to which this \
+                    regulation applies unless he has notified the persons specified \
+                    in Part I of Schedule 9.";
+        let result = classify(text);
+        assert!(
+            !result.contains(&APPLICATION_SCOPE),
+            "'to which this regulation applies' is a relative clause, not scope; got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn no_false_scope_requirement_of_these_regs_which_applies() {
+        // Workplace duty with "requirement of these Regulations which applies"
+        let text = "Every employer shall ensure that every workplace under his \
+                    control complies with any requirement of these Regulations \
+                    which applies to that workplace.";
+        let result = classify(text);
+        assert!(
+            !result.contains(&APPLICATION_SCOPE),
+            "'requirement of these Regulations which applies' is a relative clause, not scope; got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn genuine_scope_these_regs_shall_not_apply_still_matches() {
+        // Genuine scope provision — should still match
+        let text = "These Regulations shall not apply to or in relation to the \
+                    master or crew of a sea-going ship.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "genuine 'These Regulations shall not apply' should match; got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn genuine_scope_after_comma_still_matches() {
+        // Genuine scope after comma — "Subject to..., these Regulations shall not apply"
+        let text = "Subject to paragraph (3), these Regulations shall not apply \
+                    until 6th July 2010.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "scope after comma should match; got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn genuine_scope_after_number_still_matches() {
+        // Genuine scope after paragraph number
+        let text = "1 These Regulations shall not apply to sea-going ships.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "scope after paragraph number should match; got: {:?}",
+            result
         );
     }
 }

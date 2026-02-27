@@ -188,9 +188,24 @@ enum TaxaAction {
         /// If not specified, enriches all laws without taxa data
         #[arg(long)]
         laws: Option<String>,
+        /// Enrich all laws in a DuckDB family (e.g., "OH&S: Occupational / Personal Safety")
+        #[arg(long)]
+        family: Option<String>,
         /// Re-enrich all laws (clear existing DuckDB taxa columns, re-process all LanceDB text)
         #[arg(long)]
         force: bool,
+    },
+    /// Generate clause eyeball review markdown for manual QA
+    Eyeball {
+        /// Comma-separated law names to include
+        #[arg(long)]
+        laws: String,
+        /// Output file path
+        #[arg(long, default_value = "./data/clause_eyeball.md")]
+        output: PathBuf,
+        /// Maximum text sections per law
+        #[arg(long, default_value_t = 200)]
+        limit: usize,
     },
 }
 
@@ -257,13 +272,36 @@ async fn main() -> anyhow::Result<()> {
                 misses,
                 clauses,
             } => cmd_taxa_show(&data_dir, &name, limit, misses, clauses).await,
-            TaxaAction::Enrich { laws, force } => {
-                let law_filter = laws.as_ref().map(|s| {
-                    s.split(',')
-                        .map(|l| l.trim().to_string())
-                        .collect::<Vec<_>>()
-                });
-                cmd_taxa_enrich(&data_dir, &open_duck(&data_dir)?, law_filter, force).await
+            TaxaAction::Enrich {
+                laws,
+                family,
+                force,
+            } => {
+                let store = open_duck(&data_dir)?;
+                let law_filter = if let Some(ref fam) = family {
+                    // Resolve family to law names via DuckDB query
+                    let names = laws_in_family(&store, fam)?;
+                    if names.is_empty() {
+                        anyhow::bail!("No laws found with family '{fam}'");
+                    }
+                    println!("Family '{}': {} laws", fam, names.len());
+                    Some(names)
+                } else {
+                    laws.as_ref().map(|s| {
+                        s.split(',')
+                            .map(|l| l.trim().to_string())
+                            .collect::<Vec<_>>()
+                    })
+                };
+                cmd_taxa_enrich(&data_dir, &store, law_filter, force).await
+            }
+            TaxaAction::Eyeball {
+                laws,
+                output,
+                limit,
+            } => {
+                let law_names: Vec<&str> = laws.split(',').map(|l| l.trim()).collect();
+                cmd_taxa_eyeball(&data_dir, &law_names, &output, limit).await
             }
         },
 
@@ -299,6 +337,30 @@ fn open_duck(data_dir: &std::path::Path) -> anyhow::Result<DuckStore> {
         store.load_all(data_dir)?;
     }
     Ok(store)
+}
+
+/// Query DuckDB for all law names belonging to a given family.
+fn laws_in_family(store: &DuckStore, family: &str) -> anyhow::Result<Vec<String>> {
+    use arrow::array::Array;
+
+    let sql = format!(
+        "SELECT name FROM legislation WHERE family = '{}' ORDER BY name",
+        family.replace('\'', "''")
+    );
+    let batches = store.query_arrow(&sql)?;
+    let mut names = Vec::new();
+    for batch in &batches {
+        if let Some(col) = batch.column_by_name("name")
+            && let Some(arr) = col.as_any().downcast_ref::<arrow::array::StringArray>()
+        {
+            for i in 0..arr.len() {
+                if !arr.is_null(i) {
+                    names.push(arr.value(i).to_string());
+                }
+            }
+        }
+    }
+    Ok(names)
 }
 
 fn cmd_import(data_dir: &std::path::Path) -> anyhow::Result<()> {
@@ -949,6 +1011,157 @@ fn cmd_taxa_show_clauses(
     println!(
         "  Low (< 0.45):       {}",
         entries.iter().filter(|e| e.confidence < 0.45).count()
+    );
+
+    Ok(())
+}
+
+/// Human-friendly law names for eyeball review headings.
+fn law_display_name(law_name: &str) -> &str {
+    match law_name {
+        "UK_uksi_2005_1643" => "Control of Noise at Work 2005",
+        "UK_uksi_1992_2792" => "Display Screen Equipment 1992",
+        "UK_uksi_2005_1093" => "Control of Vibration at Work 2005",
+        "UK_uksi_2002_2676" => "Control of Lead at Work 2002",
+        "UK_uksi_2013_1471" => "RIDDOR 2013",
+        "UK_uksi_2000_128" => "Pressure Systems Safety 2000",
+        "UK_uksi_2015_483" => "COMAH 2015",
+        "UK_ukpga_1974_37" => "Health and Safety at Work etc. Act 1974",
+        "UK_uksi_1999_3242" => "Management of HSW Regulations 1999",
+        "UK_uksi_2015_51" => "CDM 2015",
+        _ => law_name,
+    }
+}
+
+async fn cmd_taxa_eyeball(
+    data_dir: &std::path::Path,
+    law_names: &[&str],
+    output: &std::path::Path,
+    limit: usize,
+) -> anyhow::Result<()> {
+    use std::fmt::Write;
+
+    let lance = LanceStore::open(&data_dir.join("lancedb"))
+        .await
+        .context("opening LanceDB")?;
+
+    let mut md = String::new();
+    writeln!(md, "# Clause Eyeball Review")?;
+    writeln!(md)?;
+    writeln!(
+        md,
+        "Generated by `fractalaw taxa eyeball`. Manual QA artifact for DRRP clause review."
+    )?;
+    writeln!(md)?;
+    writeln!(md, "---")?;
+
+    let mut total_drrp = 0usize;
+    let mut total_sections = 0usize;
+
+    for &law_name in law_names {
+        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
+        let batches = lance.query_legislation_text(&filter, limit, 0).await?;
+        let sections: usize = batches.iter().map(|b| b.num_rows()).sum();
+        if sections == 0 {
+            eprintln!("  WARN: No text sections found for '{law_name}', skipping.");
+            continue;
+        }
+
+        let display = law_display_name(law_name);
+        writeln!(md)?;
+        writeln!(md)?;
+        writeln!(md, "## {display} ({law_name})")?;
+
+        let mut law_drrp = 0usize;
+
+        for batch in &batches {
+            let provision_col = batch.column_by_name("provision");
+            let text_col = batch.column_by_name("text");
+
+            for row in 0..batch.num_rows() {
+                let provision = provision_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let text = text_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+
+                if text.trim().is_empty() {
+                    continue;
+                }
+
+                let record = fractalaw_core::taxa::parse_v2(&text);
+
+                if record.duty_types.is_empty() {
+                    continue;
+                }
+
+                law_drrp += 1;
+
+                let family = record.duty_types.first().map(|d| d.as_str()).unwrap_or("?");
+                let conf = record.taxa_confidence;
+
+                // Extract provision number from "reg.N" or "section.N" format
+                let prov_label = provision
+                    .split('.')
+                    .next_back()
+                    .and_then(|s| s.strip_prefix("reg"))
+                    .or_else(|| {
+                        provision
+                            .split('.')
+                            .next_back()
+                            .and_then(|s| s.strip_prefix("section"))
+                    })
+                    .map(|n| format!("Reg {n}"))
+                    .unwrap_or_else(|| provision.clone());
+
+                // Determine clause or fall back to cleaned text
+                let clause_text = record
+                    .clause_refined
+                    .as_deref()
+                    .unwrap_or(&record.cleaned_text);
+
+                // Show bad-end marker if clause doesn't end with sentence boundary
+                let bad_end = if !clause_text.ends_with('.')
+                    && !clause_text.ends_with(';')
+                    && !clause_text.ends_with(')')
+                {
+                    " **[BAD END]**"
+                } else {
+                    ""
+                };
+
+                writeln!(md)?;
+                writeln!(
+                    md,
+                    "### {prov_label} — {family} (conf: {conf:.2}) {bad_end}"
+                )?;
+                writeln!(md)?;
+                writeln!(md, "> {clause_text}")?;
+            }
+        }
+
+        total_drrp += law_drrp;
+        total_sections += sections;
+        eprintln!("  {display}: {sections} sections, {law_drrp} DRRP provisions");
+    }
+
+    // Summary
+    writeln!(md)?;
+    writeln!(md)?;
+    writeln!(md, "## Summary")?;
+    writeln!(md)?;
+    writeln!(md, "| Metric | Value |")?;
+    writeln!(md, "|--------|-------|")?;
+    writeln!(md, "| Laws | {} |", law_names.len())?;
+    writeln!(md, "| Total sections | {total_sections} |")?;
+    writeln!(md, "| DRRP provisions | {total_drrp} |")?;
+
+    std::fs::write(output, &md)?;
+    println!(
+        "Wrote {total_drrp} DRRP provisions across {} laws to {}",
+        law_names.len(),
+        output.display()
     );
 
     Ok(())
