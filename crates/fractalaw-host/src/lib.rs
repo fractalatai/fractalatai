@@ -1455,7 +1455,9 @@ mod tests {
             let err = state.generate(request).await.unwrap_err();
             assert_eq!(err.code, 1);
             assert!(
-                err.message.contains("not compiled in") || err.message.contains("not configured")
+                err.message.contains("not compiled in")
+                    || err.message.contains("not configured")
+                    || err.message.contains("no inference backend configured"),
             );
         }
     }
