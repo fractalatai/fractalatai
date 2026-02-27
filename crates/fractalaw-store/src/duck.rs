@@ -218,6 +218,74 @@ impl DuckStore {
         Ok(())
     }
 
+    /// Upsert legislation records keyed on `name`.
+    ///
+    /// For each row in the batch, deletes any existing row with the same `name`
+    /// then inserts the new row. The batch schema must be a subset of (or match)
+    /// the `legislation` table columns.
+    pub fn upsert_legislation(&self, batches: &[RecordBatch]) -> Result<usize, StoreError> {
+        let mut total_rows = 0usize;
+        for batch in batches {
+            if batch.num_rows() == 0 {
+                continue;
+            }
+
+            // Extract law names from the batch to delete existing rows.
+            let name_col = batch
+                .column_by_name("name")
+                .ok_or_else(|| StoreError::Other("LRT batch missing `name` column".to_string()))?;
+            let mut names = Vec::new();
+            for i in 0..batch.num_rows() {
+                if let Some(arr) = name_col
+                    .as_any()
+                    .downcast_ref::<arrow::array::StringArray>()
+                    && !arr.is_null(i)
+                {
+                    names.push(arr.value(i).to_string());
+                } else if let Some(arr) = name_col
+                    .as_any()
+                    .downcast_ref::<arrow::array::LargeStringArray>()
+                    && !arr.is_null(i)
+                {
+                    names.push(arr.value(i).to_string());
+                }
+            }
+
+            // Delete existing rows.
+            for name in &names {
+                let sql = format!(
+                    "DELETE FROM legislation WHERE name = '{}'",
+                    name.replace('\'', "''")
+                );
+                self.conn.execute_batch(&sql)?;
+            }
+
+            // Insert new rows via temp Parquet.
+            let tmp = tempfile::Builder::new().suffix(".parquet").tempfile()?;
+            {
+                let mut writer = parquet::arrow::ArrowWriter::try_new(
+                    tmp.as_file().try_clone()?,
+                    batch.schema(),
+                    None,
+                )
+                .map_err(|e| StoreError::Other(format!("parquet writer: {e}")))?;
+                writer
+                    .write(batch)
+                    .map_err(|e| StoreError::Other(format!("parquet write: {e}")))?;
+                writer
+                    .close()
+                    .map_err(|e| StoreError::Other(format!("parquet close: {e}")))?;
+            }
+            let sql = format!(
+                "INSERT INTO legislation SELECT * FROM read_parquet('{}')",
+                tmp.path().display()
+            );
+            self.conn.execute_batch(&sql)?;
+            total_rows += batch.num_rows();
+        }
+        Ok(total_rows)
+    }
+
     // ── DRRP tables ──
 
     /// Create the `drrp_annotations` and `polished_drrp` tables if they don't exist.

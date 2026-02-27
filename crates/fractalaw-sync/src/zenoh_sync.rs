@@ -7,6 +7,7 @@
 use arrow::ipc::reader::StreamReader;
 use arrow::ipc::writer::StreamWriter;
 use arrow::record_batch::RecordBatch;
+use serde::Deserialize;
 use std::io::Cursor;
 use thiserror::Error;
 use tracing::info;
@@ -23,6 +24,44 @@ pub enum ZenohError {
     ArrowDecode(arrow::error::ArrowError),
     #[error("no data to publish for '{law_name}'")]
     NoData { law_name: String },
+    #[error("JSON decode error: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+// ── Sync events ──
+
+/// A data-change event published by sertantai on the events/sync key.
+///
+/// Payload example:
+/// ```json
+/// {
+///   "table": "lat",
+///   "action": "persist",
+///   "metadata": { "law_name": "UK_ukpga_1974_37", "count": 350 },
+///   "timestamp": "2026-02-27T15:30:00Z"
+/// }
+/// ```
+#[derive(Debug, Clone, Deserialize)]
+pub struct SyncEvent {
+    pub table: String,
+    pub action: String,
+    pub metadata: SyncEventMetadata,
+    pub timestamp: String,
+}
+
+/// Metadata within a [`SyncEvent`].
+#[derive(Debug, Clone, Deserialize)]
+pub struct SyncEventMetadata {
+    pub law_name: String,
+    #[serde(default)]
+    pub count: Option<u64>,
+}
+
+impl SyncEvent {
+    /// Deserialize a SyncEvent from a zenoh sample payload.
+    pub fn from_payload(bytes: &[u8]) -> Result<Self, ZenohError> {
+        Ok(serde_json::from_slice(bytes)?)
+    }
 }
 
 // ── Key expressions ──
@@ -55,6 +94,36 @@ pub mod keys {
     /// returns `Some("UK_ukpga_1974_37")`.
     pub fn law_name_from_key(key_expr: &str) -> Option<&str> {
         key_expr.rsplit('/').next()
+    }
+
+    /// Key expression for a specific law's legislation text (LAT) data
+    /// served by sertantai.
+    ///
+    /// Example: `fractalaw/@acme/data/legislation/lat/UK_uksi_2004_1309`
+    pub fn lat(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/data/legislation/lat/{law_name}")
+    }
+
+    /// Wildcard key expression for all LAT data under a tenant.
+    ///
+    /// Example: `fractalaw/@acme/data/legislation/lat/*`
+    pub fn lat_wildcard(tenant: &str) -> String {
+        format!("{PREFIX}/@{tenant}/data/legislation/lat/*")
+    }
+
+    /// Key expression for a specific law's legislation record (LRT) data
+    /// served by sertantai.
+    ///
+    /// Example: `fractalaw/@acme/data/legislation/lrt/UK_ukpga_1974_37`
+    pub fn lrt(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/data/legislation/lrt/{law_name}")
+    }
+
+    /// Key expression for sertantai sync events (data-change notifications).
+    ///
+    /// Example: `fractalaw/@acme/events/sync`
+    pub fn events_sync(tenant: &str) -> String {
+        format!("{PREFIX}/@{tenant}/events/sync")
     }
 }
 
@@ -133,6 +202,12 @@ impl ZenohSync {
         &self.tenant
     }
 
+    /// Borrow the underlying zenoh session (test-only).
+    #[cfg(test)]
+    pub(crate) fn session(&self) -> &zenoh::Session {
+        &self.session
+    }
+
     /// Publish taxa enrichment data for a specific law.
     ///
     /// `batches` should contain the taxa columns from DuckDB's `legislation`
@@ -167,6 +242,97 @@ impl ZenohSync {
         Ok(())
     }
 
+    /// Query sertantai for legislation text (LAT) for a specific law.
+    ///
+    /// Sends a zenoh `get()` query to the sertantai queryable at
+    /// `fractalaw/@{tenant}/data/legislation/lat/{law_name}`.
+    /// Returns decoded Arrow RecordBatches containing all provisions.
+    ///
+    /// Returns an empty Vec if no peer responds within the timeout.
+    pub async fn query_lat(
+        &self,
+        law_name: &str,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<RecordBatch>, ZenohError> {
+        let key = keys::lat(&self.tenant, law_name);
+        info!(key = %key, "querying LAT from sertantai");
+
+        let replies = self
+            .session
+            .get(&key)
+            .timeout(timeout)
+            .await
+            .map_err(ZenohError::Session)?;
+
+        let mut all_batches = Vec::new();
+        while let Ok(reply) = replies.recv_async().await {
+            if let Ok(sample) = reply.result() {
+                let bytes = sample.payload().to_bytes();
+                if bytes.is_empty() {
+                    continue;
+                }
+                info!(
+                    law_name = %law_name,
+                    bytes_len = bytes.len(),
+                    first_bytes = ?&bytes[..bytes.len().min(64)],
+                    "raw LAT reply payload"
+                );
+                let batches = decode_arrow_ipc(&bytes)?;
+                all_batches.extend(batches);
+            }
+        }
+
+        info!(
+            law_name = %law_name,
+            batches = all_batches.len(),
+            rows = all_batches.iter().map(|b| b.num_rows()).sum::<usize>(),
+            "received LAT data"
+        );
+
+        Ok(all_batches)
+    }
+
+    /// Query sertantai for a single law's legislation record (LRT) via zenoh.
+    ///
+    /// Response is Arrow IPC streaming format, same as LAT.
+    /// Returns an empty Vec if no peer responds within the timeout.
+    pub async fn query_lrt(
+        &self,
+        law_name: &str,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<RecordBatch>, ZenohError> {
+        let key = keys::lrt(&self.tenant, law_name);
+        info!(key = %key, "querying LRT from sertantai");
+
+        let replies = self
+            .session
+            .get(&key)
+            .timeout(timeout)
+            .await
+            .map_err(ZenohError::Session)?;
+
+        let mut all_batches = Vec::new();
+        while let Ok(reply) = replies.recv_async().await {
+            if let Ok(sample) = reply.result() {
+                let bytes = sample.payload().to_bytes();
+                if bytes.is_empty() {
+                    continue;
+                }
+                let batches = decode_arrow_ipc(&bytes)?;
+                all_batches.extend(batches);
+            }
+        }
+
+        info!(
+            law_name = %law_name,
+            batches = all_batches.len(),
+            rows = all_batches.iter().map(|b| b.num_rows()).sum::<usize>(),
+            "received LRT data"
+        );
+
+        Ok(all_batches)
+    }
+
     /// Subscribe to taxa enrichment updates for the tenant.
     ///
     /// Returns a Subscriber. Receive samples via `subscriber.recv_async().await`.
@@ -184,15 +350,57 @@ impl ZenohSync {
             .await
             .map_err(ZenohError::Session)
     }
+
+    /// Subscribe to sync events (data-change notifications) from sertantai.
+    ///
+    /// Returns a Subscriber. Receive samples via `subscriber.recv_async().await`.
+    /// Each sample's payload is a JSON [`SyncEvent`], decodable with
+    /// [`SyncEvent::from_payload`].
+    pub async fn subscribe_events(
+        &self,
+    ) -> Result<
+        zenoh::pubsub::Subscriber<zenoh::handlers::FifoChannelHandler<zenoh::sample::Sample>>,
+        ZenohError,
+    > {
+        let key = keys::events_sync(&self.tenant);
+        info!(key = %key, "subscribing to sync events");
+        self.session
+            .declare_subscriber(&key)
+            .await
+            .map_err(ZenohError::Session)
+    }
 }
 
 /// Test helpers shared across sync crate tests.
 #[cfg(test)]
 pub(crate) mod test_helpers {
-    use arrow::array::{ListBuilder, StringArray, StringBuilder};
+    use arrow::array::{Int32Array, ListBuilder, StringArray, StringBuilder};
     use arrow::datatypes::{DataType, Field, Schema};
     use arrow::record_batch::RecordBatch;
     use std::sync::Arc;
+
+    /// Minimal LAT batch for testing: section_id, law_name, text, sort_key, position.
+    pub fn test_lat_batch() -> RecordBatch {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("law_name", DataType::Utf8, false),
+            Field::new("section_id", DataType::Utf8, false),
+            Field::new("sort_key", DataType::Utf8, false),
+            Field::new("position", DataType::Int32, false),
+            Field::new("text", DataType::Utf8, false),
+        ]));
+
+        RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(StringArray::from(vec!["UK_uksi_2004_1309"])),
+                Arc::new(StringArray::from(vec!["UK_uksi_2004_1309:s.1"])),
+                Arc::new(StringArray::from(vec!["001.000"])),
+                Arc::new(Int32Array::from(vec![1])),
+                Arc::new(StringArray::from(vec!["Citation and commencement"])),
+            ],
+        )
+        .unwrap()
+    }
 
     /// Minimal taxa schema for testing: name + 4 List<Utf8> holder columns.
     pub fn taxa_test_schema() -> Schema {
@@ -247,7 +455,6 @@ mod tests {
     use super::test_helpers::*;
     use super::*;
     use arrow::array::Array;
-    use std::sync::Arc;
 
     // ── Arrow IPC tests ──
 
@@ -355,5 +562,152 @@ mod tests {
         let sync = ZenohSync::new("test-no-data").await.unwrap();
         let result = sync.publish_taxa("some_law", &[]).await;
         assert!(matches!(result, Err(ZenohError::NoData { .. })));
+    }
+
+    // ── LAT key expression tests ──
+
+    #[test]
+    fn key_lat() {
+        assert_eq!(
+            keys::lat("acme", "UK_uksi_2004_1309"),
+            "fractalaw/@acme/data/legislation/lat/UK_uksi_2004_1309"
+        );
+    }
+
+    #[test]
+    fn key_lat_wildcard() {
+        assert_eq!(
+            keys::lat_wildcard("acme"),
+            "fractalaw/@acme/data/legislation/lat/*"
+        );
+    }
+
+    // ── LAT query integration test ──
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn query_lat_roundtrip() {
+        let sync = ZenohSync::new("test-lat-q").await.unwrap();
+
+        // Simulate sertantai: declare a queryable that responds with Arrow IPC.
+        let batch = test_lat_batch();
+        let ipc_bytes = encode_arrow_ipc(&[batch.clone()]).unwrap();
+        let key = keys::lat("test-lat-q", "*");
+
+        let queryable = sync.session().declare_queryable(&key).await.unwrap();
+
+        let ipc_clone = ipc_bytes.clone();
+        let responder = tokio::spawn(async move {
+            if let Ok(query) = queryable.recv_async().await {
+                let reply_key = query.key_expr().as_str().to_string();
+                query.reply(&reply_key, ipc_clone).await.unwrap();
+            }
+        });
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        let result = sync
+            .query_lat("UK_uksi_2004_1309", std::time::Duration::from_secs(5))
+            .await
+            .unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].num_rows(), batch.num_rows());
+        assert_eq!(result[0].schema(), batch.schema());
+
+        responder.await.unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn query_lat_no_responder_returns_empty() {
+        let sync = ZenohSync::new("test-lat-empty").await.unwrap();
+        let result = sync
+            .query_lat("nonexistent_law", std::time::Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert!(result.is_empty());
+    }
+
+    // ── LRT key expression tests ──
+
+    #[test]
+    fn key_lrt() {
+        assert_eq!(
+            keys::lrt("acme", "UK_ukpga_1974_37"),
+            "fractalaw/@acme/data/legislation/lrt/UK_ukpga_1974_37"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn query_lrt_no_responder_returns_empty() {
+        let sync = ZenohSync::new("test-lrt-empty").await.unwrap();
+        let result = sync
+            .query_lrt("nonexistent_law", std::time::Duration::from_secs(1))
+            .await
+            .unwrap();
+        assert!(result.is_empty());
+    }
+
+    // ── Events key expression tests ──
+
+    #[test]
+    fn key_events_sync() {
+        assert_eq!(keys::events_sync("dev"), "fractalaw/@dev/events/sync");
+    }
+
+    // ── SyncEvent deserialization tests ──
+
+    #[test]
+    fn sync_event_deserialize() {
+        let json = r#"{
+            "table": "lat",
+            "action": "persist",
+            "metadata": { "law_name": "UK_ukpga_1974_37", "count": 350 },
+            "timestamp": "2026-02-27T15:30:00Z"
+        }"#;
+        let event = SyncEvent::from_payload(json.as_bytes()).unwrap();
+        assert_eq!(event.table, "lat");
+        assert_eq!(event.action, "persist");
+        assert_eq!(event.metadata.law_name, "UK_ukpga_1974_37");
+        assert_eq!(event.metadata.count, Some(350));
+        assert_eq!(event.timestamp, "2026-02-27T15:30:00Z");
+    }
+
+    #[test]
+    fn sync_event_deserialize_without_count() {
+        let json = r#"{
+            "table": "lrt",
+            "action": "persist",
+            "metadata": { "law_name": "UK_uksi_2004_1309" },
+            "timestamp": "2026-02-27T16:00:00Z"
+        }"#;
+        let event = SyncEvent::from_payload(json.as_bytes()).unwrap();
+        assert_eq!(event.table, "lrt");
+        assert_eq!(event.metadata.count, None);
+    }
+
+    // ── Events subscription integration test ──
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn subscribe_events_roundtrip() {
+        let publisher = ZenohSync::new("test-events").await.unwrap();
+        let subscriber = ZenohSync::new("test-events").await.unwrap();
+
+        let sub = subscriber.subscribe_events().await.unwrap();
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        let payload = r#"{"table":"lat","action":"persist","metadata":{"law_name":"UK_ukpga_1974_37","count":350},"timestamp":"2026-02-27T15:30:00Z"}"#;
+        let key = keys::events_sync("test-events");
+        publisher.session().put(&key, payload).await.unwrap();
+
+        let sample = tokio::time::timeout(std::time::Duration::from_secs(5), sub.recv_async())
+            .await
+            .expect("timeout waiting for event")
+            .expect("recv error");
+
+        let bytes = sample.payload().to_bytes();
+        let event = SyncEvent::from_payload(&bytes).unwrap();
+        assert_eq!(event.table, "lat");
+        assert_eq!(event.metadata.law_name, "UK_ukpga_1974_37");
     }
 }

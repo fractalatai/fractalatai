@@ -149,3 +149,10 @@ http = ["dep:reqwest", "dep:serde", "dep:serde_json", "dep:chrono"]
   - `with_configs()` constructor for test isolation with custom zenoh configs
   - Bug fix: `shutdown()` must not reset state to `Idle` — races with `run_continuous` listener task which checks for `ShuttingDown` via `watch::Receiver::borrow_and_update()` (sees latest value, not intermediate)
   - Learned: zenoh tests need `--test-threads=1` to avoid multicast scouting contention between parallel sessions
+- [x] Phase D (partial): First LAN publish to sertantai
+  - Published 2,606 laws (all families with taxa data) to sertantai over zenoh LAN
+  - Sertantai received and processed all records successfully
+  - Bug found: `sync publish` with no `--family`/`--laws` silently publishes everything
+  - Fix: added `--all` flag — must use `--family`, `--laws`, or `--all` explicitly
+  - Design handoff doc created: `data/sertantai-zenoh-subscriber.md` (gitignored)
+  - Committed + pushed: `4ab31b7`

@@ -5,8 +5,11 @@
 //! (19K change annotations).
 
 use std::path::Path;
+use std::sync::Arc;
 
-use arrow::array::RecordBatchIterator;
+use arrow::array::{RecordBatchIterator, new_null_array};
+use arrow::compute::cast;
+use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use futures::TryStreamExt;
 use lancedb::query::{ExecutableQuery, QueryBase};
@@ -181,6 +184,56 @@ impl LanceStore {
         Ok(())
     }
 
+    /// Upsert legislation text (LAT) data received from sertantai.
+    ///
+    /// If the `legislation_text` table does not exist, creates it from the
+    /// incoming batches. If it exists, uses `merge_insert` keyed on
+    /// `section_id` to update/insert rows. Never calls `drop_table`.
+    ///
+    /// Incoming batches are normalized to handle Polars/Explorer type
+    /// differences (LargeUtf8→Utf8, Null→nullable Utf8, timezone strings).
+    pub async fn upsert_lat(&self, batches: Vec<RecordBatch>) -> Result<usize, StoreError> {
+        if batches.is_empty() {
+            return Ok(0);
+        }
+
+        let batches: Vec<RecordBatch> = batches
+            .iter()
+            .map(normalize_polars_batch)
+            .collect::<Result<_, _>>()?;
+
+        let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+        let schema = batches[0].schema();
+
+        let existing = self.db.table_names().execute().await?;
+
+        if !existing.contains(&LEGISLATION_TEXT_TABLE.to_string()) {
+            info!(
+                table = LEGISLATION_TEXT_TABLE,
+                rows = total_rows,
+                "creating legislation_text table from LAT pull"
+            );
+            let reader = RecordBatchIterator::new(batches.into_iter().map(Ok), schema);
+            self.db
+                .create_table(LEGISLATION_TEXT_TABLE, Box::new(reader))
+                .execute()
+                .await?;
+        } else {
+            let table = self.legislation_text().await?;
+            let reader = RecordBatchIterator::new(batches.into_iter().map(Ok), schema);
+            let mut builder = table.merge_insert(&["section_id"]);
+            builder.when_matched_update_all(None);
+            builder.when_not_matched_insert_all();
+            builder
+                .execute(Box::new(reader))
+                .await
+                .map_err(|e| StoreError::Other(format!("merge_insert LAT: {e}")))?;
+        }
+
+        info!(rows = total_rows, "upserted LAT data");
+        Ok(total_rows)
+    }
+
     /// List table names in the database.
     pub async fn table_names(&self) -> Result<Vec<String>, StoreError> {
         let names = self.db.table_names().execute().await?;
@@ -262,6 +315,58 @@ impl LanceStore {
         );
         Ok(())
     }
+}
+
+/// Normalize a RecordBatch from Polars/Explorer to be LanceDB-compatible.
+///
+/// Handles three common mismatches:
+/// - `LargeUtf8` → `Utf8` (Polars default string type)
+/// - `Null`-typed columns → nullable `Utf8` (all-null columns in Polars)
+/// - Timezone `Etc/UTC` → `UTC` (Polars timezone string convention)
+fn normalize_polars_batch(batch: &RecordBatch) -> Result<RecordBatch, StoreError> {
+    let schema = batch.schema();
+    let mut fields = Vec::with_capacity(schema.fields().len());
+    let mut columns = Vec::with_capacity(batch.num_columns());
+
+    for (i, field) in schema.fields().iter().enumerate() {
+        let col = batch.column(i);
+        match field.data_type() {
+            DataType::LargeUtf8 => {
+                fields.push(Arc::new(Field::new(
+                    field.name(),
+                    DataType::Utf8,
+                    field.is_nullable(),
+                )));
+                columns.push(cast(col, &DataType::Utf8).map_err(|e| {
+                    StoreError::Other(format!("cast LargeUtf8→Utf8 for `{}`: {e}", field.name()))
+                })?);
+            }
+            DataType::Null => {
+                // All-null column — promote to nullable Utf8.
+                fields.push(Arc::new(Field::new(field.name(), DataType::Utf8, true)));
+                columns.push(new_null_array(&DataType::Utf8, batch.num_rows()));
+            }
+            DataType::Timestamp(unit, Some(tz)) if tz.as_ref() != "UTC" => {
+                let target = DataType::Timestamp(*unit, Some("UTC".into()));
+                fields.push(Arc::new(Field::new(
+                    field.name(),
+                    target.clone(),
+                    field.is_nullable(),
+                )));
+                columns.push(cast(col, &target).map_err(|e| {
+                    StoreError::Other(format!("cast timezone for `{}`: {e}", field.name()))
+                })?);
+            }
+            _ => {
+                fields.push(Arc::new(field.as_ref().clone()));
+                columns.push(col.clone());
+            }
+        }
+    }
+
+    let new_schema = Arc::new(Schema::new(fields));
+    RecordBatch::try_new(new_schema, columns)
+        .map_err(|e| StoreError::Other(format!("normalize batch: {e}")))
 }
 
 /// Read a Parquet file into Arrow RecordBatches.

@@ -10,7 +10,7 @@ pub use http::{SyncClient, SyncError};
 pub mod zenoh_sync;
 
 #[cfg(feature = "zenoh")]
-pub use zenoh_sync::{ZenohError, ZenohSync};
+pub use zenoh_sync::{SyncEvent, ZenohError, ZenohSync};
 
 #[cfg(feature = "zenoh")]
 pub mod crdt_sync;

@@ -180,6 +180,27 @@ enum SyncAction {
         #[arg(long)]
         all: bool,
     },
+    /// Pull legislation text (LAT) from sertantai via zenoh
+    PullLat {
+        /// Tenant namespace
+        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
+        tenant: String,
+        /// Law names to pull (comma-separated)
+        #[arg(long)]
+        laws: String,
+        /// Query timeout in seconds
+        #[arg(long, default_value_t = 30)]
+        timeout: u64,
+    },
+    /// Watch for sync events and run the full round-trip pipeline (long-running)
+    Watch {
+        /// Tenant namespace
+        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
+        tenant: String,
+        /// Query timeout in seconds (per-law pull)
+        #[arg(long, default_value_t = 30)]
+        timeout: u64,
+    },
     /// CRDT document management and sync
     Crdt {
         #[command(subcommand)]
@@ -321,6 +342,18 @@ async fn main() -> anyhow::Result<()> {
                 family,
                 all,
             } => cmd_sync_publish(&data_dir, &tenant, laws, family, all).await,
+            SyncAction::PullLat {
+                tenant,
+                laws,
+                timeout,
+            } => {
+                let law_names: Vec<String> =
+                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                cmd_sync_pull_lat(&data_dir, &tenant, &law_names, timeout).await
+            }
+            SyncAction::Watch { tenant, timeout } => {
+                cmd_sync_watch(&data_dir, &tenant, timeout).await
+            }
             SyncAction::Crdt { action } => match action {
                 CrdtAction::Status { tenant } => cmd_crdt_status(&data_dir, &tenant).await,
                 CrdtAction::Create { doc_id, tenant } => {
@@ -651,6 +684,242 @@ async fn cmd_sync_publish(
     }
 
     println!("Published {published}/{} laws.", law_names.len());
+    Ok(())
+}
+
+async fn cmd_sync_pull_lat(
+    data_dir: &std::path::Path,
+    tenant: &str,
+    law_names: &[String],
+    timeout_secs: u64,
+) -> anyhow::Result<()> {
+    let lance = LanceStore::open(&data_dir.join("lancedb"))
+        .await
+        .context("opening LanceDB")?;
+
+    let sync = fractalaw_sync::ZenohSync::new(tenant)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+
+    let timeout = std::time::Duration::from_secs(timeout_secs);
+
+    println!(
+        "Pulling LAT for {} laws from sertantai (tenant: {tenant}, timeout: {timeout_secs}s)...",
+        law_names.len()
+    );
+
+    let mut total_pulled = 0usize;
+    let mut total_rows = 0usize;
+
+    for law_name in law_names {
+        eprint!("  {law_name}: ");
+
+        let batches = sync
+            .query_lat(law_name, timeout)
+            .await
+            .map_err(|e| anyhow::anyhow!("query failed for {law_name}: {e}"))?;
+
+        if batches.is_empty() {
+            eprintln!("no data (sertantai did not respond)");
+            continue;
+        }
+
+        let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+        lance
+            .upsert_lat(batches)
+            .await
+            .map_err(|e| anyhow::anyhow!("upsert failed for {law_name}: {e}"))?;
+
+        eprintln!("{rows} provisions");
+        total_pulled += 1;
+        total_rows += rows;
+    }
+
+    println!(
+        "\nPulled {total_pulled}/{} laws, {total_rows} total provisions.",
+        law_names.len()
+    );
+
+    Ok(())
+}
+
+async fn cmd_sync_watch(
+    data_dir: &std::path::Path,
+    tenant: &str,
+    timeout_secs: u64,
+) -> anyhow::Result<()> {
+    let lance = LanceStore::open(&data_dir.join("lancedb"))
+        .await
+        .context("opening LanceDB")?;
+    let duck = open_duck(data_dir)?;
+
+    let sync = fractalaw_sync::ZenohSync::new(tenant)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+
+    let subscriber = sync
+        .subscribe_events()
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to subscribe to events: {e}"))?;
+
+    let timeout = std::time::Duration::from_secs(timeout_secs);
+
+    println!("Watching for sync events (tenant: {tenant}, timeout: {timeout_secs}s per pull)...");
+    println!("Pipeline: ensure LRT → pull LAT → enrich → publish taxa");
+    println!("Press Ctrl+C to stop.\n");
+
+    let mut total_events = 0usize;
+    let mut total_lrt_pulls = 0usize;
+    let mut total_lat_pulls = 0usize;
+    let mut total_rows = 0usize;
+    let mut total_enriched = 0usize;
+    let mut total_published = 0usize;
+
+    loop {
+        tokio::select! {
+            sample = subscriber.recv_async() => {
+                let sample = match sample {
+                    Ok(s) => s,
+                    Err(_) => break,
+                };
+
+                let bytes = sample.payload().to_bytes();
+                let event = match fractalaw_sync::SyncEvent::from_payload(&bytes) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        eprintln!("  [warn] failed to parse event: {e}");
+                        continue;
+                    }
+                };
+
+                total_events += 1;
+                let law_name = &event.metadata.law_name;
+
+                // Skip events we don't act on (e.g. amendments).
+                if event.table != "lat" && event.table != "lrt" {
+                    eprintln!(
+                        "  [skip] {}.{} for {}",
+                        event.table, event.action, law_name
+                    );
+                    continue;
+                }
+
+                eprint!("  {law_name}:");
+
+                // Step 1: Ensure LRT exists in DuckDB.
+                let lrt_exists = duck
+                    .query_arrow(&format!(
+                        "SELECT 1 FROM legislation WHERE name = '{}'",
+                        law_name.replace('\'', "''")
+                    ))
+                    .map(|b| b.iter().any(|b| b.num_rows() > 0))
+                    .unwrap_or(false);
+
+                if !lrt_exists {
+                    eprint!(" pull LRT");
+                    match sync.query_lrt(law_name, timeout).await {
+                        Ok(batches) if batches.is_empty() => {
+                            eprintln!(" → no LRT data");
+                        }
+                        Ok(batches) => match duck.upsert_legislation(&batches) {
+                            Ok(n) => {
+                                eprint!(" → {n} row(s)");
+                                total_lrt_pulls += 1;
+                            }
+                            Err(e) => {
+                                eprintln!(" → LRT upsert error: {e}");
+                            }
+                        },
+                        Err(e) => {
+                            eprintln!(" → LRT query error: {e}");
+                        }
+                    }
+                }
+
+                // Step 2: Pull LAT from sertantai → LanceDB.
+                eprint!(" → pull LAT");
+                match sync.query_lat(law_name, timeout).await {
+                    Ok(batches) if batches.is_empty() => {
+                        eprintln!(" → no LAT data");
+                        continue;
+                    }
+                    Ok(batches) => {
+                        let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+                        match lance.upsert_lat(batches).await {
+                            Ok(_) => {
+                                eprint!(" → {rows} provisions");
+                                total_lat_pulls += 1;
+                                total_rows += rows;
+                            }
+                            Err(e) => {
+                                eprintln!(" → LAT upsert error: {e}");
+                                continue;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!(" → LAT query error: {e}");
+                        continue;
+                    }
+                }
+
+                // Step 3: Taxa enrichment (DRRP parse).
+                eprint!(" → enrich");
+                match enrich_single_law(&lance, &duck, law_name).await {
+                    Ok(had_taxa) => {
+                        if had_taxa {
+                            eprint!(" → ok");
+                            total_enriched += 1;
+                        } else {
+                            eprint!(" → no taxa signal");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!(" → enrich error: {e}");
+                        continue;
+                    }
+                }
+
+                // Step 4: Publish taxa from DuckDB (LRT) back to sertantai.
+                // LanceDB is read-only for publishing — only DuckDB data goes out.
+                eprint!(" → publish");
+                let sql = format!(
+                    "SELECT name, duty_holder, rights_holder, responsibility_holder, power_holder, \
+                            duty_type, role, role_gvt, \
+                            duties, rights, responsibilities, powers \
+                     FROM legislation WHERE name = '{}'",
+                    law_name.replace('\'', "''")
+                );
+                match duck.query_arrow(&sql) {
+                    Ok(batches)
+                        if !batches.is_empty()
+                            && batches.iter().any(|b| b.num_rows() > 0) =>
+                    {
+                        match sync.publish_taxa(law_name, &batches).await {
+                            Ok(_) => {
+                                eprintln!(" → done");
+                                total_published += 1;
+                            }
+                            Err(e) => eprintln!(" → publish error: {e}"),
+                        }
+                    }
+                    Ok(_) => eprintln!(" → no taxa in DuckDB"),
+                    Err(e) => eprintln!(" → DuckDB taxa query error: {e}"),
+                }
+            }
+            _ = tokio::signal::ctrl_c() => {
+                println!("\nShutting down...");
+                break;
+            }
+        }
+    }
+
+    println!(
+        "Done. {total_events} events, {total_lrt_pulls} LRT pulls, \
+         {total_lat_pulls} LAT pulls ({total_rows} provisions), \
+         {total_enriched} enriched, {total_published} published."
+    );
+
     Ok(())
 }
 
@@ -1419,14 +1688,337 @@ async fn cmd_taxa_eyeball(
     Ok(())
 }
 
+/// Enrich a single law: run DRRP parser on its provisions from LanceDB, write
+/// per-provision taxa back to LanceDB, and update law-level taxa in DuckDB.
+/// Returns true if the law had any taxa signal.
+async fn enrich_single_law(
+    lance: &LanceStore,
+    store: &DuckStore,
+    law_name: &str,
+) -> anyhow::Result<bool> {
+    use std::collections::BTreeSet;
+
+    let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
+    let batches = lance.query_legislation_text(&filter, 500, 0).await?;
+
+    struct LawTaxa {
+        duty_holders: BTreeSet<String>,
+        rights_holders: BTreeSet<String>,
+        responsibility_holders: BTreeSet<String>,
+        power_holders: BTreeSet<String>,
+        duty_types: BTreeSet<String>,
+        roles: BTreeSet<String>,
+        roles_gvt: BTreeSet<String>,
+        duties: Vec<(String, String, String, String)>,
+        rights: Vec<(String, String, String, String)>,
+        responsibilities: Vec<(String, String, String, String)>,
+        powers: Vec<(String, String, String, String)>,
+    }
+
+    let mut taxa = LawTaxa {
+        duty_holders: BTreeSet::new(),
+        rights_holders: BTreeSet::new(),
+        responsibility_holders: BTreeSet::new(),
+        power_holders: BTreeSet::new(),
+        duty_types: BTreeSet::new(),
+        roles: BTreeSet::new(),
+        roles_gvt: BTreeSet::new(),
+        duties: Vec::new(),
+        rights: Vec::new(),
+        responsibilities: Vec::new(),
+        powers: Vec::new(),
+    };
+
+    struct ProvisionTaxa {
+        section_id: String,
+        drrp_types: Vec<String>,
+        governed_actors: Vec<String>,
+        government_actors: Vec<String>,
+        duty_family: Option<String>,
+        duty_sub_type: Option<String>,
+        popimar: Vec<String>,
+        purposes: Vec<String>,
+        clause_refined: String,
+        taxa_confidence: Option<f32>,
+    }
+    let mut provision_taxa: Vec<ProvisionTaxa> = Vec::new();
+
+    for batch in &batches {
+        let prov_col = batch.column_by_name("provision");
+        let text_col = batch.column_by_name("text");
+        let sid_col = batch.column_by_name("section_id");
+
+        for row in 0..batch.num_rows() {
+            let provision = prov_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+            let text = text_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+            let section_id = sid_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+            if text.trim().is_empty() {
+                continue;
+            }
+
+            let record = fractalaw_core::taxa::parse_v2(&text);
+            if record.duty_types.is_empty()
+                && record.governed_actors.is_empty()
+                && record.government_actors.is_empty()
+                && record.purposes.is_empty()
+            {
+                continue;
+            }
+
+            // Collect per-provision taxa for LanceDB.
+            if !section_id.is_empty() {
+                let (duty_family, duty_sub_type) = if let Some(ref cls) = record.classification {
+                    (
+                        Some(format!("{:?}", cls.family)),
+                        Some(format!("{:?}", cls.sub_type)),
+                    )
+                } else {
+                    (None, None)
+                };
+                let taxa_confidence = if record.taxa_confidence > 0.0 {
+                    Some(record.taxa_confidence)
+                } else {
+                    None
+                };
+                provision_taxa.push(ProvisionTaxa {
+                    section_id,
+                    drrp_types: record
+                        .duty_types
+                        .iter()
+                        .map(|d| format!("{:?}", d))
+                        .collect(),
+                    governed_actors: record.governed_actors.clone(),
+                    government_actors: record.government_actors.clone(),
+                    duty_family,
+                    duty_sub_type,
+                    popimar: record.popimar.iter().map(|s| s.to_string()).collect(),
+                    purposes: record.purposes.iter().map(|s| s.to_string()).collect(),
+                    clause_refined: record
+                        .clause_refined
+                        .clone()
+                        .unwrap_or_else(|| record.cleaned_text.clone()),
+                    taxa_confidence,
+                });
+            }
+
+            // Aggregate actors into holder sets and role sets.
+            for actor in &record.governed_actors {
+                taxa.roles.insert(actor.clone());
+            }
+            for actor in &record.government_actors {
+                taxa.roles_gvt.insert(actor.clone());
+            }
+
+            // Map duty types to holder columns and DRRPEntry lists.
+            let clause_preview = if record.cleaned_text.len() > 200 {
+                let end = truncate_at_char_boundary(&record.cleaned_text, 200);
+                format!("{}...", &record.cleaned_text[..end])
+            } else {
+                record.cleaned_text.clone()
+            };
+            let article = format!("section/{provision}");
+
+            for dt in &record.duty_types {
+                taxa.duty_types.insert(format!("{dt:?}"));
+                let (holders_set, entries) = match dt {
+                    fractalaw_core::taxa::duty_type::DutyType::Duty => {
+                        (&mut taxa.duty_holders, &mut taxa.duties)
+                    }
+                    fractalaw_core::taxa::duty_type::DutyType::Right => {
+                        (&mut taxa.rights_holders, &mut taxa.rights)
+                    }
+                    fractalaw_core::taxa::duty_type::DutyType::Responsibility => {
+                        (&mut taxa.responsibility_holders, &mut taxa.responsibilities)
+                    }
+                    fractalaw_core::taxa::duty_type::DutyType::Power => {
+                        (&mut taxa.power_holders, &mut taxa.powers)
+                    }
+                };
+                for actor in &record.governed_actors {
+                    holders_set.insert(actor.clone());
+                }
+                for actor in &record.government_actors {
+                    holders_set.insert(actor.clone());
+                }
+                let holder = record
+                    .governed_actors
+                    .first()
+                    .or(record.government_actors.first())
+                    .cloned()
+                    .unwrap_or_else(|| "Unknown".to_string());
+                entries.push((
+                    holder,
+                    format!("{dt:?}").to_uppercase(),
+                    clause_preview.clone(),
+                    article.clone(),
+                ));
+            }
+        }
+    }
+
+    // Write per-provision taxa to LanceDB.
+    if !provision_taxa.is_empty() {
+        use arrow::array::{
+            Float32Builder, ListBuilder, StringBuilder, TimestampNanosecondBuilder,
+        };
+        use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+
+        let mut section_ids = StringBuilder::new();
+        let mut drrp_types_b = ListBuilder::new(StringBuilder::new());
+        let mut governed_b = ListBuilder::new(StringBuilder::new());
+        let mut government_b = ListBuilder::new(StringBuilder::new());
+        let mut duty_family_b = StringBuilder::new();
+        let mut duty_sub_type_b = StringBuilder::new();
+        let mut popimar_b = ListBuilder::new(StringBuilder::new());
+        let mut purposes_b = ListBuilder::new(StringBuilder::new());
+        let mut clause_refined_b = StringBuilder::new();
+        let mut confidence_b = Float32Builder::new();
+        let mut classified_at_b = TimestampNanosecondBuilder::new().with_timezone("UTC");
+
+        let now_ns = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
+
+        for pt in &provision_taxa {
+            section_ids.append_value(&pt.section_id);
+
+            for v in &pt.drrp_types {
+                drrp_types_b.values().append_value(v);
+            }
+            drrp_types_b.append(true);
+
+            for v in &pt.governed_actors {
+                governed_b.values().append_value(v);
+            }
+            governed_b.append(true);
+
+            for v in &pt.government_actors {
+                government_b.values().append_value(v);
+            }
+            government_b.append(true);
+
+            match &pt.duty_family {
+                Some(v) => duty_family_b.append_value(v),
+                None => duty_family_b.append_null(),
+            }
+            match &pt.duty_sub_type {
+                Some(v) => duty_sub_type_b.append_value(v),
+                None => duty_sub_type_b.append_null(),
+            }
+
+            for v in &pt.popimar {
+                popimar_b.values().append_value(v);
+            }
+            popimar_b.append(true);
+
+            for v in &pt.purposes {
+                purposes_b.values().append_value(v);
+            }
+            purposes_b.append(true);
+
+            clause_refined_b.append_value(&pt.clause_refined);
+            match pt.taxa_confidence {
+                Some(c) => confidence_b.append_value(c),
+                None => confidence_b.append_null(),
+            }
+            classified_at_b.append_value(now_ns);
+        }
+
+        let item_field = std::sync::Arc::new(Field::new("item", DataType::Utf8, true));
+        let taxa_schema = std::sync::Arc::new(Schema::new(vec![
+            Field::new("section_id", DataType::Utf8, false),
+            Field::new("drrp_types", DataType::List(item_field.clone()), true),
+            Field::new("governed_actors", DataType::List(item_field.clone()), true),
+            Field::new(
+                "government_actors",
+                DataType::List(item_field.clone()),
+                true,
+            ),
+            Field::new("duty_family", DataType::Utf8, true),
+            Field::new("duty_sub_type", DataType::Utf8, true),
+            Field::new("popimar", DataType::List(item_field.clone()), true),
+            Field::new("purposes", DataType::List(item_field), true),
+            Field::new("clause_refined", DataType::Utf8, true),
+            Field::new("taxa_confidence", DataType::Float32, true),
+            Field::new(
+                "taxa_classified_at",
+                DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())),
+                true,
+            ),
+        ]));
+
+        let taxa_batch = RecordBatch::try_new(
+            taxa_schema,
+            vec![
+                std::sync::Arc::new(section_ids.finish()),
+                std::sync::Arc::new(drrp_types_b.finish()),
+                std::sync::Arc::new(governed_b.finish()),
+                std::sync::Arc::new(government_b.finish()),
+                std::sync::Arc::new(duty_family_b.finish()),
+                std::sync::Arc::new(duty_sub_type_b.finish()),
+                std::sync::Arc::new(popimar_b.finish()),
+                std::sync::Arc::new(purposes_b.finish()),
+                std::sync::Arc::new(clause_refined_b.finish()),
+                std::sync::Arc::new(confidence_b.finish()),
+                std::sync::Arc::new(classified_at_b.finish()),
+            ],
+        )
+        .context("building taxa RecordBatch")?;
+
+        lance
+            .update_taxa(taxa_batch)
+            .await
+            .with_context(|| format!("writing taxa to LanceDB for {law_name}"))?;
+    }
+
+    // No taxa signal — nothing to write to DuckDB.
+    if taxa.duty_types.is_empty() && taxa.roles.is_empty() && taxa.roles_gvt.is_empty() {
+        return Ok(false);
+    }
+
+    // Update DuckDB law-level taxa columns (flat + struct lists).
+    let sql = format!(
+        "UPDATE legislation SET
+            duty_holder = {duty_holder},
+            rights_holder = {rights_holder},
+            responsibility_holder = {resp_holder},
+            power_holder = {power_holder},
+            duty_type = {duty_type},
+            role = {role},
+            role_gvt = {role_gvt},
+            duties = {duties},
+            rights = {rights},
+            responsibilities = {responsibilities},
+            powers = {powers}
+         WHERE name = '{name}'",
+        duty_holder = format_sql_list(taxa.duty_holders.iter().map(|s| s.as_str())),
+        rights_holder = format_sql_list(taxa.rights_holders.iter().map(|s| s.as_str())),
+        resp_holder = format_sql_list(taxa.responsibility_holders.iter().map(|s| s.as_str())),
+        power_holder = format_sql_list(taxa.power_holders.iter().map(|s| s.as_str())),
+        duty_type = format_sql_list(taxa.duty_types.iter().map(|s| s.as_str())),
+        role = format_sql_list(taxa.roles.iter().map(|s| s.as_str())),
+        role_gvt = format_sql_list(taxa.roles_gvt.iter().map(|s| s.as_str())),
+        duties = format_sql_drrp_entries(&taxa.duties),
+        rights = format_sql_drrp_entries(&taxa.rights),
+        responsibilities = format_sql_drrp_entries(&taxa.responsibilities),
+        powers = format_sql_drrp_entries(&taxa.powers),
+        name = law_name.replace('\'', "''"),
+    );
+    store.execute(&sql)?;
+
+    Ok(true)
+}
+
 async fn cmd_taxa_enrich(
     data_dir: &std::path::Path,
     store: &DuckStore,
     law_filter: Option<Vec<String>>,
     force: bool,
 ) -> anyhow::Result<()> {
-    use std::collections::BTreeSet;
-
     let lance = LanceStore::open(&data_dir.join("lancedb"))
         .await
         .context("opening LanceDB")?;
@@ -1507,330 +2099,11 @@ async fn cmd_taxa_enrich(
         names
     };
 
-    // Per-law aggregation containers.
-    struct LawTaxa {
-        duty_holders: BTreeSet<String>,
-        rights_holders: BTreeSet<String>,
-        responsibility_holders: BTreeSet<String>,
-        power_holders: BTreeSet<String>,
-        duty_types: BTreeSet<String>,
-        roles: BTreeSet<String>,
-        roles_gvt: BTreeSet<String>,
-        duties: Vec<(String, String, String, String)>, // (holder, duty_type, clause, article)
-        rights: Vec<(String, String, String, String)>,
-        responsibilities: Vec<(String, String, String, String)>,
-        powers: Vec<(String, String, String, String)>,
-    }
-
     let mut enriched = 0usize;
     let total = law_names.len();
 
     for law_name in &law_names {
-        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
-        let batches = lance.query_legislation_text(&filter, 500, 0).await?;
-
-        let mut taxa = LawTaxa {
-            duty_holders: BTreeSet::new(),
-            rights_holders: BTreeSet::new(),
-            responsibility_holders: BTreeSet::new(),
-            power_holders: BTreeSet::new(),
-            duty_types: BTreeSet::new(),
-            roles: BTreeSet::new(),
-            roles_gvt: BTreeSet::new(),
-            duties: Vec::new(),
-            rights: Vec::new(),
-            responsibilities: Vec::new(),
-            powers: Vec::new(),
-        };
-
-        // Per-provision taxa results for LanceDB write.
-        struct ProvisionTaxa {
-            section_id: String,
-            drrp_types: Vec<String>,
-            governed_actors: Vec<String>,
-            government_actors: Vec<String>,
-            duty_family: Option<String>,
-            duty_sub_type: Option<String>,
-            popimar: Vec<String>,
-            purposes: Vec<String>,
-            clause_refined: String,
-            taxa_confidence: Option<f32>,
-        }
-        let mut provision_taxa: Vec<ProvisionTaxa> = Vec::new();
-
-        for batch in &batches {
-            let prov_col = batch.column_by_name("provision");
-            let text_col = batch.column_by_name("text");
-            let sid_col = batch.column_by_name("section_id");
-
-            for row in 0..batch.num_rows() {
-                let provision = prov_col
-                    .and_then(|c| get_string_value(c.as_ref(), row))
-                    .unwrap_or_default();
-                let text = text_col
-                    .and_then(|c| get_string_value(c.as_ref(), row))
-                    .unwrap_or_default();
-                let section_id = sid_col
-                    .and_then(|c| get_string_value(c.as_ref(), row))
-                    .unwrap_or_default();
-                if text.trim().is_empty() {
-                    continue;
-                }
-
-                let record = fractalaw_core::taxa::parse_v2(&text);
-                // Skip provisions with no taxa signal at all (no DRRP, no actors, no purposes).
-                // We DO want to write provisions with purposes even if they have no DRRP content
-                // (e.g., Interpretation sections) so the purpose gate can work.
-                if record.duty_types.is_empty()
-                    && record.governed_actors.is_empty()
-                    && record.government_actors.is_empty()
-                    && record.purposes.is_empty()
-                {
-                    continue;
-                }
-
-                // Collect per-provision taxa for LanceDB.
-                if !section_id.is_empty() {
-                    let (duty_family, duty_sub_type) = if let Some(ref cls) = record.classification
-                    {
-                        (
-                            Some(format!("{:?}", cls.family)),
-                            Some(format!("{:?}", cls.sub_type)),
-                        )
-                    } else {
-                        (None, None)
-                    };
-                    let taxa_confidence = if record.taxa_confidence > 0.0 {
-                        Some(record.taxa_confidence)
-                    } else {
-                        None
-                    };
-                    provision_taxa.push(ProvisionTaxa {
-                        section_id,
-                        drrp_types: record
-                            .duty_types
-                            .iter()
-                            .map(|d| format!("{:?}", d))
-                            .collect(),
-                        governed_actors: record.governed_actors.clone(),
-                        government_actors: record.government_actors.clone(),
-                        duty_family,
-                        duty_sub_type,
-                        popimar: record.popimar.iter().map(|s| s.to_string()).collect(),
-                        purposes: record.purposes.iter().map(|s| s.to_string()).collect(),
-                        clause_refined: record
-                            .clause_refined
-                            .clone()
-                            .unwrap_or_else(|| record.cleaned_text.clone()),
-                        taxa_confidence,
-                    });
-                }
-
-                // Aggregate actors into holder sets and role sets.
-                for actor in &record.governed_actors {
-                    taxa.roles.insert(actor.clone());
-                }
-                for actor in &record.government_actors {
-                    taxa.roles_gvt.insert(actor.clone());
-                }
-
-                // Map duty types to holder columns and DRRPEntry lists.
-                let clause_preview = if record.cleaned_text.len() > 200 {
-                    let end = truncate_at_char_boundary(&record.cleaned_text, 200);
-                    format!("{}...", &record.cleaned_text[..end])
-                } else {
-                    record.cleaned_text.clone()
-                };
-                let article = format!("section/{provision}");
-
-                for dt in &record.duty_types {
-                    taxa.duty_types.insert(format!("{dt:?}"));
-                    let holders_set;
-                    let entries;
-                    match dt {
-                        fractalaw_core::taxa::duty_type::DutyType::Duty => {
-                            holders_set = &mut taxa.duty_holders;
-                            entries = &mut taxa.duties;
-                        }
-                        fractalaw_core::taxa::duty_type::DutyType::Right => {
-                            holders_set = &mut taxa.rights_holders;
-                            entries = &mut taxa.rights;
-                        }
-                        fractalaw_core::taxa::duty_type::DutyType::Responsibility => {
-                            holders_set = &mut taxa.responsibility_holders;
-                            entries = &mut taxa.responsibilities;
-                        }
-                        fractalaw_core::taxa::duty_type::DutyType::Power => {
-                            holders_set = &mut taxa.power_holders;
-                            entries = &mut taxa.powers;
-                        }
-                    }
-                    // Add governed actors as holders for this duty type.
-                    for actor in &record.governed_actors {
-                        holders_set.insert(actor.clone());
-                    }
-                    for actor in &record.government_actors {
-                        holders_set.insert(actor.clone());
-                    }
-                    // Build a DRRPEntry-style tuple.
-                    let holder = record
-                        .governed_actors
-                        .first()
-                        .or(record.government_actors.first())
-                        .cloned()
-                        .unwrap_or_else(|| "Unknown".to_string());
-                    entries.push((
-                        holder,
-                        format!("{dt:?}").to_uppercase(),
-                        clause_preview.clone(),
-                        article.clone(),
-                    ));
-                }
-            }
-        }
-
-        // Write per-provision taxa to LanceDB.
-        if !provision_taxa.is_empty() {
-            use arrow::array::{
-                Float32Builder, ListBuilder, StringBuilder, TimestampNanosecondBuilder,
-            };
-            use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
-
-            let mut section_ids = StringBuilder::new();
-            let mut drrp_types_b = ListBuilder::new(StringBuilder::new());
-            let mut governed_b = ListBuilder::new(StringBuilder::new());
-            let mut government_b = ListBuilder::new(StringBuilder::new());
-            let mut duty_family_b = StringBuilder::new();
-            let mut duty_sub_type_b = StringBuilder::new();
-            let mut popimar_b = ListBuilder::new(StringBuilder::new());
-            let mut purposes_b = ListBuilder::new(StringBuilder::new());
-            let mut clause_refined_b = StringBuilder::new();
-            let mut confidence_b = Float32Builder::new();
-            let mut classified_at_b = TimestampNanosecondBuilder::new().with_timezone("UTC");
-
-            let now_ns = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
-
-            for pt in &provision_taxa {
-                section_ids.append_value(&pt.section_id);
-
-                for v in &pt.drrp_types {
-                    drrp_types_b.values().append_value(v);
-                }
-                drrp_types_b.append(true);
-
-                for v in &pt.governed_actors {
-                    governed_b.values().append_value(v);
-                }
-                governed_b.append(true);
-
-                for v in &pt.government_actors {
-                    government_b.values().append_value(v);
-                }
-                government_b.append(true);
-
-                match &pt.duty_family {
-                    Some(v) => duty_family_b.append_value(v),
-                    None => duty_family_b.append_null(),
-                }
-                match &pt.duty_sub_type {
-                    Some(v) => duty_sub_type_b.append_value(v),
-                    None => duty_sub_type_b.append_null(),
-                }
-
-                for v in &pt.popimar {
-                    popimar_b.values().append_value(v);
-                }
-                popimar_b.append(true);
-
-                for v in &pt.purposes {
-                    purposes_b.values().append_value(v);
-                }
-                purposes_b.append(true);
-
-                clause_refined_b.append_value(&pt.clause_refined);
-                match pt.taxa_confidence {
-                    Some(c) => confidence_b.append_value(c),
-                    None => confidence_b.append_null(),
-                }
-                classified_at_b.append_value(now_ns);
-            }
-
-            let item_field = std::sync::Arc::new(Field::new("item", DataType::Utf8, true));
-            let taxa_schema = std::sync::Arc::new(Schema::new(vec![
-                Field::new("section_id", DataType::Utf8, false),
-                Field::new("drrp_types", DataType::List(item_field.clone()), true),
-                Field::new("governed_actors", DataType::List(item_field.clone()), true),
-                Field::new(
-                    "government_actors",
-                    DataType::List(item_field.clone()),
-                    true,
-                ),
-                Field::new("duty_family", DataType::Utf8, true),
-                Field::new("duty_sub_type", DataType::Utf8, true),
-                Field::new("popimar", DataType::List(item_field.clone()), true),
-                Field::new("purposes", DataType::List(item_field), true),
-                Field::new("clause_refined", DataType::Utf8, true),
-                Field::new("taxa_confidence", DataType::Float32, true),
-                Field::new(
-                    "taxa_classified_at",
-                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())),
-                    true,
-                ),
-            ]));
-
-            let taxa_batch = RecordBatch::try_new(
-                taxa_schema,
-                vec![
-                    std::sync::Arc::new(section_ids.finish()),
-                    std::sync::Arc::new(drrp_types_b.finish()),
-                    std::sync::Arc::new(governed_b.finish()),
-                    std::sync::Arc::new(government_b.finish()),
-                    std::sync::Arc::new(duty_family_b.finish()),
-                    std::sync::Arc::new(duty_sub_type_b.finish()),
-                    std::sync::Arc::new(popimar_b.finish()),
-                    std::sync::Arc::new(purposes_b.finish()),
-                    std::sync::Arc::new(clause_refined_b.finish()),
-                    std::sync::Arc::new(confidence_b.finish()),
-                    std::sync::Arc::new(classified_at_b.finish()),
-                ],
-            )
-            .context("building taxa RecordBatch")?;
-
-            lance
-                .update_taxa(taxa_batch)
-                .await
-                .with_context(|| format!("writing taxa to LanceDB for {law_name}"))?;
-        }
-
-        // Skip laws where taxa found nothing.
-        if taxa.duty_types.is_empty() && taxa.roles.is_empty() && taxa.roles_gvt.is_empty() {
-            enriched += 1;
-            continue;
-        }
-
-        // Build SQL UPDATE for this law's LRT DRRP columns.
-        let esc = |s: &str| s.replace('\'', "''");
-
-        let sql = format!(
-            "UPDATE legislation SET
-                duty_holder = {duty_holder},
-                rights_holder = {rights_holder},
-                responsibility_holder = {resp_holder},
-                power_holder = {power_holder},
-                duty_type = {duty_type},
-                role = {role},
-                role_gvt = {role_gvt}
-             WHERE name = '{name}'",
-            duty_holder = format_sql_list(taxa.duty_holders.iter().map(|s| s.as_str())),
-            rights_holder = format_sql_list(taxa.rights_holders.iter().map(|s| s.as_str())),
-            resp_holder = format_sql_list(taxa.responsibility_holders.iter().map(|s| s.as_str())),
-            power_holder = format_sql_list(taxa.power_holders.iter().map(|s| s.as_str())),
-            duty_type = format_sql_list(taxa.duty_types.iter().map(|s| s.as_str())),
-            role = format_sql_list(taxa.roles.iter().map(|s| s.as_str())),
-            role_gvt = format_sql_list(taxa.roles_gvt.iter().map(|s| s.as_str())),
-            name = esc(law_name),
-        );
-        store.execute(&sql)?;
+        enrich_single_law(&lance, store, law_name).await?;
 
         enriched += 1;
         if enriched.is_multiple_of(100) {
@@ -2815,6 +3088,28 @@ fn format_sql_list<'a>(values: impl Iterator<Item = &'a str>) -> String {
     } else {
         format!("[{}]", items.join(", "))
     }
+}
+
+/// Format a list of (holder, duty_type, clause, article) tuples as a DuckDB
+/// `List<Struct>` literal, e.g. `[{'holder':'a','duty_type':'DUTY','clause':'...','article':'s/1'}]`.
+fn format_sql_drrp_entries(entries: &[(String, String, String, String)]) -> String {
+    if entries.is_empty() {
+        return "NULL".to_string();
+    }
+    let esc = |s: &str| s.replace('\'', "''");
+    let items: Vec<String> = entries
+        .iter()
+        .map(|(holder, dt, clause, article)| {
+            format!(
+                "{{'holder':'{}','duty_type':'{}','clause':'{}','article':'{}'}}",
+                esc(holder),
+                esc(dt),
+                esc(clause),
+                esc(article)
+            )
+        })
+        .collect();
+    format!("[{}]", items.join(", "))
 }
 
 /// Project RecordBatches to only include the specified columns.
