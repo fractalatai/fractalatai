@@ -521,5 +521,9 @@ Clauses with any qualifier: **477 (15.9%)**
 | `fractalaw-core/src/taxa/clause_structure.rs` | **New** — Modal, Qualifier, ClauseStructure, decompose(), 12 tests |
 | `fractalaw-core/src/taxa/mod.rs` | Added `clause_structure` module, `clause_structure` field on TaxaRecord, wired into `parse_v2()` |
 
-### Remaining decisions
-- (none — ready to implement)
+---
+
+## Session Closed
+
+**Commit**: `4a007e3` — pushed to `origin/master`
+**Status**: Complete. All four next steps delivered. 97.9% corpus coverage, 12 tests passing, pre-commit and pre-push hooks green.

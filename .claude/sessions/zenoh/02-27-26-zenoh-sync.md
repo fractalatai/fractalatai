@@ -108,13 +108,14 @@ http = ["dep:reqwest", "dep:serde", "dep:serde_json", "dep:chrono"]
 
 | File | Role |
 |------|------|
-| `crates/fractalaw-sync/Cargo.toml` | Zenoh + zenoh feature gate |
-| `crates/fractalaw-sync/src/lib.rs` | Module registration (zenoh_sync) |
-| `crates/fractalaw-sync/src/zenoh_sync.rs` | ZenohSync struct, Arrow IPC helpers, key expressions |
-| `crates/fractalaw-cli/Cargo.toml` | Enabled zenoh feature |
-| `crates/fractalaw-cli/src/main.rs` | `sync publish` + `sync crdt` subcommands |
+| `crates/fractalaw-sync/src/zenoh_sync.rs` | ZenohSync struct, Arrow IPC helpers, key expressions, query_lrt/query_lat |
 | `crates/fractalaw-sync/src/crdt_sync.rs` | CrdtSync engine, Loro docs over Zenoh |
-| `.claude/plans/zenoh.md` | Full implementation plan |
+| `crates/fractalaw-sync/src/hive.rs` | HiveSync lifecycle (compose ZenohSync + CrdtSync) |
+| `crates/fractalaw-store/src/duck.rs` | DuckStore — includes `upsert_legislation()` |
+| `crates/fractalaw-cli/src/main.rs` | `sync watch`, `sync pull-lat`, `sync publish`, `sync crdt` |
+| `crates/fractalaw-core/src/schema.rs` | Canonical Arrow schema — `drrp_entry_struct()` defines published struct shape |
+| `docs/ZENOH-SYNC.md` | User-facing doc: data flow, published schema, CLI reference |
+| `.claude/plans/zenoh.md` | Full implementation plan (Phases A–F) |
 
 ## Progress
 
@@ -149,10 +150,36 @@ http = ["dep:reqwest", "dep:serde", "dep:serde_json", "dep:chrono"]
   - `with_configs()` constructor for test isolation with custom zenoh configs
   - Bug fix: `shutdown()` must not reset state to `Idle` — races with `run_continuous` listener task which checks for `ShuttingDown` via `watch::Receiver::borrow_and_update()` (sees latest value, not intermediate)
   - Learned: zenoh tests need `--test-threads=1` to avoid multicast scouting contention between parallel sessions
-- [x] Phase D (partial): First LAN publish to sertantai
+- [x] Phase D: Sertantai integration — reactive round-trip pipeline
   - Published 2,606 laws (all families with taxa data) to sertantai over zenoh LAN
   - Sertantai received and processed all records successfully
   - Bug found: `sync publish` with no `--family`/`--laws` silently publishes everything
   - Fix: added `--all` flag — must use `--family`, `--laws`, or `--all` explicitly
   - Design handoff doc created: `data/sertantai-zenoh-subscriber.md` (gitignored)
-  - Committed + pushed: `4ab31b7`
+  - **`sync watch`** — event-driven reactive pipeline (replaces `watch-lat`):
+    1. Subscribe to `events/sync` for change notifications from sertantai
+    2. Ensure LRT in DuckDB — if law missing, `query_lrt` from sertantai + `upsert_legislation`
+    3. Pull LAT from sertantai → upsert into LanceDB
+    4. Run DRRP taxa enrichment → write all 11 columns to DuckDB (7 flat + 4 List<Struct>)
+    5. Publish DuckDB taxa back to sertantai as Arrow IPC
+  - **`sync pull-lat`** — one-shot LAT pull without the watcher
+  - New infra: `ZenohSync::query_lrt()`, `DuckStore::upsert_legislation()`
+  - Extracted `enrich_single_law()` for reuse between `taxa enrich` and `sync watch`
+  - Critical lesson: **LanceDB never publishes** — only DuckDB (LRT) data goes out over zenoh
+  - Full round-trip validated: sertantai event → fractalaw pull+enrich → sertantai receives taxa
+  - Published schema documented in `docs/ZENOH-SYNC.md`
+  - 36 tests pass in fractalaw-sync
+  - Committed + pushed: `d7696da`
+
+## Session closed
+
+All goals met. The DRRP taxa enrichment micro-service is live:
+- Manual publish: `sync publish --family/--laws/--all`
+- Reactive pipeline: `sync watch` (long-running, event-driven)
+- Documentation: `docs/ZENOH-SYNC.md` (data flow, published schema, CLI reference)
+
+### Remaining for future sessions
+- Phase E: Multi-tenancy & mTLS
+- Phase F: Edge Bees
+- `*_ai` columns (duties_ai, rights_ai, etc.) — pending AI polisher integration
+- Automatic re-publish on parser improvements (post-run hooks)
