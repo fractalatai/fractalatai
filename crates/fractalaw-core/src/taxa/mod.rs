@@ -28,6 +28,7 @@
 
 pub mod actors;
 pub mod clause_refiner;
+pub mod clause_structure;
 pub mod confidence;
 pub mod duty_patterns;
 pub mod duty_patterns_v2;
@@ -69,6 +70,10 @@ pub struct TaxaRecord {
     /// Confidence score for the extracted clause (0.0..=1.0).
     /// Based on heuristics: span capture, clean ending, length, modal strength.
     pub taxa_confidence: f32,
+
+    /// Decomposed clause structure (applicability, modal, qualifiers, action).
+    /// Populated when `clause_refined` is present and contains a modal verb.
+    pub clause_structure: Option<clause_structure::ClauseStructure>,
 }
 
 /// Run the full Taxa classification pipeline on raw legislative text.
@@ -113,8 +118,14 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
     // Extract focused clause from match span or fall back to modal-window refiner
     let clause_refined = extract_clause(&cleaned, cr.classification.as_ref());
 
+    // Decompose clause into structured components
+    let span = cr.classification.as_ref().and_then(|c| c.span);
+    let clause_structure = clause_refined
+        .as_deref()
+        .and_then(|c| clause_structure::decompose(c, span));
+
     // Score clause confidence
-    let has_span = cr.classification.as_ref().is_some_and(|c| c.span.is_some());
+    let has_span = span.is_some();
     let taxa_confidence = clause_refined
         .as_deref()
         .map(|c| confidence::score(c, has_span))
@@ -130,6 +141,7 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
         classification: cr.classification,
         clause_refined,
         taxa_confidence,
+        clause_structure,
     }
 }
 
