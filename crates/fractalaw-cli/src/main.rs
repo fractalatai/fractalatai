@@ -1747,6 +1747,7 @@ async fn enrich_single_law(
         let prov_col = batch.column_by_name("provision");
         let text_col = batch.column_by_name("text");
         let sid_col = batch.column_by_name("section_id");
+        let stype_col = batch.column_by_name("section_type");
 
         for row in 0..batch.num_rows() {
             let provision = prov_col
@@ -1758,7 +1759,15 @@ async fn enrich_single_law(
             let section_id = sid_col
                 .and_then(|c| get_string_value(c.as_ref(), row))
                 .unwrap_or_default();
+            let section_type = stype_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
             if text.trim().is_empty() {
+                continue;
+            }
+            // Heading rows are structural markers (e.g. "Application") with
+            // no legal obligation text — skip before any taxa parsing.
+            if section_type == "heading" {
                 continue;
             }
 

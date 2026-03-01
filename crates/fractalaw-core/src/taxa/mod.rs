@@ -33,6 +33,7 @@ pub mod confidence;
 pub mod duty_patterns;
 pub mod duty_patterns_v2;
 pub mod duty_type;
+pub mod fitness;
 pub mod making;
 pub mod popimar;
 pub mod purpose;
@@ -74,6 +75,10 @@ pub struct TaxaRecord {
     /// Decomposed clause structure (applicability, modal, qualifiers, action).
     /// Populated when `clause_refined` is present and contains a modal verb.
     pub clause_structure: Option<clause_structure::ClauseStructure>,
+
+    /// Fitness rules — law-level applicability (polarity + p-dimension tags).
+    /// Populated for Application+Scope provisions only.
+    pub fitness_rules: Vec<fitness::FitnessRule>,
 }
 
 /// Run the full Taxa classification pipeline on raw legislative text.
@@ -101,9 +106,16 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
     let purposes = purpose::classify(&cleaned);
 
     if should_skip_drrp(&purposes) || is_descriptive_summary(&cleaned) {
+        // Extract fitness rules for Application+Scope provisions
+        let fitness_rules = if purposes.first() == Some(&purpose::APPLICATION_SCOPE) {
+            fitness::extract(&cleaned)
+        } else {
+            vec![]
+        };
         return TaxaRecord {
             cleaned_text: cleaned,
             purposes,
+            fitness_rules,
             ..Default::default()
         };
     }
@@ -142,6 +154,7 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
         clause_refined,
         taxa_confidence,
         clause_structure,
+        fitness_rules: vec![],
     }
 }
 

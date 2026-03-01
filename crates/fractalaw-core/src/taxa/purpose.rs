@@ -85,7 +85,11 @@ const RAW_PATTERNS: &[(&str, &str)] = &[
         // 8. Effect statements
         // 9. Provisions-referencing apply
         // 10. Crown application
-        r"(?i)(?:^Application\b|(?:^|[.;,]\s+|\d\s+)(?:these|this) (?:Regulations?|Act|Order|Part|Rules?|section).{0,60}(?:shall |do(?:es)? )?(?:not )?appl(?:y|ies)|(?:regulation|section|paragraph|article) \d.{0,40}shall not apply|shall apply to .{0,60} as they apply to|be under a like duty|(?:any )?(?:requirement|prohibition|duty).{0,150}(?:shall (?:also )?extend|shall extend only)|shall extend only to|does not apply (?:to|where|until|in|unless)|shall have (?:no )?effect|ceases? to have effect|provisions of .{0,40}(?:shall )?apply|shall bind the Crown)",
+        // Tightened for GH #20 + fitness session:
+        // - Self-ref branch: require "apply to/in/where/until" after the verb,
+        //   rejecting "applies for the purpose of interpreting/determining"
+        // - "provisions of" branch: require "apply to/in" (not bare "apply")
+        r"(?i)(?:^Application\b|(?:^|[.;,]\s+|\d\s+)(?:these|this) (?:Regulations?|Act|Order|Part|Rules?|section).{0,60}(?:shall |do(?:es)? )?(?:not )?appl(?:y|ies) (?:to|in |where|until|unless)|(?:regulation|section|paragraph|article) \d.{0,40}shall not apply|shall apply to .{0,60} as they apply to|be under a like duty|(?:any )?(?:requirement|prohibition|duty).{0,150}(?:shall (?:also )?extend|shall extend only)|shall extend only to|does not apply (?:to|where|until|in|unless)|shall have (?:no )?effect|ceases? to have effect|provisions of .{0,40}(?:shall )?apply (?:to|in)|shall bind the Crown)",
     ),
     (
         EXTENT,
