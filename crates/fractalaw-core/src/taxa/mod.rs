@@ -393,7 +393,7 @@ pub fn analyse_miss(raw_text: &str) -> MissRecord {
 /// 85/189 skipped provisions had mixed purposes with real DRRP content.
 /// ALL gives 104 clean skips (9.9%) with no false negatives, vs ANY's
 /// 189 skips (18.1%) with 58 false negatives (30.7% error rate).
-fn should_skip_drrp(purposes: &[&str]) -> bool {
+pub fn should_skip_drrp(purposes: &[&str]) -> bool {
     const SKIP_PURPOSES: &[&str] = &[
         purpose::ENACTMENT,
         purpose::INTERPRETATION,
@@ -450,7 +450,7 @@ static DESCRIPTIVE_SUMMARY: LazyLock<regex::Regex> = LazyLock::new(|| {
 /// These provisions describe what the instrument does as a whole — they don't
 /// themselves create obligations. Example: "The Regulations impose duties on
 /// employers to protect employees who may be exposed to risk..."
-fn is_descriptive_summary(text: &str) -> bool {
+pub fn is_descriptive_summary(text: &str) -> bool {
     DESCRIPTIVE_SUMMARY.is_match(text)
 }
 

@@ -284,6 +284,15 @@ enum TaxaAction {
         #[arg(long, default_value_t = 200)]
         limit: usize,
     },
+    /// Run purpose classification QA report across laws
+    Qa {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Filter by DuckDB family
+        #[arg(long)]
+        family: Option<String>,
+    },
 }
 
 #[tokio::main]
@@ -409,6 +418,7 @@ async fn main() -> anyhow::Result<()> {
                 let law_names: Vec<&str> = laws.split(',').map(|l| l.trim()).collect();
                 cmd_taxa_eyeball(&data_dir, &law_names, &output, limit).await
             }
+            TaxaAction::Qa { laws, family } => cmd_taxa_qa(&data_dir, laws, family).await,
         },
 
         // Training data export.
@@ -1729,6 +1739,410 @@ async fn cmd_taxa_eyeball(
     );
 
     Ok(())
+}
+
+// ── Taxa QA Report ──────────────────────────────────────────────────
+
+async fn cmd_taxa_qa(
+    data_dir: &std::path::Path,
+    laws: Option<String>,
+    family: Option<String>,
+) -> anyhow::Result<()> {
+    use fractalaw_core::taxa::purpose;
+    use std::collections::HashMap;
+
+    let lance = LanceStore::open(&data_dir.join("lancedb"))
+        .await
+        .context("opening LanceDB")?;
+
+    // Resolve law names.
+    let law_names: Vec<String> = if let Some(ref l) = laws {
+        l.split(',').map(|s| s.trim().to_string()).collect()
+    } else if let Some(ref fam) = family {
+        let store = open_duck(data_dir)?;
+        let names = laws_in_family(&store, fam)?;
+        if names.is_empty() {
+            anyhow::bail!("No laws found with family '{fam}'");
+        }
+        println!("Family '{}': {} laws\n", fam, names.len());
+        names
+    } else {
+        // All laws with LanceDB text.
+        let all_batches = lance.query_legislation_text("true", 200_000, 0).await?;
+        let mut names = std::collections::BTreeSet::new();
+        for batch in &all_batches {
+            if let Some(col) = batch.column_by_name("law_name") {
+                for i in 0..batch.num_rows() {
+                    if let Some(name) = get_string_value(col.as_ref(), i) {
+                        names.insert(name);
+                    }
+                }
+            }
+        }
+        names.into_iter().collect()
+    };
+
+    if law_names.is_empty() {
+        println!("No laws to analyse.");
+        return Ok(());
+    }
+
+    // Short labels for the purpose distribution columns.
+    const PURPOSE_SHORT: &[(&str, &str)] = &[
+        (purpose::ENACTMENT, "Enact"),
+        (purpose::INTERPRETATION, "Interp"),
+        (purpose::APPLICATION_SCOPE, "Scope"),
+        (purpose::EXTENT, "Extent"),
+        (purpose::EXEMPTION, "Exempt"),
+        (purpose::PROCESS_RULE, "Process"),
+        (purpose::POWER_CONFERRED, "Power"),
+        (purpose::CHARGE_FEE, "Fee"),
+        (purpose::OFFENCE, "Offence"),
+        (purpose::ENFORCEMENT, "Enforce"),
+        (purpose::DEFENCE_APPEAL, "Defence"),
+        (purpose::LIABILITY, "Liabil"),
+        (purpose::REPEAL_REVOCATION, "Repeal"),
+        (purpose::AMENDMENT, "Amend"),
+        (purpose::TRANSITIONAL, "Transit"),
+    ];
+
+    struct LawStats {
+        law_name: String,
+        total: usize,
+        with_purposes: usize,
+        with_drrp: usize,
+        gate_skip_drrp: usize,
+        gate_descriptive: usize,
+        gate_interp_primary: usize,
+        gate_enact_primary: usize,
+        gate_scope_primary: usize,
+        gate_all_structural: usize,
+        purpose_counts: HashMap<&'static str, usize>,
+        anomalies: Vec<String>,
+    }
+
+    let mut all_stats: Vec<LawStats> = Vec::new();
+
+    eprint!("Analysing {} laws", law_names.len());
+
+    for law_name in &law_names {
+        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
+        let batches = lance.query_legislation_text(&filter, 500, 0).await?;
+
+        let mut stats = LawStats {
+            law_name: law_name.clone(),
+            total: 0,
+            with_purposes: 0,
+            with_drrp: 0,
+            gate_skip_drrp: 0,
+            gate_descriptive: 0,
+            gate_interp_primary: 0,
+            gate_enact_primary: 0,
+            gate_scope_primary: 0,
+            gate_all_structural: 0,
+            purpose_counts: HashMap::new(),
+            anomalies: Vec::new(),
+        };
+
+        for batch in &batches {
+            let text_col = batch.column_by_name("text");
+            let stype_col = batch.column_by_name("section_type");
+
+            for row in 0..batch.num_rows() {
+                let text = text_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let section_type = stype_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+
+                if text.trim().is_empty() || section_type == "heading" {
+                    continue;
+                }
+
+                stats.total += 1;
+
+                let record = fractalaw_core::taxa::parse_v2(&text);
+
+                // Count purposes.
+                if !record.purposes.is_empty() {
+                    stats.with_purposes += 1;
+                }
+                for p in &record.purposes {
+                    *stats.purpose_counts.entry(p).or_insert(0) += 1;
+                }
+
+                // Count DRRP.
+                if !record.duty_types.is_empty() {
+                    stats.with_drrp += 1;
+                }
+
+                // Determine gate reason (replay the logic from parse_v2).
+                let cleaned = fractalaw_core::taxa::text_cleaner::clean(&text);
+                if fractalaw_core::taxa::is_descriptive_summary(&cleaned) {
+                    stats.gate_descriptive += 1;
+                } else if fractalaw_core::taxa::should_skip_drrp(&record.purposes) {
+                    stats.gate_skip_drrp += 1;
+                    // Sub-classify the skip reason.
+                    let first = record.purposes.first().copied();
+                    if first == Some(purpose::INTERPRETATION) {
+                        stats.gate_interp_primary += 1;
+                    } else if first == Some(purpose::ENACTMENT) {
+                        stats.gate_enact_primary += 1;
+                    } else if first == Some(purpose::APPLICATION_SCOPE) {
+                        stats.gate_scope_primary += 1;
+                    } else {
+                        stats.gate_all_structural += 1;
+                    }
+                }
+            }
+        }
+
+        // Anomaly detection.
+        if stats.total > 0 {
+            let pct = |n: usize| 100.0 * n as f64 / stats.total as f64;
+            let enact_n = stats
+                .purpose_counts
+                .get(purpose::ENACTMENT)
+                .copied()
+                .unwrap_or(0);
+            if pct(enact_n) > 10.0 {
+                stats
+                    .anomalies
+                    .push(format!("Enactment {:.1}% (>10%)", pct(enact_n)));
+            }
+            let enforce_n = stats
+                .purpose_counts
+                .get(purpose::ENFORCEMENT)
+                .copied()
+                .unwrap_or(0);
+            if pct(enforce_n) > 15.0 {
+                stats
+                    .anomalies
+                    .push(format!("Enforcement {:.1}% (>15%)", pct(enforce_n)));
+            }
+            if stats.with_drrp == 0 && stats.total > 10 {
+                stats
+                    .anomalies
+                    .push(format!("0 DRRP from {} provisions", stats.total));
+            }
+        }
+
+        eprint!(".");
+        all_stats.push(stats);
+    }
+    eprintln!(" done\n");
+
+    // ── Section 1: Coverage Summary ─────────────────────────────────
+
+    let corpus_total: usize = all_stats.iter().map(|s| s.total).sum();
+    let corpus_purposes: usize = all_stats.iter().map(|s| s.with_purposes).sum();
+    let corpus_drrp: usize = all_stats.iter().map(|s| s.with_drrp).sum();
+    let corpus_gated: usize = all_stats
+        .iter()
+        .map(|s| s.gate_skip_drrp + s.gate_descriptive)
+        .sum();
+
+    println!(
+        "=== Coverage Summary ({} laws, {} provisions) ===\n",
+        law_names.len(),
+        fmt_num(corpus_total)
+    );
+
+    println!(
+        "{:<30} {:>10} {:>9} {:>9} {:>9}",
+        "Law", "Provisions", "Purpose%", "DRRP%", "Gated%"
+    );
+    println!("{}", "-".repeat(70));
+
+    for s in &all_stats {
+        if s.total == 0 {
+            println!("{:<30} {:>10}", s.law_name, 0);
+            continue;
+        }
+        let pct = |n: usize| 100.0 * n as f64 / s.total as f64;
+        println!(
+            "{:<30} {:>10} {:>8.1}% {:>8.1}% {:>8.1}%",
+            truncate_name(&s.law_name, 30),
+            s.total,
+            pct(s.with_purposes),
+            pct(s.with_drrp),
+            pct(s.gate_skip_drrp + s.gate_descriptive),
+        );
+    }
+    if corpus_total > 0 {
+        let pct = |n: usize| 100.0 * n as f64 / corpus_total as f64;
+        println!("{}", "-".repeat(70));
+        println!(
+            "{:<30} {:>10} {:>8.1}% {:>8.1}% {:>8.1}%",
+            "CORPUS",
+            fmt_num(corpus_total),
+            pct(corpus_purposes),
+            pct(corpus_drrp),
+            pct(corpus_gated),
+        );
+    }
+
+    // ── Section 2: Purpose Distribution ─────────────────────────────
+
+    println!("\n=== Purpose Distribution ===\n");
+
+    // Header row.
+    print!("{:<30}", "Law");
+    for (_, short) in PURPOSE_SHORT {
+        print!(" {:>7}", short);
+    }
+    println!();
+    println!("{}", "-".repeat(30 + PURPOSE_SHORT.len() * 8));
+
+    for s in &all_stats {
+        if s.total == 0 {
+            continue;
+        }
+        print!("{:<30}", truncate_name(&s.law_name, 30));
+        for (full, _) in PURPOSE_SHORT {
+            let n = s.purpose_counts.get(full).copied().unwrap_or(0);
+            let pct = 100.0 * n as f64 / s.total as f64;
+            if n > 0 {
+                print!(" {:>6.1}%", pct);
+            } else {
+                print!(" {:>7}", "");
+            }
+        }
+        println!();
+    }
+
+    // Corpus totals.
+    if corpus_total > 0 {
+        let mut corpus_purpose_counts: HashMap<&str, usize> = HashMap::new();
+        for s in &all_stats {
+            for (&k, &v) in &s.purpose_counts {
+                *corpus_purpose_counts.entry(k).or_insert(0) += v;
+            }
+        }
+        println!("{}", "-".repeat(30 + PURPOSE_SHORT.len() * 8));
+        print!("{:<30}", "CORPUS");
+        for (full, _) in PURPOSE_SHORT {
+            let n = corpus_purpose_counts.get(full).copied().unwrap_or(0);
+            let pct = 100.0 * n as f64 / corpus_total as f64;
+            if n > 0 {
+                print!(" {:>6.1}%", pct);
+            } else {
+                print!(" {:>7}", "");
+            }
+        }
+        println!();
+
+        // Flag per-law anomalies: any purpose > 2x corpus average.
+        for s in &all_stats {
+            if s.total < 10 {
+                continue;
+            }
+            for (full, short) in PURPOSE_SHORT {
+                let law_n = s.purpose_counts.get(full).copied().unwrap_or(0);
+                let law_pct = 100.0 * law_n as f64 / s.total as f64;
+                let corpus_pct = 100.0
+                    * corpus_purpose_counts.get(full).copied().unwrap_or(0) as f64
+                    / corpus_total as f64;
+                if corpus_pct > 1.0 && law_pct > corpus_pct * 2.0 {
+                    println!(
+                        "  [!] {}: {} {:.1}% (corpus avg {:.1}%)",
+                        s.law_name, short, law_pct, corpus_pct
+                    );
+                }
+            }
+        }
+    }
+
+    // ── Section 3: Gate Analysis ────────────────────────────────────
+
+    let total_skip: usize = all_stats.iter().map(|s| s.gate_skip_drrp).sum();
+    let total_desc: usize = all_stats.iter().map(|s| s.gate_descriptive).sum();
+    let total_interp: usize = all_stats.iter().map(|s| s.gate_interp_primary).sum();
+    let total_enact: usize = all_stats.iter().map(|s| s.gate_enact_primary).sum();
+    let total_scope: usize = all_stats.iter().map(|s| s.gate_scope_primary).sum();
+    let total_structural: usize = all_stats.iter().map(|s| s.gate_all_structural).sum();
+
+    println!("\n=== Gate Analysis ===\n");
+
+    if corpus_total > 0 {
+        let pct = |n: usize| 100.0 * n as f64 / corpus_total as f64;
+        println!("{:<30} {:>10} {:>9}", "Gate", "Triggered", "% corpus");
+        println!("{}", "-".repeat(51));
+        println!(
+            "{:<30} {:>10} {:>8.1}%",
+            "skip_drrp (all)",
+            fmt_num(total_skip),
+            pct(total_skip)
+        );
+        println!(
+            "  {:<28} {:>10} {:>8.1}%",
+            "Interpretation-primary",
+            fmt_num(total_interp),
+            pct(total_interp)
+        );
+        println!(
+            "  {:<28} {:>10} {:>8.1}%",
+            "Enactment-primary",
+            fmt_num(total_enact),
+            pct(total_enact)
+        );
+        println!(
+            "  {:<28} {:>10} {:>8.1}%",
+            "Application+Scope",
+            fmt_num(total_scope),
+            pct(total_scope)
+        );
+        println!(
+            "  {:<28} {:>10} {:>8.1}%",
+            "All structural",
+            fmt_num(total_structural),
+            pct(total_structural)
+        );
+        println!(
+            "{:<30} {:>10} {:>8.1}%",
+            "descriptive_summary",
+            fmt_num(total_desc),
+            pct(total_desc)
+        );
+        println!("{}", "-".repeat(51));
+        println!(
+            "{:<30} {:>10} {:>8.1}%",
+            "Total gated",
+            fmt_num(total_skip + total_desc),
+            pct(total_skip + total_desc)
+        );
+    }
+
+    // ── Section 4: Anomalies ────────────────────────────────────────
+
+    let anomalies: Vec<_> = all_stats
+        .iter()
+        .filter(|s| !s.anomalies.is_empty())
+        .collect();
+
+    if anomalies.is_empty() {
+        println!("\n=== Anomalies: none ===");
+    } else {
+        println!("\n=== Anomalies ({}) ===\n", anomalies.len());
+        for s in &anomalies {
+            for a in &s.anomalies {
+                println!("  [!] {}: {}", s.law_name, a);
+            }
+        }
+    }
+
+    println!();
+    Ok(())
+}
+
+/// Truncate a law name to fit a column width, preserving the end (most distinctive part).
+fn truncate_name(name: &str, max: usize) -> String {
+    if name.len() <= max {
+        name.to_string()
+    } else {
+        format!("..{}", &name[name.len() - (max - 2)..])
+    }
 }
 
 /// Enrich a single law: run DRRP parser on its provisions from LanceDB, write

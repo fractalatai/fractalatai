@@ -39,6 +39,13 @@ cargo check -p fractalaw-sync --features flight
 cargo run -p fractalaw-cli -- stats
 cargo run -p fractalaw-cli -- law UK_ukpga_1974_37
 cargo run -p fractalaw-cli -- query "SELECT name, year FROM legislation LIMIT 10"
+
+# Taxa enrichment and QA
+cargo run -p fractalaw-cli -- taxa enrich              # enrich all unenriched laws
+cargo run -p fractalaw-cli -- taxa enrich --force      # re-enrich all (recomputes taxa_hash)
+cargo run -p fractalaw-cli -- taxa qa                  # QA report for all enriched laws
+cargo run -p fractalaw-cli -- taxa qa --laws UK_uksi_1999_3242
+cargo run -p fractalaw-cli -- taxa qa --family "OH&S: Occupational"
 ```
 
 ## Feature Gates
@@ -67,6 +74,16 @@ Heavy C/C++ dependencies are behind optional features on library crates. The CLI
 ## Data Stores
 
 Law metadata lives in **DuckDB** (`legislation` table, queried via `fractalaw query`). Per-provision text and taxa enrichment data lives in **LanceDB** (`legislation_text` table, NOT accessible via the CLI query command). See `.claude/skills/lancedb-validation/SKILL.md` for query patterns, cross-referencing workflows, and pyarrow recipes.
+
+## Taxa Pipeline
+
+The taxa enrichment pipeline extracts structured DRRP (Duties, Rights, Responsibilities, Powers) from provision text:
+
+1. **Enrich** (`taxa enrich`): Reads provision text from LanceDB, runs `parse_v2()` per provision (purpose classification → skip gates → clause decomposition → DRRP extraction), aggregates per-law results into DuckDB `legislation` table. Uses `taxa_hash` / `published_hash` for change tracking.
+2. **QA** (`taxa qa`): Re-runs `parse_v2()` live and produces a 4-section validation report: Coverage Summary, Purpose Distribution (with anomaly flags), Gate Analysis (skip_drrp sub-gates + descriptive_summary), and Anomalies. Filters by `--laws` or `--family`.
+3. **Publish** (`sync publish`): Sends enriched DuckDB taxa to sertantai via Zenoh. `--changed` publishes only laws where `taxa_hash != published_hash`.
+
+Key modules: `fractalaw-core/src/taxa/` (purpose classification, clause structure, DRRP parsing), `fractalaw-cli/src/main.rs` (enrich/qa/eyeball commands).
 
 ## Environment
 
