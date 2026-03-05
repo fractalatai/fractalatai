@@ -133,6 +133,9 @@ pub mod esh {
             Field::new("rights_ai", list_drrp_entry.clone(), true),
             Field::new("responsibilities_ai", list_drrp_entry.clone(), true),
             Field::new("powers_ai", list_drrp_entry, true),
+            // 1.10b Taxa Change Tracking (2)
+            Field::new("taxa_hash", DataType::Utf8, true),
+            Field::new("published_hash", DataType::Utf8, true),
             // 1.11 Annotation Totals (4)
             Field::new("total_text_amendments", DataType::Int32, true),
             Field::new("total_modifications", DataType::Int32, true),
@@ -362,7 +365,7 @@ mod tests {
 
     #[test]
     fn legislation_schema_field_count() {
-        assert_eq!(esh::legislation_schema().fields().len(), 89);
+        assert_eq!(esh::legislation_schema().fields().len(), 91);
     }
 
     #[test]

@@ -179,6 +179,9 @@ enum SyncAction {
         /// Publish ALL laws with taxa data (must be explicit)
         #[arg(long)]
         all: bool,
+        /// Only publish laws whose taxa changed since last publish
+        #[arg(long)]
+        changed: bool,
     },
     /// Pull legislation text (LAT) from sertantai via zenoh
     PullLat {
@@ -341,7 +344,8 @@ async fn main() -> anyhow::Result<()> {
                 laws,
                 family,
                 all,
-            } => cmd_sync_publish(&data_dir, &tenant, laws, family, all).await,
+                changed,
+            } => cmd_sync_publish(&data_dir, &tenant, laws, family, all, changed).await,
             SyncAction::PullLat {
                 tenant,
                 laws,
@@ -607,10 +611,12 @@ async fn cmd_sync_publish(
     laws: Option<String>,
     family: Option<String>,
     all: bool,
+    changed: bool,
 ) -> anyhow::Result<()> {
     let store = open_duck(data_dir)?;
+    store.ensure_taxa_hash_columns()?;
 
-    // Resolve law names: --family, --laws, or --all (must be explicit).
+    // Resolve law names: --family, --laws, --changed, or --all (must be explicit).
     let law_names: Vec<String> = if let Some(ref fam) = family {
         let names = laws_in_family(&store, fam)?;
         if names.is_empty() {
@@ -620,6 +626,30 @@ async fn cmd_sync_publish(
         names
     } else if let Some(ref l) = laws {
         l.split(',').map(|s| s.trim().to_string()).collect()
+    } else if changed {
+        let batches = store.query_arrow(
+            "SELECT name FROM legislation \
+             WHERE taxa_hash IS NOT NULL \
+               AND (published_hash IS NULL OR taxa_hash != published_hash) \
+             ORDER BY name",
+        )?;
+        let mut names = Vec::new();
+        for batch in &batches {
+            if let Some(col) = batch.column_by_name("name")
+                && let Some(arr) = col.as_any().downcast_ref::<arrow::array::StringArray>()
+            {
+                for i in 0..arr.len() {
+                    if !arr.is_null(i) {
+                        names.push(arr.value(i).to_string());
+                    }
+                }
+            }
+        }
+        println!(
+            "Publishing {} laws with changed taxa (--changed)",
+            names.len()
+        );
+        names
     } else if all {
         let batches = store.query_arrow(
             "SELECT name FROM legislation \
@@ -642,7 +672,7 @@ async fn cmd_sync_publish(
         names
     } else {
         anyhow::bail!(
-            "Specify --family, --laws, or --all to select laws to publish.\n\
+            "Specify --family, --laws, --changed, or --all to select laws to publish.\n\
              Example: fractalaw sync publish --family \"OH&S: Occupational / Personal Safety\" --tenant dev"
         );
     };
@@ -679,6 +709,12 @@ async fn cmd_sync_publish(
         sync.publish_taxa(law_name, &batches)
             .await
             .map_err(|e| anyhow::anyhow!("failed to publish {law_name}: {e}"))?;
+
+        // Mark published_hash = taxa_hash so --changed skips this law next time.
+        store.execute(&format!(
+            "UPDATE legislation SET published_hash = taxa_hash WHERE name = '{}'",
+            law_name.replace('\'', "''")
+        ))?;
 
         published += 1;
     }
@@ -752,6 +788,7 @@ async fn cmd_sync_watch(
         .await
         .context("opening LanceDB")?;
     let duck = open_duck(data_dir)?;
+    duck.ensure_taxa_hash_columns()?;
 
     let sync = fractalaw_sync::ZenohSync::new(tenant)
         .await
@@ -897,6 +934,12 @@ async fn cmd_sync_watch(
                     {
                         match sync.publish_taxa(law_name, &batches).await {
                             Ok(_) => {
+                                // Mark published_hash = taxa_hash.
+                                let _ = duck.execute(&format!(
+                                    "UPDATE legislation SET published_hash = taxa_hash \
+                                     WHERE name = '{}'",
+                                    law_name.replace('\'', "''")
+                                ));
                                 eprintln!(" → done");
                                 total_published += 1;
                             }
@@ -1989,7 +2032,38 @@ async fn enrich_single_law(
         return Ok(false);
     }
 
-    // Update DuckDB law-level taxa columns (flat + struct lists).
+    // Compute content hash of the 11 taxa columns.
+    let new_hash = compute_taxa_hash(
+        &taxa.duty_holders,
+        &taxa.rights_holders,
+        &taxa.responsibility_holders,
+        &taxa.power_holders,
+        &taxa.duty_types,
+        &taxa.roles,
+        &taxa.roles_gvt,
+        &taxa.duties,
+        &taxa.rights,
+        &taxa.responsibilities,
+        &taxa.powers,
+    );
+
+    // Check if taxa actually changed — skip UPDATE if hash is identical.
+    let existing_hash: Option<String> = {
+        let sql = format!(
+            "SELECT taxa_hash FROM legislation WHERE name = '{}'",
+            law_name.replace('\'', "''")
+        );
+        let batches = store.query_arrow(&sql)?;
+        batches.first().and_then(|b| {
+            b.column_by_name("taxa_hash")
+                .and_then(|col| get_string_value(col.as_ref(), 0))
+        })
+    };
+    if existing_hash.as_deref() == Some(&new_hash) {
+        return Ok(false); // unchanged — skip UPDATE
+    }
+
+    // Update DuckDB law-level taxa columns (flat + struct lists) + taxa_hash.
     let sql = format!(
         "UPDATE legislation SET
             duty_holder = {duty_holder},
@@ -2002,7 +2076,8 @@ async fn enrich_single_law(
             duties = {duties},
             rights = {rights},
             responsibilities = {responsibilities},
-            powers = {powers}
+            powers = {powers},
+            taxa_hash = '{taxa_hash}'
          WHERE name = '{name}'",
         duty_holder = format_sql_list(taxa.duty_holders.iter().map(|s| s.as_str())),
         rights_holder = format_sql_list(taxa.rights_holders.iter().map(|s| s.as_str())),
@@ -2015,6 +2090,7 @@ async fn enrich_single_law(
         rights = format_sql_drrp_entries(&taxa.rights),
         responsibilities = format_sql_drrp_entries(&taxa.responsibilities),
         powers = format_sql_drrp_entries(&taxa.powers),
+        taxa_hash = new_hash,
         name = law_name.replace('\'', "''"),
     );
     store.execute(&sql)?;
@@ -2028,6 +2104,9 @@ async fn cmd_taxa_enrich(
     law_filter: Option<Vec<String>>,
     force: bool,
 ) -> anyhow::Result<()> {
+    // Ensure taxa_hash/published_hash columns exist (idempotent).
+    store.ensure_taxa_hash_columns()?;
+
     let lance = LanceStore::open(&data_dir.join("lancedb"))
         .await
         .context("opening LanceDB")?;
@@ -2043,7 +2122,8 @@ async fn cmd_taxa_enrich(
                 power_holder = NULL,
                 duty_type = NULL,
                 role = NULL,
-                role_gvt = NULL",
+                role_gvt = NULL,
+                taxa_hash = NULL",
         )?;
         eprintln!("  Done — all taxa columns set to NULL.");
     }
@@ -2077,10 +2157,13 @@ async fn cmd_taxa_enrich(
         );
         names
     } else {
-        // Find laws that have NO DRRP taxa data yet (duty_holder is null or empty).
+        // Find laws that have NO DRRP taxa data yet (no duty_type column).
+        // Use duty_type rather than duty_holder because some laws have
+        // Responsibilities/Powers but no Duties — duty_holder would be empty
+        // even though they've been fully enriched.
         let law_batches = store.query_arrow(
             "SELECT name FROM legislation
-             WHERE duty_holder IS NULL OR len(duty_holder) = 0
+             WHERE duty_type IS NULL
              ORDER BY name",
         )?;
 
@@ -2127,7 +2210,7 @@ async fn cmd_taxa_enrich(
     // Count how many actually got data.
     let filled = store.query_arrow(
         "SELECT count(*)::BIGINT FROM legislation
-         WHERE duty_holder IS NOT NULL AND len(duty_holder) > 0",
+         WHERE duty_type IS NOT NULL",
     )?;
     let filled_count = extract_i64(&filled[0], 0);
 
@@ -3099,6 +3182,97 @@ fn format_sql_list<'a>(values: impl Iterator<Item = &'a str>) -> String {
     }
 }
 
+/// Compute a content hash of the 11 published taxa columns from a `LawTaxa` struct.
+///
+/// Uses `DefaultHasher` (SipHash) over a canonical string built from sorted
+/// column values. Returns a hex-encoded u64 hash.
+#[allow(clippy::too_many_arguments)]
+fn compute_taxa_hash(
+    duty_holders: &std::collections::BTreeSet<String>,
+    rights_holders: &std::collections::BTreeSet<String>,
+    responsibility_holders: &std::collections::BTreeSet<String>,
+    power_holders: &std::collections::BTreeSet<String>,
+    duty_types: &std::collections::BTreeSet<String>,
+    roles: &std::collections::BTreeSet<String>,
+    roles_gvt: &std::collections::BTreeSet<String>,
+    duties: &[(String, String, String, String)],
+    rights: &[(String, String, String, String)],
+    responsibilities: &[(String, String, String, String)],
+    powers: &[(String, String, String, String)],
+) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::hash::DefaultHasher::new();
+
+    // BTreeSets are already sorted — iterate in order.
+    for v in duty_holders {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF); // separator
+    for v in rights_holders {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    for v in responsibility_holders {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    for v in power_holders {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    for v in duty_types {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    for v in roles {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    for v in roles_gvt {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+
+    // DRRP entries: sort for determinism (Vecs may not be ordered).
+    let mut sorted_duties: Vec<_> = duties.iter().collect();
+    sorted_duties.sort();
+    for (h, dt, c, a) in sorted_duties {
+        h.hash(&mut hasher);
+        dt.hash(&mut hasher);
+        c.hash(&mut hasher);
+        a.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    let mut sorted_rights: Vec<_> = rights.iter().collect();
+    sorted_rights.sort();
+    for (h, dt, c, a) in sorted_rights {
+        h.hash(&mut hasher);
+        dt.hash(&mut hasher);
+        c.hash(&mut hasher);
+        a.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    let mut sorted_resp: Vec<_> = responsibilities.iter().collect();
+    sorted_resp.sort();
+    for (h, dt, c, a) in sorted_resp {
+        h.hash(&mut hasher);
+        dt.hash(&mut hasher);
+        c.hash(&mut hasher);
+        a.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    let mut sorted_powers: Vec<_> = powers.iter().collect();
+    sorted_powers.sort();
+    for (h, dt, c, a) in sorted_powers {
+        h.hash(&mut hasher);
+        dt.hash(&mut hasher);
+        c.hash(&mut hasher);
+        a.hash(&mut hasher);
+    }
+
+    format!("{:016x}", hasher.finish())
+}
+
 /// Format a list of (holder, duty_type, clause, article) tuples as a DuckDB
 /// `List<Struct>` literal, e.g. `[{'holder':'a','duty_type':'DUTY','clause':'...','article':'s/1'}]`.
 fn format_sql_drrp_entries(entries: &[(String, String, String, String)]) -> String {
@@ -3174,6 +3348,90 @@ fn extract_f64(batch: &RecordBatch, col_idx: usize) -> f64 {
         a.value(0) as f64
     } else {
         0.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    #[test]
+    fn taxa_hash_deterministic() {
+        let dh: BTreeSet<String> = ["employer".into()].into();
+        let rh: BTreeSet<String> = ["employee".into()].into();
+        let empty_set: BTreeSet<String> = BTreeSet::new();
+        let duties = vec![(
+            "employer".into(),
+            "DUTY".into(),
+            "shall ensure".into(),
+            "s/2".into(),
+        )];
+
+        let h1 = compute_taxa_hash(
+            &dh,
+            &rh,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &duties,
+            &[],
+            &[],
+            &[],
+        );
+        let h2 = compute_taxa_hash(
+            &dh,
+            &rh,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &duties,
+            &[],
+            &[],
+            &[],
+        );
+        assert_eq!(h1, h2, "same input must produce same hash");
+        assert_eq!(h1.len(), 16, "hash should be 16 hex chars");
+    }
+
+    #[test]
+    fn taxa_hash_changes_on_different_input() {
+        let dh: BTreeSet<String> = ["employer".into()].into();
+        let empty_set: BTreeSet<String> = BTreeSet::new();
+
+        let h1 = compute_taxa_hash(
+            &dh,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &[],
+            &[],
+            &[],
+            &[],
+        );
+
+        let dh2: BTreeSet<String> = ["employee".into()].into();
+        let h2 = compute_taxa_hash(
+            &dh2,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &[],
+            &[],
+            &[],
+            &[],
+        );
+        assert_ne!(h1, h2, "different input must produce different hash");
     }
 }
 

@@ -255,13 +255,20 @@ fn try_reverse_duty(clause: &str) -> Option<ClauseStructure> {
 /// Prefers span data (precise) over regex (fallback).
 fn find_modal(clause: &str, span: Option<MatchSpan>) -> Option<(Modal, usize, usize)> {
     if let Some(sp) = span {
-        // Use span positions to extract the modal text
-        let modal_text = &clause[sp.modal_start..sp.modal_end];
-        let modal = classify_modal(modal_text)?;
-        return Some((modal, sp.modal_start, sp.modal_end));
+        // Span positions are relative to the original cleaned_text, not the
+        // extracted clause substring.  Fall back to regex if out of bounds.
+        if sp.modal_end <= clause.len()
+            && clause.is_char_boundary(sp.modal_start)
+            && clause.is_char_boundary(sp.modal_end)
+        {
+            let modal_text = &clause[sp.modal_start..sp.modal_end];
+            if let Some(modal) = classify_modal(modal_text) {
+                return Some((modal, sp.modal_start, sp.modal_end));
+            }
+        }
     }
 
-    // Regex fallback for standalone mode
+    // Regex fallback for standalone mode or when span is out of bounds
     let m = MODAL_RE.find(clause)?;
     let modal = classify_modal(m.as_str())?;
     Some((modal, m.start(), m.end()))
