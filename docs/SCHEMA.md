@@ -1,7 +1,7 @@
 # Fractalaw Schema Design
 
-**Version**: 0.6
-**Date**: 2026-02-25
+**Version**: 0.7
+**Date**: 2026-03-05
 **Status**: Five tables — four exported to Parquet, `polished_drrp` created at runtime by drrp-polisher
 
 This document defines the three-tier data model for Fractalaw. It is the spec from which `fractalaw-core/src/schema.rs` will be implemented.
@@ -229,6 +229,44 @@ This struct is referred to as `RelatedLaw` below.
 | `clause` | Utf8 | Text excerpt from the law |
 | `article` | Utf8 | Article reference: `regulation/4`, `section/12` |
 
+### 1.9a Fitness / Applicability (Application+Scope)
+
+Extracted from Application+Scope provisions by the fitness extraction pipeline (`fractalaw-core/src/taxa/fitness.rs`). Captures who/what/where a law applies to, using the 6 p-dimensions (Person, Process, Place, Plant, Property, Sector) and polarity (applies_to, disapplies_to, extends_to).
+
+Follows the DRRP two-tier pattern: **tag columns** (`List<Utf8>`) for filtering, grouping, and no-code DB sync + a **detail column** (`List<Struct>`) for UI rendering and programmatic matching.
+
+**Tag columns** — union across all provisions and all polarities. Answer "does this law mention X at all?" for filtering. A law that exempts self-employed workers is still relevant when filtering for "self-employed" laws — polarity context lives in the detail column.
+
+| Column | Arrow Type | Nullable | Description |
+|--------|-----------|----------|-------------|
+| `fitness_person` | List\<Utf8\> | yes | Person terms across all rules: `["employer", "self-employed person"]` |
+| `fitness_process` | List\<Utf8\> | yes | Process terms: `["construction work"]` |
+| `fitness_place` | List\<Utf8\> | yes | Place terms: `["Great Britain", "offshore"]` |
+| `fitness_plant` | List\<Utf8\> | yes | Plant terms: `["asbestos"]` |
+| `fitness_property` | List\<Utf8\> | yes | Property terms: `["at work"]` |
+| `fitness_sector` | List\<Utf8\> | yes | Sector terms: `["construction"]` |
+
+**Detail column** — full rules with polarity and article reference, for UI rendering and programmatic matching. Parallel to `duties`, `rights`, `responsibilities`, `powers` (`List<DRRPEntry>`).
+
+| Column | Arrow Type | Nullable | Description |
+|--------|-----------|----------|-------------|
+| `fitness` | List\<FitnessEntry\> | yes | All fitness rules for this law |
+
+**FitnessEntry struct** — all fields scalar Utf8, matching DRRPEntry pattern. Multi-value p-dimensions are comma-separated within the string (practical for rendering; avoids nested `List<List<Utf8>>` which is painful in DuckDB and impossible in Airtable).
+
+| Struct Field | Arrow Type | Description |
+|-------------|-----------|-------------|
+| `polarity` | Utf8 | `"applies_to"`, `"disapplies_to"`, `"extends_to"` |
+| `person` | Utf8 | Comma-separated: `"employer, worker"` or null |
+| `process` | Utf8 | `"construction work"` or null |
+| `place` | Utf8 | `"Great Britain"` or null |
+| `plant` | Utf8 | `"asbestos"` or null |
+| `property` | Utf8 | `"at work"` or null |
+| `sector` | Utf8 | `"construction"` or null |
+| `article` | Utf8 | Source provision: `"regulation/2"` |
+
+> **Aggregation**: Per-law tag columns are the union of all p-dimension terms across all provisions (both polarities). The `fitness` detail column carries one `FitnessEntry` per fitness rule per provision, preserving polarity and article reference.
+
 ### 1.10 Annotation Totals
 
 Denormalized counts of F/C/I/E annotation codes aggregated across all LAT sections for this law. Avoids a LAT aggregation query for common filters like "show the most heavily amended laws."
@@ -425,6 +463,22 @@ Normalised across jurisdictions. Each country's scraper maps its local terminolo
 | `created_at` | Timestamp(ns, UTC) | no | Record creation time |
 | `updated_at` | Timestamp(ns, UTC) | no | Last update time |
 
+### 3.9 Taxa Enrichment — Fitness
+
+Per-provision fitness tags from the fitness extraction pipeline. Flat `List<Utf8>` columns consistent with other taxa columns (`purposes`, `drrp_types`, `governed_actors`, etc.). Compound provisions (which produce multiple `FitnessRule`s with opposite polarities) union their tags into the same lists.
+
+| Column | Arrow Type | Nullable | Description |
+|--------|-----------|----------|-------------|
+| `fitness_polarity` | List\<Utf8\> | yes | `["applies_to"]`, `["disapplies_to"]`, or `["applies_to", "disapplies_to"]` for compounds |
+| `fitness_person` | List\<Utf8\> | yes | Person terms: `["employer", "self-employed person"]` |
+| `fitness_process` | List\<Utf8\> | yes | Process terms: `["construction work"]` |
+| `fitness_place` | List\<Utf8\> | yes | Place terms: `["Great Britain", "offshore"]` |
+| `fitness_plant` | List\<Utf8\> | yes | Plant terms: `["asbestos"]` |
+| `fitness_property` | List\<Utf8\> | yes | Property terms: `["at work"]` |
+| `fitness_sector` | List\<Utf8\> | yes | Sector terms: `["construction"]` |
+
+Empty lists for non-Application+Scope provisions (same pattern as `drrp_types` being empty for non-DRRP provisions).
+
 ---
 
 ## Table 4: `amendment_annotations` — Semantic Path
@@ -596,17 +650,36 @@ Used in: `duties`, `rights`, `responsibilities`, `powers`, `duties_ai`, `rights_
 }
 ```
 
+### `FitnessEntry`
+
+Used in: `fitness` (§1.9a)
+
+```
+{
+  polarity:  Utf8    -- applies_to / disapplies_to / extends_to
+  person:    Utf8    -- comma-separated person terms, or null
+  process:   Utf8    -- comma-separated process terms, or null
+  place:     Utf8    -- comma-separated place terms, or null
+  plant:     Utf8    -- comma-separated plant terms, or null
+  property:  Utf8    -- comma-separated property terms, or null
+  sector:    Utf8    -- comma-separated sector terms, or null
+  article:   Utf8    -- source provision reference
+}
+```
+
 ---
 
 ## Column Counts
 
 | Table | Scalar Columns | List Columns | Total |
 |-------|---------------|-------------|-------|
-| `legislation` (LRT) | 60 | 26 (12 List\<Utf8\> + 14 List\<Struct\>) | 89 |
+| `legislation` (LRT) | 60 | 38 (18 List\<Utf8\> + 15 List\<Struct\> + 5 taxa) | 98 |
 | `law_edges` | 8 | — | 8 |
-| `legislation_text` (LAT) | 28 | — | 28 |
+| `legislation_text` (LAT) | 28 | 26 (taxa enrichment) | 54 |
 | `amendment_annotations` | 8 | 1 (List\<Utf8\>) | 9 |
 | `polished_drrp` | 11 | — | 11 |
+
+> **Note**: LRT and LAT column counts include taxa enrichment columns (DRRP §1.9, fitness §1.9a, and per-provision taxa in §3.9) added since v0.6. Authoritative counts are in `fractalaw-core/src/schema.rs` tests.
 
 ---
 

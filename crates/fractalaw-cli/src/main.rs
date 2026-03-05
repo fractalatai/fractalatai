@@ -10,6 +10,18 @@ use arrow::util::pretty::print_batches;
 use clap::{Parser, Subcommand};
 use fractalaw_store::{DuckStore, FusionStore, LanceStore, StoreError};
 
+/// (polarity, person, process, place, plant, property, sector, article)
+type FitnessEntry = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+);
+
 #[derive(Parser)]
 #[command(
     name = "fractalaw",
@@ -625,6 +637,7 @@ async fn cmd_sync_publish(
 ) -> anyhow::Result<()> {
     let store = open_duck(data_dir)?;
     store.ensure_taxa_hash_columns()?;
+    store.ensure_fitness_columns()?;
 
     // Resolve law names: --family, --laws, --changed, or --all (must be explicit).
     let law_names: Vec<String> = if let Some(ref fam) = family {
@@ -706,7 +719,9 @@ async fn cmd_sync_publish(
         let sql = format!(
             "SELECT name, duty_holder, rights_holder, responsibility_holder, power_holder, \
                     duty_type, role, role_gvt, \
-                    duties, rights, responsibilities, powers \
+                    duties, rights, responsibilities, powers, \
+                    fitness_person, fitness_process, fitness_place, \
+                    fitness_plant, fitness_property, fitness_sector, fitness \
              FROM legislation WHERE name = '{}'",
             law_name.replace('\'', "''")
         );
@@ -2170,6 +2185,14 @@ async fn enrich_single_law(
         rights: Vec<(String, String, String, String)>,
         responsibilities: Vec<(String, String, String, String)>,
         powers: Vec<(String, String, String, String)>,
+        // Fitness / applicability
+        fitness_persons: BTreeSet<String>,
+        fitness_processes: BTreeSet<String>,
+        fitness_places: BTreeSet<String>,
+        fitness_plants: BTreeSet<String>,
+        fitness_properties: BTreeSet<String>,
+        fitness_sectors: BTreeSet<String>,
+        fitness_entries: Vec<FitnessEntry>,
     }
 
     let mut taxa = LawTaxa {
@@ -2184,6 +2207,13 @@ async fn enrich_single_law(
         rights: Vec::new(),
         responsibilities: Vec::new(),
         powers: Vec::new(),
+        fitness_persons: BTreeSet::new(),
+        fitness_processes: BTreeSet::new(),
+        fitness_places: BTreeSet::new(),
+        fitness_plants: BTreeSet::new(),
+        fitness_properties: BTreeSet::new(),
+        fitness_sectors: BTreeSet::new(),
+        fitness_entries: Vec::new(),
     };
 
     struct ProvisionTaxa {
@@ -2197,6 +2227,14 @@ async fn enrich_single_law(
         purposes: Vec<String>,
         clause_refined: String,
         taxa_confidence: Option<f32>,
+        // Fitness per-provision
+        fitness_polarity: Vec<String>,
+        fitness_person: Vec<String>,
+        fitness_process: Vec<String>,
+        fitness_place: Vec<String>,
+        fitness_plant: Vec<String>,
+        fitness_property: Vec<String>,
+        fitness_sector: Vec<String>,
     }
     let mut provision_taxa: Vec<ProvisionTaxa> = Vec::new();
 
@@ -2252,6 +2290,107 @@ async fn enrich_single_law(
                 } else {
                     None
                 };
+                // Extract per-provision fitness tags from fitness_rules.
+                let mut fp_polarity = Vec::new();
+                let mut fp_person = Vec::new();
+                let mut fp_process = Vec::new();
+                let mut fp_place = Vec::new();
+                let mut fp_plant = Vec::new();
+                let mut fp_property = Vec::new();
+                let mut fp_sector = Vec::new();
+                for rule in &record.fitness_rules {
+                    use fractalaw_core::taxa::fitness::PDimension;
+                    let pol = rule.polarity.as_str().to_string();
+                    if !fp_polarity.contains(&pol) {
+                        fp_polarity.push(pol.clone());
+                    }
+                    let mut r_person = Vec::new();
+                    let mut r_process = Vec::new();
+                    let mut r_place = Vec::new();
+                    let mut r_plant = Vec::new();
+                    let mut r_property = Vec::new();
+                    let mut r_sector = Vec::new();
+                    for tag in &rule.tags {
+                        match tag.dimension {
+                            PDimension::Person => {
+                                if !fp_person.contains(&tag.term) {
+                                    fp_person.push(tag.term.clone());
+                                }
+                                r_person.push(tag.term.clone());
+                            }
+                            PDimension::Process => {
+                                if !fp_process.contains(&tag.term) {
+                                    fp_process.push(tag.term.clone());
+                                }
+                                r_process.push(tag.term.clone());
+                            }
+                            PDimension::Place => {
+                                if !fp_place.contains(&tag.term) {
+                                    fp_place.push(tag.term.clone());
+                                }
+                                r_place.push(tag.term.clone());
+                            }
+                            PDimension::Plant => {
+                                if !fp_plant.contains(&tag.term) {
+                                    fp_plant.push(tag.term.clone());
+                                }
+                                r_plant.push(tag.term.clone());
+                            }
+                            PDimension::Property => {
+                                if !fp_property.contains(&tag.term) {
+                                    fp_property.push(tag.term.clone());
+                                }
+                                r_property.push(tag.term.clone());
+                            }
+                            PDimension::Sector => {
+                                if !fp_sector.contains(&tag.term) {
+                                    fp_sector.push(tag.term.clone());
+                                }
+                                r_sector.push(tag.term.clone());
+                            }
+                        }
+                        // Aggregate into law-level sets.
+                        match tag.dimension {
+                            PDimension::Person => {
+                                taxa.fitness_persons.insert(tag.term.clone());
+                            }
+                            PDimension::Process => {
+                                taxa.fitness_processes.insert(tag.term.clone());
+                            }
+                            PDimension::Place => {
+                                taxa.fitness_places.insert(tag.term.clone());
+                            }
+                            PDimension::Plant => {
+                                taxa.fitness_plants.insert(tag.term.clone());
+                            }
+                            PDimension::Property => {
+                                taxa.fitness_properties.insert(tag.term.clone());
+                            }
+                            PDimension::Sector => {
+                                taxa.fitness_sectors.insert(tag.term.clone());
+                            }
+                        }
+                    }
+                    // Build FitnessEntry tuple for law-level detail.
+                    let join = |v: &[String]| {
+                        if v.is_empty() {
+                            String::new()
+                        } else {
+                            v.join(", ")
+                        }
+                    };
+                    taxa.fitness_entries.push((
+                        rule.polarity.as_str().to_string(),
+                        join(&r_person),
+                        join(&r_process),
+                        join(&r_place),
+                        join(&r_plant),
+                        join(&r_property),
+                        join(&r_sector),
+                        format!("section/{provision}"),
+                    ));
+                }
+
                 provision_taxa.push(ProvisionTaxa {
                     section_id,
                     drrp_types: record
@@ -2270,6 +2409,13 @@ async fn enrich_single_law(
                         .clone()
                         .unwrap_or_else(|| record.cleaned_text.clone()),
                     taxa_confidence,
+                    fitness_polarity: fp_polarity,
+                    fitness_person: fp_person,
+                    fitness_process: fp_process,
+                    fitness_place: fp_place,
+                    fitness_plant: fp_plant,
+                    fitness_property: fp_property,
+                    fitness_sector: fp_sector,
                 });
             }
 
@@ -2346,6 +2492,13 @@ async fn enrich_single_law(
         let mut clause_refined_b = StringBuilder::new();
         let mut confidence_b = Float32Builder::new();
         let mut classified_at_b = TimestampNanosecondBuilder::new().with_timezone("UTC");
+        let mut fit_polarity_b = ListBuilder::new(StringBuilder::new());
+        let mut fit_person_b = ListBuilder::new(StringBuilder::new());
+        let mut fit_process_b = ListBuilder::new(StringBuilder::new());
+        let mut fit_place_b = ListBuilder::new(StringBuilder::new());
+        let mut fit_plant_b = ListBuilder::new(StringBuilder::new());
+        let mut fit_property_b = ListBuilder::new(StringBuilder::new());
+        let mut fit_sector_b = ListBuilder::new(StringBuilder::new());
 
         let now_ns = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
 
@@ -2392,6 +2545,35 @@ async fn enrich_single_law(
                 None => confidence_b.append_null(),
             }
             classified_at_b.append_value(now_ns);
+
+            for v in &pt.fitness_polarity {
+                fit_polarity_b.values().append_value(v);
+            }
+            fit_polarity_b.append(true);
+            for v in &pt.fitness_person {
+                fit_person_b.values().append_value(v);
+            }
+            fit_person_b.append(true);
+            for v in &pt.fitness_process {
+                fit_process_b.values().append_value(v);
+            }
+            fit_process_b.append(true);
+            for v in &pt.fitness_place {
+                fit_place_b.values().append_value(v);
+            }
+            fit_place_b.append(true);
+            for v in &pt.fitness_plant {
+                fit_plant_b.values().append_value(v);
+            }
+            fit_plant_b.append(true);
+            for v in &pt.fitness_property {
+                fit_property_b.values().append_value(v);
+            }
+            fit_property_b.append(true);
+            for v in &pt.fitness_sector {
+                fit_sector_b.values().append_value(v);
+            }
+            fit_sector_b.append(true);
         }
 
         let item_field = std::sync::Arc::new(Field::new("item", DataType::Utf8, true));
@@ -2407,7 +2589,7 @@ async fn enrich_single_law(
             Field::new("duty_family", DataType::Utf8, true),
             Field::new("duty_sub_type", DataType::Utf8, true),
             Field::new("popimar", DataType::List(item_field.clone()), true),
-            Field::new("purposes", DataType::List(item_field), true),
+            Field::new("purposes", DataType::List(item_field.clone()), true),
             Field::new("clause_refined", DataType::Utf8, true),
             Field::new("taxa_confidence", DataType::Float32, true),
             Field::new(
@@ -2415,6 +2597,13 @@ async fn enrich_single_law(
                 DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())),
                 true,
             ),
+            Field::new("fitness_polarity", DataType::List(item_field.clone()), true),
+            Field::new("fitness_person", DataType::List(item_field.clone()), true),
+            Field::new("fitness_process", DataType::List(item_field.clone()), true),
+            Field::new("fitness_place", DataType::List(item_field.clone()), true),
+            Field::new("fitness_plant", DataType::List(item_field.clone()), true),
+            Field::new("fitness_property", DataType::List(item_field.clone()), true),
+            Field::new("fitness_sector", DataType::List(item_field), true),
         ]));
 
         let taxa_batch = RecordBatch::try_new(
@@ -2431,6 +2620,13 @@ async fn enrich_single_law(
                 std::sync::Arc::new(clause_refined_b.finish()),
                 std::sync::Arc::new(confidence_b.finish()),
                 std::sync::Arc::new(classified_at_b.finish()),
+                std::sync::Arc::new(fit_polarity_b.finish()),
+                std::sync::Arc::new(fit_person_b.finish()),
+                std::sync::Arc::new(fit_process_b.finish()),
+                std::sync::Arc::new(fit_place_b.finish()),
+                std::sync::Arc::new(fit_plant_b.finish()),
+                std::sync::Arc::new(fit_property_b.finish()),
+                std::sync::Arc::new(fit_sector_b.finish()),
             ],
         )
         .context("building taxa RecordBatch")?;
@@ -2442,11 +2638,15 @@ async fn enrich_single_law(
     }
 
     // No taxa signal — nothing to write to DuckDB.
-    if taxa.duty_types.is_empty() && taxa.roles.is_empty() && taxa.roles_gvt.is_empty() {
+    if taxa.duty_types.is_empty()
+        && taxa.roles.is_empty()
+        && taxa.roles_gvt.is_empty()
+        && taxa.fitness_entries.is_empty()
+    {
         return Ok(false);
     }
 
-    // Compute content hash of the 11 taxa columns.
+    // Compute content hash of the taxa columns (DRRP + fitness).
     let new_hash = compute_taxa_hash(
         &taxa.duty_holders,
         &taxa.rights_holders,
@@ -2459,6 +2659,13 @@ async fn enrich_single_law(
         &taxa.rights,
         &taxa.responsibilities,
         &taxa.powers,
+        &taxa.fitness_persons,
+        &taxa.fitness_processes,
+        &taxa.fitness_places,
+        &taxa.fitness_plants,
+        &taxa.fitness_properties,
+        &taxa.fitness_sectors,
+        &taxa.fitness_entries,
     );
 
     // Check if taxa actually changed — skip UPDATE if hash is identical.
@@ -2491,6 +2698,13 @@ async fn enrich_single_law(
             rights = {rights},
             responsibilities = {responsibilities},
             powers = {powers},
+            fitness_person = {fitness_person},
+            fitness_process = {fitness_process},
+            fitness_place = {fitness_place},
+            fitness_plant = {fitness_plant},
+            fitness_property = {fitness_property},
+            fitness_sector = {fitness_sector},
+            fitness = {fitness},
             taxa_hash = '{taxa_hash}'
          WHERE name = '{name}'",
         duty_holder = format_sql_list(taxa.duty_holders.iter().map(|s| s.as_str())),
@@ -2504,6 +2718,13 @@ async fn enrich_single_law(
         rights = format_sql_drrp_entries(&taxa.rights),
         responsibilities = format_sql_drrp_entries(&taxa.responsibilities),
         powers = format_sql_drrp_entries(&taxa.powers),
+        fitness_person = format_sql_list(taxa.fitness_persons.iter().map(|s| s.as_str())),
+        fitness_process = format_sql_list(taxa.fitness_processes.iter().map(|s| s.as_str())),
+        fitness_place = format_sql_list(taxa.fitness_places.iter().map(|s| s.as_str())),
+        fitness_plant = format_sql_list(taxa.fitness_plants.iter().map(|s| s.as_str())),
+        fitness_property = format_sql_list(taxa.fitness_properties.iter().map(|s| s.as_str())),
+        fitness_sector = format_sql_list(taxa.fitness_sectors.iter().map(|s| s.as_str())),
+        fitness = format_sql_fitness_entries(&taxa.fitness_entries),
         taxa_hash = new_hash,
         name = law_name.replace('\'', "''"),
     );
@@ -2518,8 +2739,9 @@ async fn cmd_taxa_enrich(
     law_filter: Option<Vec<String>>,
     force: bool,
 ) -> anyhow::Result<()> {
-    // Ensure taxa_hash/published_hash columns exist (idempotent).
+    // Ensure taxa_hash/published_hash and fitness columns exist (idempotent).
     store.ensure_taxa_hash_columns()?;
+    store.ensure_fitness_columns()?;
 
     let lance = LanceStore::open(&data_dir.join("lancedb"))
         .await
@@ -2537,6 +2759,13 @@ async fn cmd_taxa_enrich(
                 duty_type = NULL,
                 role = NULL,
                 role_gvt = NULL,
+                fitness_person = NULL,
+                fitness_process = NULL,
+                fitness_place = NULL,
+                fitness_plant = NULL,
+                fitness_property = NULL,
+                fitness_sector = NULL,
+                fitness = NULL,
                 taxa_hash = NULL",
         )?;
         eprintln!("  Done — all taxa columns set to NULL.");
@@ -3613,6 +3842,13 @@ fn compute_taxa_hash(
     rights: &[(String, String, String, String)],
     responsibilities: &[(String, String, String, String)],
     powers: &[(String, String, String, String)],
+    fitness_persons: &std::collections::BTreeSet<String>,
+    fitness_processes: &std::collections::BTreeSet<String>,
+    fitness_places: &std::collections::BTreeSet<String>,
+    fitness_plants: &std::collections::BTreeSet<String>,
+    fitness_properties: &std::collections::BTreeSet<String>,
+    fitness_sectors: &std::collections::BTreeSet<String>,
+    fitness_entries: &[FitnessEntry],
 ) -> String {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::hash::DefaultHasher::new();
@@ -3684,6 +3920,45 @@ fn compute_taxa_hash(
         a.hash(&mut hasher);
     }
 
+    // Fitness tag sets (BTreeSet — already sorted).
+    hasher.write_u8(0xFF);
+    for v in fitness_persons {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    for v in fitness_processes {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    for v in fitness_places {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    for v in fitness_plants {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    for v in fitness_properties {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    for v in fitness_sectors {
+        v.hash(&mut hasher);
+    }
+    hasher.write_u8(0xFF);
+    let mut sorted_fitness: Vec<_> = fitness_entries.iter().collect();
+    sorted_fitness.sort();
+    for (pol, per, proc, pl, plt, prop, sec, art) in sorted_fitness {
+        pol.hash(&mut hasher);
+        per.hash(&mut hasher);
+        proc.hash(&mut hasher);
+        pl.hash(&mut hasher);
+        plt.hash(&mut hasher);
+        prop.hash(&mut hasher);
+        sec.hash(&mut hasher);
+        art.hash(&mut hasher);
+    }
+
     format!("{:016x}", hasher.finish())
 }
 
@@ -3703,6 +3978,38 @@ fn format_sql_drrp_entries(entries: &[(String, String, String, String)]) -> Stri
                 esc(dt),
                 esc(clause),
                 esc(article)
+            )
+        })
+        .collect();
+    format!("[{}]", items.join(", "))
+}
+
+/// Format fitness entries as a DuckDB `List<Struct>` literal.
+fn format_sql_fitness_entries(entries: &[FitnessEntry]) -> String {
+    if entries.is_empty() {
+        return "NULL".to_string();
+    }
+    let esc = |s: &str| s.replace('\'', "''");
+    let null_or_val = |s: &str| {
+        if s.is_empty() {
+            "NULL".to_string()
+        } else {
+            format!("'{}'", esc(s))
+        }
+    };
+    let items: Vec<String> = entries
+        .iter()
+        .map(|(pol, per, proc, pl, plt, prop, sec, art)| {
+            format!(
+                "{{'polarity':{},'person':{},'process':{},'place':{},'plant':{},'property':{},'sector':{},'article':{}}}",
+                null_or_val(pol),
+                null_or_val(per),
+                null_or_val(proc),
+                null_or_val(pl),
+                null_or_val(plt),
+                null_or_val(prop),
+                null_or_val(sec),
+                null_or_val(art),
             )
         })
         .collect();
@@ -3794,6 +4101,13 @@ mod tests {
             &[],
             &[],
             &[],
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &[],
         );
         let h2 = compute_taxa_hash(
             &dh,
@@ -3806,6 +4120,13 @@ mod tests {
             &duties,
             &[],
             &[],
+            &[],
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
             &[],
         );
         assert_eq!(h1, h2, "same input must produce same hash");
@@ -3829,6 +4150,13 @@ mod tests {
             &[],
             &[],
             &[],
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &[],
         );
 
         let dh2: BTreeSet<String> = ["employee".into()].into();
@@ -3843,6 +4171,13 @@ mod tests {
             &[],
             &[],
             &[],
+            &[],
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
+            &empty_set,
             &[],
         );
         assert_ne!(h1, h2, "different input must produce different hash");

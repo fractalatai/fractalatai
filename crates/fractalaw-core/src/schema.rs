@@ -24,6 +24,20 @@ pub mod esh {
         ])
     }
 
+    /// Struct fields for `FitnessEntry` — used in fitness detail `List<Struct>` column.
+    fn fitness_entry_struct() -> Fields {
+        Fields::from(vec![
+            Field::new("polarity", DataType::Utf8, true),
+            Field::new("person", DataType::Utf8, true),
+            Field::new("process", DataType::Utf8, true),
+            Field::new("place", DataType::Utf8, true),
+            Field::new("plant", DataType::Utf8, true),
+            Field::new("property", DataType::Utf8, true),
+            Field::new("sector", DataType::Utf8, true),
+            Field::new("article", DataType::Utf8, true),
+        ])
+    }
+
     /// Timestamp(Nanosecond, UTC) — the standard timestamp type for all tables.
     fn timestamp_ns_utc() -> DataType {
         DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into()))
@@ -136,6 +150,22 @@ pub mod esh {
             // 1.10b Taxa Change Tracking (2)
             Field::new("taxa_hash", DataType::Utf8, true),
             Field::new("published_hash", DataType::Utf8, true),
+            // 1.10c Fitness / Applicability (7)
+            Field::new("fitness_person", list_utf8.clone(), true),
+            Field::new("fitness_process", list_utf8.clone(), true),
+            Field::new("fitness_place", list_utf8.clone(), true),
+            Field::new("fitness_plant", list_utf8.clone(), true),
+            Field::new("fitness_property", list_utf8.clone(), true),
+            Field::new("fitness_sector", list_utf8.clone(), true),
+            Field::new(
+                "fitness",
+                DataType::List(Arc::new(Field::new(
+                    "item",
+                    DataType::Struct(fitness_entry_struct()),
+                    true,
+                ))),
+                true,
+            ),
             // 1.11 Annotation Totals (4)
             Field::new("total_text_amendments", DataType::Int32, true),
             Field::new("total_modifications", DataType::Int32, true),
@@ -262,7 +292,43 @@ pub mod esh {
             Field::new("clause_refined", DataType::Utf8, true),
             Field::new("taxa_confidence", DataType::Float32, true),
             Field::new("taxa_classified_at", timestamp_ns_utc(), true),
-            // 3.10 AI-Refined DRRP — polisher output stored back in LanceDB (7)
+            // 3.10 Fitness — per-provision applicability tags (7)
+            Field::new(
+                "fitness_polarity",
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            Field::new(
+                "fitness_person",
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            Field::new(
+                "fitness_process",
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            Field::new(
+                "fitness_place",
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            Field::new(
+                "fitness_plant",
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            Field::new(
+                "fitness_property",
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            Field::new(
+                "fitness_sector",
+                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+                true,
+            ),
+            // 3.11 AI-Refined DRRP — polisher output stored back in LanceDB (7)
             Field::new("ai_holder", DataType::Utf8, true),
             Field::new("ai_clause", DataType::Utf8, true),
             Field::new("ai_qualifier", DataType::Utf8, true),
@@ -365,7 +431,7 @@ mod tests {
 
     #[test]
     fn legislation_schema_field_count() {
-        assert_eq!(esh::legislation_schema().fields().len(), 91);
+        assert_eq!(esh::legislation_schema().fields().len(), 98);
     }
 
     #[test]
@@ -375,7 +441,7 @@ mod tests {
 
     #[test]
     fn legislation_text_schema_field_count() {
-        assert_eq!(esh::legislation_text_schema().fields().len(), 47);
+        assert_eq!(esh::legislation_text_schema().fields().len(), 54);
     }
 
     #[test]
@@ -628,6 +694,31 @@ mod tests {
                 },
                 other => panic!("{col}: expected List, got {other:?}"),
             }
+        }
+    }
+
+    // ── Fitness entry struct ──
+
+    #[test]
+    fn fitness_entry_struct_has_8_fields() {
+        let schema = esh::legislation_schema();
+        let field = schema.field_with_name("fitness").unwrap();
+        match field.data_type() {
+            DataType::List(inner) => match inner.data_type() {
+                DataType::Struct(fields) => {
+                    assert_eq!(fields.len(), 8);
+                    assert!(fields.iter().any(|f| f.name() == "polarity"));
+                    assert!(fields.iter().any(|f| f.name() == "person"));
+                    assert!(fields.iter().any(|f| f.name() == "process"));
+                    assert!(fields.iter().any(|f| f.name() == "place"));
+                    assert!(fields.iter().any(|f| f.name() == "plant"));
+                    assert!(fields.iter().any(|f| f.name() == "property"));
+                    assert!(fields.iter().any(|f| f.name() == "sector"));
+                    assert!(fields.iter().any(|f| f.name() == "article"));
+                }
+                other => panic!("expected Struct, got {other:?}"),
+            },
+            other => panic!("expected List, got {other:?}"),
         }
     }
 
