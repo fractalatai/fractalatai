@@ -17,6 +17,7 @@ use regex::Regex;
 pub enum DutyFamily {
     Government,
     Governed,
+    Rule,
     Unknown,
 }
 
@@ -45,6 +46,8 @@ pub enum DutySubType {
     // Shared
     Prescriptive,
     Enabling,
+    // Rule (thing-subject)
+    ThingObligation,
     // Fallback
     Unclassified,
 }

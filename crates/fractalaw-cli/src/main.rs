@@ -2917,6 +2917,9 @@ async fn enrich_single_law(
                     fractalaw_core::taxa::duty_type::DutyType::Power => {
                         (&mut taxa.power_holders, &mut taxa.powers)
                     }
+                    fractalaw_core::taxa::duty_type::DutyType::Rule => {
+                        (&mut taxa.duty_holders, &mut taxa.duties)
+                    }
                 };
                 for actor in &record.governed_actors {
                     holders_set.insert(actor.clone());
@@ -2936,6 +2939,36 @@ async fn enrich_single_law(
                     clause_preview.clone(),
                     article.clone(),
                 ));
+            }
+        }
+    }
+
+    // Phase 2: Actor back-linking — infer holder for Rule provisions.
+    // Find the most frequent governed actor across all DRRP entries,
+    // then replace "Unknown" holders in RULE entries with that actor.
+    {
+        let mut actor_freq: std::collections::HashMap<&str, usize> =
+            std::collections::HashMap::new();
+        for (holder, duty_type, _, _) in &taxa.duties {
+            if duty_type != "RULE" && holder != "Unknown" {
+                *actor_freq.entry(holder.as_str()).or_default() += 1;
+            }
+        }
+        // Also count from rights, responsibilities, powers
+        for entries in [&taxa.rights, &taxa.responsibilities, &taxa.powers] {
+            for (holder, _, _, _) in entries {
+                if holder != "Unknown" {
+                    *actor_freq.entry(holder.as_str()).or_default() += 1;
+                }
+            }
+        }
+        if let Some((&dominant_actor, _)) = actor_freq.iter().max_by_key(|&(_, &count)| count) {
+            let inferred = format!("{dominant_actor} (inferred)");
+            for entry in &mut taxa.duties {
+                if entry.1 == "RULE" && entry.0 == "Unknown" {
+                    entry.0 = inferred.clone();
+                    taxa.duty_holders.insert(inferred.clone());
+                }
             }
         }
     }

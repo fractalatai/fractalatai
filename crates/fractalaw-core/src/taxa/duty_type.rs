@@ -11,6 +11,7 @@
 
 use super::actors::ActorMatch;
 use super::duty_patterns::{self, DutyClassification, DutyFamily, DutySubType};
+use super::duty_patterns_rule;
 use super::duty_patterns_v2;
 
 /// The four DRRP duty-type labels.
@@ -20,6 +21,7 @@ pub enum DutyType {
     Right,
     Responsibility,
     Power,
+    Rule,
 }
 
 impl DutyType {
@@ -30,6 +32,7 @@ impl DutyType {
             Self::Right => "Right",
             Self::Responsibility => "Responsibility",
             Self::Power => "Power",
+            Self::Rule => "Rule",
         }
     }
 
@@ -40,6 +43,7 @@ impl DutyType {
             Self::Right => 2,
             Self::Responsibility => 3,
             Self::Power => 4,
+            Self::Rule => 5,
         }
     }
 }
@@ -85,6 +89,10 @@ pub fn classify(
     if let Some(dc) = duty_patterns::match_government_v2(text) {
         return to_result(dc);
     }
+    // Tier 4: Rule (thing-subject + modal — no person-actor)
+    if let Some(dc) = duty_patterns_rule::match_rule(text) {
+        return to_result(dc);
+    }
     // No match
     ClassificationResult {
         duty_types: Vec::new(),
@@ -128,6 +136,7 @@ fn map_to_duty_type(dc: &DutyClassification) -> Vec<DutyType> {
                 }
             }
         },
+        DutyFamily::Rule => vec![DutyType::Rule],
         DutyFamily::Unknown => Vec::new(),
     }
 }
@@ -154,6 +163,7 @@ impl DutySubType {
             Self::TrainingDuty => "training duty",
             Self::Prescriptive => "prescriptive",
             Self::Enabling => "enabling",
+            Self::ThingObligation => "thing obligation",
             Self::Unclassified => "unclassified",
         }
     }
@@ -266,5 +276,22 @@ mod tests {
         assert_eq!(DutyType::Right.as_str(), "Right");
         assert_eq!(DutyType::Responsibility.as_str(), "Responsibility");
         assert_eq!(DutyType::Power.as_str(), "Power");
+        assert_eq!(DutyType::Rule.as_str(), "Rule");
+    }
+
+    #[test]
+    fn classify_thing_subject_as_rule() {
+        let text = "every traffic routes must be suitable for the persons using them";
+        let result = classify(text, &[], &[]);
+        assert_eq!(result.duty_types, vec![DutyType::Rule]);
+    }
+
+    #[test]
+    fn person_takes_precedence_over_thing() {
+        // "employer" is a governed actor → Governed tier wins over Rule
+        let text = "the employer shall ensure that equipment is suitable";
+        let actors = vec![actor("Org: Employer", "employer")];
+        let result = classify(text, &actors, &[]);
+        assert_eq!(result.duty_types, vec![DutyType::Duty]);
     }
 }
