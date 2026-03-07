@@ -185,6 +185,30 @@ GROUP BY r.name;
 .print '✓ Built spl_rescinded_by'
 
 -- ---------------------------------------------------------------------------
+-- 2b. Commencement status (derived from law_edges)
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE commencement_status AS
+WITH per_law AS (
+    SELECT target_name AS law_name,
+           count(*) FILTER (WHERE applied_status IN ('Yes', 'Y')) AS applied,
+           count(*) FILTER (WHERE applied_status LIKE 'Not yet%') AS not_yet
+    FROM read_parquet('data/law_edges.parquet')
+    WHERE affect_type ILIKE 'coming into force'
+       OR affect_type ILIKE 'Commencement Order'
+    GROUP BY target_name
+)
+SELECT law_name,
+       CASE
+           WHEN not_yet = 0 THEN 'fully_commenced'
+           WHEN applied = 0 THEN 'not_commenced'
+           ELSE 'partially_commenced'
+       END AS commencement_status
+FROM per_law;
+
+.print '✓ Built commencement_status'
+
+-- ---------------------------------------------------------------------------
 -- 3. Export legislation.parquet
 -- ---------------------------------------------------------------------------
 
@@ -287,16 +311,19 @@ COPY (
         extract_drrp_entries(r.responsibilities) AS responsibilities,
         extract_drrp_entries(r.powers) AS powers,
 
-        -- 1.10 Annotation Totals (4) — backfilled from annotation_totals.parquet
+        -- 1.10 Commencement Status (1) — derived from law_edges
+        cs.commencement_status,
+
+        -- 1.11 Annotation Totals (4) — backfilled from annotation_totals.parquet
         ann.total_text_amendments,
         ann.total_modifications,
         ann.total_commencements,
         ann.total_extents,
 
-        -- 1.11 Change Logs (1)
+        -- 1.12 Change Logs (1)
         r.record_change_log::VARCHAR AS change_log,
 
-        -- 1.12 Timestamps (2)
+        -- 1.13 Timestamps (2)
         CAST(r.created_at AS TIMESTAMP) AS created_at,
         CAST(r.updated_at AS TIMESTAMP) AS updated_at
 
@@ -306,6 +333,7 @@ COPY (
     LEFT JOIN spl_rescinding sr ON sr.law_name = r.name
     LEFT JOIN spl_rescinded_by srb ON srb.law_name = r.name
     LEFT JOIN read_parquet('data/annotation_totals.parquet') ann ON ann.name = r.name
+    LEFT JOIN commencement_status cs ON cs.law_name = r.name
 )
 TO 'data/legislation.parquet' (FORMAT PARQUET, COMPRESSION ZSTD);
 

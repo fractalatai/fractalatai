@@ -709,7 +709,7 @@ mod tests {
 
         let batch = store.get_legislation("UK_ukpga_1974_37").unwrap();
         assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 78);
+        assert_eq!(batch.num_columns(), 79);
     }
 
     #[test]
@@ -832,7 +832,7 @@ mod tests {
         let store = DuckStore::open_persistent(&db_path).unwrap();
         let batch = store.get_legislation("UK_ukpga_1974_37").unwrap();
         assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 78);
+        assert_eq!(batch.num_columns(), 79);
 
         let edges = store.edges_for_law("UK_ukpga_1974_37").unwrap();
         let total_edges: usize = edges.iter().map(|b| b.num_rows()).sum();

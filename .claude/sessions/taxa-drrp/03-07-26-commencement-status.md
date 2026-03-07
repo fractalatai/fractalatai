@@ -46,37 +46,56 @@ Verified end-to-end:
 
 Derive a high-level `commencement_status` enum from edge-level `applied_status` data. This tells users at a glance whether a law is in force.
 
-### Approach
+### Research findings
 
-Aggregate `applied_status` from `law_edges` where `edge_type` involves commencement:
+- `affect_type ILIKE 'coming into force'` is the main commencement signal (234K edges)
+- `affect_type ILIKE 'Commencement Order'` adds 2,350 more
+- `applied_status` values: `Yes`/`Y` (applied), `Not yet` (pending), `Not yet made to Welsh...` (partial), `See note` (ambiguous)
+- Edge types are not commencement-specific; `affect_type` is the discriminant
+- 2,267 laws in LRT have commencement edges as targets
 
-```
-fully_commenced    — all commencement edges have applied_status = 'Yes'
-partially_commenced — mix of 'Yes' and 'Not yet'
-not_commenced      — all edges have applied_status = 'Not yet'
-no_commencement_data — no commencement edges exist (most SIs)
-```
+### Changes
 
-### New LRT columns
+#### `data/export_legislation.sql`
 
-| Column | Arrow Type | Nullable | Description |
-|--------|-----------|----------|-------------|
-| `commencement_status` | Utf8 | yes | Enum: `fully_commenced`, `partially_commenced`, `not_commenced`, `no_commencement_data` |
-| `commencement_date` | Date32 | yes | Date of full commencement (null if partial/not commenced) |
+Added `commencement_status` table (section 2b) derived from `law_edges.parquet`:
+- Filter edges where `affect_type ILIKE 'coming into force'` or `'Commencement Order'`
+- Per-law: count applied (`Yes`/`Y`) vs not-yet (`Not yet%`)
+- Classify: `fully_commenced` (no not-yet), `not_commenced` (no applied), `partially_commenced` (mix)
+- LEFT JOIN onto legislation export as `cs.commencement_status`
+- Laws without commencement edges get NULL (no_commencement_data implied)
 
-### Research needed
+#### `crates/fractalaw-core/src/schema.rs`
 
-- Survey `law_edges` to count how many laws have commencement-related edges
-- Determine whether `edge_type` values distinguish commencement from other relationships
-- Check if `applied_status = 'Not yet'` reliably maps to "not commenced" vs "amendment not applied"
+- Added `commencement_status` (Utf8, nullable) field after section 1.9
+- Updated doc comment: 78 -> 79 columns
+- Updated field count test: 98 -> 99
 
-### Files to modify
+#### `crates/fractalaw-store/src/duck.rs`
 
-| File | Change |
-|------|--------|
-| `crates/fractalaw-core/src/schema.rs` | Add `commencement_status` and `commencement_date` columns |
-| `data/export_legislation.sql` | Derive status from edge aggregation |
-| `docs/SCHEMA.md` | Document new columns |
-| `crates/fractalaw-cli/src/display.rs` | Add to law card display |
+- Updated 2 column count assertions: 78 -> 79
 
-## Status: Phase 1 complete, Phase 2 pending research
+#### `crates/fractalaw-cli/src/display.rs`
+
+- Added `commencement_status` to STATUS section (displays alongside `status`)
+
+### Results
+
+| commencement_status | Laws |
+|---------------------|------|
+| fully_commenced | 1,855 |
+| not_commenced | 329 |
+| partially_commenced | 83 |
+| NULL (no data) | 17,051 |
+
+Verified:
+- `fractalaw law UK_ukpga_2007_19`: shows `commencement_status: fully_commenced`
+- Partially commenced laws correctly identified (e.g., UK_ukpga_2025_36)
+- 361 tests pass
+
+### Deferred
+
+- `commencement_date` column: requires extracting dates from edges, lower priority
+- `docs/SCHEMA.md` update: can be done in a follow-up
+
+## Status: Phase 1 + Phase 2 complete

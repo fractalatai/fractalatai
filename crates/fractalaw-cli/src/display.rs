@@ -65,6 +65,7 @@ const DOC_STATS: &[&str] = &[
 
 const STATUS: &[&str] = &[
     "status",
+    "commencement_status",
     "status_source",
     "status_conflict",
     "status_conflict_detail",

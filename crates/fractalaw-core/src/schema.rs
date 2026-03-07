@@ -45,7 +45,7 @@ pub mod esh {
 
     /// Schema for the `legislation` table (LRT) — hot path.
     ///
-    /// One row per law. 78 columns covering identity, classification, dates,
+    /// One row per law. 79 columns covering identity, classification, dates,
     /// territorial extent, document stats, status, function, denormalized
     /// relationships, DRRP taxa, annotation totals, change logs, and timestamps.
     pub fn legislation_schema() -> Schema {
@@ -166,6 +166,8 @@ pub mod esh {
                 ))),
                 true,
             ),
+            // 1.10 Commencement Status (1)
+            Field::new("commencement_status", DataType::Utf8, true),
             // 1.11 Annotation Totals (4)
             Field::new("total_text_amendments", DataType::Int32, true),
             Field::new("total_modifications", DataType::Int32, true),
@@ -431,7 +433,7 @@ mod tests {
 
     #[test]
     fn legislation_schema_field_count() {
-        assert_eq!(esh::legislation_schema().fields().len(), 98);
+        assert_eq!(esh::legislation_schema().fields().len(), 99);
     }
 
     #[test]
