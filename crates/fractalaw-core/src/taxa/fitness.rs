@@ -82,6 +82,8 @@ pub struct FitnessRule {
     pub tags: Vec<PDimensionTag>,
     /// The raw text this rule was extracted from.
     pub raw_text: String,
+    /// Cross-references to other provisions detected in the text.
+    pub cross_refs: Vec<String>,
 }
 
 // ── Polarity detection ──────────────────────────────────────────────
@@ -109,6 +111,14 @@ static APPLIES_RE: LazyLock<Regex> = LazyLock::new(|| {
     ).unwrap()
 });
 
+/// Detect references to other provisions (regulation N, paragraph N, schedule N, etc.).
+static CROSS_REF_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)\b(?:regulation|paragraph|sub-paragraph|section|article|schedule|part)\s+[\d(]+[\d().a-z]*",
+    )
+    .unwrap()
+});
+
 fn detect_polarity(text: &str) -> Option<RulePolarity> {
     // Order matters: check negative before positive
     if DISAPPLIES_RE.is_match(text) {
@@ -121,6 +131,17 @@ fn detect_polarity(text: &str) -> Option<RulePolarity> {
         return Some(RulePolarity::AppliesTo);
     }
     None
+}
+
+fn detect_cross_refs(text: &str) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    CROSS_REF_RE
+        .find_iter(text)
+        .filter_map(|m| {
+            let s = m.as_str().to_string();
+            seen.insert(s.to_lowercase()).then_some(s)
+        })
+        .collect()
 }
 
 // ── P-dimension dictionaries ────────────────────────────────────────
@@ -406,10 +427,12 @@ pub fn extract(text: &str, family: Option<&str>) -> Vec<FitnessRule> {
     };
 
     let tags = extract_tags(text, family);
+    let cross_refs = detect_cross_refs(text);
     vec![FitnessRule {
         polarity,
         tags,
         raw_text: text.to_string(),
+        cross_refs,
     }]
 }
 
@@ -508,11 +531,13 @@ fn try_split_compound(text: &str, family: Option<&str>) -> Option<Vec<FitnessRul
             polarity: pol_a,
             tags: tags_a,
             raw_text: part_a.trim().to_string(),
+            cross_refs: detect_cross_refs(part_a),
         },
         FitnessRule {
             polarity: pol_b,
             tags: tags_b,
             raw_text: part_b.trim().to_string(),
+            cross_refs: detect_cross_refs(part_b),
         },
     ])
 }
@@ -896,5 +921,51 @@ mod tests {
         let text = "These Regulations shall apply to machinery used at work.";
         let rules = extract(text, Some("OH&S: Occupational / Personal Safety"));
         assert!(has_tag(&rules[0], PDimension::Plant, "machinery"));
+    }
+
+    // ── Cross-reference detection ────────────────────────────────────
+
+    #[test]
+    fn cross_ref_regulation_detected() {
+        let text = "Regulation 11(11) shall not apply in relation to any visiting force.";
+        let rules = extract(text, None);
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].cross_refs, vec!["Regulation 11(11)"]);
+    }
+
+    #[test]
+    fn cross_ref_paragraph_detected() {
+        let text = "paragraph (2) shall not apply to fumigations using the fumigant specified in Column 1.";
+        let rules = extract(text, None);
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].cross_refs, vec!["paragraph (2)"]);
+    }
+
+    #[test]
+    fn cross_ref_schedule_detected() {
+        let text = "Schedule 5 shall have effect.";
+        let rules = extract(text, None);
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].cross_refs, vec!["Schedule 5"]);
+    }
+
+    #[test]
+    fn cross_ref_multiple_deduplicated() {
+        let text = "Regulation 16A and regulation 17A do not apply in circumstances where regulation 16 and regulation 17 apply to the same premises.";
+        let rules = extract(text, None);
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].cross_refs.len(), 4);
+        assert!(rules[0].cross_refs.contains(&"Regulation 16A".to_string()));
+        assert!(rules[0].cross_refs.contains(&"regulation 17A".to_string()));
+        assert!(rules[0].cross_refs.contains(&"regulation 16".to_string()));
+        assert!(rules[0].cross_refs.contains(&"regulation 17".to_string()));
+    }
+
+    #[test]
+    fn no_cross_ref_when_none_present() {
+        let text = "These Regulations shall apply to every employer and self-employed person.";
+        let rules = extract(text, None);
+        assert_eq!(rules.len(), 1);
+        assert!(rules[0].cross_refs.is_empty());
     }
 }

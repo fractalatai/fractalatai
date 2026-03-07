@@ -2261,8 +2261,10 @@ async fn cmd_taxa_audit_fitness(
         polarity_matched: usize,
         with_tags: usize,
         gap_count: usize,
+        cross_ref_count: usize,
         no_polarity_count: usize,
         gap_provisions: Vec<GapProvision>,
+        cross_ref_provisions: Vec<GapProvision>,
         no_polarity_provisions: Vec<String>,
         term_hits: HashMap<String, usize>,
     }
@@ -2287,8 +2289,10 @@ async fn cmd_taxa_audit_fitness(
                 polarity_matched: 0,
                 with_tags: 0,
                 gap_count: 0,
+                cross_ref_count: 0,
                 no_polarity_count: 0,
                 gap_provisions: Vec::new(),
+                cross_ref_provisions: Vec::new(),
                 no_polarity_provisions: Vec::new(),
                 term_hits: HashMap::new(),
             });
@@ -2339,11 +2343,19 @@ async fn cmd_taxa_audit_fitness(
                     }
 
                     if rule.tags.is_empty() {
-                        stats.gap_count += 1;
-                        stats.gap_provisions.push(GapProvision {
-                            law_name: law_name.clone(),
-                            raw_text: rule.raw_text.clone(),
-                        });
+                        if rule.cross_refs.is_empty() {
+                            stats.gap_count += 1;
+                            stats.gap_provisions.push(GapProvision {
+                                law_name: law_name.clone(),
+                                raw_text: rule.raw_text.clone(),
+                            });
+                        } else {
+                            stats.cross_ref_count += 1;
+                            stats.cross_ref_provisions.push(GapProvision {
+                                law_name: law_name.clone(),
+                                raw_text: rule.raw_text.clone(),
+                            });
+                        }
                     } else {
                         provision_has_tags = true;
                     }
@@ -2366,27 +2378,29 @@ async fn cmd_taxa_audit_fitness(
         family_stats.len()
     );
     println!(
-        "{:<45} {:>8} {:>10} {:>10} {:>8}",
-        "Family", "AppScope", "Polarity%", "Tagged%", "Gaps"
+        "{:<45} {:>8} {:>10} {:>10} {:>8} {:>8}",
+        "Family", "AppScope", "Polarity%", "Tagged%", "Gaps", "CrossRef"
     );
-    println!("{}", "-".repeat(85));
+    println!("{}", "-".repeat(95));
 
     let mut corpus_app = 0usize;
     let mut corpus_pol = 0usize;
     let mut corpus_tag = 0usize;
     let mut corpus_gap = 0usize;
+    let mut corpus_xref = 0usize;
 
     for (fam, s) in &family_stats {
         corpus_app += s.total_app_scope;
         corpus_pol += s.polarity_matched;
         corpus_tag += s.with_tags;
         corpus_gap += s.gap_count;
+        corpus_xref += s.cross_ref_count;
 
         if s.total_app_scope == 0 {
             continue;
         }
         println!(
-            "{:<45} {:>8} {:>9.1}% {:>9.1}% {:>8}",
+            "{:<45} {:>8} {:>9.1}% {:>9.1}% {:>8} {:>8}",
             truncate_name(fam, 45),
             s.total_app_scope,
             if s.total_app_scope > 0 {
@@ -2400,11 +2414,12 @@ async fn cmd_taxa_audit_fitness(
                 0.0
             },
             s.gap_count,
+            s.cross_ref_count,
         );
     }
-    println!("{}", "-".repeat(85));
+    println!("{}", "-".repeat(95));
     println!(
-        "{:<45} {:>8} {:>9.1}% {:>9.1}% {:>8}",
+        "{:<45} {:>8} {:>9.1}% {:>9.1}% {:>8} {:>8}",
         "CORPUS",
         corpus_app,
         if corpus_app > 0 {
@@ -2418,15 +2433,16 @@ async fn cmd_taxa_audit_fitness(
             0.0
         },
         corpus_gap,
+        corpus_xref,
     );
 
     // ── Section 2: Gap Provisions ──
 
-    println!("\n=== Section 2: Gap Provisions (polarity but 0 tags) ===\n");
+    println!("\n=== Section 2: Vocabulary Gaps (polarity, 0 tags, no cross-ref) ===\n");
 
     let any_gaps = family_stats.values().any(|s| !s.gap_provisions.is_empty());
     if !any_gaps {
-        println!("  None — all provisions with polarity have at least one tag.\n");
+        println!("  None — all non-cross-ref provisions with polarity have at least one tag.\n");
     } else {
         for (fam, s) in &family_stats {
             if s.gap_provisions.is_empty() {
@@ -2444,6 +2460,43 @@ async fn cmd_taxa_audit_fitness(
                 show
             );
             for gp in s.gap_provisions.iter().take(show) {
+                let trunc = if gp.raw_text.len() > 120 {
+                    format!("{}...", &gp.raw_text[..120])
+                } else {
+                    gp.raw_text.clone()
+                };
+                println!("  [{}] {}", truncate_name(&gp.law_name, 25), trunc);
+            }
+            println!();
+        }
+    }
+
+    // ── Section 2b: Cross-Reference Provisions ──
+
+    println!("=== Section 2b: Cross-Reference Provisions (polarity, 0 tags, has cross-ref) ===\n");
+
+    let any_xref = family_stats
+        .values()
+        .any(|s| !s.cross_ref_provisions.is_empty());
+    if !any_xref {
+        println!("  None — no cross-reference provisions detected.\n");
+    } else {
+        for (fam, s) in &family_stats {
+            if s.cross_ref_provisions.is_empty() {
+                continue;
+            }
+            let show = if limit == 0 {
+                s.cross_ref_provisions.len()
+            } else {
+                limit.min(s.cross_ref_provisions.len())
+            };
+            println!(
+                "--- {} ({} cross-ref, showing {}) ---",
+                fam,
+                s.cross_ref_provisions.len(),
+                show
+            );
+            for gp in s.cross_ref_provisions.iter().take(show) {
                 let trunc = if gp.raw_text.len() > 120 {
                     format!("{}...", &gp.raw_text[..120])
                 } else {
