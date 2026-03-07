@@ -2,6 +2,34 @@
 
 Tracking how issue priorities shift as the project evolves.
 
+## 2026-03-07 — Post #8 Commencement Status Denormalization
+
+Context: #8 implemented in two phases. Phase 1 (5b93360): backfill annotation totals — LEFT JOIN `annotation_totals.parquet` into `export_legislation.sql`, 128 laws now have `total_text_amendments`/`total_modifications`/`total_commencements`/`total_extents`. Phase 2 (e6b7579): derive `commencement_status` from `law_edges` commencement edges — 1,855 fully_commenced, 329 not_commenced, 83 partially_commenced. SCHEMA.md updated to v0.8 (6ab39cd). Filed #29 (commencement_date follow-up).
+
+### What shifted
+
+- **#8 substantially complete** — both annotation totals and semantic commencement status are on the LRT. Remaining work (#29 commencement_date) is incremental.
+- **#25 rises to P1** — Zenoh WAN sync is the next infrastructure target. All LRT enrichment work (#7 fitness, #8 commencement, #16 Rule) is now done.
+- **#29 (NEW)** — commencement_date column, filed as follow-up to #8. Low priority.
+
+### Priority order (post #8)
+
+| Priority | Issue | Effort | Rationale |
+|----------|-------|--------|-----------|
+| 1 | **#25** — Zenoh WAN sync | Medium | Production infrastructure; all LRT enrichment complete |
+| — | #29 | Low | Commencement date extraction (follow-up to #8) |
+| — | #27 | Ongoing | Vocabulary gaps tracker (12 gaps remaining) |
+| — | #28 | Medium | Intra-law cross-ref resolution (66 cross-refs) |
+| — | #18, #19 | High | Blocked on Phase C architecture |
+| — | #14, #12, #10, #6, #5, #4, #2, #1 | High | Future / large scope |
+
+### Closed this session
+
+- **#8** — Commencement status denormalization (5b93360 + e6b7579, 2,267 laws with status)
+- **#16** — Rule classification + actor back-linking (b429f17)
+
+---
+
 ## 2026-03-07 — Post #16 Rule Classification + Actor Back-Linking
 
 Context: #16 implemented and closed (b429f17). Phase 1: Rule detection via thing-subject + modal matcher (45 keywords, 80-char window, person negative guard). Phase 2: actor back-linking infers duty holder from dominant governed actor. Phase 3: LanceDB fitness column migration (7 `List<Utf8>` columns added via `add_columns()` API). CDM 2015: 26 Rule provisions detected, DRRP provisions 63→89 (+41%). 361 tests pass.
