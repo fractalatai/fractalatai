@@ -287,11 +287,11 @@ COPY (
         extract_drrp_entries(r.responsibilities) AS responsibilities,
         extract_drrp_entries(r.powers) AS powers,
 
-        -- 1.10 Annotation Totals (4) — not in legacy data
-        NULL::INTEGER AS total_text_amendments,
-        NULL::INTEGER AS total_modifications,
-        NULL::INTEGER AS total_commencements,
-        NULL::INTEGER AS total_extents,
+        -- 1.10 Annotation Totals (4) — backfilled from annotation_totals.parquet
+        ann.total_text_amendments,
+        ann.total_modifications,
+        ann.total_commencements,
+        ann.total_extents,
 
         -- 1.11 Change Logs (1)
         r.record_change_log::VARCHAR AS change_log,
@@ -305,6 +305,7 @@ COPY (
     LEFT JOIN spl_affected_by sab ON sab.law_name = r.name
     LEFT JOIN spl_rescinding sr ON sr.law_name = r.name
     LEFT JOIN spl_rescinded_by srb ON srb.law_name = r.name
+    LEFT JOIN read_parquet('data/annotation_totals.parquet') ann ON ann.name = r.name
 )
 TO 'data/legislation.parquet' (FORMAT PARQUET, COMPRESSION ZSTD);
 
@@ -427,6 +428,13 @@ SELECT count(*) AS rows,
        count(status) AS has_status,
        count(amended_by) AS has_amended_by,
        count(duties) AS has_duties
+FROM read_parquet('data/legislation.parquet');
+
+SELECT '── annotation totals ──' AS "";
+SELECT count(*) FILTER (WHERE total_commencements IS NOT NULL) AS has_commencements,
+       count(*) FILTER (WHERE total_text_amendments IS NOT NULL) AS has_amendments,
+       count(*) FILTER (WHERE total_modifications IS NOT NULL) AS has_modifications,
+       count(*) FILTER (WHERE total_extents IS NOT NULL) AS has_extents
 FROM read_parquet('data/legislation.parquet');
 
 SELECT '── law_edges.parquet ──' AS "";

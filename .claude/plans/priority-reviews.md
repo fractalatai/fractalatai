@@ -2,6 +2,34 @@
 
 Tracking how issue priorities shift as the project evolves.
 
+## 2026-03-07 — Post #16 Rule Classification + Actor Back-Linking
+
+Context: #16 implemented and closed (b429f17). Phase 1: Rule detection via thing-subject + modal matcher (45 keywords, 80-char window, person negative guard). Phase 2: actor back-linking infers duty holder from dominant governed actor. Phase 3: LanceDB fitness column migration (7 `List<Utf8>` columns added via `add_columns()` API). CDM 2015: 26 Rule provisions detected, DRRP provisions 63→89 (+41%). 361 tests pass.
+
+### What shifted
+
+- **#16 closed** — Rule classification captures ~8% of obligation-bearing provisions that were invisible. Actor back-linking provides useful duty holder inference. End-to-end enrichment verified.
+- **DRRP pipeline is now feature-complete** — all 5 classification types (Duty, Right, Responsibility, Power, Rule) implemented with actor extraction.
+- **#8 rises to P1** — commencement status denormalization is the next LRT enrichment target. However, the Feb 19 comment on #8 notes it's blocked on LAT schema cleanup (section_id collision, annotation ID uniqueness).
+- **#25 unchanged** — Zenoh WAN sync remains production infrastructure work.
+
+### Priority order (post #16)
+
+| Priority | Issue | Effort | Rationale |
+|----------|-------|--------|-----------|
+| 1 | **#8** — Denormalize commencement status onto LRT | Medium | Next LRT enrichment; blocked on LAT schema cleanup |
+| 2 | **#25** — Zenoh WAN sync | Medium | Production infrastructure, not urgent for dev |
+| — | #27 | Ongoing | Vocabulary gaps tracker (12 gaps remaining) |
+| — | #28 | Medium | Intra-law cross-ref resolution (66 cross-refs) |
+| — | #18, #19 | High | Blocked on Phase C architecture |
+| — | #14, #12, #10, #6, #5, #4, #2, #1 | High | Future / large scope |
+
+### Closed this session
+
+- **#16** — Rule classification + actor back-linking (b429f17, 26 Rule provisions in CDM 2015, +41% DRRP coverage)
+
+---
+
 ## 2026-03-07 — Post #26 APPLICATION_SCOPE Priority Bug Fix
 
 Context: #26 fixed (e5e141c). Both `parse_v2()` code paths now use `purposes.contains()` instead of `purposes.first()`. 95 provisions that were silently skipped now get fitness extraction. Polarity% 81.4→99.0%, Tagged% 58.5→79.6%, no-polarity 99→4. Also fixed per-provision audit counting bug.
