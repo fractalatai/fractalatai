@@ -2,6 +2,33 @@
 
 Tracking how issue priorities shift as the project evolves.
 
+## 2026-03-07 — Post #24 Purpose Classifier Investigation
+
+Context: #24 investigated and closed as "not planned". The APPLICATION_SCOPE regex in `purpose.rs` is universal — not OH&S-biased. Non-OH&S families (FOOD, TRANSPORT: Maritime Safety) returned zero APPLICATION_SCOPE provisions because their LAT text hasn't been synced to LanceDB from sertantai, not because the classifier fails on them. CLIMATE CHANGE (non-OH&S, with LAT data) shows 150 APPLICATION_SCOPE provisions with 90% polarity, proving the classifier works cross-family.
+
+### What shifted
+
+- **#24 closed as "not planned"** — the purpose classifier is universal; the real blocker for non-OH&S fitness is LAT population (syncing full-text law data from sertantai)
+- **LAT population is the true bottleneck** — families like FOOD and Maritime have DuckDB metadata but no provision text in LanceDB. Once sertantai syncs their text, the existing classifier + dictionary architecture will work immediately.
+- **#22, #16, #8, #25 unchanged** — no new evidence to reprioritize
+
+### Priority order (post #24)
+
+| Priority | Issue | Effort | Rationale |
+|----------|-------|--------|-----------|
+| 1 | **#22** — Cross-reference resolution | Medium | Valid but lower impact at 83% coverage |
+| 2 | **#16** — Add 'Rule' classification | Medium | Informed by #17 findings |
+| 3 | **#8** — Denormalize commencement status onto LRT | Medium | Useful metadata, no blockers |
+| 4 | **#25** — Zenoh WAN sync | Medium | Production infrastructure, not urgent for dev |
+| — | #18, #19 | High | Blocked on Phase C architecture |
+| — | #14, #12, #10, #6, #5, #4, #2, #1 | High | Future / large scope |
+
+### Closed this session
+
+- **#24** — Purpose classifier investigation (closed as "not planned" — classifier is universal, blocker is LAT population)
+
+---
+
 ## 2026-03-07 — Post #23 P-Dimension Dictionary Expansion
 
 Context: #23 implemented and closed (967adfd + 66cadcd). Two-tier dictionary architecture (Option A: runtime family lookup) with OH&S specialist dicts (19 terms). Gaps reduced 118→94 (tagged% 46.2→52.3%). Audit tooling (`taxa audit-fitness`) and runbook (`docs/FITNESS-DICTIONARY-RUNBOOK.md`) in place.
