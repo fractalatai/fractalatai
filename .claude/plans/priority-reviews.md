@@ -2,6 +2,34 @@
 
 Tracking how issue priorities shift as the project evolves.
 
+## 2026-03-07 — Post #26 APPLICATION_SCOPE Priority Bug Fix
+
+Context: #26 fixed (e5e141c). Both `parse_v2()` code paths now use `purposes.contains()` instead of `purposes.first()`. 95 provisions that were silently skipped now get fitness extraction. Polarity% 81.4→99.0%, Tagged% 58.5→79.6%, no-polarity 99→4. Also fixed per-provision audit counting bug.
+
+### What shifted
+
+- **#26 closed** — the single biggest fitness coverage improvement: 95 provisions unlocked. Remaining 4 no-polarity provisions are genuinely unparseable (no applicability vocabulary).
+- **Fitness pipeline is now mature** — 99% polarity detection, 79.6% tagged coverage for OH&S. Remaining work is incremental (#27 vocabulary gaps, #28 intra-law resolution).
+- **#16, #8, #25 unchanged** — no new evidence to reprioritize
+
+### Priority order (post #26)
+
+| Priority | Issue | Effort | Rationale |
+|----------|-------|--------|-----------|
+| 1 | **#16** — Add 'Rule' classification | Medium | Informed by #17 findings |
+| 2 | **#8** — Denormalize commencement status onto LRT | Medium | Useful metadata, no blockers |
+| 3 | **#25** — Zenoh WAN sync | Medium | Production infrastructure, not urgent for dev |
+| — | #27 | Ongoing | Vocabulary gaps tracker (12 gaps remaining) |
+| — | #28 | Medium | Intra-law cross-ref resolution (66 cross-refs) |
+| — | #18, #19 | High | Blocked on Phase C architecture |
+| — | #14, #12, #10, #6, #5, #4, #2, #1 | High | Future / large scope |
+
+### Closed this session
+
+- **#26** — APPLICATION_SCOPE priority bug (e5e141c, Polarity% 81.4→99.0%)
+
+---
+
 ## 2026-03-07 — Post #22 Cross-Reference Resolution (Phases 1 & 2)
 
 Context: #22 Phase 1 (cross-reference detection, e443556) and Phase 2 (dictionary expansion + plural fixes, b6f05cf) implemented. Gaps reduced 94→10 (Phase 1 separated 63 cross-refs; Phase 2 resolved 21 vocab gaps via dictionary expansion). Tagged% 52.3→58.5%. Filed #26 (APPLICATION_SCOPE priority bug) as side finding.
