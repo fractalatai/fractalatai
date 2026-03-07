@@ -55,3 +55,29 @@ Context: #15 implemented and closed. `fractalaw taxa qa` now provides live re-cl
 ### Closed this session
 
 - **#15** — Taxa QA report (b658113, closed 2026-03-05)
+
+---
+
+## 2026-03-05 — Post #7 Fitness Denormalization
+
+Context: #7 implemented and pushed (9eda38e). Fitness/applicability data now flows end-to-end: LAT (7 per-provision columns) → LRT (6 tag + 1 detail column) → taxa hash → sync publish (12→19 columns). SCHEMA.md updated to v0.7. Sertantai schema extension tracked in [sertantai-legal#39](https://github.com/shotleybuilder/sertantai-legal/issues/39).
+
+### What shifted
+
+- **#7 complete** — fitness data is on the hot path and publishable; sertantai needs schema migration (sertantai-legal#39) before the data lands
+- **#23 (expand p-dimension dictionaries) rises to #1** — now that fitness flows end-to-end, improving dictionary coverage directly improves published data quality
+- **#22 and #16 unchanged** — no new evidence to reprioritize
+
+### Priority order (post #7)
+
+| Priority | Issue | Effort | Rationale |
+|----------|-------|--------|-----------|
+| 1 | **#23** — Expand p-dimension dictionaries | Low-Med | Directly improves fitness quality now that it ships end-to-end |
+| 2 | **#22** — Cross-reference resolution | Medium | Valid but lower impact at 83% coverage |
+| 3 | **#16** — Add 'Rule' classification | Medium | Informed by #17 findings |
+| — | #18, #19 | High | Blocked on Phase C architecture |
+| — | #14, #12, #10, #6, #5, #4, #2, #1 | High | Future / large scope |
+
+### Closed this session
+
+- **#7** — Denormalize fitness/scope onto LRT hot path (9eda38e, sertantai-legal#39 for downstream schema)

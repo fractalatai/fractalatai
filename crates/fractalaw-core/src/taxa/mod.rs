@@ -85,7 +85,7 @@ pub struct TaxaRecord {
 ///
 /// Delegates to `parse_v2()` — the actor-anchored pipeline is now the default.
 pub fn parse(raw_text: &str) -> TaxaRecord {
-    parse_v2(raw_text)
+    parse_v2(raw_text, None)
 }
 
 /// Run the actor-anchored Taxa classification pipeline on raw legislative text.
@@ -97,7 +97,7 @@ pub fn parse(raw_text: &str) -> TaxaRecord {
 /// 4. Classify duty type via actor-anchored v2 patterns
 /// 5. Classify POPIMAR categories (only if DRRP-bearing)
 /// 6. Extract focused clause from match span
-pub fn parse_v2(raw_text: &str) -> TaxaRecord {
+pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
     if raw_text.trim().is_empty() {
         return TaxaRecord::default();
     }
@@ -108,7 +108,7 @@ pub fn parse_v2(raw_text: &str) -> TaxaRecord {
     if should_skip_drrp(&purposes) || is_descriptive_summary(&cleaned) {
         // Extract fitness rules for Application+Scope provisions
         let fitness_rules = if purposes.first() == Some(&purpose::APPLICATION_SCOPE) {
-            fitness::extract(&cleaned)
+            fitness::extract(&cleaned, family)
         } else {
             vec![]
         };
@@ -682,7 +682,10 @@ mod tests {
 
     #[test]
     fn parse_v2_employer_duty() {
-        let record = parse_v2("The employer shall ensure the health and safety of employees.");
+        let record = parse_v2(
+            "The employer shall ensure the health and safety of employees.",
+            None,
+        );
         assert!(record.duty_types.contains(&DutyType::Duty));
         assert!(
             record
@@ -694,7 +697,10 @@ mod tests {
 
     #[test]
     fn parse_v2_rejects_actor_as_object() {
-        let record = parse_v2("information must be provided to the contractor before work begins");
+        let record = parse_v2(
+            "information must be provided to the contractor before work begins",
+            None,
+        );
         assert!(
             record.duty_types.is_empty(),
             "v2 should reject contractor-as-object, got: {:?}",
@@ -899,7 +905,10 @@ mod tests {
 
     #[test]
     fn clause_refined_simple_employer_duty() {
-        let record = parse_v2("The employer shall ensure the health and safety of employees.");
+        let record = parse_v2(
+            "The employer shall ensure the health and safety of employees.",
+            None,
+        );
         let clause = record.clause_refined.unwrap();
         assert!(
             clause.contains("employer"),
@@ -926,7 +935,7 @@ mod tests {
                     for ensuring, so far as is reasonably practicable, safety and \
                     absence of risks to health in connection with the use, handling, \
                     storage and transport of articles and substances.";
-        let record = parse_v2(text);
+        let record = parse_v2(text, None);
         let clause = record.clause_refined.unwrap();
         assert!(
             clause.contains("employer"),
@@ -943,7 +952,7 @@ mod tests {
     fn clause_refined_person_compound() {
         let text = "A person must not ride, or be required or permitted to ride, \
                     on any vehicle being used for the purposes of construction work.";
-        let record = parse_v2(text);
+        let record = parse_v2(text, None);
         let clause = record.clause_refined.unwrap();
         assert!(
             clause.contains("person"),
@@ -958,7 +967,7 @@ mod tests {
     #[test]
     fn clause_refined_government_fallback() {
         let text = "The Secretary of State shall have power to make regulations.";
-        let record = parse_v2(text);
+        let record = parse_v2(text, None);
         let clause = record.clause_refined.unwrap();
         assert!(
             clause.contains("Secretary"),
@@ -972,13 +981,13 @@ mod tests {
 
     #[test]
     fn clause_refined_none_for_empty() {
-        let record = parse_v2("");
+        let record = parse_v2("", None);
         assert!(record.clause_refined.is_none());
     }
 
     #[test]
     fn clause_refined_none_for_no_drrp() {
-        let record = parse_v2("the quick brown fox jumped over the lazy dog");
+        let record = parse_v2("the quick brown fox jumped over the lazy dog", None);
         assert!(record.clause_refined.is_none());
     }
 
@@ -986,7 +995,7 @@ mod tests {
     fn clause_refined_passive_by_pattern() {
         let text = "An internal emergency plan must be prepared by the operator \
                     before the establishment is put into operation.";
-        let record = parse_v2(text);
+        let record = parse_v2(text, None);
         let clause = record.clause_refined.unwrap();
         assert!(
             clause.contains("operator"),
@@ -1003,7 +1012,7 @@ mod tests {
         let text = "It shall be the duty of every employer to ensure, so far as \
                     is reasonably practicable, the health, safety and welfare at \
                     work of all his employees.";
-        let record = parse_v2(text);
+        let record = parse_v2(text, None);
         let clause = record.clause_refined.unwrap();
         assert!(
             clause.contains("employer"),
@@ -1025,7 +1034,7 @@ mod tests {
                     which the conditions of Schedule 3 relate, the \
                     appropriate registration authority shall enter in its register \
                     the particulars furnished to it pursuant to that provision.";
-        let record = parse_v2(text);
+        let record = parse_v2(text, None);
         let clause = record.clause_refined.unwrap();
         assert!(
             !clause.starts_with("..."),
@@ -1046,7 +1055,7 @@ mod tests {
                     installation is subject to a permit, the operator of the installation \
                     shall by the SED date make an application under regulation 17 of \
                     the principal framework.";
-        let record = parse_v2(text);
+        let record = parse_v2(text, None);
         let clause = record.clause_refined.unwrap();
         assert!(
             !clause.starts_with("..."),

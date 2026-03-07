@@ -305,6 +305,18 @@ enum TaxaAction {
         #[arg(long)]
         family: Option<String>,
     },
+    /// Audit p-dimension dictionary coverage for fitness extraction gaps
+    AuditFitness {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Filter by DuckDB family
+        #[arg(long)]
+        family: Option<String>,
+        /// Max gap provisions shown per family (0 = show all)
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+    },
 }
 
 #[tokio::main]
@@ -431,6 +443,11 @@ async fn main() -> anyhow::Result<()> {
                 cmd_taxa_eyeball(&data_dir, &law_names, &output, limit).await
             }
             TaxaAction::Qa { laws, family } => cmd_taxa_qa(&data_dir, laws, family).await,
+            TaxaAction::AuditFitness {
+                laws,
+                family,
+                limit,
+            } => cmd_taxa_audit_fitness(&data_dir, laws, family, limit).await,
         },
 
         // Training data export.
@@ -1242,7 +1259,7 @@ async fn cmd_taxa_show(
 
             section_num += 1;
 
-            let record = fractalaw_core::taxa::parse_v2(&text);
+            let record = fractalaw_core::taxa::parse_v2(&text, None);
 
             // Skip sections with no classification signal.
             if record.duty_types.is_empty()
@@ -1334,7 +1351,7 @@ fn cmd_taxa_show_misses(
                 continue;
             }
 
-            let record = fractalaw_core::taxa::parse_v2(&text);
+            let record = fractalaw_core::taxa::parse_v2(&text, None);
             if !record.duty_types.is_empty() {
                 v2_count += 1;
                 continue;
@@ -1465,7 +1482,7 @@ fn cmd_taxa_show_clauses(
                 continue;
             }
 
-            let record = fractalaw_core::taxa::parse_v2(&text);
+            let record = fractalaw_core::taxa::parse_v2(&text, None);
 
             if record.duty_types.is_empty() {
                 no_drrp_count += 1;
@@ -1679,7 +1696,7 @@ async fn cmd_taxa_eyeball(
                     continue;
                 }
 
-                let record = fractalaw_core::taxa::parse_v2(&text);
+                let record = fractalaw_core::taxa::parse_v2(&text, None);
 
                 if record.duty_types.is_empty() {
                     continue;
@@ -1877,7 +1894,7 @@ async fn cmd_taxa_qa(
 
                 stats.total += 1;
 
-                let record = fractalaw_core::taxa::parse_v2(&text);
+                let record = fractalaw_core::taxa::parse_v2(&text, None);
 
                 // Count purposes.
                 if !record.purposes.is_empty() {
@@ -2160,6 +2177,386 @@ fn truncate_name(name: &str, max: usize) -> String {
     }
 }
 
+/// Audit p-dimension dictionary coverage: find Application+Scope provisions
+/// where polarity was detected but zero p-dimension tags were extracted.
+async fn cmd_taxa_audit_fitness(
+    data_dir: &std::path::Path,
+    laws: Option<String>,
+    family: Option<String>,
+    limit: usize,
+) -> anyhow::Result<()> {
+    use fractalaw_core::taxa::{fitness, purpose};
+    use std::collections::{BTreeMap, BTreeSet, HashMap};
+
+    let lance = LanceStore::open(&data_dir.join("lancedb"))
+        .await
+        .context("opening LanceDB")?;
+    let store = open_duck(data_dir)?;
+
+    // Resolve law names (same pattern as cmd_taxa_qa)
+    let law_names: Vec<String> = if let Some(ref l) = laws {
+        l.split(',').map(|s| s.trim().to_string()).collect()
+    } else if let Some(ref fam) = family {
+        let names = laws_in_family(&store, fam)?;
+        if names.is_empty() {
+            anyhow::bail!("No laws found with family '{fam}'");
+        }
+        println!("Family '{}': {} laws\n", fam, names.len());
+        names
+    } else {
+        let all_batches = lance.query_legislation_text("true", 200_000, 0).await?;
+        let mut names = std::collections::BTreeSet::new();
+        for batch in &all_batches {
+            if let Some(col) = batch.column_by_name("law_name") {
+                for i in 0..batch.num_rows() {
+                    if let Some(name) = get_string_value(col.as_ref(), i) {
+                        names.insert(name);
+                    }
+                }
+            }
+        }
+        names.into_iter().collect()
+    };
+
+    if law_names.is_empty() {
+        println!("No laws to audit.");
+        return Ok(());
+    }
+
+    // Build law-to-family map from DuckDB
+    let family_map: HashMap<String, String> = {
+        let batches =
+            store.query_arrow("SELECT name, family FROM legislation WHERE family IS NOT NULL")?;
+        let mut map = HashMap::new();
+        for batch in &batches {
+            let name_col = batch.column_by_name("name");
+            let fam_col = batch.column_by_name("family");
+            if let (Some(nc), Some(fc)) = (name_col, fam_col) {
+                for i in 0..batch.num_rows() {
+                    if let (Some(n), Some(f)) = (
+                        get_string_value(nc.as_ref(), i),
+                        get_string_value(fc.as_ref(), i),
+                    ) {
+                        map.insert(n, f);
+                    }
+                }
+            }
+        }
+        map
+    };
+
+    // Build known-terms set from dictionaries
+    let known_terms: BTreeSet<String> = fitness::all_canonical_terms(family.as_deref())
+        .into_iter()
+        .map(|s| s.to_string())
+        .collect();
+
+    // Per-family stats
+    struct GapProvision {
+        law_name: String,
+        raw_text: String,
+    }
+    struct FamilyStats {
+        total_app_scope: usize,
+        polarity_matched: usize,
+        with_tags: usize,
+        gap_count: usize,
+        no_polarity_count: usize,
+        gap_provisions: Vec<GapProvision>,
+        no_polarity_provisions: Vec<String>,
+        term_hits: HashMap<String, usize>,
+    }
+
+    let mut family_stats: BTreeMap<String, FamilyStats> = BTreeMap::new();
+
+    eprint!("Auditing {} laws", law_names.len());
+
+    for law_name in &law_names {
+        let fam = family_map
+            .get(law_name.as_str())
+            .cloned()
+            .unwrap_or_else(|| "(unknown)".to_string());
+
+        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
+        let batches = lance.query_legislation_text(&filter, 500, 0).await?;
+
+        let stats = family_stats
+            .entry(fam.clone())
+            .or_insert_with(|| FamilyStats {
+                total_app_scope: 0,
+                polarity_matched: 0,
+                with_tags: 0,
+                gap_count: 0,
+                no_polarity_count: 0,
+                gap_provisions: Vec::new(),
+                no_polarity_provisions: Vec::new(),
+                term_hits: HashMap::new(),
+            });
+
+        for batch in &batches {
+            let text_col = batch.column_by_name("text");
+            let stype_col = batch.column_by_name("section_type");
+            if text_col.is_none() {
+                continue;
+            }
+
+            for row in 0..batch.num_rows() {
+                let text = text_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let section_type = stype_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+
+                if text.trim().is_empty() || section_type == "heading" {
+                    continue;
+                }
+
+                let record = fractalaw_core::taxa::parse_v2(&text, Some(&fam));
+
+                if !record.purposes.contains(&purpose::APPLICATION_SCOPE) {
+                    continue;
+                }
+
+                stats.total_app_scope += 1;
+
+                if record.fitness_rules.is_empty() {
+                    stats.no_polarity_count += 1;
+                    if stats.no_polarity_provisions.len() < 5 {
+                        let cleaned = fractalaw_core::taxa::text_cleaner::clean(&text);
+                        stats.no_polarity_provisions.push(cleaned);
+                    }
+                    continue;
+                }
+
+                let mut provision_has_tags = false;
+
+                for rule in &record.fitness_rules {
+                    stats.polarity_matched += 1;
+
+                    for tag in &rule.tags {
+                        *stats.term_hits.entry(tag.term.clone()).or_insert(0) += 1;
+                    }
+
+                    if rule.tags.is_empty() {
+                        stats.gap_count += 1;
+                        stats.gap_provisions.push(GapProvision {
+                            law_name: law_name.clone(),
+                            raw_text: rule.raw_text.clone(),
+                        });
+                    } else {
+                        provision_has_tags = true;
+                    }
+                }
+
+                if provision_has_tags {
+                    stats.with_tags += 1;
+                }
+            }
+        }
+
+        eprint!(".");
+    }
+    eprintln!(" done\n");
+
+    // ── Section 1: Coverage by Family ──
+
+    println!(
+        "=== Section 1: Coverage by Family ({} families) ===\n",
+        family_stats.len()
+    );
+    println!(
+        "{:<45} {:>8} {:>10} {:>10} {:>8}",
+        "Family", "AppScope", "Polarity%", "Tagged%", "Gaps"
+    );
+    println!("{}", "-".repeat(85));
+
+    let mut corpus_app = 0usize;
+    let mut corpus_pol = 0usize;
+    let mut corpus_tag = 0usize;
+    let mut corpus_gap = 0usize;
+
+    for (fam, s) in &family_stats {
+        corpus_app += s.total_app_scope;
+        corpus_pol += s.polarity_matched;
+        corpus_tag += s.with_tags;
+        corpus_gap += s.gap_count;
+
+        if s.total_app_scope == 0 {
+            continue;
+        }
+        println!(
+            "{:<45} {:>8} {:>9.1}% {:>9.1}% {:>8}",
+            truncate_name(fam, 45),
+            s.total_app_scope,
+            if s.total_app_scope > 0 {
+                100.0 * s.polarity_matched as f64 / s.total_app_scope as f64
+            } else {
+                0.0
+            },
+            if s.total_app_scope > 0 {
+                100.0 * s.with_tags as f64 / s.total_app_scope as f64
+            } else {
+                0.0
+            },
+            s.gap_count,
+        );
+    }
+    println!("{}", "-".repeat(85));
+    println!(
+        "{:<45} {:>8} {:>9.1}% {:>9.1}% {:>8}",
+        "CORPUS",
+        corpus_app,
+        if corpus_app > 0 {
+            100.0 * corpus_pol as f64 / corpus_app as f64
+        } else {
+            0.0
+        },
+        if corpus_app > 0 {
+            100.0 * corpus_tag as f64 / corpus_app as f64
+        } else {
+            0.0
+        },
+        corpus_gap,
+    );
+
+    // ── Section 2: Gap Provisions ──
+
+    println!("\n=== Section 2: Gap Provisions (polarity but 0 tags) ===\n");
+
+    let any_gaps = family_stats.values().any(|s| !s.gap_provisions.is_empty());
+    if !any_gaps {
+        println!("  None — all provisions with polarity have at least one tag.\n");
+    } else {
+        for (fam, s) in &family_stats {
+            if s.gap_provisions.is_empty() {
+                continue;
+            }
+            let show = if limit == 0 {
+                s.gap_provisions.len()
+            } else {
+                limit.min(s.gap_provisions.len())
+            };
+            println!(
+                "--- {} ({} gaps, showing {}) ---",
+                fam,
+                s.gap_provisions.len(),
+                show
+            );
+            for gp in s.gap_provisions.iter().take(show) {
+                let trunc = if gp.raw_text.len() > 120 {
+                    format!("{}...", &gp.raw_text[..120])
+                } else {
+                    gp.raw_text.clone()
+                };
+                println!("  [{}] {}", truncate_name(&gp.law_name, 25), trunc);
+            }
+            println!();
+        }
+    }
+
+    // ── Section 3: Candidate Terms ──
+
+    println!("=== Section 3: Candidate Terms (top 50) ===\n");
+
+    let all_gap_texts: Vec<&str> = family_stats
+        .values()
+        .flat_map(|s| s.gap_provisions.iter().map(|g| g.raw_text.as_str()))
+        .collect();
+
+    let candidates = extract_candidate_terms(&all_gap_texts, &known_terms);
+
+    if candidates.is_empty() {
+        println!("  No candidates found (no gap provisions or all terms already known).\n");
+    } else {
+        println!("{:<45} {:>8}", "Candidate Term", "Freq");
+        println!("{}", "-".repeat(55));
+        for (term, count) in candidates.iter().take(50) {
+            println!("{:<45} {:>8}", term, count);
+        }
+        println!();
+    }
+
+    // ── Section 4: No-Polarity Provisions ──
+
+    println!("=== Section 4: No-Polarity Provisions ===\n");
+
+    let total_no_pol: usize = family_stats.values().map(|s| s.no_polarity_count).sum();
+    if total_no_pol == 0 {
+        println!("  None — all APPLICATION_SCOPE provisions have polarity detected.\n");
+    } else {
+        println!(
+            "  {} provisions with APPLICATION_SCOPE purpose but no polarity detected\n",
+            total_no_pol
+        );
+        for (fam, s) in &family_stats {
+            if s.no_polarity_count == 0 {
+                continue;
+            }
+            println!("  {}: {}", fam, s.no_polarity_count);
+            for sample in &s.no_polarity_provisions {
+                let trunc = if sample.len() > 100 {
+                    format!("{}...", &sample[..100])
+                } else {
+                    sample.clone()
+                };
+                println!("    > {}", trunc);
+            }
+        }
+        println!();
+    }
+
+    // ── Section 5: Dictionary Utilisation ──
+
+    println!("=== Section 5: Dictionary Utilisation ===\n");
+
+    let mut global_hits: HashMap<String, usize> = HashMap::new();
+    for s in family_stats.values() {
+        for (term, count) in &s.term_hits {
+            *global_hits.entry(term.clone()).or_insert(0) += count;
+        }
+    }
+
+    let terms_by_dim = fitness::all_terms_by_dimension(family.as_deref());
+    let dimensions = [
+        (fitness::PDimension::Person, "Person"),
+        (fitness::PDimension::Process, "Process"),
+        (fitness::PDimension::Place, "Place"),
+        (fitness::PDimension::Plant, "Plant"),
+        (fitness::PDimension::Property, "Property"),
+        (fitness::PDimension::Sector, "Sector"),
+    ];
+
+    let mut total_terms = 0usize;
+    let mut zero_hit_terms = 0usize;
+
+    for (dim, dim_name) in &dimensions {
+        let mut dim_terms: Vec<(&str, usize)> = terms_by_dim
+            .iter()
+            .filter(|(d, _)| d == dim)
+            .map(|(_, term)| (*term, global_hits.get(*term).copied().unwrap_or(0)))
+            .collect();
+        dim_terms.sort_by(|a, b| b.1.cmp(&a.1));
+
+        println!("  {} ({} terms):", dim_name, dim_terms.len());
+        for (term, hits) in &dim_terms {
+            let marker = if *hits == 0 { " [!]" } else { "" };
+            println!("    {:<40} {:>6}{}", term, hits, marker);
+            total_terms += 1;
+            if *hits == 0 {
+                zero_hit_terms += 1;
+            }
+        }
+        println!();
+    }
+    println!(
+        "  {} of {} dictionary terms had zero hits.\n",
+        zero_hit_terms, total_terms
+    );
+
+    Ok(())
+}
+
 /// Enrich a single law: run DRRP parser on its provisions from LanceDB, write
 /// per-provision taxa back to LanceDB, and update law-level taxa in DuckDB.
 /// Returns true if the law had any taxa signal.
@@ -2169,6 +2566,22 @@ async fn enrich_single_law(
     law_name: &str,
 ) -> anyhow::Result<bool> {
     use std::collections::BTreeSet;
+
+    // Look up family for specialist dictionary selection
+    let family: Option<String> = {
+        let batches = store.query_arrow(&format!(
+            "SELECT family FROM legislation WHERE name = '{}'",
+            law_name.replace('\'', "''")
+        ))?;
+        batches
+            .iter()
+            .flat_map(|b| {
+                let col = b.column_by_name("family");
+                (0..b.num_rows())
+                    .filter_map(move |i| col.and_then(|c| get_string_value(c.as_ref(), i)))
+            })
+            .next()
+    };
 
     let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
     let batches = lance.query_legislation_text(&filter, 500, 0).await?;
@@ -2266,7 +2679,7 @@ async fn enrich_single_law(
                 continue;
             }
 
-            let record = fractalaw_core::taxa::parse_v2(&text);
+            let record = fractalaw_core::taxa::parse_v2(&text, family.as_deref());
             if record.duty_types.is_empty()
                 && record.governed_actors.is_empty()
                 && record.government_actors.is_empty()
@@ -3982,6 +4395,190 @@ fn format_sql_drrp_entries(entries: &[(String, String, String, String)]) -> Stri
         })
         .collect();
     format!("[{}]", items.join(", "))
+}
+
+/// Extract candidate noun phrases from gap provision texts, filtering known
+/// dictionary terms and stop words. Returns (term, frequency) pairs sorted
+/// by frequency descending.
+fn extract_candidate_terms(
+    texts: &[&str],
+    known_terms: &std::collections::BTreeSet<String>,
+) -> Vec<(String, usize)> {
+    use std::collections::{BTreeSet, HashMap};
+
+    let stop_words: BTreeSet<&str> = [
+        "the",
+        "a",
+        "an",
+        "of",
+        "to",
+        "in",
+        "for",
+        "on",
+        "at",
+        "by",
+        "or",
+        "and",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "shall",
+        "will",
+        "would",
+        "should",
+        "may",
+        "might",
+        "can",
+        "could",
+        "not",
+        "no",
+        "nor",
+        "but",
+        "if",
+        "so",
+        "as",
+        "than",
+        "that",
+        "this",
+        "these",
+        "those",
+        "such",
+        "any",
+        "all",
+        "each",
+        "every",
+        "with",
+        "from",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "between",
+        "under",
+        "over",
+        "about",
+        "against",
+        "without",
+        "which",
+        "who",
+        "whom",
+        "whose",
+        "where",
+        "when",
+        "how",
+        "what",
+        "it",
+        "its",
+        "they",
+        "them",
+        "their",
+        "he",
+        "his",
+        "she",
+        "her",
+        "we",
+        "our",
+        "you",
+        "your",
+        "me",
+        "my",
+        "him",
+        "us",
+        "only",
+        "also",
+        "other",
+        "more",
+        "most",
+        "very",
+        "just",
+        "here",
+        "there",
+        "regulation",
+        "regulations",
+        "section",
+        "paragraph",
+        "sub-paragraph",
+        "act",
+        "order",
+        "article",
+        "part",
+        "schedule",
+        "provision",
+        "provisions",
+        "apply",
+        "applies",
+        "applied",
+        "applying",
+        "application",
+        "must",
+        "effect",
+        "force",
+        "extent",
+        "relation",
+        "respect",
+        "case",
+        "person",
+        "persons",
+    ]
+    .into_iter()
+    .collect();
+
+    let mut freq: HashMap<String, usize> = HashMap::new();
+
+    for text in texts {
+        // Tokenize: split on non-alphabetic/hyphen boundaries, keep words with letters
+        let words: Vec<&str> = text
+            .split(|c: char| !c.is_alphabetic() && c != '-')
+            .filter(|w| w.len() >= 2 && w.chars().any(|c| c.is_alphabetic()))
+            .collect();
+
+        for n in 1..=3usize {
+            for window in words.windows(n) {
+                // For 1-grams, skip stop words entirely
+                if n == 1 && stop_words.contains(&window[0].to_lowercase().as_str()) {
+                    continue;
+                }
+                // For multi-grams, skip if ALL words are stop words
+                if n > 1
+                    && window
+                        .iter()
+                        .all(|w: &&str| stop_words.contains(&w.to_lowercase().as_str()))
+                {
+                    continue;
+                }
+
+                let phrase = window
+                    .iter()
+                    .map(|w| w.to_lowercase())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+
+                if phrase.len() < 3 || known_terms.contains(&phrase) {
+                    continue;
+                }
+
+                *freq.entry(phrase).or_insert(0) += 1;
+            }
+        }
+    }
+
+    let mut sorted: Vec<(String, usize)> =
+        freq.into_iter().filter(|(_, count)| *count >= 2).collect();
+    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted
 }
 
 /// Format fitness entries as a DuckDB `List<Struct>` literal.

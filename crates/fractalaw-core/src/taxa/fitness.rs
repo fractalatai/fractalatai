@@ -321,6 +321,61 @@ static SECTOR_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
     ])
 });
 
+// ── OH&S Specialist Dictionaries ─────────────────────────────────────
+//
+// Terms specific to Occupational Health & Safety law families.
+// Applied only when the law's family starts with "OH&S".
+
+static OHS_PERSON_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("young\\s+person(?:s)?", "young person"),
+        ("new\\s+or\\s+expectant\\s+moth", "new or expectant mother"),
+        ("principal\\s+contractor", "principal contractor"),
+        ("principal\\s+designer", "principal designer"),
+        ("domestic\\s+client(?:s)?", "domestic client"),
+        ("client(?:s)?", "client"),
+    ])
+});
+
+static OHS_PROCESS_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("lifting\\s+operation(?:s)?", "lifting operations"),
+        ("confined\\s+space(?:s)?", "confined spaces"),
+        ("provision\\s+and\\s+use", "provision and use"),
+        ("working\\s+at\\s+height", "work at height"),
+        ("work(?:ing)?\\s+near\\s+voltage", "work near voltage"),
+    ])
+});
+
+static OHS_PLANT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("pressure\\s+equipment", "pressure equipment"),
+        ("lifting\\s+equipment", "lifting equipment"),
+        ("machiner(?:y|ies)", "machinery"),
+        ("lift(?:s)?(?:\\s+and\\s+escalator)?", "lifts"),
+        ("electrical\\s+equipment", "electrical equipment"),
+        ("scaffold(?:s|ing)?", "scaffolding"),
+        ("safety\\s+sign(?:s)?", "safety signs"),
+        ("first[- ]?aid", "first-aid"),
+    ])
+});
+
+/// Return specialist dictionaries for a given law family.
+///
+/// Currently only OH&S families have specialists. Returns empty vec for
+/// unknown families — the core dictionaries still run.
+fn specialist_dicts_for(family: &str) -> Vec<(PDimension, &'static [DictEntry])> {
+    if family.starts_with("OH&S") {
+        vec![
+            (PDimension::Person, &OHS_PERSON_DICT),
+            (PDimension::Process, &OHS_PROCESS_DICT),
+            (PDimension::Plant, &OHS_PLANT_DICT),
+        ]
+    } else {
+        vec![]
+    }
+}
+
 // ── Public API ───────────────────────────────────────────────────────
 
 /// Extract fitness rules from an Application+Scope provision text.
@@ -329,7 +384,7 @@ static SECTOR_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
 /// disapplies-to clauses (e.g. "shall not apply to X, but shall apply to Y").
 ///
 /// Returns an empty vec if no polarity pattern is detected.
-pub fn extract(text: &str) -> Vec<FitnessRule> {
+pub fn extract(text: &str, family: Option<&str>) -> Vec<FitnessRule> {
     let text = text.trim();
     if text.is_empty() {
         return vec![];
@@ -339,7 +394,7 @@ pub fn extract(text: &str) -> Vec<FitnessRule> {
     // Split on " but " when both polarities are present.
     if DISAPPLIES_RE.is_match(text)
         && APPLIES_RE.is_match(text)
-        && let Some(rules) = try_split_compound(text)
+        && let Some(rules) = try_split_compound(text, family)
     {
         return rules;
     }
@@ -350,7 +405,7 @@ pub fn extract(text: &str) -> Vec<FitnessRule> {
         None => return vec![],
     };
 
-    let tags = extract_tags(text);
+    let tags = extract_tags(text, family);
     vec![FitnessRule {
         polarity,
         tags,
@@ -358,10 +413,76 @@ pub fn extract(text: &str) -> Vec<FitnessRule> {
     }]
 }
 
+/// Return all canonical terms from core + optional specialist dictionaries.
+///
+/// Used by audit tooling to filter known terms from candidate suggestions.
+/// When `family` is `Some`, includes specialist terms for that family.
+pub fn all_canonical_terms(family: Option<&str>) -> Vec<&'static str> {
+    let dicts: &[&[DictEntry]] = &[
+        &PERSON_DICT,
+        &PROCESS_DICT,
+        &PLACE_DICT,
+        &PLANT_DICT,
+        &PROPERTY_DICT,
+        &SECTOR_DICT,
+    ];
+    let mut terms = Vec::new();
+    for dict in dicts {
+        for entry in dict.iter() {
+            if !terms.contains(&entry.term) {
+                terms.push(entry.term);
+            }
+        }
+    }
+    if let Some(fam) = family {
+        for (_dim, dict) in specialist_dicts_for(fam) {
+            for entry in dict {
+                if !terms.contains(&entry.term) {
+                    terms.push(entry.term);
+                }
+            }
+        }
+    }
+    terms
+}
+
+/// Return all canonical terms grouped by their p-dimension.
+///
+/// Used by audit tooling to report dictionary utilisation per dimension.
+/// When `family` is `Some`, includes specialist terms for that family.
+pub fn all_terms_by_dimension(family: Option<&str>) -> Vec<(PDimension, &'static str)> {
+    let dicts: &[(PDimension, &[DictEntry])] = &[
+        (PDimension::Person, &PERSON_DICT),
+        (PDimension::Process, &PROCESS_DICT),
+        (PDimension::Place, &PLACE_DICT),
+        (PDimension::Plant, &PLANT_DICT),
+        (PDimension::Property, &PROPERTY_DICT),
+        (PDimension::Sector, &SECTOR_DICT),
+    ];
+    let mut result = Vec::new();
+    for (dim, dict) in dicts {
+        for entry in dict.iter() {
+            if !result.iter().any(|(d, t)| d == dim && *t == entry.term) {
+                result.push((*dim, entry.term));
+            }
+        }
+    }
+    if let Some(fam) = family {
+        for (dim, dict) in specialist_dicts_for(fam) {
+            for entry in dict {
+                if !result.iter().any(|(d, t)| *d == dim && *t == entry.term) {
+                    result.push((dim, entry.term));
+                }
+            }
+        }
+    }
+    result
+}
+
 // ── Internal helpers ─────────────────────────────────────────────────
 
 /// Try to split a compound provision into separate applies/disapplies rules.
-fn try_split_compound(text: &str) -> Option<Vec<FitnessRule>> {
+fn try_split_compound(text: &str, family: Option<&str>) -> Option<Vec<FitnessRule>> {
     // Look for "but" or "except that" or "save that" as split points
     let split_re = LazyLock::new(|| {
         Regex::new(r"(?i)\b(?:but\s+(?:they\s+)?shall|except\s+that|save\s+that)").unwrap()
@@ -379,8 +500,8 @@ fn try_split_compound(text: &str) -> Option<Vec<FitnessRule>> {
         return None;
     }
 
-    let tags_a = extract_tags(part_a);
-    let tags_b = extract_tags(part_b);
+    let tags_a = extract_tags(part_a, family);
+    let tags_b = extract_tags(part_b, family);
 
     Some(vec![
         FitnessRule {
@@ -397,10 +518,14 @@ fn try_split_compound(text: &str) -> Option<Vec<FitnessRule>> {
 }
 
 /// Extract all p-dimension tags from text.
-fn extract_tags(text: &str) -> Vec<PDimensionTag> {
+///
+/// Runs core dictionaries always.  When `family` is `Some`, also runs any
+/// specialist dictionaries that match the family prefix.
+fn extract_tags(text: &str, family: Option<&str>) -> Vec<PDimensionTag> {
     let mut tags = Vec::new();
 
-    let dicts: &[(PDimension, &[DictEntry])] = &[
+    // Core dictionaries (always applied)
+    let core_dicts: &[(PDimension, &[DictEntry])] = &[
         (PDimension::Person, &PERSON_DICT),
         (PDimension::Process, &PROCESS_DICT),
         (PDimension::Place, &PLACE_DICT),
@@ -409,10 +534,9 @@ fn extract_tags(text: &str) -> Vec<PDimensionTag> {
         (PDimension::Sector, &SECTOR_DICT),
     ];
 
-    for (dim, dict) in dicts {
+    for (dim, dict) in core_dicts {
         for entry in *dict {
             if entry.re.is_match(text) {
-                // Avoid duplicates for the same term in the same dimension
                 let already = tags
                     .iter()
                     .any(|t: &PDimensionTag| t.dimension == *dim && t.term == entry.term);
@@ -421,6 +545,25 @@ fn extract_tags(text: &str) -> Vec<PDimensionTag> {
                         dimension: *dim,
                         term: entry.term.to_string(),
                     });
+                }
+            }
+        }
+    }
+
+    // Specialist dictionaries (applied when family matches)
+    if let Some(fam) = family {
+        for (dim, dict) in specialist_dicts_for(fam) {
+            for entry in dict {
+                if entry.re.is_match(text) {
+                    let already = tags
+                        .iter()
+                        .any(|t: &PDimensionTag| t.dimension == dim && t.term == entry.term);
+                    if !already {
+                        tags.push(PDimensionTag {
+                            dimension: dim,
+                            term: entry.term.to_string(),
+                        });
+                    }
                 }
             }
         }
@@ -448,7 +591,7 @@ mod tests {
     fn positive_applies_to() {
         let text =
             "These Regulations shall apply to every employer and every self-employed person.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].polarity, RulePolarity::AppliesTo);
         assert!(has_tag(&rules[0], PDimension::Person, "employer"));
@@ -462,7 +605,7 @@ mod tests {
     #[test]
     fn negative_disapplies() {
         let text = "These Regulations shall not apply to or in relation to the master or crew of a sea-going ship.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].polarity, RulePolarity::DisappliesTo);
         assert!(has_tag(&rules[0], PDimension::Person, "master of ship"));
@@ -473,7 +616,7 @@ mod tests {
     fn does_not_apply() {
         let text =
             "This regulation does not apply to construction work carried out by the armed forces.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].polarity, RulePolarity::DisappliesTo);
         assert!(has_tag(&rules[0], PDimension::Process, "construction work"));
@@ -482,7 +625,7 @@ mod tests {
     #[test]
     fn extends_to() {
         let text = "These Regulations extend to Northern Ireland.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].polarity, RulePolarity::ExtendsTo);
         assert!(has_tag(&rules[0], PDimension::Place, "Northern Ireland"));
@@ -493,7 +636,7 @@ mod tests {
     #[test]
     fn geographic_applies_to_england() {
         let text = "These Regulations apply to England only.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].polarity, RulePolarity::AppliesTo);
         assert!(has_tag(&rules[0], PDimension::Place, "England"));
@@ -502,7 +645,7 @@ mod tests {
     #[test]
     fn geographic_great_britain() {
         let text = "These Regulations shall apply in Great Britain.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert!(has_tag(&rules[0], PDimension::Place, "Great Britain"));
     }
@@ -510,7 +653,7 @@ mod tests {
     #[test]
     fn extends_outside_gb() {
         let text = "These Regulations extend to outside Great Britain as sections 1 to 59 and 80 to 82 of the 1974 Act apply.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].polarity, RulePolarity::ExtendsTo);
         assert!(has_tag(
@@ -525,7 +668,7 @@ mod tests {
     #[test]
     fn self_employed_extension() {
         let text = "These Regulations shall apply to a self-employed person as they apply to an employer and an employee.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].polarity, RulePolarity::AppliesTo);
         assert!(has_tag(
@@ -540,7 +683,7 @@ mod tests {
     #[test]
     fn like_duty() {
         let text = "The employer shall, so far as is reasonably practicable, be under a like duty in respect of any other person at work.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].polarity, RulePolarity::AppliesTo);
         assert!(has_tag(&rules[0], PDimension::Person, "employer"));
@@ -550,7 +693,7 @@ mod tests {
     #[test]
     fn crown_application() {
         let text = "The provisions of these Regulations shall apply to persons in the public service of the Crown as they apply to other persons.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert!(has_tag(&rules[0], PDimension::Property, "Crown service"));
     }
@@ -560,7 +703,7 @@ mod tests {
     #[test]
     fn activity_scoped() {
         let text = "These Regulations apply to construction work.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert!(has_tag(&rules[0], PDimension::Process, "construction work"));
     }
@@ -568,7 +711,7 @@ mod tests {
     #[test]
     fn diving_operations() {
         let text = "These Regulations shall apply to and in relation to any diving project.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert!(has_tag(&rules[0], PDimension::Process, "diving operations"));
     }
@@ -578,7 +721,7 @@ mod tests {
     #[test]
     fn quarry_scope() {
         let text = "These Regulations shall apply to all quarries where persons work.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert!(has_tag(&rules[0], PDimension::Place, "quarry"));
         assert!(has_tag(&rules[0], PDimension::Person, "person at work"));
@@ -587,7 +730,7 @@ mod tests {
     #[test]
     fn mine_exclusion() {
         let text = "These Regulations shall not apply to any place below ground in a mine.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].polarity, RulePolarity::DisappliesTo);
         assert!(has_tag(&rules[0], PDimension::Place, "mine"));
@@ -598,7 +741,7 @@ mod tests {
     #[test]
     fn compound_disapplies_then_applies() {
         let text = "These Regulations shall not apply in relation to such premises, but they shall apply in relation to premises used for domestic purposes.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 2);
         assert_eq!(rules[0].polarity, RulePolarity::DisappliesTo);
         assert_eq!(rules[1].polarity, RulePolarity::AppliesTo);
@@ -611,7 +754,7 @@ mod tests {
     #[test]
     fn gas_fittings() {
         let text = "These Regulations shall apply to gas fittings used in connection with gas which has been conveyed through a distribution main.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert!(has_tag(&rules[0], PDimension::Plant, "gas fittings"));
     }
@@ -620,7 +763,7 @@ mod tests {
     fn dangerous_substances() {
         let text =
             "These Regulations apply where a dangerous substance is present at the workplace.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert!(has_tag(
             &rules[0],
@@ -635,7 +778,7 @@ mod tests {
     #[test]
     fn ship_board_activities() {
         let text = "These Regulations shall not apply to normal ship-board activities of a ship's crew under the direction of the master.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].polarity, RulePolarity::DisappliesTo);
         assert!(has_tag(
@@ -650,20 +793,20 @@ mod tests {
 
     #[test]
     fn empty_returns_empty() {
-        assert!(extract("").is_empty());
-        assert!(extract("   ").is_empty());
+        assert!(extract("", None).is_empty());
+        assert!(extract("   ", None).is_empty());
     }
 
     #[test]
     fn no_polarity_returns_empty() {
         let text = "Citation, commencement and interpretation.";
-        assert!(extract(text).is_empty());
+        assert!(extract(text, None).is_empty());
     }
 
     #[test]
     fn ceases_to_have_effect() {
         let text = "This regulation ceases to have effect on 1st April 2025.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].polarity, RulePolarity::DisappliesTo);
     }
@@ -671,7 +814,7 @@ mod tests {
     #[test]
     fn bind_the_crown() {
         let text = "This Act shall bind the Crown.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].polarity, RulePolarity::AppliesTo);
     }
@@ -679,9 +822,79 @@ mod tests {
     #[test]
     fn multiple_places() {
         let text = "These Regulations apply in relation to England and Wales.";
-        let rules = extract(text);
+        let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert!(has_tag(&rules[0], PDimension::Place, "England"));
         assert!(has_tag(&rules[0], PDimension::Place, "Wales"));
+    }
+
+    // ── OH&S specialist dictionary tests ────────────────────────────
+
+    #[test]
+    fn ohs_lifting_operations_with_family() {
+        let text = "These Regulations shall apply to lifting operations.";
+        // Without family: no Process tag (not in core dict)
+        let rules = extract(text, None);
+        assert_eq!(rules.len(), 1);
+        assert!(!has_tag(
+            &rules[0],
+            PDimension::Process,
+            "lifting operations"
+        ));
+        // With OH&S family: Process tag found
+        let rules = extract(text, Some("OH&S: Occupational / Personal Safety"));
+        assert_eq!(rules.len(), 1);
+        assert!(has_tag(
+            &rules[0],
+            PDimension::Process,
+            "lifting operations"
+        ));
+    }
+
+    #[test]
+    fn ohs_pressure_equipment_with_family() {
+        let text = "These Regulations apply to pressure equipment used at work.";
+        let rules = extract(text, None);
+        assert!(!has_tag(&rules[0], PDimension::Plant, "pressure equipment"));
+        let rules = extract(text, Some("OH&S: Mines & Quarries"));
+        assert!(has_tag(&rules[0], PDimension::Plant, "pressure equipment"));
+    }
+
+    #[test]
+    fn ohs_young_person_with_family() {
+        let text =
+            "These Regulations shall not apply to a young person employed in a family undertaking.";
+        let rules = extract(text, None);
+        assert!(!has_tag(&rules[0], PDimension::Person, "young person"));
+        let rules = extract(text, Some("OH&S: Occupational / Personal Safety"));
+        assert!(has_tag(&rules[0], PDimension::Person, "young person"));
+    }
+
+    #[test]
+    fn ohs_confined_spaces_with_family() {
+        let text = "These Regulations apply where work in confined spaces is carried out.";
+        let rules = extract(text, None);
+        assert!(!has_tag(&rules[0], PDimension::Process, "confined spaces"));
+        let rules = extract(text, Some("OH&S: Occupational / Personal Safety"));
+        assert!(has_tag(&rules[0], PDimension::Process, "confined spaces"));
+    }
+
+    #[test]
+    fn non_ohs_family_no_specialist() {
+        let text = "These Regulations apply to lifting operations.";
+        // Non-OH&S family should not get specialist tags
+        let rules = extract(text, Some("AGRICULTURE"));
+        assert!(!has_tag(
+            &rules[0],
+            PDimension::Process,
+            "lifting operations"
+        ));
+    }
+
+    #[test]
+    fn ohs_machinery_with_family() {
+        let text = "These Regulations shall apply to machinery used at work.";
+        let rules = extract(text, Some("OH&S: Occupational / Personal Safety"));
+        assert!(has_tag(&rules[0], PDimension::Plant, "machinery"));
     }
 }
