@@ -2,6 +2,36 @@
 
 Tracking how issue priorities shift as the project evolves.
 
+## 2026-03-07 — Post #23 P-Dimension Dictionary Expansion
+
+Context: #23 implemented and closed (967adfd + 66cadcd). Two-tier dictionary architecture (Option A: runtime family lookup) with OH&S specialist dicts (19 terms). Gaps reduced 118→94 (tagged% 46.2→52.3%). Audit tooling (`taxa audit-fitness`) and runbook (`docs/FITNESS-DICTIONARY-RUNBOOK.md`) in place.
+
+### What shifted
+
+- **#23 complete** — dictionary architecture is extensible; adding a new family specialist is ~30 lines + a branch in `specialist_dicts_for()`
+- **#24 (NEW: purpose classifier for non-OH&S)** — discovered that non-OH&S families get zero APPLICATION_SCOPE classifications, blocking fitness expansion beyond OH&S. This is the next prerequisite before dictionary work can help other families.
+- **#25 (NEW: Zenoh WAN sync)** — current sync is LAN-only; production deployment needs WAN connectivity with auth/TLS
+- **#8 (commencement status) unchanged** — still valid, no new evidence
+- **#22 and #16 unchanged** — cross-ref and Rule classification remain medium priority
+
+### Priority order (post #23)
+
+| Priority | Issue | Effort | Rationale |
+|----------|-------|--------|-----------|
+| 1 | **#24** — Extend purpose classifier beyond OH&S | Medium | Unblocks fitness for all families; #23 architecture is ready |
+| 2 | **#22** — Cross-reference resolution | Medium | Valid but lower impact at 83% coverage |
+| 3 | **#16** — Add 'Rule' classification | Medium | Informed by #17 findings |
+| 4 | **#8** — Denormalize commencement status onto LRT | Medium | Useful metadata, no blockers |
+| 5 | **#25** — Zenoh WAN sync | Medium | Production infrastructure, not urgent for dev |
+| — | #18, #19 | High | Blocked on Phase C architecture |
+| — | #14, #12, #10, #6, #5, #4, #2, #1 | High | Future / large scope |
+
+### Closed this session
+
+- **#23** — P-dimension dictionary expansion (967adfd + 66cadcd, all 4 phases complete)
+
+---
+
 ## 2026-03-05 — Post #17 Gap Investigation
 
 Context: #21 (taxa hash) and #17 (enrichment gap) both closed. The 193-law gap was mostly bugs (panic in clause_structure, duty_holder-only check), not pattern coverage. True enrichment coverage is 83% (384/464), not 60%.

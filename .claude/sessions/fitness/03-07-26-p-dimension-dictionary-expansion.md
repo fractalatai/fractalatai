@@ -186,10 +186,15 @@ From the fitness index design session:
 | Process mentions | 54 (1.7%) |
 | Sector mentions | 41 (1.3%) — least common |
 
-## Status: **Closed** — all phases complete (967adfd)
+## Status: **Closed** — all phases complete (967adfd + 66cadcd)
+
+### Follow-up issues
+
+- **#24** — Extend purpose classifier beyond OH&S for APPLICATION_SCOPE detection (blocks fitness expansion to other families)
+- **#25** — Zenoh WAN sync: enable cross-network publish/subscribe
 
 ### Observations
 
-- Non-OH&S families (FOOD, TRANSPORT: Maritime Safety) have zero APPLICATION_SCOPE provisions — the purpose classifier is currently OH&S-biased. Expanding fitness dictionaries for other families will require extending the purpose classifier first.
+- Non-OH&S families (FOOD, TRANSPORT: Maritime Safety) have zero APPLICATION_SCOPE provisions — the purpose classifier is currently OH&S-biased. Expanding fitness dictionaries for other families will require extending the purpose classifier first (#24).
 - Remaining OH&S gaps (94) are mostly provisions about conformity assessment procedures, carriage regulations, and Crown application — terms that may not map cleanly to the 6 p-dimensions.
 - The two-tier architecture scales well — adding a new family specialist is ~30 lines of code + a branch in `specialist_dicts_for()`.
