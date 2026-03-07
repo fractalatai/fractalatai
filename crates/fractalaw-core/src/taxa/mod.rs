@@ -106,8 +106,9 @@ pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
     let purposes = purpose::classify(&cleaned);
 
     if should_skip_drrp(&purposes) || is_descriptive_summary(&cleaned) {
-        // Extract fitness rules for Application+Scope provisions
-        let fitness_rules = if purposes.first() == Some(&purpose::APPLICATION_SCOPE) {
+        // Extract fitness rules whenever APPLICATION_SCOPE is present,
+        // even if another purpose (INTERPRETATION, ENACTMENT) ranked first.
+        let fitness_rules = if purposes.contains(&purpose::APPLICATION_SCOPE) {
             fitness::extract(&cleaned, family)
         } else {
             vec![]
@@ -143,6 +144,14 @@ pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
         .map(|c| confidence::score(c, has_span))
         .unwrap_or(0.0);
 
+    // Extract fitness rules for provisions with secondary APPLICATION_SCOPE.
+    // Primary APPLICATION_SCOPE is handled in the skip-DRRP early return above.
+    let fitness_rules = if purposes.contains(&purpose::APPLICATION_SCOPE) {
+        fitness::extract(&cleaned, family)
+    } else {
+        vec![]
+    };
+
     TaxaRecord {
         cleaned_text: cleaned,
         governed_actors: extracted.governed_labels(),
@@ -154,7 +163,7 @@ pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
         clause_refined,
         taxa_confidence,
         clause_structure,
-        fitness_rules: vec![],
+        fitness_rules,
     }
 }
 
@@ -1223,6 +1232,21 @@ mod tests {
         assert!(
             !record.duty_types.is_empty(),
             "'to which this regulation applies' prohibition should produce DRRP, got empty"
+        );
+    }
+
+    #[test]
+    fn secondary_application_scope_gets_fitness_rules() {
+        // When APPLICATION_SCOPE is a secondary purpose (not first),
+        // fitness::extract() should still run. GH #26.
+        let text = "These Regulations shall not apply to the master or crew \
+                    of a sea-going ship or to the employer of such persons \
+                    in respect of the normal ship-board activities of a \
+                    ship's crew under the direction of the master.";
+        let record = parse(text);
+        assert!(
+            !record.fitness_rules.is_empty(),
+            "secondary APPLICATION_SCOPE should produce fitness_rules, got empty"
         );
     }
 

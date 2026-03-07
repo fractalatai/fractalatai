@@ -2333,11 +2333,11 @@ async fn cmd_taxa_audit_fitness(
                     continue;
                 }
 
+                // Count per provision, not per rule
+                stats.polarity_matched += 1;
                 let mut provision_has_tags = false;
 
                 for rule in &record.fitness_rules {
-                    stats.polarity_matched += 1;
-
                     for tag in &rule.tags {
                         *stats.term_hits.entry(tag.term.clone()).or_insert(0) += 1;
                     }
