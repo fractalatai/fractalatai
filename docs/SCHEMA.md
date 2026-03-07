@@ -1,7 +1,7 @@
 # Fractalaw Schema Design
 
-**Version**: 0.7
-**Date**: 2026-03-05
+**Version**: 0.8
+**Date**: 2026-03-07
 **Status**: Five tables — four exported to Parquet, `polished_drrp` created at runtime by drrp-polisher
 
 This document defines the three-tier data model for Fractalaw. It is the spec from which `fractalaw-core/src/schema.rs` will be implemented.
@@ -148,6 +148,7 @@ Laws in jurisdictions without meaningful sub-national variation (e.g., NZ, NO) w
 | `status_source` | Utf8 | yes | How status was determined: `metadata`, `changes`, `both` | `live_source` |
 | `status_conflict` | Boolean | yes | Whether status sources disagreed | `live_conflict` |
 | `status_conflict_detail` | Utf8 | yes | JSON string with conflict reconciliation detail | `live_conflict_detail` (JSONB) |
+| `commencement_status` | Utf8 | yes | Derived from `law_edges` commencement edges: `fully_commenced`, `partially_commenced`, `not_commenced`, or NULL (no commencement data) | *new* (derived from `applied_status` on `coming into force` edges) |
 
 ### 1.7 Function
 
