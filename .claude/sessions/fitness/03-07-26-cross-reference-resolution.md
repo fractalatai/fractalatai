@@ -66,22 +66,56 @@ All 347 core tests pass (5 new). CLI compiles and audit output verified.
 - `crates/fractalaw-core/src/taxa/fitness.rs` — `CROSS_REF_RE` (line ~112), `detect_cross_refs()` (line ~126), `FitnessRule.cross_refs` (line 86)
 - `crates/fractalaw-cli/src/main.rs` — `FamilyStats` (cross_ref_count, cross_ref_provisions), Section 2b output
 
+## Implementation: Phase 2 — Dictionary Expansion & Bug Fixes ✓
+
+### Changes
+
+#### `crates/fractalaw-core/src/taxa/fitness.rs`
+
+**Cross-ref regex plural fix**: `CROSS_REF_RE` now handles plurals (`regulations?`, `paragraphs?`, etc.)
+
+**Word-boundary plural bug**: `dict()` wraps patterns in `\b...\b`, which breaks on plurals (e.g., `\bfumigation\b` won't match "fumigations" because "n" is followed by "s"). Fixed by using `s?` in patterns.
+
+**New core dictionary entries**:
+- Process: 3 carriage patterns (`carriage of/class`, `national carriage`, `carriage by road/rail/sea/air/vehicles?`)
+- Plant: `\bPPE\b` → "personal protective equipment"
+- Place: `establishment(?:s)?` → "establishment"
+- Property: `(?:bind|apply\s+to)\s+the\s+Crown` → "Crown application"
+
+**New OH&S specialist entries**:
+- OHS_PLANT_DICT: `door, gate or hatch` pattern
+- New `OHS_PROCESS_EXT_DICT`: `fumigat(?:ions?|ants?|ing)` → "fumigation", `relevant\s+project` → "construction project"
+
+**1 new test**: `cross_ref_plural_regulations`
+
+### Results
+
+| Metric | Post Phase 1 | Post Phase 2 | Change |
+|--------|-------------|-------------|--------|
+| Tagged% | 52.3% | 58.5% | +6.2pp |
+| Vocabulary Gaps | 31 | 10 | -21 |
+| Cross-Refs | 63 | 57 | -6 |
+
+**Remaining 10 vocabulary gaps** (genuinely hard cases):
+- HSWA 1974 abstract provisions (3): "prescribed process", "duty...things done in the course of trade", "activities...carried on"
+- Corporate Manslaughter 2007 (3): "organisation owed a duty of care", "partnership...legal person", "person's death"
+- Fire-fighting equipment (1): "equipment used exclusively for fire-fighting purposes"
+- Statutory provisions/Schedule (1): meta-legal reference without numbered schedule
+- Dismissal (1): employment law term
+- Food and drink (1): Welsh SI about school food standards in OH&S family
+
 ## Future Phases
-
-### Phase 2: Dictionary expansion for remaining vocabulary gaps
-
-The 31 vocabulary gaps are addressable via the #23 runbook:
-- Carriage/transport terms (7) → Sector or Process
-- Establishment (6) → Place or Property
-- Crown (5) → Property
-- PPE (3) → Plant
-- Others (10) → mixed
 
 ### Phase 3: Intra-law resolution (future, if needed)
 
-For the 63 cross-reference provisions, some reference provisions within the same law that could be looked up and their p-dimensions extracted. This requires:
+For the 57 cross-reference provisions, some reference provisions within the same law that could be looked up and their p-dimensions extracted. This requires:
 - Parsing provision references into structured form
 - Matching against LanceDB `provision` column values
 - Two-pass enrichment within `enrich_single_law()`
 
-## Status: **Phase 1 complete** — cross-reference detection and audit separation implemented
+## Key Files
+
+- `crates/fractalaw-core/src/taxa/fitness.rs` — `CROSS_REF_RE` (line ~115), `detect_cross_refs()` (line ~128), `FitnessRule.cross_refs` (line 86), dictionaries (lines 147–416)
+- `crates/fractalaw-cli/src/main.rs` — `FamilyStats` (cross_ref_count, cross_ref_provisions), Section 2b output
+
+## Status: **Phase 2 complete** — dictionary expansion reduces gaps 31→10, Tagged% 52.3→58.5%

@@ -114,7 +114,7 @@ static APPLIES_RE: LazyLock<Regex> = LazyLock::new(|| {
 /// Detect references to other provisions (regulation N, paragraph N, schedule N, etc.).
 static CROSS_REF_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?i)\b(?:regulation|paragraph|sub-paragraph|section|article|schedule|part)\s+[\d(]+[\d().a-z]*",
+        r"(?i)\b(?:regulations?|paragraphs?|sub-paragraphs?|sections?|articles?|schedules?|parts?)\s+[\d(]+[\d().a-z]*",
     )
     .unwrap()
 });
@@ -234,6 +234,15 @@ static PROCESS_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
         ("noise\\s+(?:exposure|assessment)", "noise exposure"),
         ("vibration\\s+(?:exposure|assessment)", "vibration exposure"),
         ("pressure\\s+system", "pressure systems work"),
+        (
+            "carriage\\s+(?:of\\s+)?(?:dangerous\\s+)?(?:goods|class\\s+\\d)",
+            "carriage of goods",
+        ),
+        ("national\\s+carriage", "carriage of goods"),
+        (
+            "carriage\\s+by\\s+(?:road|rail|sea|air|vehicles?)",
+            "carriage of goods",
+        ),
     ])
 });
 
@@ -259,6 +268,7 @@ static PLACE_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
         ("workplace(?:s)?", "workplace"),
         ("ship(?:s)?", "ship"),
         ("aircraft", "aircraft"),
+        ("establishment(?:s)?", "establishment"),
     ])
 });
 
@@ -270,6 +280,7 @@ static PLANT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
             "personal\\s+protective\\s+equipment",
             "personal protective equipment",
         ),
+        ("\\bPPE\\b", "personal protective equipment"),
         ("work\\s+equipment", "work equipment"),
         ("pressure\\s+system(?:s)?", "pressure systems"),
         ("dangerous\\s+goods", "dangerous goods"),
@@ -313,6 +324,7 @@ static PROPERTY_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
             "in\\s+the\\s+public\\s+service\\s+of\\s+the\\s+Crown",
             "Crown service",
         ),
+        ("(?:bind|apply\\s+to)\\s+the\\s+Crown", "Crown application"),
     ])
 });
 
@@ -378,6 +390,17 @@ static OHS_PLANT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
         ("scaffold(?:s|ing)?", "scaffolding"),
         ("safety\\s+sign(?:s)?", "safety signs"),
         ("first[- ]?aid", "first-aid"),
+        (
+            "door[,\\s]+gate[,\\s]+(?:or\\s+)?hatch",
+            "door, gate or hatch",
+        ),
+    ])
+});
+
+static OHS_PROCESS_EXT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("fumigat(?:ions?|ants?|ing)", "fumigation"),
+        ("relevant\\s+project", "construction project"),
     ])
 });
 
@@ -390,6 +413,7 @@ fn specialist_dicts_for(family: &str) -> Vec<(PDimension, &'static [DictEntry])>
         vec![
             (PDimension::Person, &OHS_PERSON_DICT),
             (PDimension::Process, &OHS_PROCESS_DICT),
+            (PDimension::Process, &OHS_PROCESS_EXT_DICT),
             (PDimension::Plant, &OHS_PLANT_DICT),
         ]
     } else {
@@ -959,6 +983,15 @@ mod tests {
         assert!(rules[0].cross_refs.contains(&"regulation 17A".to_string()));
         assert!(rules[0].cross_refs.contains(&"regulation 16".to_string()));
         assert!(rules[0].cross_refs.contains(&"regulation 17".to_string()));
+    }
+
+    #[test]
+    fn cross_ref_plural_regulations() {
+        let text = "This regulation shall not apply to regulations 21 and 28(2), which expressly say on whom the duties are imposed.";
+        let rules = extract(text, None);
+        assert_eq!(rules.len(), 1);
+        // "regulations 21" matches; "28(2)" has no prefix so is not detected
+        assert!(rules[0].cross_refs.contains(&"regulations 21".to_string()));
     }
 
     #[test]
