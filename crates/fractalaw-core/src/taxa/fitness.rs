@@ -194,6 +194,11 @@ static PERSON_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
             "master of ship",
         ),
         ("master\\s+or\\s+crew", "master of ship"),
+        (
+            "in\\s+the\\s+public\\s+service\\s+of\\s+the\\s+Crown",
+            "Crown service",
+        ),
+        ("(?:bind|apply\\s+to)\\s+the\\s+Crown", "Crown application"),
         ("crew", "crew"),
     ])
 });
@@ -320,11 +325,6 @@ static PROPERTY_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
         ),
         ("not\\s+in\\s+prolonged\\s+use", "not in prolonged use"),
         ("on\\s+board\\s+(?:a\\s+)?transport", "on board transport"),
-        (
-            "in\\s+the\\s+public\\s+service\\s+of\\s+the\\s+Crown",
-            "Crown service",
-        ),
-        ("(?:bind|apply\\s+to)\\s+the\\s+Crown", "Crown application"),
     ])
 });
 
@@ -744,7 +744,7 @@ mod tests {
         let text = "The provisions of these Regulations shall apply to persons in the public service of the Crown as they apply to other persons.";
         let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
-        assert!(has_tag(&rules[0], PDimension::Property, "Crown service"));
+        assert!(has_tag(&rules[0], PDimension::Person, "Crown service"));
     }
 
     // ── Process/activity patterns ───────────────────────────────────
