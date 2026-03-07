@@ -135,15 +135,15 @@ Skipped in favour of proving the family-specialist architecture with OH&S data f
 - [x] 6 new tests for OH&S specialist matching (with/without family, non-OH&S family)
 - [x] All 342 core tests pass (up from 336)
 
-### Phase 4: Automation for new families
+### Phase 4: Automation for new families ✓
 
-- [ ] Document the workflow in a runbook
-- [ ] Ensure `taxa audit-fitness --family NEW_FAMILY` works out of the box
-- [ ] Consider: auto-generate candidate dictionary from noun-phrase frequency analysis
+- [x] Document the workflow in a runbook → `docs/FITNESS-DICTIONARY-RUNBOOK.md`
+- [x] Ensure `taxa audit-fitness --family NEW_FAMILY` works out of the box — verified with FOOD and TRANSPORT: Maritime Safety (both run cleanly; zero APPLICATION_SCOPE provisions because purpose classifier is OH&S-biased — separate issue)
+- [x] Auto-generate candidate dictionary: existing `extract_candidate_terms()` in Section 3 already does n-gram frequency analysis — no further automation needed for now
 
-## Phase 1 Results: OH&S Family Audit
+## Audit Results: OH&S Family
 
-Verified against OH&S: Occupational / Personal Safety (451 laws):
+### Phase 1 baseline (before specialist dicts)
 
 | Metric | Value |
 |--------|-------|
@@ -152,17 +152,21 @@ Verified against OH&S: Occupational / Personal Safety (451 laws):
 | At least one p-dimension tag | 184 (46.2%) |
 | Gap provisions (polarity, zero tags) | 118 |
 
-### Top candidate terms surfaced
+### Phase 3 result (after OH&S specialist dicts)
 
-`pressure equipment`, `machinery`, `lifts`, `visiting force`, `supply`, `provision and use`, `lifting operations`, `work at height`, `confined spaces`, `electrical equipment`
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| Tagged% | 46.2% | 52.3% | +6.1pp |
+| Gap provisions | 118 | 94 | -24 (20% reduction) |
 
-These candidates (frequency ≥ 2 across gap provisions, not in any existing dictionary) are inputs for Phase 2 dictionary expansion.
+Top remaining candidate terms: `carriage`, `specified`, `crown`, `safety`, `health`, `door gate or hatch`, `conformity assessment procedure`
 
 ## Key Files
 
 - `crates/fractalaw-core/src/taxa/fitness.rs` — 6 core dicts + 3 OH&S specialist dicts, `specialist_dicts_for()`, `extract_tags(text, family)`, `extract(text, family)`, `all_canonical_terms(family)`, `all_terms_by_dimension(family)`
 - `crates/fractalaw-core/src/taxa/mod.rs` — `parse_v2(raw_text, family)`, `TaxaRecord.fitness_rules`
 - `crates/fractalaw-cli/src/main.rs` — `enrich_single_law()` (family lookup + pass-through), `cmd_taxa_audit_fitness()`, `extract_candidate_terms()`
+- `docs/FITNESS-DICTIONARY-RUNBOOK.md` — repeatable 7-step workflow for dictionary expansion
 - `.claude/sessions/fitness/03-01-26-fitness-index-design.md` — corpus validation baseline
 
 ## Corpus Statistics (baseline)
@@ -182,11 +186,10 @@ From the fitness index design session:
 | Process mentions | 54 (1.7%) |
 | Sector mentions | 41 (1.3%) — least common |
 
-## Status: **Phase 3 Complete (OH&S)** — two-tier dictionary architecture implemented, not yet committed
+## Status: **Closed** — all phases complete (967adfd)
 
-### Next steps
+### Observations
 
-- Re-run `taxa audit-fitness --family "OH&S: Occupational / Personal Safety"` to measure gap reduction
-- Re-enrich OH&S laws with `taxa enrich --family "OH&S: ..." --force` to persist new tags
-- Add specialist dictionaries for other families (Agriculture, Radiological, Maritime, Food) as needed
-- Phase 4: document the repeatable workflow for new families
+- Non-OH&S families (FOOD, TRANSPORT: Maritime Safety) have zero APPLICATION_SCOPE provisions — the purpose classifier is currently OH&S-biased. Expanding fitness dictionaries for other families will require extending the purpose classifier first.
+- Remaining OH&S gaps (94) are mostly provisions about conformity assessment procedures, carriage regulations, and Crown application — terms that may not map cleanly to the 6 p-dimensions.
+- The two-tier architecture scales well — adding a new family specialist is ~30 lines of code + a branch in `specialist_dicts_for()`.
