@@ -118,4 +118,4 @@ For the 57 cross-reference provisions, some reference provisions within the same
 - `crates/fractalaw-core/src/taxa/fitness.rs` — `CROSS_REF_RE` (line ~115), `detect_cross_refs()` (line ~128), `FitnessRule.cross_refs` (line 86), dictionaries (lines 147–416)
 - `crates/fractalaw-cli/src/main.rs` — `FamilyStats` (cross_ref_count, cross_ref_provisions), Section 2b output
 
-## Status: **Phase 2 complete** — dictionary expansion reduces gaps 31→10, Tagged% 52.3→58.5%
+## Status: **Closed** — #22 complete (Phases 1+2). Follow-ups: #26, #27, #28
