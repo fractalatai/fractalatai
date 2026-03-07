@@ -84,8 +84,32 @@ Edge cases:
 | `crates/fractalaw-core/src/taxa/mod.rs` | Module registration |
 | `crates/fractalaw-cli/src/main.rs` | `DutyType::Rule` match arm + actor back-linking pass |
 
-## Status: **Complete** — 361 tests pass, CDM 2015 verified
+## Phase 3: LanceDB Fitness Column Migration
 
-## Note
+The fitness extraction code (#22/#26) writes 7 per-provision columns to LanceDB, but the table schema didn't have them yet. `taxa enrich` failed with:
 
-LanceDB schema needs fitness columns added before `taxa enrich` can write — pre-existing issue from #22/#26 fitness work, not related to Rule changes.
+```
+merge_insert taxa: lance error: Append with different schema:
+  unexpected=[fitness_polarity, fitness_property, fitness_place, fitness_sector,
+              fitness_person, fitness_plant, fitness_process]
+```
+
+### Fix
+
+Used LanceDB Python `add_columns()` API to add 7 `List<Utf8>` nullable columns initialized to null:
+
+```python
+fields = [pa.field(name, pa.list_(pa.utf8()), nullable=True)
+          for name in ['fitness_polarity', 'fitness_person', 'fitness_process',
+                       'fitness_place', 'fitness_plant', 'fitness_property',
+                       'fitness_sector']]
+table.add_columns(fields)  # version 1758
+```
+
+### Verification
+
+- `taxa enrich --force --laws UK_uksi_2015_51` — succeeds, writes DRRP + fitness data
+- DuckDB shows `duty_type = [Duty, Responsibility, Right, Rule]` with `Ind: Person (inferred)` in holders
+- LanceDB fitness columns populated: 5 provisions with polarity data (AppliesTo/DisappliesTo)
+
+## Status: **Complete** — 361 tests pass, enrichment pipeline end-to-end verified
