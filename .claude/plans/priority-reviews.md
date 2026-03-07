@@ -2,6 +2,36 @@
 
 Tracking how issue priorities shift as the project evolves.
 
+## 2026-03-07 — Post #22 Cross-Reference Resolution (Phases 1 & 2)
+
+Context: #22 Phase 1 (cross-reference detection, e443556) and Phase 2 (dictionary expansion + plural fixes, b6f05cf) implemented. Gaps reduced 94→10 (Phase 1 separated 63 cross-refs; Phase 2 resolved 21 vocab gaps via dictionary expansion). Tagged% 52.3→58.5%. Filed #26 (APPLICATION_SCOPE priority bug) as side finding.
+
+### What shifted
+
+- **#22 Phase 1+2 complete** — cross-reference detection separates cross-ref provisions from vocab gaps; dictionary expansion resolves most remaining vocab gaps. 10 residual gaps are genuinely hard edge cases (abstract legal concepts, misclassified family). Phase 3 (intra-law resolution) deferred.
+- **#26 (NEW: APPLICATION_SCOPE priority bug)** — 15 provisions have "shall (not) apply" but APPLICATION_SCOPE is not their first purpose, so `parse_v2()` skips fitness extraction. Fix requires priority-aware purpose routing in mod.rs.
+- **#16, #8, #25 unchanged** — no new evidence to reprioritize
+
+### Priority order (post #22)
+
+| Priority | Issue | Effort | Rationale |
+|----------|-------|--------|-----------|
+| 1 | **#26** — APPLICATION_SCOPE priority bug | Low-Med | 15 provisions with valid "shall apply" get zero fitness_rules; fix in mod.rs |
+| 2 | **#16** — Add 'Rule' classification | Medium | Informed by #17 findings |
+| 3 | **#8** — Denormalize commencement status onto LRT | Medium | Useful metadata, no blockers |
+| 4 | **#25** — Zenoh WAN sync | Medium | Production infrastructure, not urgent for dev |
+| — | #22 Phase 3 | Medium | Intra-law cross-ref resolution; deferred, 57 cross-refs addressable later |
+| — | #18, #19 | High | Blocked on Phase C architecture |
+| — | #14, #12, #10, #6, #5, #4, #2, #1 | High | Future / large scope |
+
+### Closed this session
+
+- **#22 Phase 1** — Cross-reference detection and audit separation (e443556)
+- **#22 Phase 2** — Dictionary expansion, plural fixes, gaps 31→10 (b6f05cf)
+- **#26 filed** — APPLICATION_SCOPE priority bug (side finding from #22 investigation)
+
+---
+
 ## 2026-03-07 — Post #24 Purpose Classifier Investigation
 
 Context: #24 investigated and closed as "not planned". The APPLICATION_SCOPE regex in `purpose.rs` is universal — not OH&S-biased. Non-OH&S families (FOOD, TRANSPORT: Maritime Safety) returned zero APPLICATION_SCOPE provisions because their LAT text hasn't been synced to LanceDB from sertantai, not because the classifier fails on them. CLIMATE CHANGE (non-OH&S, with LAT data) shows 150 APPLICATION_SCOPE provisions with 90% polarity, proving the classifier works cross-family.
