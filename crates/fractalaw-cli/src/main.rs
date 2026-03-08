@@ -1079,7 +1079,9 @@ async fn cmd_sync_watch(
                 let sql = format!(
                     "SELECT name, duty_holder, rights_holder, responsibility_holder, power_holder, \
                             duty_type, role, role_gvt, \
-                            duties, rights, responsibilities, powers \
+                            duties, rights, responsibilities, powers, \
+                            fitness_person, fitness_process, fitness_place, \
+                            fitness_plant, fitness_property, fitness_sector, fitness \
                      FROM legislation WHERE name = '{}'",
                     law_name.replace('\'', "''")
                 );
