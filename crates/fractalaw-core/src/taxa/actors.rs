@@ -156,6 +156,10 @@ const GOVERNMENT_DEFS: &[(&str, &str)] = &[
         r"(?:[\s[:punct:]])[Pp]lanning [Aa]uthority?i?e?s?(?:[\s[:punct:]])"
     ),
     actor!(
+        "Gvt: Authority: Fire and Rescue",
+        r"(?:[\s[:punct:]])(?:[Ff]ire and [Rr]escue [Aa]uthority?i?e?s?|[Ff]ire [Aa]uthority?i?e?s?)(?:[\s[:punct:]])"
+    ),
+    actor!(
         "Gvt: Authority: Harbour",
         r"(?:[\s[:punct:]])(?:[Hh]arbour [Aa]uthority?i?e?s?|harbour master)(?:[\s[:punct:]])"
     ),
