@@ -220,7 +220,15 @@ impl ZenohArgs {
                 anyhow::anyhow!("failed to load zenoh config from '{}': {e}", path.display())
             })
         } else {
-            Ok(zenoh::Config::default())
+            // Peer mode: listen on tcp/0.0.0.0:7447 so remote peers with
+            // explicit connect endpoints (e.g., sertantai) can reach us.
+            // Multicast scouting remains enabled for LAN discovery.
+            let json5 = r#"{
+                mode: "peer",
+                listen: { endpoints: ["tcp/[::]:7447"] }
+            }"#;
+            zenoh::Config::from_json5(json5)
+                .map_err(|e| anyhow::anyhow!("failed to build zenoh peer config: {e}"))
         }
     }
 
@@ -838,6 +846,18 @@ async fn cmd_sync_publish(
     let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
         .await
         .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+
+    // Wait for at least one peer to connect before publishing.
+    // Peer-mode scouting and inbound connections need time to establish.
+    print!("Waiting for zenoh peer...");
+    let peers = sync
+        .wait_for_peers(std::time::Duration::from_secs(15))
+        .await;
+    if peers == 0 {
+        println!(" no peers connected (timeout). Publishing anyway, but data may not be received.");
+    } else {
+        println!(" {peers} peer(s) connected.");
+    }
 
     let mut published = 0usize;
     for law_name in &law_names {

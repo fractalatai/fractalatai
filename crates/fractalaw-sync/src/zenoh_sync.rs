@@ -202,6 +202,25 @@ impl ZenohSync {
         &self.tenant
     }
 
+    /// Wait until at least one Zenoh peer connects, or timeout expires.
+    ///
+    /// Returns the number of connected peers, or 0 if timeout elapsed.
+    /// Useful for short-lived sessions (e.g., `sync publish`) where the
+    /// remote peer may not have connected yet via scouting or configured endpoint.
+    pub async fn wait_for_peers(&self, timeout: std::time::Duration) -> usize {
+        let deadline = tokio::time::Instant::now() + timeout;
+        loop {
+            let count = self.session.info().peers_zid().await.count();
+            if count > 0 {
+                return count;
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return 0;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        }
+    }
+
     /// Borrow the underlying zenoh session (test-only).
     #[cfg(test)]
     pub(crate) fn session(&self) -> &zenoh::Session {
