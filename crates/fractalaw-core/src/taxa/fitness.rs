@@ -404,10 +404,76 @@ static OHS_PROCESS_EXT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
     ])
 });
 
+// ── FIRE Specialist Dictionaries ─────────────────────────────────────
+//
+// Terms specific to Fire Safety and Dangerous/Explosive Substances.
+// Applied when the law's family starts with "FIRE".
+
+static FIRE_PERSON_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("fire\\s+(?:and\\s+rescue\\s+)?authority", "fire authority"),
+        ("enforcing\\s+authority", "enforcing authority"),
+        ("licensing\\s+authority", "licensing authority"),
+        ("Chief\\s+Inspector", "chief inspector"),
+    ])
+});
+
+static FIRE_PROCESS_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        (
+            "transport(?:ing|ation)?\\s+(?:of\\s+)?(?:fireworks|explosives|ammunition|dangerous\\s+goods)",
+            "transporting dangerous goods",
+        ),
+        (
+            "transfer\\s+(?:of\\s+)?(?:any\\s+)?(?:component|explosives?|ammunition)",
+            "transfer of explosives",
+        ),
+        (
+            "manufacture\\s+(?:or\\s+)?(?:compression|storage|keeping)",
+            "manufacture of explosives",
+        ),
+        (
+            "filling\\s+(?:of\\s+)?(?:any\\s+)?cylinder",
+            "filling of cylinders",
+        ),
+        (
+            "storage\\s+of\\s+(?:explosives?|fireworks?|ammunition)",
+            "storage of explosives",
+        ),
+    ])
+});
+
+static FIRE_PLACE_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        // Cross-family candidate: also relevant to MARITIME, PORT etc.
+        ("(?:nuclear\\s+)?harbour\\s+area", "harbour area"),
+        ("harbour(?:s)?", "harbour"),
+        ("licensed\\s+premises", "licensed premises"),
+        ("petroleum\\s+store", "petroleum store"),
+        ("magazine(?:s)?", "magazine"),
+    ])
+});
+
+static FIRE_PLANT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        // Compound terms first
+        ("small\\s+arms\\s+ammunition", "small arms ammunition"),
+        ("pyrotechnic\\s+article(?:s)?", "pyrotechnic articles"),
+        ("ammonium\\s+nitrate(?:\\s+blasting)?", "ammonium nitrate"),
+        ("fire\\s+alarm(?:s)?", "fire alarm"),
+        ("smoke\\s+detector(?:s)?", "smoke detector"),
+        ("sprinkler(?:s)?(?:\\s+system)?", "sprinkler system"),
+        ("fire\\s+extinguisher(?:s)?", "fire extinguisher"),
+        ("firework(?:s)?", "fireworks"),
+        ("ammunition", "ammunition"),
+        ("detonator(?:s)?", "detonator"),
+    ])
+});
+
 /// Return specialist dictionaries for a given law family.
 ///
-/// Currently only OH&S families have specialists. Returns empty vec for
-/// unknown families — the core dictionaries still run.
+/// Currently OH&S and FIRE families have specialists. Returns empty vec
+/// for unknown families — the core dictionaries still run.
 fn specialist_dicts_for(family: &str) -> Vec<(PDimension, &'static [DictEntry])> {
     if family.starts_with("OH&S") {
         vec![
@@ -415,6 +481,13 @@ fn specialist_dicts_for(family: &str) -> Vec<(PDimension, &'static [DictEntry])>
             (PDimension::Process, &OHS_PROCESS_DICT),
             (PDimension::Process, &OHS_PROCESS_EXT_DICT),
             (PDimension::Plant, &OHS_PLANT_DICT),
+        ]
+    } else if family.starts_with("FIRE") {
+        vec![
+            (PDimension::Person, &FIRE_PERSON_DICT),
+            (PDimension::Process, &FIRE_PROCESS_DICT),
+            (PDimension::Place, &FIRE_PLACE_DICT),
+            (PDimension::Plant, &FIRE_PLANT_DICT),
         ]
     } else {
         vec![]
@@ -938,6 +1011,80 @@ mod tests {
             PDimension::Process,
             "lifting operations"
         ));
+    }
+
+    // ── FIRE specialist dictionary tests ─────────────────────────────
+
+    #[test]
+    fn fire_fireworks_with_family() {
+        let text = "This regulation does not apply to a person who is transporting fireworks on behalf of another person.";
+        // Without family: no Plant tag for fireworks (not in core dict)
+        let rules = extract(text, None);
+        assert_eq!(rules.len(), 1);
+        assert!(!has_tag(&rules[0], PDimension::Plant, "fireworks"));
+        // With FIRE family: Plant tag found
+        let rules = extract(text, Some("FIRE: Dangerous and Explosive Substances"));
+        assert!(has_tag(&rules[0], PDimension::Plant, "fireworks"));
+        assert!(has_tag(
+            &rules[0],
+            PDimension::Process,
+            "transporting dangerous goods"
+        ));
+    }
+
+    #[test]
+    fn fire_small_arms_ammunition_with_family() {
+        let text = "This regulation shall not apply to the transfer of any component of small arms ammunition by a person for his own sporting use.";
+        let rules = extract(text, Some("FIRE: Dangerous and Explosive Substances"));
+        assert!(has_tag(
+            &rules[0],
+            PDimension::Plant,
+            "small arms ammunition"
+        ));
+        assert!(has_tag(
+            &rules[0],
+            PDimension::Process,
+            "transfer of explosives"
+        ));
+    }
+
+    #[test]
+    fn fire_pyrotechnic_articles_with_family() {
+        let text = "This regulation does not apply to pyrotechnic articles for vehicles.";
+        let rules = extract(text, None);
+        assert!(!has_tag(
+            &rules[0],
+            PDimension::Plant,
+            "pyrotechnic articles"
+        ));
+        let rules = extract(text, Some("FIRE"));
+        assert!(has_tag(
+            &rules[0],
+            PDimension::Plant,
+            "pyrotechnic articles"
+        ));
+    }
+
+    #[test]
+    fn fire_harbour_area_with_family() {
+        let text = "This regulation applies where the harbour area in respect of which the licence was issued becomes a nuclear harbour area.";
+        let rules = extract(text, Some("FIRE: Dangerous and Explosive Substances"));
+        assert!(has_tag(&rules[0], PDimension::Place, "harbour area"));
+    }
+
+    #[test]
+    fn fire_authority_with_family() {
+        let text = "These Regulations shall apply to every fire and rescue authority in England.";
+        let rules = extract(text, Some("FIRE"));
+        assert!(has_tag(&rules[0], PDimension::Person, "fire authority"));
+        assert!(has_tag(&rules[0], PDimension::Place, "England"));
+    }
+
+    #[test]
+    fn fire_specialist_not_on_ohs() {
+        let text = "This regulation does not apply to fireworks.";
+        let rules = extract(text, Some("OH&S: Occupational / Personal Safety"));
+        assert!(!has_tag(&rules[0], PDimension::Plant, "fireworks"));
     }
 
     #[test]
