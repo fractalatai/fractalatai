@@ -170,7 +170,7 @@ struct ZenohArgs {
     #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
     tenant: String,
 
-    /// Zenoh endpoint to connect to (e.g., tcp/1.2.3.4:7447).
+    /// Zenoh endpoint to connect to (e.g., tcp/1.2.3.4:7447 or tls/host:7447).
     /// Switches to client mode with multicast scouting disabled.
     #[arg(long, env = "ZENOH_ENDPOINT")]
     connect: Option<String>,
@@ -179,21 +179,37 @@ struct ZenohArgs {
     /// Mutually exclusive with --connect.
     #[arg(long, env = "ZENOH_CONFIG", conflicts_with = "connect")]
     zenoh_config: Option<PathBuf>,
+
+    /// Root CA certificate for TLS verification (PEM).
+    /// Required when --connect uses a tls:// endpoint.
+    #[arg(long, env = "ZENOH_TLS_CA", requires = "connect")]
+    tls_ca: Option<PathBuf>,
+
+    /// Client certificate for mutual TLS (PEM).
+    /// Both --tls-cert and --tls-key must be provided together.
+    #[arg(long, env = "ZENOH_TLS_CERT", requires = "tls_key")]
+    tls_cert: Option<PathBuf>,
+
+    /// Client private key for mutual TLS (PEM).
+    #[arg(long, env = "ZENOH_TLS_KEY", requires = "tls_cert")]
+    tls_key: Option<PathBuf>,
 }
 
 impl ZenohArgs {
     /// Build a zenoh::Config from CLI flags.
     ///
     /// - `--connect`: client mode, explicit endpoint, no multicast
+    /// - `--connect` + `--tls-*`: adds TLS transport config
     /// - `--zenoh-config`: load from JSON5 file
     /// - neither: default peer mode with multicast scouting (LAN P2P)
     fn build_zenoh_config(&self) -> anyhow::Result<zenoh::Config> {
         if let Some(ref endpoint) = self.connect {
+            let tls_block = self.build_tls_json5(endpoint)?;
             let json5 = format!(
                 r#"{{
                     mode: "client",
                     connect: {{ endpoints: ["{endpoint}"] }},
-                    scouting: {{ multicast: {{ enabled: false }} }}
+                    scouting: {{ multicast: {{ enabled: false }} }}{tls_block}
                 }}"#
             );
             zenoh::Config::from_json5(&json5).map_err(|e| {
@@ -206,6 +222,57 @@ impl ZenohArgs {
         } else {
             Ok(zenoh::Config::default())
         }
+    }
+
+    /// Build the TLS transport JSON5 fragment, or empty string if no TLS flags.
+    fn build_tls_json5(&self, endpoint: &str) -> anyhow::Result<String> {
+        let is_tls = endpoint.starts_with("tls/") || endpoint.starts_with("quic/");
+
+        if self.tls_ca.is_none() && self.tls_cert.is_none() {
+            if is_tls {
+                anyhow::bail!(
+                    "TLS endpoint '{endpoint}' requires --tls-ca (and optionally --tls-cert + --tls-key for mTLS)"
+                );
+            }
+            return Ok(String::new());
+        }
+
+        let ca = self
+            .tls_ca
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("--tls-ca is required for TLS endpoints"))?;
+
+        if !ca.exists() {
+            anyhow::bail!("TLS CA certificate not found: {}", ca.display());
+        }
+
+        let mut tls_fields = format!(
+            r#"root_ca_certificate: "{}""#,
+            ca.display().to_string().replace('\\', "\\\\")
+        );
+
+        // mTLS: client cert + key
+        if let (Some(cert), Some(key)) = (&self.tls_cert, &self.tls_key) {
+            if !cert.exists() {
+                anyhow::bail!("TLS client certificate not found: {}", cert.display());
+            }
+            if !key.exists() {
+                anyhow::bail!("TLS client key not found: {}", key.display());
+            }
+            tls_fields.push_str(&format!(
+                r#",
+                        enable_mtls: true,
+                        connect_certificate: "{}",
+                        connect_private_key: "{}""#,
+                cert.display().to_string().replace('\\', "\\\\"),
+                key.display().to_string().replace('\\', "\\\\"),
+            ));
+        }
+
+        Ok(format!(
+            r#",
+                    transport: {{ link: {{ tls: {{ {tls_fields} }} }} }}"#
+        ))
     }
 }
 

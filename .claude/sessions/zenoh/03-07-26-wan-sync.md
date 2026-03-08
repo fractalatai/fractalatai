@@ -229,4 +229,46 @@ Note: `zenoh::Config` doesn't expose fields directly — uses `from_json5()` / `
 - Default (no flags) = LAN P2P unchanged
 - No changes to `fractalaw-sync` library crate
 
-## Status: Phase 1 complete, Phase 2 (TLS) pending
+## Phase 2 Implementation: TLS Transport
+
+### Changes
+
+#### `crates/fractalaw-cli/src/main.rs`
+
+**3 new flags on `ZenohArgs`:**
+- `--tls-ca` (env: `ZENOH_TLS_CA`) — root CA cert (PEM). `requires = "connect"`
+- `--tls-cert` (env: `ZENOH_TLS_CERT`) — client cert for mTLS. `requires = "tls_key"`
+- `--tls-key` (env: `ZENOH_TLS_KEY`) — client private key for mTLS. `requires = "tls_cert"`
+
+**`build_tls_json5()` helper** — generates `transport: { link: { tls: { ... } } }` JSON5 fragment:
+- If no TLS flags + tls endpoint → error with clear message
+- `--tls-ca` only → server-side TLS verification
+- `--tls-ca` + `--tls-cert` + `--tls-key` → mTLS (`enable_mtls: true`)
+- File existence validated before building config
+
+### Clap constraints
+- `--tls-ca` requires `--connect`
+- `--tls-cert` and `--tls-key` require each other
+- Runtime: tls/quic endpoints without `--tls-ca` get a clear error
+
+### Results
+- All workspace tests pass
+- Flag constraints verified (requires, mutual dependency)
+- Runtime TLS endpoint validation works
+
+### Usage
+```bash
+# Server-side TLS only
+fractalaw sync watch --connect tls/hetzner:7447 --tls-ca /etc/fractalaw/ca.pem
+
+# Mutual TLS
+fractalaw sync watch --connect tls/hetzner:7447 \
+  --tls-ca /etc/fractalaw/ca.pem \
+  --tls-cert /etc/fractalaw/client.cert.pem \
+  --tls-key /etc/fractalaw/client.key.pem
+
+# Via env vars
+ZENOH_ENDPOINT=tls/hetzner:7447 ZENOH_TLS_CA=/etc/fractalaw/ca.pem fractalaw sync watch
+```
+
+## Status: Phase 1 + Phase 2 complete, Phase 3 (router deployment) pending
