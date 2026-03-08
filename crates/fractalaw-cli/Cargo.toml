@@ -16,6 +16,7 @@ fractalaw-store = { path = "../fractalaw-store", features = ["duckdb", "datafusi
 fractalaw-ai = { path = "../fractalaw-ai", features = ["onnx"] }
 fractalaw-host = { path = "../fractalaw-host", features = ["duckdb", "onnx", "lancedb"] }
 fractalaw-sync = { path = "../fractalaw-sync", features = ["http", "zenoh"] }
+zenoh = { workspace = true }
 arrow = { workspace = true, features = ["prettyprint"] }
 chrono = { workspace = true }
 clap = { workspace = true }

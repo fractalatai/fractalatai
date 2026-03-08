@@ -163,6 +163,52 @@ enum Command {
     },
 }
 
+/// Shared Zenoh connectivity args for all sync subcommands.
+#[derive(clap::Args, Clone, Debug)]
+struct ZenohArgs {
+    /// Tenant namespace
+    #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
+    tenant: String,
+
+    /// Zenoh endpoint to connect to (e.g., tcp/1.2.3.4:7447).
+    /// Switches to client mode with multicast scouting disabled.
+    #[arg(long, env = "ZENOH_ENDPOINT")]
+    connect: Option<String>,
+
+    /// Path to a Zenoh JSON5 config file (advanced).
+    /// Mutually exclusive with --connect.
+    #[arg(long, env = "ZENOH_CONFIG", conflicts_with = "connect")]
+    zenoh_config: Option<PathBuf>,
+}
+
+impl ZenohArgs {
+    /// Build a zenoh::Config from CLI flags.
+    ///
+    /// - `--connect`: client mode, explicit endpoint, no multicast
+    /// - `--zenoh-config`: load from JSON5 file
+    /// - neither: default peer mode with multicast scouting (LAN P2P)
+    fn build_zenoh_config(&self) -> anyhow::Result<zenoh::Config> {
+        if let Some(ref endpoint) = self.connect {
+            let json5 = format!(
+                r#"{{
+                    mode: "client",
+                    connect: {{ endpoints: ["{endpoint}"] }},
+                    scouting: {{ multicast: {{ enabled: false }} }}
+                }}"#
+            );
+            zenoh::Config::from_json5(&json5).map_err(|e| {
+                anyhow::anyhow!("failed to build zenoh client config for '{endpoint}': {e}")
+            })
+        } else if let Some(ref path) = self.zenoh_config {
+            zenoh::Config::from_file(path).map_err(|e| {
+                anyhow::anyhow!("failed to load zenoh config from '{}': {e}", path.display())
+            })
+        } else {
+            Ok(zenoh::Config::default())
+        }
+    }
+}
+
 #[derive(Subcommand)]
 enum SyncAction {
     /// Pull new annotations from sertantai outbox
@@ -179,9 +225,8 @@ enum SyncAction {
     },
     /// Publish taxa enrichment to zenoh mesh
     Publish {
-        /// Tenant namespace
-        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
-        tenant: String,
+        #[command(flatten)]
+        zenoh: ZenohArgs,
         /// Specific laws to publish (comma-separated)
         #[arg(long)]
         laws: Option<String>,
@@ -197,9 +242,8 @@ enum SyncAction {
     },
     /// Pull legislation text (LAT) from sertantai via zenoh
     PullLat {
-        /// Tenant namespace
-        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
-        tenant: String,
+        #[command(flatten)]
+        zenoh: ZenohArgs,
         /// Law names to pull (comma-separated)
         #[arg(long)]
         laws: String,
@@ -209,9 +253,8 @@ enum SyncAction {
     },
     /// Watch for sync events and run the full round-trip pipeline (long-running)
     Watch {
-        /// Tenant namespace
-        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
-        tenant: String,
+        #[command(flatten)]
+        zenoh: ZenohArgs,
         /// Query timeout in seconds (per-law pull)
         #[arg(long, default_value_t = 30)]
         timeout: u64,
@@ -227,31 +270,27 @@ enum SyncAction {
 enum CrdtAction {
     /// Show status of persisted CRDT documents
     Status {
-        /// Tenant namespace
-        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
-        tenant: String,
+        #[command(flatten)]
+        zenoh: ZenohArgs,
     },
     /// Create a new empty CRDT document
     Create {
         /// Document ID
         doc_id: String,
-        /// Tenant namespace
-        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
-        tenant: String,
+        #[command(flatten)]
+        zenoh: ZenohArgs,
     },
     /// Inspect a CRDT document's current state
     Inspect {
         /// Document ID
         doc_id: String,
-        /// Tenant namespace
-        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
-        tenant: String,
+        #[command(flatten)]
+        zenoh: ZenohArgs,
     },
     /// Save all loaded CRDT documents to disk
     Save {
-        /// Tenant namespace
-        #[arg(long, env = "FRACTALAW_TENANT", default_value = "local")]
-        tenant: String,
+        #[command(flatten)]
+        zenoh: ZenohArgs,
     },
 }
 
@@ -373,33 +412,33 @@ async fn main() -> anyhow::Result<()> {
             SyncAction::Pull { url } => cmd_sync_pull(&data_dir, &url).await,
             SyncAction::Push { url } => cmd_sync_push(&data_dir, &url).await,
             SyncAction::Publish {
-                tenant,
+                zenoh,
                 laws,
                 family,
                 all,
                 changed,
-            } => cmd_sync_publish(&data_dir, &tenant, laws, family, all, changed).await,
+            } => cmd_sync_publish(&data_dir, &zenoh, laws, family, all, changed).await,
             SyncAction::PullLat {
-                tenant,
+                zenoh,
                 laws,
                 timeout,
             } => {
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_sync_pull_lat(&data_dir, &tenant, &law_names, timeout).await
+                cmd_sync_pull_lat(&data_dir, &zenoh, &law_names, timeout).await
             }
-            SyncAction::Watch { tenant, timeout } => {
-                cmd_sync_watch(&data_dir, &tenant, timeout).await
+            SyncAction::Watch { zenoh, timeout } => {
+                cmd_sync_watch(&data_dir, &zenoh, timeout).await
             }
             SyncAction::Crdt { action } => match action {
-                CrdtAction::Status { tenant } => cmd_crdt_status(&data_dir, &tenant).await,
-                CrdtAction::Create { doc_id, tenant } => {
-                    cmd_crdt_create(&data_dir, &tenant, &doc_id).await
+                CrdtAction::Status { zenoh } => cmd_crdt_status(&data_dir, &zenoh).await,
+                CrdtAction::Create { doc_id, zenoh } => {
+                    cmd_crdt_create(&data_dir, &zenoh, &doc_id).await
                 }
-                CrdtAction::Inspect { doc_id, tenant } => {
-                    cmd_crdt_inspect(&data_dir, &tenant, &doc_id).await
+                CrdtAction::Inspect { doc_id, zenoh } => {
+                    cmd_crdt_inspect(&data_dir, &zenoh, &doc_id).await
                 }
-                CrdtAction::Save { tenant } => cmd_crdt_save(&data_dir, &tenant).await,
+                CrdtAction::Save { zenoh } => cmd_crdt_save(&data_dir, &zenoh).await,
             },
         },
 
@@ -646,7 +685,7 @@ async fn cmd_sync_push(data_dir: &std::path::Path, url: &str) -> anyhow::Result<
 
 async fn cmd_sync_publish(
     data_dir: &std::path::Path,
-    tenant: &str,
+    zenoh: &ZenohArgs,
     laws: Option<String>,
     family: Option<String>,
     all: bool,
@@ -723,11 +762,13 @@ async fn cmd_sync_publish(
     }
 
     println!(
-        "Publishing taxa for {} laws to zenoh (tenant: {tenant})...",
-        law_names.len()
+        "Publishing taxa for {} laws to zenoh (tenant: {})...",
+        law_names.len(),
+        zenoh.tenant,
     );
 
-    let sync = fractalaw_sync::ZenohSync::new(tenant)
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
         .await
         .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
 
@@ -767,7 +808,7 @@ async fn cmd_sync_publish(
 
 async fn cmd_sync_pull_lat(
     data_dir: &std::path::Path,
-    tenant: &str,
+    zenoh: &ZenohArgs,
     law_names: &[String],
     timeout_secs: u64,
 ) -> anyhow::Result<()> {
@@ -775,15 +816,17 @@ async fn cmd_sync_pull_lat(
         .await
         .context("opening LanceDB")?;
 
-    let sync = fractalaw_sync::ZenohSync::new(tenant)
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
         .await
         .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
 
     let timeout = std::time::Duration::from_secs(timeout_secs);
 
     println!(
-        "Pulling LAT for {} laws from sertantai (tenant: {tenant}, timeout: {timeout_secs}s)...",
-        law_names.len()
+        "Pulling LAT for {} laws from sertantai (tenant: {}, timeout: {timeout_secs}s)...",
+        law_names.len(),
+        zenoh.tenant,
     );
 
     let mut total_pulled = 0usize;
@@ -823,7 +866,7 @@ async fn cmd_sync_pull_lat(
 
 async fn cmd_sync_watch(
     data_dir: &std::path::Path,
-    tenant: &str,
+    zenoh: &ZenohArgs,
     timeout_secs: u64,
 ) -> anyhow::Result<()> {
     let lance = LanceStore::open(&data_dir.join("lancedb"))
@@ -832,7 +875,8 @@ async fn cmd_sync_watch(
     let duck = open_duck(data_dir)?;
     duck.ensure_taxa_hash_columns()?;
 
-    let sync = fractalaw_sync::ZenohSync::new(tenant)
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
         .await
         .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
 
@@ -843,7 +887,10 @@ async fn cmd_sync_watch(
 
     let timeout = std::time::Duration::from_secs(timeout_secs);
 
-    println!("Watching for sync events (tenant: {tenant}, timeout: {timeout_secs}s per pull)...");
+    println!(
+        "Watching for sync events (tenant: {}, timeout: {timeout_secs}s per pull)...",
+        zenoh.tenant
+    );
     println!("Pipeline: ensure LRT → pull LAT → enrich → publish taxa");
     println!("Press Ctrl+C to stop.\n");
 
@@ -1024,16 +1071,22 @@ fn generate_peer_id() -> u64 {
     hasher.finish()
 }
 
-async fn cmd_crdt_status(data_dir: &std::path::Path, tenant: &str) -> anyhow::Result<()> {
+async fn cmd_crdt_status(data_dir: &std::path::Path, zenoh: &ZenohArgs) -> anyhow::Result<()> {
     let persist_dir = crdt_persist_dir(data_dir);
-    let sync = fractalaw_sync::CrdtSync::new(tenant, generate_peer_id(), &persist_dir)
-        .await
-        .map_err(|e| anyhow::anyhow!("failed to open CRDT session: {e}"))?;
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::CrdtSync::with_config(
+        &zenoh.tenant,
+        generate_peer_id(),
+        &persist_dir,
+        config,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("failed to open CRDT session: {e}"))?;
 
     let persisted = sync
         .list_persisted_docs()
         .map_err(|e| anyhow::anyhow!("{e}"))?;
-    println!("Tenant: {tenant}");
+    println!("Tenant: {}", zenoh.tenant);
     println!("Persist dir: {}", persist_dir.display());
     println!("Persisted documents: {}", persisted.len());
     for doc_id in &persisted {
@@ -1046,13 +1099,19 @@ async fn cmd_crdt_status(data_dir: &std::path::Path, tenant: &str) -> anyhow::Re
 
 async fn cmd_crdt_create(
     data_dir: &std::path::Path,
-    tenant: &str,
+    zenoh: &ZenohArgs,
     doc_id: &str,
 ) -> anyhow::Result<()> {
     let persist_dir = crdt_persist_dir(data_dir);
-    let sync = fractalaw_sync::CrdtSync::new(tenant, generate_peer_id(), &persist_dir)
-        .await
-        .map_err(|e| anyhow::anyhow!("failed to open CRDT session: {e}"))?;
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::CrdtSync::with_config(
+        &zenoh.tenant,
+        generate_peer_id(),
+        &persist_dir,
+        config,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("failed to open CRDT session: {e}"))?;
 
     sync.create_doc(doc_id)
         .await
@@ -1066,13 +1125,19 @@ async fn cmd_crdt_create(
 
 async fn cmd_crdt_inspect(
     data_dir: &std::path::Path,
-    tenant: &str,
+    zenoh: &ZenohArgs,
     doc_id: &str,
 ) -> anyhow::Result<()> {
     let persist_dir = crdt_persist_dir(data_dir);
-    let sync = fractalaw_sync::CrdtSync::new(tenant, generate_peer_id(), &persist_dir)
-        .await
-        .map_err(|e| anyhow::anyhow!("failed to open CRDT session: {e}"))?;
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::CrdtSync::with_config(
+        &zenoh.tenant,
+        generate_peer_id(),
+        &persist_dir,
+        config,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("failed to open CRDT session: {e}"))?;
 
     sync.open_or_create(doc_id)
         .await
@@ -1085,11 +1150,17 @@ async fn cmd_crdt_inspect(
     Ok(())
 }
 
-async fn cmd_crdt_save(data_dir: &std::path::Path, tenant: &str) -> anyhow::Result<()> {
+async fn cmd_crdt_save(data_dir: &std::path::Path, zenoh: &ZenohArgs) -> anyhow::Result<()> {
     let persist_dir = crdt_persist_dir(data_dir);
-    let sync = fractalaw_sync::CrdtSync::new(tenant, generate_peer_id(), &persist_dir)
-        .await
-        .map_err(|e| anyhow::anyhow!("failed to open CRDT session: {e}"))?;
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::CrdtSync::with_config(
+        &zenoh.tenant,
+        generate_peer_id(),
+        &persist_dir,
+        config,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("failed to open CRDT session: {e}"))?;
 
     // Load all persisted docs first
     let doc_ids = sync
