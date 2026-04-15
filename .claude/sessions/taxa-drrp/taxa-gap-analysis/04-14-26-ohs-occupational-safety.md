@@ -226,8 +226,8 @@ Sample review of Employer misses (99 with obligation modal):
 - [x] Check very low DRRP% laws — mixed-content provision problem
 - [x] Build confusion matrix — recall 48.6%, precision 96.4%
 - [x] Classify Gap A vs Gap C — Gap C dominates (78%), Gap A has actionable GOVERNED_ACTORS misses
-- [ ] **Fix 1**: Mixed-content provision gate bypass (product safety SIs)
-- [ ] **Fix 2**: GOVERNED_ACTORS v2 matcher failures (308 provisions)
+- [x] **Fix 1**: Mixed-content provision gate bypass (product safety SIs) — committed 2cc3aa0
+- [ ] **Fix 2**: GOVERNED_ACTORS v2 matcher failures (747 Gap A provisions post-Fix 1)
 - [ ] Log Gap C for future AI session
 
 ## Fix 1: Mixed-Content Provision Gate Bypass
@@ -296,3 +296,61 @@ The Interpretation-primary gate was added to prevent false DRRP from definition 
 - [x] 1j. Product safety SIs: UK_uksi_2016_1092 1.4%→12.4%, UK_uksi_2016_1093 0.7%→50.2%, UK_uksi_2016_1105 0.7%→45.2%, UK_asc_2025_4 tested OK
 
 **Bug fix**: `extract_clause()` panicked on `begin <= end` when span actor_start > modal_end due to regex overlap in mixed-content provisions. Added guard to swap bounds.
+
+## Fix 2: v2 Matcher Gap Analysis
+
+### Investigation
+
+Post-Fix 1, 747 Gap A provisions remain (governed actor present, no DRRP). Deep investigation across all governed actors (excluding Ind: Person, Worker, etc.):
+
+| Category | Count | Notes |
+|----------|-------|-------|
+| Gate-blocked (correct) | 197 | scope 83, enact 85, structural 26, descriptive 3 |
+| Actor after modal (correct) | 316 | Actor is object/beneficiary, not subject — v2 correctly rejects |
+| **v2 potential bugs** | **50** | Forward anchor exists but Rust v2 doesn't fire |
+
+v2 bugs by actor:
+
+| Actor | Count |
+|-------|-------|
+| Ind: Employee | 18 |
+| Org: Employer | 14 |
+| SC: Manufacturer | 5 |
+| Svc: Installer | 5 |
+| Operator | 4 |
+| Org: Occupier | 3 |
+| Ind: User | 1 |
+
+### Root causes identified
+
+1. **Subordinate clause + pronoun reference** (4 provisions): Text cleaner strips paragraph numbers ("2 ") → "Where an employer..., he shall" → subordinate check fires for "employer" but main clause uses pronoun "he" → v2 retries keyword but no second occurrence exists.
+
+2. **Enabling "may" epistemic rejection** (~16 provisions): "employer may" matched by forward anchor but rejected by `is_epistemic_may()` check (false positive on the epistemic filter).
+
+3. **Text cleaner artefacts**: Paragraph number stripping changes subordinate clause boundary detection.
+
+### Decision
+
+**Diminishing returns** — 50 provisions = 0.25% of corpus. Fix 1 recovered 400 provisions (8x larger impact). The remaining 2,688 Gap C provisions (passive voice, no actor) are 54x larger than Fix 2's potential gain.
+
+**No code changes for Fix 2.** The subordinate/pronoun and epistemic-may issues are documented for future reference. Gap C is the priority and will be addressed in a dedicated AI/LLM session.
+
+## Session Summary
+
+| Metric | Baseline | Post-Fix 1 | Delta |
+|--------|----------|------------|-------|
+| Recall | 48.6% | 53.4% | +4.8pp |
+| F1 | 64.6% | 66.2% | +1.6pp |
+| False negatives | 4,200 | 3,800 | -400 |
+| Gap A (actor present) | 925 | 747 | -178 |
+| Gap C (no actor) | 3,275 | 2,688 | -587 |
+
+### Remaining work
+
+- [ ] Gap C: AI/LLM session for passive-voice provisions (2,688 — 71% of remaining FN). Will also cover the 50 v2 bugs (pronoun reference, epistemic "may") since LLM parsing is actor-agnostic.
+- [ ] GH #32: Bulk LAT prune across all families
+- [ ] Publish re-enriched OH&S data: `sync publish --tenant dev --family "OH&S: Occupational / Personal Safety"`
+
+---
+
+**Session closed**: 2026-04-15. Commit: 2cc3aa0 (Fix 1).
