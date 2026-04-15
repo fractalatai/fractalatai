@@ -36,7 +36,7 @@ Non-negotiable in practice:
 | Purpose | Library | Notes |
 |---------|---------|-------|
 | Base model + training | `transformers` | ModernBERT-large (primary) and DeBERTa-v3-large (comparison baseline); new from-scratch training |
-| Parameter-efficient fine-tuning | `peft` (LoRA/QLoRA) | Keeps GPU cost down |
+| Parameter-efficient fine-tuning | `peft` (LoRA/QLoRA) | **Fallback only** per §0 quality-first; full fine-tune is the default |
 | Dataset handling | `datasets` + `pyarrow` | Parquet interop with main repo |
 | Training loop | `transformers.Trainer` | Or `accelerate` for custom loops |
 | Tokenizer | `tokenizers` | Matches existing artefact |
@@ -88,7 +88,7 @@ fractalaw-taxa-training/           # separate git repo, private
 │   │   └── validate.py            # Label quality checks (no meta-labels!)
 │   ├── train/
 │   │   ├── dataset.py             # Parquet → HF Dataset, tokenisation
-│   │   ├── model.py               # ModernBERT-large or DeBERTa-v3-large + detector + extraction heads
+│   │   ├── model.py               # Both configs (ModernBERT-large, DeBERTa-v3-large) dispatched via CLI arg; detector + extraction heads
 │   │   ├── train.py               # Trainer setup + launch
 │   │   └── export.py              # ONNX + int8 quantisation + metadata.json
 │   └── eval/

@@ -76,10 +76,14 @@ artefacts, and go/no-go checks between sessions.
    from `actors.rs` added. This is the **model vocabulary** (training
    output space), distinct from `actors.rs`'s regex detection vocabulary.
    See research doc §4.1.
-4. **DuckDB LRT migration note** — the new `holder_inferred_from` column
-   already exists in main at hand-off; training doesn't need to produce it,
-   but the training-time labels must carry an `inferred_from` field per
-   example so the model can be supervised on provenance.
+4. **`holder_inferred_from` field design spec** — research doc §4.1a
+   defines the field. The DuckDB LRT column and the `DrrpExtraction`
+   struct field itself ship in **Session 3 S7** (deferred from Session
+   1 to avoid dead schema without a producer). Training-time labels
+   must carry an `inferred_from` field per example so the model can be
+   supervised on provenance, matching the spec. Training repo doesn't
+   need the column to exist in main at hand-off; it just needs to
+   produce labels in the spec's shape.
 
 ### Session 2 → Session 3
 
@@ -156,6 +160,22 @@ Don't cross a boundary if the preceding session didn't clear its gate.
   must enumerate any additions explicitly.
 - **Precision regression (S7)**: the confidence threshold is the main
   lever. Start high, lower only with evidence from the eval harness.
+
+## Cost envelope
+
+See research doc §8 for the full cost envelope table (initial catchup,
+ongoing inference, head-swap retrain, full retrain). Headline figures:
+
+- **Initial catchup**: ~$1–10 (one-off, inference over ~3k Gap C
+  provisions)
+- **Ongoing inference**: <$1/month (20–100 provisions/month after
+  catchup)
+- **Head-swap retrain**: ~$5–20 per new role added to taxonomy
+- **Full retrain**: ~$50–200 (rare, ~1×/year)
+- **Total annual steady-state**: well under $500
+
+Cheap relative to the quality impact. Budget impact is trivial; the
+expensive part of this work is labelled training data, not compute.
 
 ## Living document
 

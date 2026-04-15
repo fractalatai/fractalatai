@@ -32,6 +32,21 @@ Session 2.
 fallback. Must not regress precision. Feature-flagged and
 threshold-gated from day one.
 
+**Scope note**: S7 is the largest single deliverable across all three
+sessions. It absorbs several pieces of work that cluster naturally
+together: the `holder_inferred_from` schema (deferred from Session 1),
+the remote-inference provider, disabling the deprecated local polisher,
+the regex-placeholder routing rule, and the detector integration itself.
+The consolidation is deliberate — shipping schema alongside its producer
+avoids dead columns. If S7 proves too large to execute as one PR at
+implementation time, the natural split seam is:
+
+- **S7a**: schema extension (`holder_inferred_from`) + remote-inference
+  provider scaffolding + deprecated-polisher short-circuit. Pure
+  plumbing; no behavioural change to enrichment yet.
+- **S7b**: `parse_v2` integration + detector call path + placeholder
+  routing + tests. The behavioural change, gated behind feature flag.
+
 Tasks:
 - [ ] **Land the `holder_inferred_from` schema** (deferred from Session
   1 per scope change; field design in research doc §4.1a):
