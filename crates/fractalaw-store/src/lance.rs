@@ -234,6 +234,23 @@ impl LanceStore {
         Ok(total_rows)
     }
 
+    /// Delete all legislation text rows for a given law.
+    ///
+    /// Uses LanceDB row-level deletion. Returns the number of rows that
+    /// existed before deletion. No-op if the table doesn't exist or the
+    /// law has no rows (idempotent).
+    pub async fn delete_law_lat(&self, law_name: &str) -> Result<usize, StoreError> {
+        self.delete_by_law(LEGISLATION_TEXT_TABLE, law_name).await
+    }
+
+    /// Delete all amendment annotation rows for a given law.
+    ///
+    /// Same semantics as [`delete_law_lat`](Self::delete_law_lat).
+    pub async fn delete_law_annotations(&self, law_name: &str) -> Result<usize, StoreError> {
+        self.delete_by_law(AMENDMENT_ANNOTATIONS_TABLE, law_name)
+            .await
+    }
+
     /// List table names in the database.
     pub async fn table_names(&self) -> Result<Vec<String>, StoreError> {
         let names = self.db.table_names().execute().await?;
@@ -275,6 +292,28 @@ impl LanceStore {
     }
 
     // ── Internal ──
+
+    /// Delete all rows matching `law_name` from the given table.
+    async fn delete_by_law(&self, table_name: &str, law_name: &str) -> Result<usize, StoreError> {
+        let existing = self.db.table_names().execute().await?;
+        if !existing.contains(&table_name.to_string()) {
+            return Ok(0);
+        }
+
+        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
+        let table = self.db.open_table(table_name).execute().await?;
+        let count = table.count_rows(Some(filter.clone())).await?;
+
+        if count > 0 {
+            table
+                .delete(&filter)
+                .await
+                .map_err(|e| StoreError::Other(format!("delete from {table_name}: {e}")))?;
+            info!(table = table_name, law_name, rows = count, "deleted rows");
+        }
+
+        Ok(count)
+    }
 
     async fn create_table_from_parquet(
         &self,
@@ -544,5 +583,66 @@ mod tests {
         assert!(schema.field_with_name("text").is_ok());
         assert!(schema.field_with_name("sort_key").is_ok());
         assert!(schema.field_with_name("embedding").is_ok());
+    }
+
+    #[tokio::test]
+    async fn delete_law_lat_removes_only_target_law() {
+        let dir = require_lat_data();
+        let tmp = TempDir::new().unwrap();
+        let db_path = tmp.path().join("test_lancedb");
+        let store = LanceStore::open(&db_path).await.unwrap();
+        store
+            .create_legislation_text(&dir.join("legislation_text.parquet"))
+            .await
+            .unwrap();
+
+        let total_before = store.legislation_text_count().await.unwrap();
+        let law = "UK_ukpga_1974_37";
+
+        // Count rows for this specific law.
+        let law_rows = store
+            .query_legislation_text(&format!("law_name = '{law}'"), 100_000, 0)
+            .await
+            .unwrap()
+            .iter()
+            .map(|b| b.num_rows())
+            .sum::<usize>();
+        assert!(
+            law_rows > 100,
+            "HSWA 1974 should have >100 rows, got {law_rows}"
+        );
+
+        // Delete.
+        let deleted = store.delete_law_lat(law).await.unwrap();
+        assert_eq!(deleted, law_rows);
+
+        // Verify target law is gone.
+        let remaining = store
+            .query_legislation_text(&format!("law_name = '{law}'"), 100_000, 0)
+            .await
+            .unwrap()
+            .iter()
+            .map(|b| b.num_rows())
+            .sum::<usize>();
+        assert_eq!(remaining, 0, "deleted law should have 0 rows");
+
+        // Verify other laws remain.
+        let total_after = store.legislation_text_count().await.unwrap();
+        assert_eq!(total_after, total_before - law_rows);
+
+        // Idempotent re-delete returns 0.
+        let deleted_again = store.delete_law_lat(law).await.unwrap();
+        assert_eq!(deleted_again, 0);
+    }
+
+    #[tokio::test]
+    async fn delete_law_lat_no_table_returns_zero() {
+        let tmp = TempDir::new().unwrap();
+        let db_path = tmp.path().join("test_lancedb");
+        let store = LanceStore::open(&db_path).await.unwrap();
+
+        // No table exists — should return 0, not error.
+        let deleted = store.delete_law_lat("UK_ukpga_1974_37").await.unwrap();
+        assert_eq!(deleted, 0);
     }
 }

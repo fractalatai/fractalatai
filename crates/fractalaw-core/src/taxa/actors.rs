@@ -140,6 +140,14 @@ const GOVERNMENT_DEFS: &[(&str, &str)] = &[
         r"(?:[\s[:punct:]])Natural Resources Body for Wales(?:[\s[:punct:]])"
     ),
     actor!(
+        "Gvt: Agency: Maritime and Coastguard Agency",
+        r"(?:[\s[:punct:]])(?:Maritime and Coastguard Agency|MCA)(?:[\s[:punct:]])"
+    ),
+    actor!(
+        "Gvt: Agency: Oil and Gas Authority",
+        r"(?:[\s[:punct:]])(?:Oil and Gas Authority|North Sea Transition Authority|OGA|NSTA)(?:[\s[:punct:]])"
+    ),
+    actor!(
         "Gvt: Agency",
         r"(?:[\s[:punct:]])[Aa]gency(?:[\s[:punct:]])"
     ),
@@ -226,6 +234,10 @@ const GOVERNMENT_DEFS: &[(&str, &str)] = &[
     actor!(
         "Gvt: Ministry: Ministry of Defence",
         r"(?:[\s[:punct:]])Ministry of Defence(?:[\s[:punct:]])"
+    ),
+    actor!(
+        "Gvt: Ministry: Department of Enterprise, Trade and Investment",
+        r"(?:[\s[:punct:]])Department of Enterprise,? Trade and Investment(?:[\s[:punct:]])"
     ),
     actor!(
         "Gvt: Ministry",
@@ -386,6 +398,18 @@ const GOVERNED_DEFS: &[(&str, &str)] = &[
     ),
 ];
 
+// ── Specialist governed actor definitions ────────────────────────────
+//
+// Domain-specific actors that only run when the law's family matches.
+// Mirrors the specialist dictionary pattern in `fitness.rs`.
+
+/// Offshore petroleum licensing actors.
+/// Applied when `family.starts_with("OH&S: Offshore")`.
+const OFFSHORE_GOVERNED_DEFS: &[(&str, &str)] = &[actor!(
+    "Offshore: Licensee",
+    r"(?:[\s[:punct:]])[Ll]icen[cs]ees?(?:[\s[:punct:]])"
+)];
+
 // ── Compiled pattern caches ──────────────────────────────────────────
 
 static GOVERNMENT_COMPILED: LazyLock<Vec<(&str, Regex)>> = LazyLock::new(|| {
@@ -402,6 +426,24 @@ static GOVERNED_COMPILED: LazyLock<Vec<(&str, Regex)>> = LazyLock::new(|| {
         .collect()
 });
 
+static OFFSHORE_GOVERNED_COMPILED: LazyLock<Vec<(&str, Regex)>> = LazyLock::new(|| {
+    OFFSHORE_GOVERNED_DEFS
+        .iter()
+        .map(|(label, pat)| (*label, Regex::new(pat).unwrap()))
+        .collect()
+});
+
+/// Return specialist governed actor patterns for a given law family.
+///
+/// Returns an empty slice for unknown families — only core patterns run.
+fn specialist_governed_for(family: &str) -> &'static [(&'static str, Regex)] {
+    if family.starts_with("OH&S: Offshore") {
+        &OFFSHORE_GOVERNED_COMPILED
+    } else {
+        &[]
+    }
+}
+
 // ── Public API ───────────────────────────────────────────────────────
 
 /// Extract all actors (governed + government) from text.
@@ -412,6 +454,30 @@ pub fn extract_actors(text: &str) -> ExtractedActors {
     let cleaned = apply_blacklist(text);
     ExtractedActors {
         governed: run_patterns(&cleaned, &GOVERNED_COMPILED),
+        government: run_patterns(&cleaned, &GOVERNMENT_COMPILED),
+    }
+}
+
+/// Extract all actors with family-gated specialist patterns.
+///
+/// Runs core patterns (same as `extract_actors`) plus any specialist
+/// governed actor patterns that match the law family prefix.
+pub fn extract_actors_for_family(text: &str, family: Option<&str>) -> ExtractedActors {
+    let cleaned = apply_blacklist(text);
+    let mut governed = run_patterns(&cleaned, &GOVERNED_COMPILED);
+
+    if let Some(fam) = family {
+        let specialists = specialist_governed_for(fam);
+        if !specialists.is_empty() {
+            let mut extra = run_patterns(&cleaned, specialists);
+            governed.append(&mut extra);
+            governed.sort_by(|a, b| a.label.cmp(&b.label));
+            governed.dedup_by(|a, b| a.label == b.label);
+        }
+    }
+
+    ExtractedActors {
+        governed,
         government: run_patterns(&cleaned, &GOVERNMENT_COMPILED),
     }
 }
@@ -553,6 +619,47 @@ mod tests {
         assert!(any_label_contains(&actors.government, "Local"));
     }
 
+    #[test]
+    fn extract_maritime_and_coastguard_agency() {
+        let actors =
+            extract_actors(" send the arrangements to the Maritime and Coastguard Agency. ");
+        assert!(has_label(
+            &actors.government,
+            "Gvt: Agency: Maritime and Coastguard Agency"
+        ));
+    }
+
+    #[test]
+    fn extract_oil_and_gas_authority() {
+        let actors = extract_actors(
+            " before the submission of a field development plan to the Oil and Gas Authority ",
+        );
+        assert!(has_label(
+            &actors.government,
+            "Gvt: Agency: Oil and Gas Authority"
+        ));
+    }
+
+    #[test]
+    fn extract_nsta() {
+        let actors = extract_actors(" a plan submitted to the NSTA for approval ");
+        assert!(has_label(
+            &actors.government,
+            "Gvt: Agency: Oil and Gas Authority"
+        ));
+    }
+
+    #[test]
+    fn extract_dept_enterprise_trade_investment() {
+        let actors = extract_actors(
+            " Sealed with the Official Seal of the Department of Enterprise, Trade and Investment ",
+        );
+        assert!(has_label(
+            &actors.government,
+            "Gvt: Ministry: Department of Enterprise, Trade and Investment"
+        ));
+    }
+
     // ── Backward-compat label accessors ─────────────────────────────
 
     #[test]
@@ -609,5 +716,65 @@ mod tests {
             "temporary work agency should not be classified as Gvt: Agency, got: {:?}",
             actors.government
         );
+    }
+
+    // ── Family-gated specialist actors ───────────────────────────────
+
+    #[test]
+    fn licensee_extracted_for_offshore_family() {
+        let text = "The licensee shall ensure that any operator is capable.";
+        let actors = extract_actors_for_family(text, Some("OH&S: Offshore Safety"));
+        assert!(
+            has_label(&actors.governed, "Offshore: Licensee"),
+            "licensee should be extracted for offshore family, got: {:?}",
+            actors.governed
+        );
+    }
+
+    #[test]
+    fn licensee_not_extracted_without_family() {
+        let text = "The licensee shall ensure that any operator is capable.";
+        let actors = extract_actors(text);
+        assert!(
+            !has_label(&actors.governed, "Offshore: Licensee"),
+            "licensee should not be extracted without family, got: {:?}",
+            actors.governed
+        );
+    }
+
+    #[test]
+    fn licensee_not_extracted_for_other_family() {
+        let text = "The licensee shall ensure that any operator is capable.";
+        let actors = extract_actors_for_family(text, Some("AGRICULTURE"));
+        assert!(
+            !has_label(&actors.governed, "Offshore: Licensee"),
+            "licensee should not be extracted for AGRICULTURE, got: {:?}",
+            actors.governed
+        );
+    }
+
+    #[test]
+    fn offshore_family_still_extracts_core_actors() {
+        let text = "The employer shall ensure safety. The licensee must comply.";
+        let actors = extract_actors_for_family(text, Some("OH&S: Offshore Safety"));
+        assert!(
+            has_label(&actors.governed, "Org: Employer"),
+            "core actors should still be extracted, got: {:?}",
+            actors.governed
+        );
+        assert!(
+            has_label(&actors.governed, "Offshore: Licensee"),
+            "specialist actors should also be extracted, got: {:?}",
+            actors.governed
+        );
+    }
+
+    #[test]
+    fn family_none_same_as_extract_actors() {
+        let text = "The employer shall ensure safety.";
+        let with_none = extract_actors_for_family(text, None);
+        let without = extract_actors(text);
+        assert_eq!(with_none.governed_labels(), without.governed_labels());
+        assert_eq!(with_none.government_labels(), without.government_labels());
     }
 }

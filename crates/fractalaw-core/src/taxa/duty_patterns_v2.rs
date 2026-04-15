@@ -303,6 +303,11 @@ fn is_epistemic_may(text: &str, match_end: usize) -> bool {
 }
 
 /// Match a specific actor keyword against all sub-type patterns.
+///
+/// When a match is rejected (subordinate clause, epistemic "may"), retries
+/// from the next keyword occurrence rather than giving up. This handles the
+/// common legislative pattern where the same actor appears in both a
+/// subordinate "Where/If" clause and the main obligation clause.
 fn match_actor_anchored(text: &str, keyword: &str) -> Option<DutyClassification> {
     // First check the "shall be the duty of" reverse pattern (HSWA formulation)
     if let Some(dc) = match_duty_of_pattern(text, keyword) {
@@ -317,46 +322,56 @@ fn match_actor_anchored(text: &str, keyword: &str) -> Option<DutyClassification>
     // Try primary window first (higher confidence)
     for pat in SUB_TYPE_PATTERNS {
         let re = cached_anchored(keyword, pat.obligation, pat.idx, PRIMARY_WINDOW);
-        if let Some(m) = re.find(text) {
-            // Reject epistemic "may be/need/have/require" for Enabling matches
-            if pat.sub_type == DutySubType::Enabling && is_epistemic_may(text, m.end()) {
-                continue;
-            }
-            let span = extract_span_from_anchored(text, m.start(), m.end());
-            // Reject actor in subordinate clause ("Where {actor} ..., {subject} shall")
-            if is_actor_in_subordinate(text, span.actor_start, span.modal_start) {
-                continue;
-            }
-            return Some(DutyClassification {
-                family: DutyFamily::Governed,
-                sub_type: pat.sub_type,
-                confidence: pat.confidence,
-                span: Some(span),
-            });
+        if let Some(dc) = find_valid_match(text, keyword, &re, pat.sub_type, pat.confidence) {
+            return Some(dc);
         }
     }
 
     // Try extended window at reduced confidence
     for pat in SUB_TYPE_PATTERNS {
         let re = cached_anchored(keyword, pat.obligation, pat.idx, EXTENDED_WINDOW);
-        if let Some(m) = re.find(text) {
-            if pat.sub_type == DutySubType::Enabling && is_epistemic_may(text, m.end()) {
-                continue;
-            }
-            let span = extract_span_from_anchored(text, m.start(), m.end());
-            if is_actor_in_subordinate(text, span.actor_start, span.modal_start) {
-                continue;
-            }
-            return Some(DutyClassification {
-                family: DutyFamily::Governed,
-                sub_type: pat.sub_type,
-                // Reduce confidence by 0.15 for extended window matches
-                confidence: (pat.confidence - 0.15).max(0.30),
-                span: Some(span),
-            });
+        let reduced = (pat.confidence - 0.15).max(0.30);
+        if let Some(dc) = find_valid_match(text, keyword, &re, pat.sub_type, reduced) {
+            return Some(dc);
         }
     }
 
+    None
+}
+
+/// Search for a valid anchored match, retrying from later keyword occurrences
+/// when a match is rejected by subordinate-clause or epistemic-may checks.
+fn find_valid_match(
+    text: &str,
+    keyword: &str,
+    re: &Regex,
+    sub_type: DutySubType,
+    confidence: f32,
+) -> Option<DutyClassification> {
+    let mut offset = 0;
+    while offset < text.len() {
+        let Some(m) = re.find(&text[offset..]) else {
+            break;
+        };
+        let abs_start = offset + m.start();
+        let abs_end = offset + m.end();
+        let span = extract_span_from_anchored(text, abs_start, abs_end);
+
+        if sub_type == DutySubType::Enabling && is_epistemic_may(text, abs_end) {
+            offset = abs_start + keyword.len();
+            continue;
+        }
+        if is_actor_in_subordinate(text, span.actor_start, span.modal_start) {
+            offset = abs_start + keyword.len();
+            continue;
+        }
+        return Some(DutyClassification {
+            family: DutyFamily::Governed,
+            sub_type,
+            confidence,
+            span: Some(span),
+        });
+    }
     None
 }
 
@@ -1074,5 +1089,32 @@ mod tests {
             "provided TO actor should not match, got: {:?}",
             result
         );
+    }
+
+    // ── Subordinate clause retry (same actor in both clauses) ───────
+
+    #[test]
+    fn duty_holder_repeated_in_subordinate_and_main_clause() {
+        // UK_nisr_2016_406:30 — "duty holder" appears in both the subordinate
+        // Where-clause and the main clause. The first occurrence is rejected
+        // by is_actor_in_subordinate, but the second should still match.
+        let text = "where the duty holder has adopted other measures, the duty holder \
+                     shall perform the internal emergency response duties so as to \
+                     secure a good prospect of personal safety and survival, taking \
+                     into account the adoption of those other measures";
+        let actors = vec![actor("Ind: Duty Holder", "duty holder")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+        assert_eq!(dc.sub_type, DutySubType::Prescriptive);
+    }
+
+    #[test]
+    fn employer_repeated_where_clause_and_main() {
+        // Same pattern: "Where an employer ..., the employer shall ensure..."
+        let text = "where an employer has made an assessment, the employer shall \
+                     ensure that the risk is eliminated or controlled";
+        let actors = vec![actor("Org: Employer", "employer")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
     }
 }

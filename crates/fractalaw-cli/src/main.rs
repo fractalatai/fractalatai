@@ -987,6 +987,7 @@ async fn cmd_sync_watch(
     let mut total_rows = 0usize;
     let mut total_enriched = 0usize;
     let mut total_published = 0usize;
+    let mut total_deletions = 0usize;
 
     loop {
         tokio::select! {
@@ -1014,6 +1015,16 @@ async fn cmd_sync_watch(
                         "  [skip] {}.{} for {}",
                         event.table, event.action, law_name
                     );
+                    continue;
+                }
+
+                // Handle LAT deletion — purge local text + annotations, keep taxa/fitness.
+                if event.action == "lat_deleted" {
+                    eprint!("  {law_name}: lat_deleted");
+                    let lat_count = lance.delete_law_lat(law_name).await.unwrap_or(0);
+                    let ann_count = lance.delete_law_annotations(law_name).await.unwrap_or(0);
+                    eprintln!(" → deleted {lat_count} provisions, {ann_count} annotations");
+                    total_deletions += 1;
                     continue;
                 }
 
@@ -1078,18 +1089,36 @@ async fn cmd_sync_watch(
 
                 // Step 3: Taxa enrichment (DRRP parse).
                 eprint!(" → enrich");
-                match enrich_single_law(&lance, &duck, law_name).await {
-                    Ok(had_taxa) => {
-                        if had_taxa {
-                            eprint!(" → ok");
-                            total_enriched += 1;
-                        } else {
-                            eprint!(" → no taxa signal");
+                let enrich_result = match enrich_single_law(&lance, &duck, law_name).await {
+                    Ok(result) => {
+                        match result {
+                            EnrichResult::Making => {
+                                eprint!(" → ok");
+                                total_enriched += 1;
+                            }
+                            EnrichResult::NonMaking => {
+                                eprint!(" → non-making");
+                                total_enriched += 1;
+                            }
+                            EnrichResult::NoTaxa => {
+                                eprint!(" → no taxa signal");
+                            }
                         }
+                        result
                     }
                     Err(e) => {
                         eprintln!(" → enrich error: {e}");
                         continue;
+                    }
+                };
+
+                // Step 3b: Prune LAT from LanceDB for non-making laws (no duties
+                // or responsibilities). The LRT metadata in DuckDB is kept and
+                // published — only the per-provision text is pruned.
+                if matches!(enrich_result, EnrichResult::NonMaking | EnrichResult::NoTaxa) {
+                    let pruned = lance.delete_law_lat(law_name).await.unwrap_or(0);
+                    if pruned > 0 {
+                        eprint!(" → pruned {pruned} LAT rows");
                     }
                 }
 
@@ -1138,7 +1167,8 @@ async fn cmd_sync_watch(
     println!(
         "Done. {total_events} events, {total_lrt_pulls} LRT pulls, \
          {total_lat_pulls} LAT pulls ({total_rows} provisions), \
-         {total_enriched} enriched, {total_published} published."
+         {total_enriched} enriched, {total_published} published, \
+         {total_deletions} deletions."
     );
 
     Ok(())
@@ -1379,6 +1409,19 @@ async fn cmd_taxa_show(
         .await
         .context("opening LanceDB")?;
 
+    // Look up law's family from DuckDB for family-gated specialist actors.
+    let family: Option<String> = {
+        let duck = open_duck(data_dir)?;
+        let batches = duck.query_arrow(&format!(
+            "SELECT family FROM legislation WHERE name = '{}'",
+            name.replace('\'', "''")
+        ))?;
+        batches.iter().find_map(|b| {
+            let col = b.column_by_name("family")?;
+            get_string_value(col.as_ref(), 0)
+        })
+    };
+
     let filter = format!("law_name = '{}'", name.replace('\'', "''"));
     let batches = lance.query_legislation_text(&filter, limit, 0).await?;
 
@@ -1390,10 +1433,10 @@ async fn cmd_taxa_show(
     }
 
     if misses {
-        return cmd_taxa_show_misses(name, total, &batches);
+        return cmd_taxa_show_misses(name, total, &batches, family.as_deref());
     }
     if clauses {
-        return cmd_taxa_show_clauses(name, total, &batches);
+        return cmd_taxa_show_clauses(name, total, &batches, family.as_deref());
     }
 
     println!("=== Taxa Classification: {name} ({total} sections) ===\n");
@@ -1419,7 +1462,7 @@ async fn cmd_taxa_show(
 
             section_num += 1;
 
-            let record = fractalaw_core::taxa::parse_v2(&text, None);
+            let record = fractalaw_core::taxa::parse_v2(&text, family.as_deref());
 
             // Skip sections with no classification signal.
             if record.duty_types.is_empty()
@@ -1484,6 +1527,7 @@ fn cmd_taxa_show_misses(
     name: &str,
     total: usize,
     batches: &[arrow::record_batch::RecordBatch],
+    family: Option<&str>,
 ) -> anyhow::Result<()> {
     // Phase 1: Run v2 on every provision, collect misses with heat scores.
     struct MissEntry {
@@ -1511,7 +1555,7 @@ fn cmd_taxa_show_misses(
                 continue;
             }
 
-            let record = fractalaw_core::taxa::parse_v2(&text, None);
+            let record = fractalaw_core::taxa::parse_v2(&text, family);
             if !record.duty_types.is_empty() {
                 v2_count += 1;
                 continue;
@@ -1612,6 +1656,7 @@ fn cmd_taxa_show_clauses(
     name: &str,
     total: usize,
     batches: &[arrow::record_batch::RecordBatch],
+    law_family: Option<&str>,
 ) -> anyhow::Result<()> {
     struct ClauseEntry {
         provision: String,
@@ -1642,7 +1687,7 @@ fn cmd_taxa_show_clauses(
                 continue;
             }
 
-            let record = fractalaw_core::taxa::parse_v2(&text, None);
+            let record = fractalaw_core::taxa::parse_v2(&text, law_family);
 
             if record.duty_types.is_empty() {
                 no_drrp_count += 1;
@@ -2073,7 +2118,10 @@ async fn cmd_taxa_qa(
                 let cleaned = fractalaw_core::taxa::text_cleaner::clean(&text);
                 if fractalaw_core::taxa::is_descriptive_summary(&cleaned) {
                     stats.gate_descriptive += 1;
-                } else if fractalaw_core::taxa::should_skip_drrp(&record.purposes) {
+                } else if fractalaw_core::taxa::should_skip_drrp(
+                    &record.purposes,
+                    !record.governed_actors.is_empty(),
+                ) {
                     stats.gate_skip_drrp += 1;
                     // Sub-classify the skip reason.
                     let first = record.purposes.first().copied();
@@ -2770,14 +2818,25 @@ async fn cmd_taxa_audit_fitness(
     Ok(())
 }
 
+/// Result of enriching a single law.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EnrichResult {
+    /// Law creates at least one duty or responsibility — LAT should be kept.
+    Making,
+    /// Law has taxa metadata (rights, powers, fitness, etc.) but no duties or
+    /// responsibilities — LAT can be pruned.
+    NonMaking,
+    /// No taxa signal at all — nothing was written to DuckDB.
+    NoTaxa,
+}
+
 /// Enrich a single law: run DRRP parser on its provisions from LanceDB, write
 /// per-provision taxa back to LanceDB, and update law-level taxa in DuckDB.
-/// Returns true if the law had any taxa signal.
 async fn enrich_single_law(
     lance: &LanceStore,
     store: &DuckStore,
     law_name: &str,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<EnrichResult> {
     use std::collections::BTreeSet;
 
     // Look up family for specialist dictionary selection
@@ -3302,7 +3361,7 @@ async fn enrich_single_law(
         && taxa.roles_gvt.is_empty()
         && taxa.fitness_entries.is_empty()
     {
-        return Ok(false);
+        return Ok(EnrichResult::NoTaxa);
     }
 
     // Compute content hash of the taxa columns (DRRP + fitness).
@@ -3339,8 +3398,15 @@ async fn enrich_single_law(
                 .and_then(|col| get_string_value(col.as_ref(), 0))
         })
     };
+    let is_making = !taxa.duties.is_empty() || !taxa.responsibilities.is_empty();
     if existing_hash.as_deref() == Some(&new_hash) {
-        return Ok(false); // unchanged — skip UPDATE
+        // Hash unchanged — skip DuckDB UPDATE, but still report making status
+        // so the caller can prune LAT for non-making laws.
+        return Ok(if is_making {
+            EnrichResult::Making
+        } else {
+            EnrichResult::NonMaking
+        });
     }
 
     // Update DuckDB law-level taxa columns (flat + struct lists) + taxa_hash.
@@ -3389,7 +3455,11 @@ async fn enrich_single_law(
     );
     store.execute(&sql)?;
 
-    Ok(true)
+    Ok(if is_making {
+        EnrichResult::Making
+    } else {
+        EnrichResult::NonMaking
+    })
 }
 
 async fn cmd_taxa_enrich(
@@ -3494,10 +3564,21 @@ async fn cmd_taxa_enrich(
     };
 
     let mut enriched = 0usize;
+    let mut pruned_laws = 0usize;
+    let mut pruned_rows = 0usize;
     let total = law_names.len();
 
     for law_name in &law_names {
-        enrich_single_law(&lance, store, law_name).await?;
+        let result = enrich_single_law(&lance, store, law_name).await?;
+
+        // Prune LAT for non-making laws (no duties or responsibilities).
+        if matches!(result, EnrichResult::NonMaking | EnrichResult::NoTaxa) {
+            let n = lance.delete_law_lat(law_name).await.unwrap_or(0);
+            if n > 0 {
+                pruned_laws += 1;
+                pruned_rows += n;
+            }
+        }
 
         enriched += 1;
         if enriched.is_multiple_of(100) {
@@ -3517,6 +3598,9 @@ async fn cmd_taxa_enrich(
     let filled_count = extract_i64(&filled[0], 0);
 
     println!("Processed {enriched} laws. LRT now has {filled_count} laws with DRRP taxa data.");
+    if pruned_laws > 0 {
+        println!("Pruned {pruned_rows} LAT rows from {pruned_laws} non-making laws.");
+    }
     Ok(())
 }
 

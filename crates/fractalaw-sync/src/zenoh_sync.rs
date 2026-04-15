@@ -55,6 +55,12 @@ pub struct SyncEventMetadata {
     pub law_name: String,
     #[serde(default)]
     pub count: Option<u64>,
+    /// Number of LAT rows deleted (present only on `lat_deleted` events).
+    #[serde(default)]
+    pub lat_deleted: Option<u64>,
+    /// Number of amendment annotation rows deleted (present only on `lat_deleted` events).
+    #[serde(default)]
+    pub annotations_deleted: Option<u64>,
 }
 
 impl SyncEvent {

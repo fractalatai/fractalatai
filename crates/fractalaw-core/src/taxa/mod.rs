@@ -93,11 +93,12 @@ pub fn parse(raw_text: &str) -> TaxaRecord {
 ///
 /// Steps:
 /// 1. Clean the text (HTML strip, normalise whitespace)
-/// 2. Classify purpose (EARLY GATE — skip DRRP if non-DRRP purpose)
-/// 3. Extract actors (only if DRRP-bearing)
-/// 4. Classify duty type via actor-anchored v2 patterns
-/// 5. Classify POPIMAR categories (only if DRRP-bearing)
-/// 6. Extract focused clause from match span
+/// 2. Classify purpose
+/// 3. Extract actors (always — needed for gate override decision)
+/// 4. Purpose gate (skip DRRP unless governed actor overrides)
+/// 5. Classify duty type via actor-anchored v2 patterns
+/// 6. Classify POPIMAR categories (only if DRRP-bearing)
+/// 7. Extract focused clause from match span
 pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
     if raw_text.trim().is_empty() {
         return TaxaRecord::default();
@@ -106,7 +107,12 @@ pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
     let cleaned = text_cleaner::clean(raw_text);
     let purposes = purpose::classify(&cleaned);
 
-    if should_skip_drrp(&purposes) || is_descriptive_summary(&cleaned) {
+    // Extract actors BEFORE the purpose gate so we can use governed-actor
+    // presence as an override signal for mixed-content provisions.
+    let extracted = actors::extract_actors_for_family(&cleaned, family);
+    let has_governed = !extracted.governed.is_empty();
+
+    if should_skip_drrp(&purposes, has_governed) || is_descriptive_summary(&cleaned) {
         // Extract fitness rules whenever APPLICATION_SCOPE is present,
         // even if another purpose (INTERPRETATION, ENACTMENT) ranked first.
         let fitness_rules = if purposes.contains(&purpose::APPLICATION_SCOPE) {
@@ -116,13 +122,13 @@ pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
         };
         return TaxaRecord {
             cleaned_text: cleaned,
+            governed_actors: extracted.governed_labels(),
+            government_actors: extracted.government_labels(),
             purposes,
             fitness_rules,
             ..Default::default()
         };
     }
-
-    let extracted = actors::extract_actors(&cleaned);
     let lower = cleaned.to_lowercase();
     let cr = duty_type::classify(&lower, &extracted.governed, &extracted.government);
 
@@ -206,7 +212,14 @@ fn extract_clause(
             text_len
         };
 
-        let clause = cleaned_text[start..end].trim().to_string();
+        // Guard: if span positions are inconsistent (actor after modal due
+        // to regex overlap), fall back to the full text between boundaries.
+        let (slice_start, slice_end) = if start <= end {
+            (start, end)
+        } else {
+            (end, start)
+        };
+        let clause = cleaned_text[slice_start..slice_end].trim().to_string();
         if clause.is_empty() {
             return None;
         }
@@ -403,7 +416,12 @@ pub fn analyse_miss(raw_text: &str) -> MissRecord {
 /// 85/189 skipped provisions had mixed purposes with real DRRP content.
 /// ALL gives 104 clean skips (9.9%) with no false negatives, vs ANY's
 /// 189 skips (18.1%) with 58 false negatives (30.7% error rate).
-pub fn should_skip_drrp(purposes: &[&str]) -> bool {
+///
+/// When `has_governed_actor` is true, the Interpretation-primary gate is
+/// softened — mixed-content provisions (definitions + duties) in product
+/// safety SIs often have Interpretation as primary purpose but contain
+/// real actor-anchored duties that should still be extracted.
+pub fn should_skip_drrp(purposes: &[&str], has_governed_actor: bool) -> bool {
     const SKIP_PURPOSES: &[&str] = &[
         purpose::ENACTMENT,
         purpose::INTERPRETATION,
@@ -416,16 +434,18 @@ pub fn should_skip_drrp(purposes: &[&str]) -> bool {
     }
 
     // ALL strategy: skip when every detected purpose is a skip-purpose.
+    // Even with a governed actor, pure-structural provisions have no DRRP.
     if purposes.iter().all(|p| SKIP_PURPOSES.contains(p)) {
         return true;
     }
 
     // Interpretation-primary: if Interpretation is first (highest priority)
-    // purpose, skip DRRP.  Modal verbs inside definition blocks (e.g.
-    // `"exposure limit value" means... which must not be exceeded`) trigger
-    // PROCESS_RULE but aren't real duties.
+    // purpose, skip DRRP — UNLESS a governed actor is present, indicating
+    // a mixed-content provision (definitions + duties in the same block).
+    // Product safety SIs commonly have long provisions where definitions
+    // appear first but real duties follow (e.g. "employer" shall ...).
     if purposes.first() == Some(&purpose::INTERPRETATION) {
-        return true;
+        return !has_governed_actor;
     }
 
     // Enactment-primary: title blocks and signed blocks always skip.
@@ -530,16 +550,25 @@ mod tests {
 
     #[test]
     fn skip_interpretation_section() {
+        // Pure definition — only INTERPRETATION purpose, no modal verbs.
+        // ALL-structural gate fires, DRRP is skipped.
+        // Actors are still extracted (above the gate) for metadata.
         let text =
             r#"In these Regulations— "employer" means a person who employs one or more employees."#;
         let record = parse(text);
         // Purpose detected
         assert!(record.purposes.contains(&purpose::INTERPRETATION));
-        // DRRP classification skipped
+        // DRRP classification skipped (ALL-structural gate)
         assert!(record.duty_types.is_empty());
-        assert!(record.governed_actors.is_empty());
-        assert!(record.government_actors.is_empty());
         assert!(record.popimar.is_empty());
+        // Actors ARE populated — extraction moved above gate for override logic
+        assert!(
+            record
+                .governed_actors
+                .iter()
+                .any(|a| a.contains("Employer")),
+            "actors should be extracted even for gated provisions"
+        );
     }
 
     #[test]
@@ -601,13 +630,28 @@ mod tests {
     }
 
     #[test]
-    fn interpretation_primary_skipped() {
-        // When Interpretation is the primary (first) purpose, skip DRRP even
-        // if modal verbs inside definitions trigger Process+Rule.
+    fn interpretation_primary_with_actor_override() {
+        // When Interpretation is primary BUT a governed actor is present,
+        // the gate is overridden to handle mixed-content provisions (product
+        // safety SIs). DRRP extraction runs — the v2 pattern matcher
+        // determines whether duties are real.
         let text = r#"For the purposes of interpretation, "employer" means a person who shall ensure safety."#;
         let record = parse(text);
         assert!(record.purposes.contains(&purpose::INTERPRETATION));
-        // Interpretation-primary — DRRP skipped
+        // Gate overridden — DRRP extraction runs because governed actor present
+        assert!(
+            !record.governed_actors.is_empty(),
+            "governed actor should be extracted"
+        );
+    }
+
+    #[test]
+    fn interpretation_primary_without_actor_still_skipped() {
+        // When Interpretation is primary with NO governed actor, gate still fires.
+        let text = r#"For the purposes of these Regulations, "workplace" means any premises or part of premises which are not domestic premises."#;
+        let record = parse(text);
+        assert!(record.purposes.contains(&purpose::INTERPRETATION));
+        // No governed actor → gate fires → DRRP skipped
         assert!(record.duty_types.is_empty());
     }
 
@@ -714,6 +758,52 @@ mod tests {
         assert!(
             record.duty_types.is_empty(),
             "v2 should reject contractor-as-object, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    // ── Mixed-content provision gate override tests (Fix 1) ───────────
+
+    #[test]
+    fn mixed_content_provision_employer_duty_extracted() {
+        // Product safety SI pattern: Interpretation-primary provision that
+        // starts with definitions but contains real employer duties.
+        // The governed-actor gate override lets DRRP extraction run.
+        let text = "In this regulation, \"the relevant statutory provisions\" means \
+                    sections 2 to 7 of the 1974 Act. Every employer shall ensure \
+                    that exposure of his employees to substances hazardous to health \
+                    is either prevented or, where this is not reasonably practicable, \
+                    adequately controlled.";
+        let record = parse_v2(text, None);
+        assert!(
+            record.purposes.contains(&purpose::INTERPRETATION),
+            "should detect Interpretation purpose"
+        );
+        assert!(
+            !record.governed_actors.is_empty(),
+            "should extract governed actors"
+        );
+        assert!(
+            !record.duty_types.is_empty(),
+            "mixed-content provision with real employer duty should produce DRRP, \
+             got purposes: {:?}, actors: {:?}",
+            record.purposes,
+            record.governed_actors
+        );
+    }
+
+    #[test]
+    fn pure_definition_with_actor_keyword_no_drrp() {
+        // Pure definition mentioning an actor keyword but no modal verb.
+        // ALL-structural gate fires (only Interpretation purpose).
+        let text = r#"In these Regulations— "employer" means a person who employs \
+                    one or more employees under a contract of employment."#;
+        let record = parse_v2(text, None);
+        assert!(record.purposes.contains(&purpose::INTERPRETATION));
+        // ALL-structural gate fires — no DRRP despite actor keyword
+        assert!(
+            record.duty_types.is_empty(),
+            "pure definition should not produce DRRP, got: {:?}",
             record.duty_types
         );
     }
@@ -1262,6 +1352,75 @@ mod tests {
         assert!(
             !record.duty_types.is_empty(),
             "'requirement of these Regulations which applies' duty should produce DRRP, got empty"
+        );
+    }
+
+    // ── Family-gated specialist actors (GH #31) ────────────────────────
+
+    #[test]
+    fn licensee_duty_offshore_family_produces_drrp() {
+        // Real offshore provision: licensee is the duty-holder.
+        // With OH&S: Offshore family, licensee should be extracted as a
+        // specialist actor and produce DRRP classification.
+        let text = "The licensee shall ensure that any operator appointed \
+                    by him is capable of satisfactorily carrying out his \
+                    functions under these Regulations.";
+        let record = parse_v2(text, Some("OH&S: Offshore Safety"));
+        assert!(
+            record
+                .governed_actors
+                .iter()
+                .any(|a| a.contains("Licensee")),
+            "licensee should be extracted for offshore family, got: {:?}",
+            record.governed_actors
+        );
+        assert!(
+            !record.duty_types.is_empty(),
+            "licensee duty should produce DRRP for offshore family, got empty"
+        );
+    }
+
+    #[test]
+    fn licensee_duty_no_family_no_specialist_actor() {
+        // Same provision text but without family context — licensee should
+        // NOT be extracted (it's a specialist actor, not core).
+        let text = "The licensee shall ensure that any operator appointed \
+                    by him is capable of satisfactorily carrying out his \
+                    functions under these Regulations.";
+        let record = parse_v2(text, None);
+        assert!(
+            !record
+                .governed_actors
+                .iter()
+                .any(|a| a.contains("Licensee")),
+            "licensee should NOT be extracted without family context, got: {:?}",
+            record.governed_actors
+        );
+    }
+
+    // ── Subordinate clause retry (actor in both clauses) ─────────────
+
+    #[test]
+    fn duty_holder_where_clause_repeat_produces_drrp() {
+        // UK_nisr_2016_406:30 — "duty holder" in both subordinate Where-clause
+        // and main clause. Should produce DRRP from the main clause occurrence.
+        let text = "Where the duty holder has adopted other measures, the duty holder \
+                    shall perform the internal emergency response duties so as to \
+                    secure a good prospect of personal safety and survival, taking \
+                    into account the adoption of those other measures.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.contains(&DutyType::Duty),
+            "repeated actor in Where+main clause should produce Duty, got: {:?}",
+            record.duty_types
+        );
+        assert!(
+            record
+                .governed_actors
+                .iter()
+                .any(|a| a.contains("Duty Holder")),
+            "should extract Duty Holder, got: {:?}",
+            record.governed_actors
         );
     }
 }
