@@ -4,6 +4,8 @@ Repeatable workflow for improving DRRP classification patterns when new law fami
 
 The taxa pipeline classifies legislative provisions into structured DRRP (Duties, Rights, Responsibilities, Powers) data using regex pattern matching across 5 classifiers. This runbook describes how to diagnose gaps and improve those patterns.
 
+> **Note**: The full Claude Code skill (with Python snippets, confusion matrix methodology, and actor-gating details) is in `.claude/skills/taxa-gap-analysis/SKILL.md`. This runbook is a concise human-readable reference.
+
 ## Prerequisites
 
 - LAT (provision text) populated in LanceDB for the target family
