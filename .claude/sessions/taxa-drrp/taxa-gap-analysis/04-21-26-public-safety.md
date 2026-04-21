@@ -301,4 +301,53 @@ PUBLIC has the lowest recall across analysed families. This is driven by:
 
 ---
 
-**Session status**: Analysis complete. Fix 1 ready to implement.
+## Appendix: Upstream Data Quality Issues (Added Post-Analysis)
+
+### Critical: Enrichment Truncation Bug
+
+`enrich_single_law()` at `crates/fractalaw-cli/src/main.rs:~2859` queries LanceDB with `limit=500`. Laws with >500 provisions are silently truncated — only the first 500 rows get enriched.
+
+**Impact on this analysis**: 4 of 17 PUBLIC laws are truncated:
+
+| Law | Total Provisions | Enriched (max) | Lost |
+|-----|-----------------|----------------|------|
+| UK_ukpga_2023_50 (Online Safety Act) | 4,181 | 500 | 3,681 |
+| UK_ukpga_1968_27 (Firearms Act) | 839 | 500 | 339 |
+| UK_nisi_1983_764 (Dogs NI Order) | 535 | 500 | 35 |
+| UK_ukpga_2025_10 (Terrorism Premises) | 501 | 500 | 1 |
+
+**This is the primary cause of the OSA's 0.4% recall** — not missing actor patterns. Only 5 out of 4,094 section-level provisions were enriched because the enricher hit its 500-row limit before reaching most section-level rows. The confusion matrix and Gap A/C analysis for these 4 laws is unreliable.
+
+**Corpus-wide**: 80 laws (52,846 provisions) are affected across all families.
+
+**Fix required**: Increase or remove the limit before re-running this gap analysis.
+
+### Secondary: Part-Level Blob Duplication
+
+Sertantai produces both section-level provisions AND large Part/Chapter blobs containing the full concatenated text. The Online Safety Act has 34 Part/Chapter blobs totalling 753KB of duplicated text (38% of all text). These inflate provision counts and consume enrichment budget on duplicate text.
+
+**Mitigation**: The enricher should either skip Part/Ch/Sch rows or filter them at query time.
+
+### Corrected Assessment
+
+The gap analysis in Steps 1-4 above is **partially invalid** for the 4 truncated laws. The findings about family-gated specialist actors (provider, keeper, dealer) remain valid — those actors ARE missing from patterns — but the quantitative impact estimates are unreliable. The analysis should be re-run after the truncation fix.
+
+**Revised next steps**:
+1. Fix enrichment truncation bug (raise/remove 500-row limit)
+2. Re-enrich PUBLIC family with `--force`
+3. Re-run confusion matrix and gap analysis
+4. Then implement family-gated specialist actors if still needed
+
+---
+
+**Session status**: SUSPENDED — awaiting upstream fixes before continuing.
+
+**Blocking issues**:
+- fractalaw/fractalaw#33 — Enrichment truncates laws with >500 provisions
+- shotleybuilder/sertantai-legal#69 — Part/Chapter blobs duplicate section-level text
+
+Resume this session after #33 is fixed and PUBLIC family is re-enriched with `--force`.
+
+### LAT QA Skill Created
+
+A new skill `.claude/skills/lat-qa/SKILL.md` formalises the upstream data quality checks that should run BEFORE DRRP gap analysis. Checks: enrichment truncation (BLOCKER), Part-level blob duplication (WARNING), provision granularity, empty text, section ID consistency.

@@ -6,6 +6,8 @@ When analysing a law family's taxa DRRP (Duty, Right, Responsibility, Power) cov
 
 **Trigger**: User asks to run a gap analysis on a family, or to improve DRRP coverage for a set of laws.
 
+**Prerequisite**: Run the `lat-qa` skill first to validate upstream data quality. There is no value analysing DRRP coverage if the enricher is truncating provisions or the input data is malformed.
+
 **First step**: Ask which **family** to analyse (e.g. `PUBLIC`, `OH&S: Offshore Safety`). Query available families with:
 ```bash
 cargo run -p fractalaw-cli -- query "SELECT DISTINCT family FROM legislation ORDER BY family" 2>/dev/null
