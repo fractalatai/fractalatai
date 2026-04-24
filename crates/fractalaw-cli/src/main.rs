@@ -2064,7 +2064,7 @@ async fn cmd_taxa_qa(
 
     for law_name in &law_names {
         let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
-        let batches = lance.query_legislation_text(&filter, 500, 0).await?;
+        let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
 
         let mut stats = LawStats {
             law_name: law_name.clone(),
@@ -2488,7 +2488,7 @@ async fn cmd_taxa_audit_fitness(
             .unwrap_or_else(|| "(unknown)".to_string());
 
         let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
-        let batches = lance.query_legislation_text(&filter, 500, 0).await?;
+        let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
 
         let stats = family_stats
             .entry(fam.clone())
@@ -2856,7 +2856,11 @@ async fn enrich_single_law(
     };
 
     let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
-    let batches = lance.query_legislation_text(&filter, 500, 0).await?;
+    let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+    let row_count: usize = batches.iter().map(|b| b.num_rows()).sum();
+    if row_count > 2000 {
+        tracing::warn!("{law_name}: {row_count} provisions — large law");
+    }
 
     struct LawTaxa {
         duty_holders: BTreeSet<String>,
@@ -3726,7 +3730,7 @@ async fn cmd_export_training_data(
 
         // Query LanceDB for all sections of this law.
         let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
-        let lat_batches = lance.query_legislation_text(&filter, 1000, 0).await?;
+        let lat_batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
 
         // Build provision → text map.
         let mut prov_text: HashMap<String, String> = HashMap::new();

@@ -73,14 +73,37 @@ After fix + re-enrichment:
 2. Re-run PUBLIC family gap analysis (resume suspended session)
 3. Compare confusion matrix before/after
 
+## Investigation: Why Did the Limit Exist?
+
+The `limit=500` was introduced in commit `a0af20e` ("Rework taxa enrichment to use existing LRT DRRP columns", 2026-02-24). It was a pragmatic default — at that time the corpus was mostly OH&S laws with <500 provisions per law. The limit was never revisited as larger laws (Online Safety Act at 4,181 provisions) entered the corpus. Not a deliberate safety mechanism, just a stale assumption.
+
+## Implementation (2026-04-24)
+
+### All affected sites found
+
+| Line | Function | Old Limit | Fixed |
+|------|----------|-----------|-------|
+| ~2067 | `cmd_taxa_qa()` | 500 | 100,000 |
+| ~2491 | `cmd_taxa_audit_fitness()` | 500 | 100,000 |
+| ~2859 | `enrich_single_law()` | 500 | 100,000 + warning log |
+| ~3733 | `cmd_export_training_data()` | 1,000 | 100,000 |
+
+Three other call sites already used 200,000 (`cmd_taxa_qa` corpus-wide queries) — those were fine.
+
+Added `tracing::warn!` in `enrich_single_law()` for laws with >2,000 provisions.
+
+### Sertantai#69 status
+
+OSA LanceDB data unchanged — Part blobs still present. The sertantai fix has been applied to the parser but affected laws haven't been re-synced to local LanceDB yet. The enrichment fix is independent.
+
 ## Next Steps
 
-- [ ] Fix the limit in `enrich_single_law()`
-- [ ] Add warning log for large laws
-- [ ] Investigate Part blob filtering safety
-- [ ] Re-enrich PUBLIC family
+- [x] Fix the limit in `enrich_single_law()` and all other call sites
+- [x] Add warning log for large laws
+- [ ] Re-enrich PUBLIC family after commit
 - [ ] Resume PUBLIC gap analysis session
+- [ ] Investigate Part blob filtering safety (deferred — depends on sertantai re-sync)
 
 ---
 
-**Session status**: Open. Ready to implement.
+**Session status**: Fix implemented, pending commit and re-enrichment.
