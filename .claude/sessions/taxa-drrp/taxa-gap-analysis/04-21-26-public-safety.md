@@ -383,12 +383,46 @@ The gap profile has fundamentally changed:
 
 4. **Gap C dropped to 495** (was 1,573) — the passive-voice problem is much smaller than originally thought. Most of the original "Gap C" was actually truncated provisions.
 
-### Revised Next Steps
+## Fix 1: OFCOM Gov Patterns + PUBLIC Specialist Actors (eef298f)
 
-- [ ] Investigate OFCOM gov v1/v2 pattern gaps — why aren't 292 OFCOM provisions getting Responsibility/Power?
-- [ ] Add `PUBLIC_GOVERNED_DEFS` with provider, keeper, dealer (family-gated specialist actors)
-- [ ] Investigate Ind: User v2 matcher failures (88 provisions)
-- [ ] Re-measure after fixes
+### Root Cause: OFCOM
+
+`duty_patterns.rs` `GOVERNMENT_ACTORS` is a flat substring list that gates gov v1/v2 pattern matching. "ofcom" was not in the list — it was built for OH&S law. Added 7 keywords: ofcom, chief officer, constable, police, sheriff, procurator fiscal, department.
+
+### Root Cause: Provider/Keeper/Dealer
+
+These domain-specific actors were not in `GOVERNED_DEFS`. Added as `PUBLIC_GOVERNED_DEFS` in `actors.rs`, family-gated on `family == "PUBLIC"` (same pattern as offshore licensee).
+
+### Results
+
+| Metric | Pre-OFCOM fix | Post-OFCOM + specialists | Delta |
+|--------|--------------|-------------------------|-------|
+| **TP** | 678 | **1,158** | **+480** |
+| **FN** | 1,282 | **802** | **-480** |
+| **Recall** | 34.6% | **59.1%** | **+24.5pp** |
+| **Precision** | 75.8% | **80.5%** | +4.7pp |
+| **F1** | 47.5% | **68.1%** | **+20.6pp** |
+| Gap A | 787 | **381** | -406 |
+| Gap C | 495 | **421** | -74 |
+| OSA recall | 29.4% | **64.7%** | +35.3pp |
+
+### Full Session Delta (baseline → final)
+
+| Metric | Baseline (start of session) | Final | Total delta |
+|--------|---------------------------|-------|-------------|
+| **Recall** | 19.4% | **59.1%** | **+39.7pp** |
+| **F1** | 32.0% | **68.1%** | **+36.1pp** |
+| OSA recall | 0.4% | **64.7%** | **+64.3pp** |
+
+### Remaining Gaps
+
+Gap A (381) and Gap C (421) are now roughly balanced — low-hanging fruit has been picked.
+
+### Next Steps
+
+- [ ] Investigate Ind: Person (339 Gap A) — known-broad, diminishing returns
+- [ ] Investigate Ind: User v2 matcher failures (subset of Gap A)
+- [ ] Log Gap C (421) for future AI session
 
 ## Appendix: Upstream Data Quality Issues (Added Post-Analysis)
 
