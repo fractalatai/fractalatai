@@ -152,6 +152,13 @@ const GOVERNMENT_ACTORS: &[&str] = &[
     "court",
     "parliament",
     "regulations made",
+    "ofcom",
+    "chief officer",
+    "constable",
+    "police",
+    "sheriff",
+    "procurator fiscal",
+    "department",
 ];
 
 // ── Shared helper functions ──────────────────────────────────────────
@@ -387,6 +394,34 @@ mod tests {
         assert!(match_government_v1(text).is_none());
     }
 
+    #[test]
+    fn gov_v1_ofcom_prescriptive() {
+        let text = "ofcom must prepare a code of practice";
+        let result = match_government_v1(text).unwrap();
+        assert_eq!(result.sub_type, DutySubType::Prescriptive);
+    }
+
+    #[test]
+    fn gov_v1_ofcom_enabling() {
+        let text = "ofcom may issue a confirmation decision";
+        let result = match_government_v1(text).unwrap();
+        assert_eq!(result.sub_type, DutySubType::Enabling);
+    }
+
+    #[test]
+    fn gov_v1_chief_officer_prescriptive() {
+        let text = "the chief officer of police shall by notice require the holder";
+        let result = match_government_v1(text).unwrap();
+        assert_eq!(result.sub_type, DutySubType::Prescriptive);
+    }
+
+    #[test]
+    fn gov_v1_sheriff_enabling() {
+        let text = "the sheriff may make an order requiring the person to attend";
+        let result = match_government_v1(text).unwrap();
+        assert_eq!(result.sub_type, DutySubType::Enabling);
+    }
+
     // ── Government v2 ────────────────────────────────────────────────
 
     #[test]
@@ -467,6 +502,17 @@ mod tests {
         assert!(has_government_actor("the secretary of state may"));
         assert!(has_government_actor("the inspector shall"));
         assert!(!has_government_actor("every employer shall"));
+    }
+
+    #[test]
+    fn government_actor_detection_public_family() {
+        assert!(has_government_actor("ofcom must prepare a code of practice"));
+        assert!(has_government_actor("the chief officer of police shall"));
+        assert!(has_government_actor("a constable may seize the dog"));
+        assert!(has_government_actor("the sheriff may make an order"));
+        assert!(has_government_actor("the procurator fiscal must investigate"));
+        assert!(has_government_actor("the department may by order require"));
+        assert!(has_government_actor("police force for the area"));
     }
 
     #[test]

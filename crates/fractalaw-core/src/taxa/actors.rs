@@ -410,6 +410,23 @@ const OFFSHORE_GOVERNED_DEFS: &[(&str, &str)] = &[actor!(
     r"(?:[\s[:punct:]])[Ll]icen[cs]ees?(?:[\s[:punct:]])"
 )];
 
+/// Public safety actors (online safety, firearms, dangerous dogs).
+/// Applied when `family == "PUBLIC"`.
+const PUBLIC_GOVERNED_DEFS: &[(&str, &str)] = &[
+    actor!(
+        "Public: Provider",
+        r"(?:[\s[:punct:]])[Pp]roviders?(?:[\s[:punct:]])"
+    ),
+    actor!(
+        "Public: Keeper",
+        r"(?:[\s[:punct:]])[Kk]eepers?(?:[\s[:punct:]])"
+    ),
+    actor!(
+        "Public: Dealer",
+        r"(?:[\s[:punct:]])(?:[Dd]ealers?|registered (?:firearms )?dealer)(?:[\s[:punct:]])"
+    ),
+];
+
 // ── Compiled pattern caches ──────────────────────────────────────────
 
 static GOVERNMENT_COMPILED: LazyLock<Vec<(&str, Regex)>> = LazyLock::new(|| {
@@ -433,12 +450,21 @@ static OFFSHORE_GOVERNED_COMPILED: LazyLock<Vec<(&str, Regex)>> = LazyLock::new(
         .collect()
 });
 
+static PUBLIC_GOVERNED_COMPILED: LazyLock<Vec<(&str, Regex)>> = LazyLock::new(|| {
+    PUBLIC_GOVERNED_DEFS
+        .iter()
+        .map(|(label, pat)| (*label, Regex::new(pat).unwrap()))
+        .collect()
+});
+
 /// Return specialist governed actor patterns for a given law family.
 ///
 /// Returns an empty slice for unknown families — only core patterns run.
 fn specialist_governed_for(family: &str) -> &'static [(&'static str, Regex)] {
     if family.starts_with("OH&S: Offshore") {
         &OFFSHORE_GOVERNED_COMPILED
+    } else if family == "PUBLIC" {
+        &PUBLIC_GOVERNED_COMPILED
     } else {
         &[]
     }
@@ -776,5 +802,67 @@ mod tests {
         let without = extract_actors(text);
         assert_eq!(with_none.governed_labels(), without.governed_labels());
         assert_eq!(with_none.government_labels(), without.government_labels());
+    }
+
+    // ── PUBLIC family-gated specialist actors ────────────────────────
+
+    #[test]
+    fn provider_extracted_for_public_family() {
+        let text = "A provider of a Part 3 service must carry out the first children's access assessment.";
+        let actors = extract_actors_for_family(text, Some("PUBLIC"));
+        assert!(
+            has_label(&actors.governed, "Public: Provider"),
+            "provider should be extracted for PUBLIC family, got: {:?}",
+            actors.governed
+        );
+    }
+
+    #[test]
+    fn provider_not_extracted_without_family() {
+        let text = "A provider of a Part 3 service must carry out the assessment.";
+        let actors = extract_actors(text);
+        assert!(
+            !has_label(&actors.governed, "Public: Provider"),
+            "provider should not be extracted without family, got: {:?}",
+            actors.governed
+        );
+    }
+
+    #[test]
+    fn keeper_extracted_for_public_family() {
+        let text = "The keeper of a dog shall ensure it is under control.";
+        let actors = extract_actors_for_family(text, Some("PUBLIC"));
+        assert!(
+            has_label(&actors.governed, "Public: Keeper"),
+            "keeper should be extracted for PUBLIC family, got: {:?}",
+            actors.governed
+        );
+    }
+
+    #[test]
+    fn dealer_extracted_for_public_family() {
+        let text = "A registered firearms dealer shall comply with this requirement.";
+        let actors = extract_actors_for_family(text, Some("PUBLIC"));
+        assert!(
+            has_label(&actors.governed, "Public: Dealer"),
+            "dealer should be extracted for PUBLIC family, got: {:?}",
+            actors.governed
+        );
+    }
+
+    #[test]
+    fn public_specialists_not_extracted_for_ohs() {
+        let text = "The provider shall ensure the keeper is informed.";
+        let actors = extract_actors_for_family(text, Some("OH&S: Occupational / Personal Safety"));
+        assert!(
+            !has_label(&actors.governed, "Public: Provider"),
+            "provider should not be extracted for OH&S, got: {:?}",
+            actors.governed
+        );
+        assert!(
+            !has_label(&actors.governed, "Public: Keeper"),
+            "keeper should not be extracted for OH&S, got: {:?}",
+            actors.governed
+        );
     }
 }
