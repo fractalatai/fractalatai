@@ -100,10 +100,10 @@ OSA LanceDB data unchanged — Part blobs still present. The sertantai fix has b
 
 - [x] Fix the limit in `enrich_single_law()` and all other call sites
 - [x] Add warning log for large laws
-- [ ] Re-enrich PUBLIC family after commit
-- [ ] Resume PUBLIC gap analysis session
+- [x] Re-enrich PUBLIC family after commit
+- [x] Resume PUBLIC gap analysis session (reanalysis complete)
 - [ ] Investigate Part blob filtering safety (deferred — depends on sertantai re-sync)
 
 ---
 
-**Session status**: Fix implemented, pending commit and re-enrichment.
+**Session closed**: 2026-04-24. Commit d72a702. PUBLIC gap analysis resumed with corrected data.

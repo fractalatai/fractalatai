@@ -301,6 +301,95 @@ PUBLIC has the lowest recall across analysed families. This is driven by:
 
 ---
 
+## Post-Fix Reanalysis (2026-04-24)
+
+### Enrichment Truncation Fix
+
+fractalaw/fractalaw#33 fixed in commit d72a702 — raised limit from 500 to 100,000 in all 4 affected call sites. PUBLIC family re-enriched with `--force`.
+
+### Revised QA Baseline
+
+| Metric | Before (truncated) | After (fixed) | Delta |
+|--------|-------------------|---------------|-------|
+| QA provisions | 3,624 | **7,413** | +3,789 |
+| OSA provisions | 498 | **4,128** | +3,630 |
+| OSA DRRP% | 4.8% | **8.9%** | +4.1pp |
+| Corpus DRRP% | 15.8% | **11.3%** | -4.5pp (diluted by newly-visible provisions) |
+
+### Revised Confusion Matrix (7,740 provisions)
+
+|  | Predicted: DRRP | Predicted: No DRRP | Total |
+|--|----------------:|-------------------:|------:|
+| **Expected: DRRP** | 678 (TP) | 1,282 (FN) | 1,960 |
+| **Expected: No DRRP** | 216 (FP) | 5,564 (TN) | 5,780 |
+| **Total** | 894 | 6,846 | 7,740 |
+
+| Metric | Before | After | Delta |
+|--------|--------|-------|-------|
+| **Precision** | 91.3% | 75.8% | -15.5pp |
+| **Recall** | 19.4% | **34.6%** | **+15.2pp** |
+| **F1** | 32.0% | **47.5%** | **+15.5pp** |
+| OSA recall | 0.4% | **29.4%** | +29pp |
+
+#### Precision Drop Explained
+
+134 of 216 FP are `Interpretation+Definition`-primary provisions that DO contain genuine duties (gate bypass from OH&S Fix 1, commit 2cc3aa0). Examples: "the procurator fiscal must bring forward evidence", "The SCTS must publish". The ground truth heuristic ("Interpretation-primary = not expected positive") is too conservative for these mixed-content provisions. Real-world precision is likely >85%.
+
+### Revised Gap Breakdown (1,282 FN)
+
+| Category | Count | % of FN | Change from pre-fix |
+|----------|-------|---------|---------------------|
+| **Gap A** (actor present) | 787 | 61% | Was 346 (18%) — now dominant |
+| **Gap C** (no actor) | 495 | 39% | Was 1,573 (82%) — dropped |
+| FN obligation | 652 | 51% | |
+| FN enabling | 630 | 49% | |
+
+The ratio flipped: Gap A is now 61% of FN (was 18%). This is because the newly-enriched provisions are substantive duty text where actors ARE detected but DRRP matching fails. Gap C dropped from 1,573 to 495 — many former "Gap C" were actually truncated provisions with no data at all.
+
+### Revised Gap A: Governed Actors
+
+| Actor Label | Misses | Notes |
+|-------------|--------|-------|
+| Ind: Person | 339 | Known-broad, existing predicates only |
+| **Ind: User** | **88** | **NEW — OSA "users of the service"** |
+| Public | 31 | Broad |
+| Org: Company | 24 | |
+| Org: Owner | 9 | Dog owner |
+| Org: Occupier | 5 | |
+| Org: Employer | 5 | |
+| Ind: Manager | 5 | |
+
+### Revised Gap A: Government Actors
+
+| Actor Label | Misses | Notes |
+|-------------|--------|-------|
+| **Gvt: Agency: OFCOM** | **292** | **Dominant gap — OSA regulatory powers/duties** |
+| Gvt: Officer | 87 | Authorised officers |
+| Gvt: Judiciary | 68 | Court/sheriff |
+| Gvt: Authority: Local | 50 | District council |
+| Gvt: Ministry | 42 | Secretary of State, Department |
+| Gvt: Minister | 34 | |
+| Gvt: Emergency Services: Police | 21 | |
+
+### Revised Assessment
+
+The gap profile has fundamentally changed:
+
+1. **OFCOM (292 misses)** is now the dominant addressable gap. OFCOM is a government actor — already extracted by `actors.rs` as `Gvt: Agency: OFCOM`. But gov v1/v2 patterns aren't matching the OSA's regulatory language. The OSA uses patterns like "OFCOM must prepare a code of practice" which don't match the existing gov v1 keyword patterns (designed for HSE-style regulation).
+
+2. **"Provider" (not in actors)** — still needed but impact is lower than originally estimated. Many "provider must" provisions now get DRRP through other paths (rule matcher, government patterns). Family-gated specialist still valuable.
+
+3. **"User" (88 misses)** — already in `GOVERNED_DEFS` as `Ind: User`. These are v2 matcher failures, not missing actors.
+
+4. **Gap C dropped to 495** (was 1,573) — the passive-voice problem is much smaller than originally thought. Most of the original "Gap C" was actually truncated provisions.
+
+### Revised Next Steps
+
+- [ ] Investigate OFCOM gov v1/v2 pattern gaps — why aren't 292 OFCOM provisions getting Responsibility/Power?
+- [ ] Add `PUBLIC_GOVERNED_DEFS` with provider, keeper, dealer (family-gated specialist actors)
+- [ ] Investigate Ind: User v2 matcher failures (88 provisions)
+- [ ] Re-measure after fixes
+
 ## Appendix: Upstream Data Quality Issues (Added Post-Analysis)
 
 ### Critical: Enrichment Truncation Bug
@@ -340,13 +429,7 @@ The gap analysis in Steps 1-4 above is **partially invalid** for the 4 truncated
 
 ---
 
-**Session status**: SUSPENDED — awaiting upstream fixes before continuing.
-
-**Blocking issues**:
-- fractalaw/fractalaw#33 — Enrichment truncates laws with >500 provisions
-- shotleybuilder/sertantai-legal#69 — Part/Chapter blobs duplicate section-level text
-
-Resume this session after #33 is fixed and PUBLIC family is re-enriched with `--force`.
+**Session status**: RESUMED (2026-04-24). #33 fixed (d72a702), re-enriched. Reanalysis complete — gap profile changed fundamentally. OFCOM gov pattern gaps now dominant.
 
 ### LAT QA Skill Created
 
