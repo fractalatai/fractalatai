@@ -467,11 +467,57 @@ Of the 953 misses, **922 have no modal verb at all** — completely invisible to
 
 **Decision**: This warrants a dedicated session. Logged for follow-up.
 
-### Next Steps
+## Ind: User Investigation (2026-04-25)
 
-- [ ] Investigate Ind: User v2 matcher failures (88 provisions — subset of Gap A)
-- [ ] Log Gap C (421) for future AI session
-- [ ] Consider closing session — regex improvements largely exhausted
+53 `Ind: User` Gap A FN provisions — **all 53 from the Online Safety Act**.
+
+### Finding: False Actor Extraction, Not v2 Failure
+
+In the OSA, "user" means "user of the service" — the **protected party**, not a duty-holder. The `Ind: User` regex in `actors.rs` (`[Uu]sers?`) matches this, but:
+
+- **23/53** contain "user-to-user" — a compound term for a service type, not an actor
+- **14/53** have "user" as object/beneficiary ("users of the service", "United Kingdom users")
+- **8/53** appear subject-adjacent but are Part-level definition blobs (6) or provisions where provider/OFCOM is the real duty-holder (2)
+- **0/53** have "user" as the duty-holder
+
+**Conclusion**: The v2 matcher is correctly NOT matching these. This is a false positive in actor extraction — `Ind: User` should not be extracted from OSA provisions where "user" means "service user" (beneficiary). However, since v2 doesn't anchor against it, the impact is limited to inflating Gap A counts in analysis. No code change needed.
+
+**Possible future improvement**: Add "user-to-user" to the `BLACKLIST` in `actors.rs` to prevent `Ind: User` extraction from the compound term. Low priority — cosmetic improvement to actor labels, no DRRP impact.
+
+## Session Summary
+
+### Fixes Applied
+
+| Fix | Commit | Recall Delta |
+|-----|--------|-------------|
+| Enrichment truncation (#33) | d72a702 | 19.4% → 34.6% |
+| OFCOM gov patterns + PUBLIC specialist actors | eef298f | 34.6% → 59.1% |
+
+### Final Metrics
+
+| Metric | Start | End |
+|--------|-------|-----|
+| **Recall** | 19.4% | **59.1%** |
+| **F1** | 32.0% | **68.1%** |
+| **OSA Recall** | 0.4% | **64.7%** |
+
+### Remaining Gaps (Not Addressable by Regex)
+
+| Category | Count | Status |
+|----------|-------|--------|
+| Gap A (actor present) | 381 | Diminishing returns — Ind: Person (object), Ind: User (false extraction) |
+| Gap C (no actor) | 421 | AI frontier — passive voice, actor-less obligations |
+| Offence-as-duty (#34) | 953 corpus-wide | New pattern tier — separate session |
+
+### Next Steps (Other Sessions)
+
+- fractalaw/fractalaw#34: Offence-as-duty pattern tier (953 provisions)
+- Gap C: AI/LLM session for passive-voice provisions
+- Re-run after sertantai#69 re-sync (Part blob cleanup)
+
+---
+
+**Session closed**: 2026-04-25. Regex improvements for PUBLIC family exhausted.
 
 ## Appendix: Upstream Data Quality Issues (Added Post-Analysis)
 
