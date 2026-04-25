@@ -9,7 +9,9 @@
       "Bash(*DELETE FROM legislation*)",
       "Bash(*TRUNCATE*legislation*)",
       "Bash(*DROP TABLE*legislation*)",
-      "Bash(*rm*fractalaw.duckdb*)"
+      "Bash(*rm*fractalaw.duckdb*)",
+      "Bash(*taxa enrich --force)",
+      "Bash(*rm*legislation_text.lance*)"
     ]
   }
 }
