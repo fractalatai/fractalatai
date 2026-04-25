@@ -127,7 +127,10 @@ pub fn match_rule(text: &str) -> Option<DutyClassification> {
         let modal_start = modal_match.start();
 
         // Look backwards from modal for thing keywords
-        let window_start = modal_start.saturating_sub(THING_WINDOW);
+        let mut window_start = modal_start.saturating_sub(THING_WINDOW);
+        while window_start > 0 && !text.is_char_boundary(window_start) {
+            window_start -= 1;
+        }
         let before_modal = &text[window_start..modal_start];
 
         // Find the closest thing keyword (by position, rightmost = closest to modal)

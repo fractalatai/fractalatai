@@ -16,6 +16,26 @@ use regex::Regex;
 use super::actors::ActorMatch;
 use super::duty_patterns::{DutyClassification, DutyFamily, DutySubType, MatchSpan};
 
+/// Snap a byte offset to the nearest valid char boundary (forward).
+fn snap_forward(s: &str, pos: usize) -> usize {
+    let pos = pos.min(s.len());
+    let mut i = pos;
+    while i < s.len() && !s.is_char_boundary(i) {
+        i += 1;
+    }
+    i
+}
+
+/// Snap a byte offset to the nearest valid char boundary (backward).
+fn snap_backward(s: &str, pos: usize) -> usize {
+    let pos = pos.min(s.len());
+    let mut i = pos;
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
+
 // ── Configuration ────────────────────────────────────────────────────
 
 /// Primary window: actor keyword must appear within this many characters
@@ -297,8 +317,9 @@ fn is_epistemic_may(text: &str, match_end: usize) -> bool {
     // Find where "may" is in the matched text — it's near the end of the match
     // The matched span is `{keyword}.{0,window}{may|power to|...}`, so "may" is
     // at the tail. Search backwards from match_end for "may".
-    let search_start = match_end.saturating_sub(20);
-    let region = &text[search_start..text.len().min(match_end + 30)];
+    let search_start = snap_backward(text, match_end.saturating_sub(20));
+    let region_end = snap_forward(text, text.len().min(match_end + 30));
+    let region = &text[search_start..region_end];
     EPISTEMIC_MAY.is_match(region)
 }
 
