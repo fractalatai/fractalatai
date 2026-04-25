@@ -418,11 +418,35 @@ These domain-specific actors were not in `GOVERNED_DEFS`. Added as `PUBLIC_GOVER
 
 Gap A (381) and Gap C (421) are now roughly balanced — low-hanging fruit has been picked.
 
+## Ind: Person Investigation (2026-04-25)
+
+### Breakdown of 219 "Ind: Person" Gap A Provisions
+
+| Category | Count | Addressable? |
+|----------|-------|-------------|
+| "(other)" — person as object/passive/reference | 115 | NO — grammatically passive |
+| "the person" — anaphoric reference | 56 | NO — mostly object/beneficiary |
+| "a person who" — compound should match | 22 | NO — 18/22 "person who" appears AFTER modal (object); 4 before modal are offence provisions |
+| "person...offence/guilty" | 21 | NO — penalties, true negatives |
+| "any person" (no qualifier) | 20 | NO — 16/20 are objects |
+| "a person shall/must" | 2 | TOO FEW — not worth a pattern |
+| "person responsible" / "person in charge" | 3 | TOO FEW |
+
+### Key Finding
+
+The existing `PERSON_QUALIFIERS` regex in `duty_patterns_v2.rs` is correctly restrictive. Of 219 provisions where `Ind: Person` is extracted but no DRRP results:
+
+- **~195 (89%)** have "person" in object/beneficiary/passive position — correctly NOT getting DRRP
+- **~22 (10%)** have "a person who" but AFTER the modal — object, not subject
+- **~2 (1%)** might be genuine misses ("the person in interim charge must comply") — too few to justify pattern changes
+
+**Conclusion**: "Ind: Person" is at **diminishing returns** for the PUBLIC family. The compound predicate system is working correctly — it's just that PUBLIC law uses "person" overwhelmingly as object/beneficiary rather than duty-holder (unlike OH&S law where "person who designs/manufactures/imports" is a common duty pattern).
+
 ### Next Steps
 
-- [ ] Investigate Ind: Person (339 Gap A) — known-broad, diminishing returns
-- [ ] Investigate Ind: User v2 matcher failures (subset of Gap A)
+- [ ] Investigate Ind: User v2 matcher failures (88 provisions — subset of Gap A)
 - [ ] Log Gap C (421) for future AI session
+- [ ] Consider closing session — regex improvements largely exhausted
 
 ## Appendix: Upstream Data Quality Issues (Added Post-Analysis)
 
