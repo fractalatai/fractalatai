@@ -156,8 +156,30 @@ Two-layer exclusion:
 - [ ] Re-enrich corpus-wide to measure full impact across all families
 - [ ] Update `taxa-gap-analysis/SKILL.md` confusion matrix heuristic to include offence language
 
+## Corpus-wide Re-enrichment (2026-04-25)
+
+### Char Boundary Panics
+
+Full enrichment hit panics on multi-byte emoji `🔸` (editorial footnote markers in sertantai text). Two sites: `duty_patterns_v2.rs:301` and `duty_patterns_rule.rs:131` — both use `saturating_sub()` which can land inside 4-byte UTF-8 chars. Fixed with char boundary snapping. Commit a88d703.
+
+### LanceDB Disk Space Crisis
+
+Full `--force` re-enrichment created massive write amplification (each merge_insert writes new Lance fragments without deleting old ones). LanceDB grew from 300MB to 39GB. Disk filled to 0. Attempted manual orphan cleanup via binary manifest search, but this was unreliable and corrupted the table.
+
+**Recovery**: Restored from Parquet backup (`backups/legislation_text_20260226_055749.parquet`, 97,522 rows). Added taxa columns via pyarrow, re-enriched 377 laws. Fresh backup taken (`backups/legislation_text_20260425_212901.parquet`, 96,751 rows).
+
+**Note**: The Feb 26 backup predates the sertantai LAT sync that brought in newer laws. Laws added after Feb 26 need fresh LAT data from sertantai before they can be enriched. Current coverage: 371 laws with DRRP (was 3,355 before the incident). The gap is in LAT data, not enrichment — a sertantai re-sync will restore full coverage.
+
+### LanceDB Hygiene Lesson
+
+- **NEVER** do `--force` re-enrichment on the full corpus without monitoring disk
+- Lance `merge_insert` creates ~25x write amplification (97K rows × update = ~8GB of new fragments per full pass)
+- `optimize()` compacts fragments but doesn't delete old ones — need `cleanup_old_versions()` which requires the `lance` native Python library (not installed)
+- Manual fragment cleanup via binary manifest grep is unreliable — don't do it
+- Always keep a Parquet backup before any bulk operation
+
 ---
 
-**Session status**: Implementation complete. Commit db0481c. Closes #34.
+**Session status**: Implementation complete. Commits db0481c (offence tier), a88d703 (char boundary fix). Closes #34.
 
-Corpus-wide re-enrichment deferred — can be done as a batch operation.
+Corpus re-enrichment completed for available LAT data (371 laws). Full corpus restoration requires sertantai LAT re-sync.
