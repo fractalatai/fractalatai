@@ -440,7 +440,32 @@ The existing `PERSON_QUALIFIERS` regex in `duty_patterns_v2.rs` is correctly res
 - **~22 (10%)** have "a person who" but AFTER the modal — object, not subject
 - **~2 (1%)** might be genuine misses ("the person in interim charge must comply") — too few to justify pattern changes
 
-**Conclusion**: "Ind: Person" is at **diminishing returns** for the PUBLIC family. The compound predicate system is working correctly — it's just that PUBLIC law uses "person" overwhelmingly as object/beneficiary rather than duty-holder (unlike OH&S law where "person who designs/manufactures/imports" is a common duty pattern).
+**Conclusion**: "Ind: Person" compound predicate expansion is at diminishing returns — person is overwhelmingly object/beneficiary in PUBLIC law. However, the investigation uncovered a **new pattern class**: offence-creating language as implicit duty.
+
+### Discovery: Offence-Creating Language as Implicit Duty
+
+The provision "it shall be unlawful for any person to keep a dog" expresses a duty without any modal verb. The pipeline is blind to this pattern class because all pattern tiers require shall/must/may as an entry point.
+
+**Corpus-wide scope**: 1,241 provisions match offence-creating patterns, **953 (76%) have no DRRP**. This is a fundamentally new tier — **"offence-as-duty"**.
+
+| Pattern | Total | No DRRP | Miss% |
+|---------|-------|---------|-------|
+| "it is an offence for" | 209 | 195 | 93% |
+| "commits an offence if" | 206 | 196 | 95% |
+| "shall be guilty of an offence" | ~164 | ~164 | ~100% |
+| "unlawful for" | 8 | 7 | 88% |
+| **Total (deduplicated)** | **1,241** | **953** | **76%** |
+
+Of the 953 misses, **922 have no modal verb at all** — completely invisible to the current pipeline. The remaining 31 have a modal but the offence language still causes them to miss.
+
+**DRRP classification**: These are **Duty (Prohibitive)** — "it is an offence for a person to X" means the person has a duty not to do X.
+
+**Architecture**: A new pattern tier in `duty_type.rs`, after governed v2 and gov v1/v2 but before rule. The matcher would:
+1. Detect offence-creating language (regex)
+2. Extract the duty-holder from "for [person/actor] to" or "[person] commits an offence if"
+3. Classify as `Governed / Prohibitive`
+
+**Decision**: This warrants a dedicated session. Logged for follow-up.
 
 ### Next Steps
 
