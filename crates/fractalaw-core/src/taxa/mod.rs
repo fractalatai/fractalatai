@@ -31,6 +31,7 @@ pub mod clause_refiner;
 pub mod clause_structure;
 pub mod confidence;
 pub mod duty_patterns;
+pub mod duty_patterns_offence;
 pub mod duty_patterns_rule;
 pub mod duty_patterns_v2;
 pub mod duty_type;

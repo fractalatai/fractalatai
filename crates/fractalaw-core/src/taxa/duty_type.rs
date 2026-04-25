@@ -11,6 +11,7 @@
 
 use super::actors::ActorMatch;
 use super::duty_patterns::{self, DutyClassification, DutyFamily, DutySubType};
+use super::duty_patterns_offence;
 use super::duty_patterns_rule;
 use super::duty_patterns_v2;
 
@@ -60,10 +61,12 @@ pub struct ClassificationResult {
 /// Classify a **downcased** legal text into DRRP duty types.
 ///
 /// Tries pattern tiers in order:
-/// 1. Government v1 (strong patterns — embedded actor keywords)
-/// 2. Government v2 (extended patterns — embedded actor keywords)
-/// 3. Governed: actor-anchored patterns (actor keyword before modal within window)
-/// 4. Falls back to `Unknown` / empty
+/// 1. Governed v2: actor-anchored patterns (actor keyword before modal within window)
+/// 2. Government v1 (strong patterns — embedded actor keywords)
+/// 3. Government v2 (extended patterns — embedded actor keywords)
+/// 4. Offence-as-duty (offence-creating language as implicit prohibition)
+/// 5. Rule (thing-subject + modal — no person-actor)
+/// 6. Falls back to `Unknown` / empty
 ///
 /// The family determines DRRP mapping:
 /// - `Government` + obligation → Responsibility
@@ -89,7 +92,11 @@ pub fn classify(
     if let Some(dc) = duty_patterns::match_government_v2(text) {
         return to_result(dc);
     }
-    // Tier 4: Rule (thing-subject + modal — no person-actor)
+    // Tier 4: Offence-as-duty (offence-creating language as implicit prohibition)
+    if let Some(dc) = duty_patterns_offence::match_offence_as_duty(text) {
+        return to_result(dc);
+    }
+    // Tier 5: Rule (thing-subject + modal — no person-actor)
     if let Some(dc) = duty_patterns_rule::match_rule(text) {
         return to_result(dc);
     }
@@ -277,6 +284,54 @@ mod tests {
         assert_eq!(DutyType::Responsibility.as_str(), "Responsibility");
         assert_eq!(DutyType::Power.as_str(), "Power");
         assert_eq!(DutyType::Rule.as_str(), "Rule");
+    }
+
+    // ── Offence-as-duty tier ─────────────────────────────────────────
+
+    #[test]
+    fn classify_offence_for_person_as_duty() {
+        let text = "it is an offence for a person to fail to comply with a condition subject to which a firearm certificate is held by him.";
+        let result = classify(text, &[], &[]);
+        assert_eq!(result.duty_types, vec![DutyType::Duty]);
+    }
+
+    #[test]
+    fn classify_commits_offence_as_duty() {
+        let text = "a person commits an offence if the person passes any relevant substance from trade premises into a public sewer.";
+        let result = classify(text, &[], &[]);
+        assert_eq!(result.duty_types, vec![DutyType::Duty]);
+    }
+
+    #[test]
+    fn classify_unlawful_for_as_duty() {
+        let text = "it shall be unlawful for any person to keep a dog unless he holds a dog licence.";
+        let result = classify(text, &[], &[]);
+        assert_eq!(result.duty_types, vec![DutyType::Duty]);
+    }
+
+    #[test]
+    fn classify_penalty_not_duty() {
+        let text = "a person guilty of an offence under this section is liable on summary conviction to a fine not exceeding level 5.";
+        let result = classify(text, &[], &[]);
+        assert!(
+            result.duty_types.is_empty(),
+            "penalty provision should not classify, got: {:?}",
+            result.duty_types
+        );
+    }
+
+    #[test]
+    fn governed_v2_takes_precedence_over_offence() {
+        // If governed v2 matches (actor-anchored), it should win over offence tier
+        let text = "every employer shall ensure that no person commits an offence if the workplace is unsafe.";
+        let actors = vec![actor("Org: Employer", "employer")];
+        let result = classify(text, &actors, &[]);
+        assert_eq!(result.duty_types, vec![DutyType::Duty]);
+        // Should match governed v2 (employer shall ensure), not offence tier
+        assert_eq!(
+            result.classification.unwrap().family,
+            DutyFamily::Governed
+        );
     }
 
     #[test]
