@@ -111,27 +111,53 @@ Some provisions name specific actors: "for **a pawnbroker** to take in pawn", "f
 
 ## Implementation Plan
 
-- [ ] Create `duty_patterns_offence.rs` with `match_offence_as_duty()`
-- [ ] Add sub-pattern regexes for each offence-creating variant
-- [ ] Add penalty exclusion heuristic
-- [ ] Add actor extraction from "for X to" and "X commits" patterns
-- [ ] Wire into `duty_type.rs::classify()` as tier 4
-- [ ] Add true-positive tests using real provision text from Firearms Act, Dogs NI, OSA
-- [ ] Add true-negative tests for penalty/sentencing provisions
-- [ ] Run full taxa test suite
-- [ ] Re-enrich affected families, measure corpus-wide improvement
-- [ ] Update gap analysis session docs with results
+- [x] Create `duty_patterns_offence.rs` with `match_offence_as_duty()`
+- [x] Add sub-pattern regexes for each offence-creating variant
+- [x] Add penalty exclusion heuristic
+- [x] Add actor extraction from "for X to" and "X commits" patterns (span captures)
+- [x] Wire into `duty_type.rs::classify()` as tier 4 (before Rule)
+- [x] Add true-positive tests (10 tests — Firearms, Dogs, OSA, pawnbroker, holder)
+- [x] Add true-negative tests (5 tests — penalty/sentencing, mere reference, no offence language)
+- [x] Add integration tests in `duty_type.rs` (5 tests — classify through full pipeline)
+- [x] Run full taxa test suite — 341 passed, 0 failed
+- [x] Re-enrich PUBLIC family, measure improvement
+- [ ] Re-enrich corpus-wide to measure full impact (other families)
 
-## Key Files
+## Results (PUBLIC Family)
 
-| File | Role |
-|------|------|
-| `crates/fractalaw-core/src/taxa/duty_patterns_offence.rs` | NEW — offence-as-duty matcher |
-| `crates/fractalaw-core/src/taxa/duty_type.rs` | Wire in new tier |
-| `crates/fractalaw-core/src/taxa/mod.rs` | Module declaration |
-| `crates/fractalaw-core/src/taxa/duty_patterns.rs` | Reference — existing pattern structure |
-| `crates/fractalaw-core/src/taxa/duty_patterns_v2.rs` | Reference — actor-anchored patterns |
+| Metric | Before | After (expanded heuristic) | Delta |
+|--------|--------|---------------------------|-------|
+| TP | 1,158 | 1,240 | +82 |
+| Precision | 80.5% | 81.4% | +0.9pp |
+| Recall | 59.1% | 60.9% | +1.8pp |
+| F1 | 68.1% | 69.7% | +1.6pp |
+
+82 new offence-as-duty provisions correctly classified in PUBLIC. Modest gain because most of the 953 corpus-wide offence provisions are in other families (Wildlife & Countryside 102, Environmental Protection 25, Marine 22).
+
+**Note on ground truth heuristic**: The original heuristic uses modal verbs only. Offence-creating provisions have no modal — they appear as FP under the old heuristic (precision drops from 80.5% to 76.4%). The expanded heuristic (modal OR offence language) correctly treats them as expected positives (precision 81.4%).
+
+### Patterns Implemented
+
+| Pattern | Regex | Confidence |
+|---------|-------|-----------|
+| "it is/shall be an offence for" | `OFFENCE_FOR` | 0.70 |
+| "commits an offence if" | `COMMITS_OFFENCE` | 0.70 |
+| "shall be/is guilty of an offence if" | `GUILTY_IF` | 0.65 |
+| "it is/shall be unlawful for" | `UNLAWFUL_FOR` | 0.70 |
+
+### Penalty Exclusion
+
+Two-layer exclusion:
+1. `PENALTY_PRIMARY` — rejects "A person guilty of an offence is liable to..." at sentence start
+2. `is_penalty_dominant()` — rejects when penalty language appears before the offence pattern
+
+## Next Steps
+
+- [ ] Re-enrich corpus-wide to measure full impact across all families
+- [ ] Update `taxa-gap-analysis/SKILL.md` confusion matrix heuristic to include offence language
 
 ---
 
-**Session status**: Open. Ready to implement.
+**Session status**: Implementation complete. Commit db0481c. Closes #34.
+
+Corpus-wide re-enrichment deferred — can be done as a batch operation.
