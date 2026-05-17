@@ -808,7 +808,8 @@ mod tests {
 
     #[test]
     fn provider_extracted_for_public_family() {
-        let text = "A provider of a Part 3 service must carry out the first children's access assessment.";
+        let text =
+            "A provider of a Part 3 service must carry out the first children's access assessment.";
         let actors = extract_actors_for_family(text, Some("PUBLIC"));
         assert!(
             has_label(&actors.governed, "Public: Provider"),

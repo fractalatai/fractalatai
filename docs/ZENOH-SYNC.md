@@ -88,7 +88,62 @@ STRUCT(
 )
 ```
 
+### Fitness columns (`List<Utf8>` + `List<Struct>`)
+
+| Column | Description |
+|--------|-------------|
+| `fitness_person` | Person terms: `["employer", "self-employed person"]` |
+| `fitness_process` | Process terms: `["construction work"]` |
+| `fitness_place` | Place terms: `["Great Britain", "offshore"]` |
+| `fitness_plant` | Plant terms: `["asbestos"]` |
+| `fitness_property` | Property terms: `["at work"]` |
+| `fitness_sector` | Sector terms: `["construction"]` |
+| `fitness` | `List<FitnessEntry>` — full rules with polarity and article reference |
+
 Canonical definition: [`drrp_entry_struct()`](../crates/fractalaw-core/src/schema.rs) (line 18).
+
+## Enrichment States
+
+The DRRP parser produces one of three outcomes per law. These determine what gets written to DuckDB, what gets published, and whether LAT (per-provision text) is pruned from LanceDB.
+
+| State | DuckDB taxa written? | Published to sertantai? | LAT pruned? | Meaning |
+|-------|---------------------|------------------------|-------------|---------|
+| **Making** (`ok`) | Yes — all 19 taxa columns + `taxa_hash` | Yes — full 19-column Arrow IPC batch | No | Law creates at least one duty or responsibility. Full DRRP signal. |
+| **NonMaking** (`non-making`) | Yes — all 19 taxa columns + `taxa_hash` | Yes — full 19-column Arrow IPC batch | Yes | Law has taxa metadata (rights, powers, fitness) but no duties or responsibilities. Taxa are published but per-provision text is pruned from LanceDB since it's not needed for duty tracking. |
+| **NoTaxa** (`no taxa signal`) | No — nothing written to DuckDB | Yes — but all taxa columns are NULL/empty lists | Yes | Parser found nothing — no duties, rights, powers, fitness, or roles. The publish sends the row from DuckDB as-is (taxa columns remain NULL from initial LRT insert). LAT is pruned. Typical for procedural/administrative instruments with no substantive ESH content. |
+
+### What sertantai receives per state
+
+The published Arrow IPC payload always has the same 19-column schema (see Published Schema above). The difference is in the column values:
+
+**Making / NonMaking**: Columns contain populated `List<Utf8>` and `List<Struct>` arrays with the extracted taxa. NonMaking laws will have empty `duties` and `responsibilities` lists but may have populated `rights`, `powers`, `fitness_*`, `role`, `role_gvt`.
+
+**NoTaxa**: All list columns are NULL (not empty lists). Sertantai receives a valid Arrow batch with the law's `name` and 18 NULL columns. This distinguishes "we analysed this law and found nothing" from "we haven't analysed this law yet" (no publish at all).
+
+## Re-enrichment Behaviour
+
+When a previously enriched law is sent through the pipeline again (e.g. because sertantai re-persisted updated text), the enrichment uses content hashing to avoid redundant writes:
+
+1. The parser runs on all provisions and produces a new taxa result.
+2. A `taxa_hash` is computed from the 18 taxa column values (DRRP + fitness).
+3. The new hash is compared against the existing `taxa_hash` in DuckDB.
+
+| Scenario | DuckDB UPDATE? | Published? | `published_hash` updated? |
+|----------|---------------|-----------|--------------------------|
+| Hash unchanged (same taxa) | No — skipped | Yes — publishes existing DuckDB row | Yes |
+| Hash changed (taxa differ) | Yes — all 19 columns overwritten | Yes — publishes updated row | Yes |
+| Previously Making, now NoTaxa | Yes — clears all 18 taxa columns + `taxa_hash` to NULL | Yes — publishes NULLs (signals "analysed, found nothing") | Yes |
+
+**Important**: the publish step always runs regardless of hash match. This means re-enrichment is idempotent from sertantai's perspective — it receives the same data shape whether the taxa changed or not. The `published_hash` is set to `taxa_hash` after each successful publish, so `--changed` filtering works correctly.
+
+### Change tracking columns
+
+| Column | Purpose |
+|--------|---------|
+| `taxa_hash` | SHA-256 of all 18 taxa column values. Set on enrichment. NULL if never enriched. |
+| `published_hash` | Copied from `taxa_hash` after successful publish. NULL if never published. |
+
+`sync publish --changed` selects laws where `taxa_hash IS NOT NULL AND (published_hash IS NULL OR taxa_hash != published_hash)`.
 
 ## Key Expressions
 

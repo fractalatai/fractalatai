@@ -24,27 +24,23 @@ use super::duty_patterns::{DutyClassification, DutyFamily, DutySubType, MatchSpa
 
 /// "it is an offence for [actor] to [action]"
 /// "it shall be an offence for [actor] to [action]"
-static OFFENCE_FOR: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\bit (?:is|shall be) an offence for\b").unwrap()
-});
+static OFFENCE_FOR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\bit (?:is|shall be) an offence for\b").unwrap());
 
 /// "[actor] commits an offence if [condition]"
 /// "[actor] commit an offence if [condition]"
-static COMMITS_OFFENCE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\bcommits? an offence if\b").unwrap()
-});
+static COMMITS_OFFENCE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\bcommits? an offence if\b").unwrap());
 
 /// "[actor] shall be guilty of an offence if [condition]"
 /// "[actor] is guilty of an offence if [condition]"
-static GUILTY_IF: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\b(?:shall be|is) guilty of an offence if\b").unwrap()
-});
+static GUILTY_IF: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(?:shall be|is) guilty of an offence if\b").unwrap());
 
 /// "it is unlawful for [actor] to [action]"
 /// "it shall be unlawful for [actor] to [action]"
-static UNLAWFUL_FOR: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\bit (?:is|shall be) unlawful for\b").unwrap()
-});
+static UNLAWFUL_FOR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\bit (?:is|shall be) unlawful for\b").unwrap());
 
 // ── Penalty exclusion ───────────────────────────────────────────────
 
@@ -66,7 +62,8 @@ offence (?:under |is |shall be )(?:liable|punishable)|(?:^|\. )\s*(?:is |shall b
 /// If the text matches an offence-creating pattern AND this, we check whether
 /// the offence pattern comes before the penalty language (duty) or after (penalty).
 static PENALTY_PHRASES: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)\bliable (?:on (?:summary )?conviction|to (?:a fine|imprisonment|a penalty))").unwrap()
+    Regex::new(r"(?i)\bliable (?:on (?:summary )?conviction|to (?:a fine|imprisonment|a penalty))")
+        .unwrap()
 });
 
 // ── Public API ──────────────────────────────────────────────────────
@@ -100,51 +97,51 @@ pub fn match_offence_as_duty(text: &str) -> Option<DutyClassification> {
     }
 
     // Pattern 2: "[X] commits an offence if [Y]"
-    if let Some(m) = COMMITS_OFFENCE.find(text) {
-        if !is_penalty_dominant(text, m.start()) {
-            return Some(DutyClassification {
-                family: DutyFamily::Governed,
-                sub_type: DutySubType::Prohibitive,
-                confidence: 0.70,
-                span: Some(MatchSpan {
-                    actor_start: 0, // actor is at start of text (before "commits")
-                    modal_start: m.start(),
-                    modal_end: m.end(),
-                }),
-            });
-        }
+    if let Some(m) = COMMITS_OFFENCE.find(text)
+        && !is_penalty_dominant(text, m.start())
+    {
+        return Some(DutyClassification {
+            family: DutyFamily::Governed,
+            sub_type: DutySubType::Prohibitive,
+            confidence: 0.70,
+            span: Some(MatchSpan {
+                actor_start: 0, // actor is at start of text (before "commits")
+                modal_start: m.start(),
+                modal_end: m.end(),
+            }),
+        });
     }
 
     // Pattern 3: "[X] shall be / is guilty of an offence if [Y]"
-    if let Some(m) = GUILTY_IF.find(text) {
-        if !is_penalty_dominant(text, m.start()) {
-            return Some(DutyClassification {
-                family: DutyFamily::Governed,
-                sub_type: DutySubType::Prohibitive,
-                confidence: 0.65,
-                span: Some(MatchSpan {
-                    actor_start: 0,
-                    modal_start: m.start(),
-                    modal_end: m.end(),
-                }),
-            });
-        }
+    if let Some(m) = GUILTY_IF.find(text)
+        && !is_penalty_dominant(text, m.start())
+    {
+        return Some(DutyClassification {
+            family: DutyFamily::Governed,
+            sub_type: DutySubType::Prohibitive,
+            confidence: 0.65,
+            span: Some(MatchSpan {
+                actor_start: 0,
+                modal_start: m.start(),
+                modal_end: m.end(),
+            }),
+        });
     }
 
     // Pattern 4: "it is/shall be unlawful for [X] to [Y]"
-    if let Some(m) = UNLAWFUL_FOR.find(text) {
-        if !is_penalty_dominant(text, m.start()) {
-            return Some(DutyClassification {
-                family: DutyFamily::Governed,
-                sub_type: DutySubType::Prohibitive,
-                confidence: 0.70,
-                span: Some(MatchSpan {
-                    actor_start: m.end(),
-                    modal_start: m.start(),
-                    modal_end: m.end(),
-                }),
-            });
-        }
+    if let Some(m) = UNLAWFUL_FOR.find(text)
+        && !is_penalty_dominant(text, m.start())
+    {
+        return Some(DutyClassification {
+            family: DutyFamily::Governed,
+            sub_type: DutySubType::Prohibitive,
+            confidence: 0.70,
+            span: Some(MatchSpan {
+                actor_start: m.end(),
+                modal_start: m.start(),
+                modal_end: m.end(),
+            }),
+        });
     }
 
     None
@@ -179,7 +176,8 @@ mod tests {
 
     #[test]
     fn offence_for_person_to_contravene() {
-        let text = "it is an offence for a person to contravene any byelaws made under section 26 or 29.";
+        let text =
+            "it is an offence for a person to contravene any byelaws made under section 26 or 29.";
         let dc = match_offence_as_duty(text).unwrap();
         assert_eq!(dc.family, DutyFamily::Governed);
         assert_eq!(dc.sub_type, DutySubType::Prohibitive);

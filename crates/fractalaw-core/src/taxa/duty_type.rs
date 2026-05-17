@@ -304,7 +304,8 @@ mod tests {
 
     #[test]
     fn classify_unlawful_for_as_duty() {
-        let text = "it shall be unlawful for any person to keep a dog unless he holds a dog licence.";
+        let text =
+            "it shall be unlawful for any person to keep a dog unless he holds a dog licence.";
         let result = classify(text, &[], &[]);
         assert_eq!(result.duty_types, vec![DutyType::Duty]);
     }
@@ -328,10 +329,7 @@ mod tests {
         let result = classify(text, &actors, &[]);
         assert_eq!(result.duty_types, vec![DutyType::Duty]);
         // Should match governed v2 (employer shall ensure), not offence tier
-        assert_eq!(
-            result.classification.unwrap().family,
-            DutyFamily::Governed
-        );
+        assert_eq!(result.classification.unwrap().family, DutyFamily::Governed);
     }
 
     #[test]

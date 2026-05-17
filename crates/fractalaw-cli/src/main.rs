@@ -3359,12 +3359,26 @@ async fn enrich_single_law(
             .with_context(|| format!("writing taxa to LanceDB for {law_name}"))?;
     }
 
-    // No taxa signal — nothing to write to DuckDB.
+    // No taxa signal — clear any stale taxa in DuckDB so publishes send NULLs.
     if taxa.duty_types.is_empty()
         && taxa.roles.is_empty()
         && taxa.roles_gvt.is_empty()
         && taxa.fitness_entries.is_empty()
     {
+        store.execute(&format!(
+            "UPDATE legislation SET \
+                duty_holder = NULL, rights_holder = NULL, \
+                responsibility_holder = NULL, power_holder = NULL, \
+                duty_type = NULL, role = NULL, role_gvt = NULL, \
+                duties = NULL, rights = NULL, \
+                responsibilities = NULL, powers = NULL, \
+                fitness_person = NULL, fitness_process = NULL, \
+                fitness_place = NULL, fitness_plant = NULL, \
+                fitness_property = NULL, fitness_sector = NULL, \
+                fitness = NULL, taxa_hash = NULL \
+             WHERE name = '{}'",
+            law_name.replace('\'', "''")
+        ))?;
         return Ok(EnrichResult::NoTaxa);
     }
 

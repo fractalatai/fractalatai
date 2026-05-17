@@ -506,11 +506,15 @@ mod tests {
 
     #[test]
     fn government_actor_detection_public_family() {
-        assert!(has_government_actor("ofcom must prepare a code of practice"));
+        assert!(has_government_actor(
+            "ofcom must prepare a code of practice"
+        ));
         assert!(has_government_actor("the chief officer of police shall"));
         assert!(has_government_actor("a constable may seize the dog"));
         assert!(has_government_actor("the sheriff may make an order"));
-        assert!(has_government_actor("the procurator fiscal must investigate"));
+        assert!(has_government_actor(
+            "the procurator fiscal must investigate"
+        ));
         assert!(has_government_actor("the department may by order require"));
         assert!(has_government_actor("police force for the area"));
     }

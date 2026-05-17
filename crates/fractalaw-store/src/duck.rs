@@ -276,8 +276,26 @@ impl DuckStore {
                     .close()
                     .map_err(|e| StoreError::Other(format!("parquet close: {e}")))?;
             }
+            // Query the target table's columns so we only insert columns
+            // that actually exist (the incoming batch may have extra cols
+            // like "id" that our legislation table lacks).
+            let mut col_stmt = self.conn.prepare(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = 'legislation'"
+            )?;
+            let table_cols: std::collections::HashSet<String> = col_stmt
+                .query_map([], |row| row.get::<_, String>(0))?
+                .filter_map(|r| r.ok())
+                .collect();
+            let schema = batch.schema();
+            let cols: Vec<&str> = schema
+                .fields()
+                .iter()
+                .map(|f| f.name().as_str())
+                .filter(|name| table_cols.contains(*name))
+                .collect();
+            let col_list = cols.join(", ");
             let sql = format!(
-                "INSERT INTO legislation SELECT * FROM read_parquet('{}')",
+                "INSERT INTO legislation ({col_list}) SELECT {col_list} FROM read_parquet('{}')",
                 tmp.path().display()
             );
             self.conn.execute_batch(&sql)?;
