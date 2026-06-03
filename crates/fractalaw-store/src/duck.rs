@@ -534,6 +534,20 @@ impl DuckStore {
         Ok(())
     }
 
+    /// Ensure `provisions_published_at` column exists on `legislation`.
+    ///
+    /// Tracks the last time provision-level taxa were published for a law.
+    /// Used by `sync publish --provisions --changed` to detect dirty laws.
+    ///
+    /// Idempotent — safe to call multiple times.
+    pub fn ensure_provisions_published_column(&self) -> Result<(), StoreError> {
+        self.conn.execute_batch(
+            "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS provisions_published_at TIMESTAMP",
+        )?;
+        info!("ensured provisions_published_at column exists");
+        Ok(())
+    }
+
     // ── Training data extraction ──
 
     /// Extract all DRRPEntry records as flat rows from the four DRRP columns.

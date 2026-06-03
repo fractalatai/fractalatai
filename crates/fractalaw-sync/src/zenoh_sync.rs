@@ -125,6 +125,20 @@ pub mod keys {
         format!("{PREFIX}/@{tenant}/data/legislation/lrt/{law_name}")
     }
 
+    /// Key expression for a specific law's provision-level taxa data.
+    ///
+    /// Example: `fractalaw/@acme/taxa/provisions/UK_ukpga_1974_37`
+    pub fn taxa_provisions(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/taxa/provisions/{law_name}")
+    }
+
+    /// Wildcard key expression for all provision-level taxa under a tenant.
+    ///
+    /// Example: `fractalaw/@acme/taxa/provisions/*`
+    pub fn taxa_provisions_wildcard(tenant: &str) -> String {
+        format!("{PREFIX}/@{tenant}/taxa/provisions/*")
+    }
+
     /// Key expression for sertantai sync events (data-change notifications).
     ///
     /// Example: `fractalaw/@acme/events/sync`
@@ -257,6 +271,41 @@ impl ZenohSync {
             bytes = ipc_bytes.len(),
             rows = batches.iter().map(|b| b.num_rows()).sum::<usize>(),
             "publishing taxa enrichment"
+        );
+
+        self.session
+            .put(&key, ipc_bytes)
+            .await
+            .map_err(ZenohError::Session)?;
+
+        Ok(())
+    }
+
+    /// Publish provision-level taxa/fitness data for a specific law.
+    ///
+    /// `batches` should contain per-provision DRRP and fitness columns
+    /// from LanceDB's `legislation_text` table (section_id, drrp_types,
+    /// governed_actors, fitness_*, etc.) as Arrow RecordBatches.
+    /// The payload is serialized as Arrow IPC streaming format.
+    pub async fn publish_provision_taxa(
+        &self,
+        law_name: &str,
+        batches: &[RecordBatch],
+    ) -> Result<(), ZenohError> {
+        if batches.is_empty() || batches.iter().all(|b| b.num_rows() == 0) {
+            return Err(ZenohError::NoData {
+                law_name: law_name.to_string(),
+            });
+        }
+
+        let ipc_bytes = encode_arrow_ipc(batches)?;
+        let key = keys::taxa_provisions(&self.tenant, law_name);
+
+        info!(
+            key = %key,
+            bytes = ipc_bytes.len(),
+            rows = batches.iter().map(|b| b.num_rows()).sum::<usize>(),
+            "publishing provision-level taxa"
         );
 
         self.session
@@ -589,6 +638,47 @@ mod tests {
         assert!(matches!(result, Err(ZenohError::NoData { .. })));
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn publish_provision_taxa_roundtrip() {
+        let publisher = ZenohSync::new("test-prov-taxa").await.unwrap();
+        let subscriber = ZenohSync::new("test-prov-taxa").await.unwrap();
+
+        let key = keys::taxa_provisions_wildcard("test-prov-taxa");
+        let sub = subscriber.session().declare_subscriber(&key).await.unwrap();
+
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        let batch = test_taxa_batch();
+        publisher
+            .publish_provision_taxa("UK_ukpga_1974_37", &[batch.clone()])
+            .await
+            .unwrap();
+
+        let sample = tokio::time::timeout(std::time::Duration::from_secs(5), sub.recv_async())
+            .await
+            .expect("timeout waiting for sample")
+            .expect("recv error");
+
+        assert!(
+            sample
+                .key_expr()
+                .as_str()
+                .contains("taxa/provisions/UK_ukpga_1974_37")
+        );
+
+        let payload = sample.payload().to_bytes();
+        let decoded = decode_arrow_ipc(&payload).unwrap();
+        assert_eq!(decoded.len(), 1);
+        assert_eq!(decoded[0].num_rows(), 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn publish_provision_taxa_no_data_errors() {
+        let sync = ZenohSync::new("test-prov-no-data").await.unwrap();
+        let result = sync.publish_provision_taxa("some_law", &[]).await;
+        assert!(matches!(result, Err(ZenohError::NoData { .. })));
+    }
+
     // ── LAT key expression tests ──
 
     #[test]
@@ -670,6 +760,24 @@ mod tests {
             .await
             .unwrap();
         assert!(result.is_empty());
+    }
+
+    // ── Provision taxa key expression tests ──
+
+    #[test]
+    fn key_taxa_provisions() {
+        assert_eq!(
+            keys::taxa_provisions("acme", "UK_ukpga_1974_37"),
+            "fractalaw/@acme/taxa/provisions/UK_ukpga_1974_37"
+        );
+    }
+
+    #[test]
+    fn key_taxa_provisions_wildcard() {
+        assert_eq!(
+            keys::taxa_provisions_wildcard("acme"),
+            "fractalaw/@acme/taxa/provisions/*"
+        );
     }
 
     // ── Events key expression tests ──

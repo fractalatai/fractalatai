@@ -147,9 +147,10 @@ pub mod esh {
             Field::new("rights_ai", list_drrp_entry.clone(), true),
             Field::new("responsibilities_ai", list_drrp_entry.clone(), true),
             Field::new("powers_ai", list_drrp_entry, true),
-            // 1.10b Taxa Change Tracking (2)
+            // 1.10b Taxa Change Tracking (3)
             Field::new("taxa_hash", DataType::Utf8, true),
             Field::new("published_hash", DataType::Utf8, true),
+            Field::new("provisions_published_at", timestamp_ns_utc(), true),
             // 1.10c Fitness / Applicability (7)
             Field::new("fitness_person", list_utf8.clone(), true),
             Field::new("fitness_process", list_utf8.clone(), true),
@@ -433,7 +434,7 @@ mod tests {
 
     #[test]
     fn legislation_schema_field_count() {
-        assert_eq!(esh::legislation_schema().fields().len(), 99);
+        assert_eq!(esh::legislation_schema().fields().len(), 100);
     }
 
     #[test]

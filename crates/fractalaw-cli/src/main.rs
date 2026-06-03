@@ -314,6 +314,9 @@ enum SyncAction {
         /// Only publish laws whose taxa changed since last publish
         #[arg(long)]
         changed: bool,
+        /// Publish provision-level taxa (from LanceDB) instead of law-level
+        #[arg(long)]
+        provisions: bool,
     },
     /// Pull legislation text (LAT) from sertantai via zenoh
     PullLat {
@@ -492,7 +495,14 @@ async fn main() -> anyhow::Result<()> {
                 family,
                 all,
                 changed,
-            } => cmd_sync_publish(&data_dir, &zenoh, laws, family, all, changed).await,
+                provisions,
+            } => {
+                if provisions {
+                    cmd_sync_publish_provisions(&data_dir, &zenoh, laws, family, all, changed).await
+                } else {
+                    cmd_sync_publish(&data_dir, &zenoh, laws, family, all, changed).await
+                }
+            }
             SyncAction::PullLat {
                 zenoh,
                 laws,
@@ -893,6 +903,145 @@ async fn cmd_sync_publish(
     Ok(())
 }
 
+async fn cmd_sync_publish_provisions(
+    data_dir: &std::path::Path,
+    zenoh: &ZenohArgs,
+    laws: Option<String>,
+    family: Option<String>,
+    all: bool,
+    changed: bool,
+) -> anyhow::Result<()> {
+    let store = open_duck(data_dir)?;
+    store.ensure_taxa_hash_columns()?;
+    store.ensure_provisions_published_column()?;
+
+    let lance = LanceStore::open(&data_dir.join("lancedb"))
+        .await
+        .context("opening LanceDB")?;
+
+    // Resolve law names — same logic as law-level publish.
+    let law_names: Vec<String> = if let Some(ref fam) = family {
+        let names = laws_in_family(&store, fam)?;
+        if names.is_empty() {
+            anyhow::bail!("No laws found with family '{fam}'");
+        }
+        println!("Family '{}': {} laws", fam, names.len());
+        names
+    } else if let Some(ref l) = laws {
+        l.split(',').map(|s| s.trim().to_string()).collect()
+    } else if changed {
+        let batches = store.query_arrow(
+            "SELECT name FROM legislation \
+             WHERE taxa_hash IS NOT NULL \
+               AND (provisions_published_at IS NULL \
+                    OR provisions_published_at < updated_at) \
+             ORDER BY name",
+        )?;
+        let mut names = Vec::new();
+        for batch in &batches {
+            if let Some(col) = batch.column_by_name("name")
+                && let Some(arr) = col.as_any().downcast_ref::<arrow::array::StringArray>()
+            {
+                for i in 0..arr.len() {
+                    if !arr.is_null(i) {
+                        names.push(arr.value(i).to_string());
+                    }
+                }
+            }
+        }
+        println!(
+            "Publishing provisions for {} laws with changed taxa (--changed)",
+            names.len()
+        );
+        names
+    } else if all {
+        let batches = store.query_arrow(
+            "SELECT name FROM legislation \
+             WHERE duty_holder IS NOT NULL AND len(duty_holder) > 0 \
+             ORDER BY name",
+        )?;
+        let mut names = Vec::new();
+        for batch in &batches {
+            if let Some(col) = batch.column_by_name("name")
+                && let Some(arr) = col.as_any().downcast_ref::<arrow::array::StringArray>()
+            {
+                for i in 0..arr.len() {
+                    if !arr.is_null(i) {
+                        names.push(arr.value(i).to_string());
+                    }
+                }
+            }
+        }
+        println!(
+            "Publishing provisions for ALL {} laws with taxa data",
+            names.len()
+        );
+        names
+    } else {
+        anyhow::bail!(
+            "Specify --family, --laws, --changed, or --all to select laws to publish.\n\
+             Example: fractalaw sync publish --provisions --family \"OH&S: Occupational / Personal Safety\" --tenant dev"
+        );
+    };
+
+    if law_names.is_empty() {
+        println!("No laws with taxa data to publish.");
+        return Ok(());
+    }
+
+    println!(
+        "Publishing provision-level taxa for {} laws to zenoh (tenant: {})...",
+        law_names.len(),
+        zenoh.tenant,
+    );
+
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+
+    print!("Waiting for zenoh peer...");
+    let peers = sync
+        .wait_for_peers(std::time::Duration::from_secs(15))
+        .await;
+    if peers == 0 {
+        println!(" no peers connected (timeout). Publishing anyway, but data may not be received.");
+    } else {
+        println!(" {peers} peer(s) connected.");
+    }
+
+    let mut published = 0usize;
+    let mut total_provisions = 0usize;
+    for law_name in &law_names {
+        let batches = lance.query_provision_taxa(law_name).await?;
+        let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+        if rows == 0 {
+            eprintln!("  {law_name}: no enriched provisions, skipping");
+            continue;
+        }
+
+        sync.publish_provision_taxa(law_name, &batches)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to publish provisions for {law_name}: {e}"))?;
+
+        // Mark provisions as published.
+        store.execute(&format!(
+            "UPDATE legislation SET provisions_published_at = CURRENT_TIMESTAMP WHERE name = '{}'",
+            law_name.replace('\'', "''")
+        ))?;
+
+        println!("  {law_name}: {rows} provisions");
+        total_provisions += rows;
+        published += 1;
+    }
+
+    println!(
+        "Published {total_provisions} provisions across {published}/{} laws.",
+        law_names.len()
+    );
+    Ok(())
+}
+
 async fn cmd_sync_pull_lat(
     data_dir: &std::path::Path,
     zenoh: &ZenohArgs,
@@ -961,6 +1110,7 @@ async fn cmd_sync_watch(
         .context("opening LanceDB")?;
     let duck = open_duck(data_dir)?;
     duck.ensure_taxa_hash_columns()?;
+    duck.ensure_provisions_published_column()?;
 
     let config = zenoh.build_zenoh_config()?;
     let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
@@ -978,7 +1128,7 @@ async fn cmd_sync_watch(
         "Watching for sync events (tenant: {}, timeout: {timeout_secs}s per pull)...",
         zenoh.tenant
     );
-    println!("Pipeline: ensure LRT → pull LAT → enrich → publish taxa");
+    println!("Pipeline: ensure LRT → pull LAT → enrich → publish taxa + provisions");
     println!("Press Ctrl+C to stop.\n");
 
     let mut total_events = 0usize;
@@ -1122,8 +1272,7 @@ async fn cmd_sync_watch(
                     }
                 }
 
-                // Step 4: Publish taxa from DuckDB (LRT) back to sertantai.
-                // LanceDB is read-only for publishing — only DuckDB data goes out.
+                // Step 4: Publish law-level taxa from DuckDB (LRT) back to sertantai.
                 eprint!(" → publish");
                 let sql = format!(
                     "SELECT name, duty_holder, rights_holder, responsibility_holder, power_holder, \
@@ -1147,11 +1296,40 @@ async fn cmd_sync_watch(
                                      WHERE name = '{}'",
                                     law_name.replace('\'', "''")
                                 ));
-                                eprintln!(" → done");
+                                eprint!(" → lrt ok");
                                 total_published += 1;
                             }
                             Err(e) => eprintln!(" → publish error: {e}"),
                         }
+
+                        // Step 5: Publish provision-level taxa from LanceDB.
+                        match lance.query_provision_taxa(law_name).await {
+                            Ok(prov_batches) => {
+                                let prov_rows: usize =
+                                    prov_batches.iter().map(|b| b.num_rows()).sum();
+                                if prov_rows > 0 {
+                                    match sync
+                                        .publish_provision_taxa(law_name, &prov_batches)
+                                        .await
+                                    {
+                                        Ok(_) => {
+                                            let _ = duck.execute(&format!(
+                                                "UPDATE legislation \
+                                                 SET provisions_published_at = CURRENT_TIMESTAMP \
+                                                 WHERE name = '{}'",
+                                                law_name.replace('\'', "''")
+                                            ));
+                                            eprint!(" + {prov_rows} provisions");
+                                        }
+                                        Err(e) => {
+                                            eprint!(" → provision publish error: {e}");
+                                        }
+                                    }
+                                }
+                            }
+                            Err(e) => eprint!(" → provision query error: {e}"),
+                        }
+                        eprintln!(" → done");
                     }
                     Ok(_) => eprintln!(" → no taxa in DuckDB"),
                     Err(e) => eprintln!(" → DuckDB taxa query error: {e}"),

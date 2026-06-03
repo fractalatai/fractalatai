@@ -12,7 +12,7 @@ use arrow::compute::cast;
 use arrow::datatypes::{DataType, Field, Schema};
 use arrow::record_batch::RecordBatch;
 use futures::TryStreamExt;
-use lancedb::query::{ExecutableQuery, QueryBase};
+use lancedb::query::{ExecutableQuery, QueryBase, Select};
 use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
 use tracing::info;
 
@@ -129,6 +129,55 @@ impl LanceStore {
             .only_if(filter)
             .limit(limit)
             .offset(offset)
+            .execute()
+            .await?
+            .try_collect()
+            .await?;
+        Ok(results)
+    }
+
+    /// Query provision-level taxa and fitness columns for a law.
+    ///
+    /// Returns only enriched provisions (where `drrp_types IS NOT NULL`)
+    /// with a column projection that excludes text, embeddings, and token_ids.
+    /// Used by `sync publish --provisions` to build the zenoh payload.
+    pub async fn query_provision_taxa(
+        &self,
+        law_name: &str,
+    ) -> Result<Vec<RecordBatch>, StoreError> {
+        let table = self.legislation_text().await?;
+        let filter = format!(
+            "law_name = '{}' AND drrp_types IS NOT NULL",
+            law_name.replace('\'', "''")
+        );
+        let columns: Vec<String> = [
+            "section_id",
+            "drrp_types",
+            "governed_actors",
+            "government_actors",
+            "duty_family",
+            "duty_sub_type",
+            "popimar",
+            "purposes",
+            "clause_refined",
+            "taxa_confidence",
+            "taxa_classified_at",
+            "fitness_polarity",
+            "fitness_person",
+            "fitness_process",
+            "fitness_place",
+            "fitness_plant",
+            "fitness_property",
+            "fitness_sector",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+
+        let results: Vec<RecordBatch> = table
+            .query()
+            .only_if(filter)
+            .select(Select::Columns(columns))
             .execute()
             .await?
             .try_collect()
