@@ -400,6 +400,9 @@ enum TaxaAction {
         /// Re-enrich all laws (clear existing DuckDB taxa columns, re-process all LanceDB text)
         #[arg(long)]
         force: bool,
+        /// Enable Gap C Tier 1: deterministic parent-clause inheritance for implicit duty holders
+        #[arg(long)]
+        gap_c: bool,
     },
     /// Generate clause eyeball review markdown for manual QA
     Eyeball {
@@ -539,6 +542,7 @@ async fn main() -> anyhow::Result<()> {
                 laws,
                 family,
                 force,
+                gap_c,
             } => {
                 let store = open_duck(&data_dir)?;
                 let law_filter = if let Some(ref fam) = family {
@@ -556,7 +560,7 @@ async fn main() -> anyhow::Result<()> {
                             .collect::<Vec<_>>()
                     })
                 };
-                cmd_taxa_enrich(&data_dir, &store, law_filter, force).await
+                cmd_taxa_enrich(&data_dir, &store, law_filter, force, gap_c).await
             }
             TaxaAction::Eyeball {
                 laws,
@@ -1239,7 +1243,7 @@ async fn cmd_sync_watch(
 
                 // Step 3: Taxa enrichment (DRRP parse).
                 eprint!(" → enrich");
-                let enrich_result = match enrich_single_law(&lance, &duck, law_name).await {
+                let enrich_result = match enrich_single_law(&lance, &duck, law_name, false).await {
                     Ok(result) => {
                         match result {
                             EnrichResult::Making => {
@@ -3014,6 +3018,7 @@ async fn enrich_single_law(
     lance: &LanceStore,
     store: &DuckStore,
     law_name: &str,
+    gap_c: bool,
 ) -> anyhow::Result<EnrichResult> {
     use std::collections::BTreeSet;
 
@@ -3032,6 +3037,11 @@ async fn enrich_single_law(
             })
             .next()
     };
+
+    // Ensure Gap C provenance columns exist if Tier 1 is enabled.
+    if gap_c {
+        lance.ensure_gap_c_columns().await?;
+    }
 
     let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
     let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
@@ -3102,6 +3112,12 @@ async fn enrich_single_law(
         fitness_plant: Vec<String>,
         fitness_property: Vec<String>,
         fitness_sector: Vec<String>,
+        // Gap C provenance
+        hierarchy_path: String,
+        depth: i32,
+        extraction_method: String,
+        holder_inferred_from: Vec<String>,
+        ancestor_distance: Option<i32>,
     }
     let mut provision_taxa: Vec<ProvisionTaxa> = Vec::new();
 
@@ -3110,6 +3126,8 @@ async fn enrich_single_law(
         let text_col = batch.column_by_name("text");
         let sid_col = batch.column_by_name("section_id");
         let stype_col = batch.column_by_name("section_type");
+        let hpath_col = batch.column_by_name("hierarchy_path");
+        let depth_col = batch.column_by_name("depth");
 
         for row in 0..batch.num_rows() {
             let provision = prov_col
@@ -3124,6 +3142,22 @@ async fn enrich_single_law(
             let section_type = stype_col
                 .and_then(|c| get_string_value(c.as_ref(), row))
                 .unwrap_or_default();
+            let hierarchy_path = hpath_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+            let depth = depth_col
+                .and_then(|c| {
+                    c.as_any()
+                        .downcast_ref::<arrow::array::Int32Array>()
+                        .and_then(|a| {
+                            if a.is_null(row) {
+                                None
+                            } else {
+                                Some(a.value(row))
+                            }
+                        })
+                })
+                .unwrap_or(0);
             if text.trim().is_empty() {
                 continue;
             }
@@ -3283,6 +3317,11 @@ async fn enrich_single_law(
                     fitness_plant: fp_plant,
                     fitness_property: fp_property,
                     fitness_sector: fp_sector,
+                    hierarchy_path: hierarchy_path.clone(),
+                    depth,
+                    extraction_method: "regex".to_string(),
+                    holder_inferred_from: Vec::new(),
+                    ancestor_distance: None,
                 });
             }
 
@@ -3374,6 +3413,101 @@ async fn enrich_single_law(
         }
     }
 
+    // ── Gap C Tier 1: Deterministic parent inheritance ──
+    //
+    // For provisions with no DRRP but a duty-bearing purpose, walk up the
+    // hierarchy to find the nearest ancestor with actors. Deepest-first:
+    // stop at the closest parent that has governed_actors, not the root.
+    let mut inherited_count = 0u32;
+    if gap_c {
+        // Build a snapshot of section_id → index for parent lookups.
+        // We iterate by index so we can read from immutable slices while
+        // collecting mutations, then apply them in a second pass.
+        let gap_c_candidates: Vec<usize> = (0..provision_taxa.len())
+            .filter(|&i| {
+                let p = &provision_taxa[i];
+                p.drrp_types.is_empty()
+                    && p.governed_actors.is_empty()
+                    && fractalaw_core::taxa::is_duty_bearing_purpose(&p.purposes)
+                    && !p.hierarchy_path.is_empty()
+            })
+            .collect();
+
+        // For each candidate, find the nearest ancestor with actors.
+        struct InheritedTaxa {
+            target_idx: usize,
+            drrp_types: Vec<String>,
+            governed_actors: Vec<String>,
+            government_actors: Vec<String>,
+            duty_family: Option<String>,
+            duty_sub_type: Option<String>,
+            ancestor_sid: String,
+            distance: i32,
+        }
+        let mut mutations: Vec<InheritedTaxa> = Vec::new();
+
+        for &idx in &gap_c_candidates {
+            let target_path = &provision_taxa[idx].hierarchy_path;
+            let target_depth = provision_taxa[idx].depth;
+
+            // Find ancestors: provisions whose hierarchy_path is a strict
+            // prefix of the target's path. Sort by depth descending (deepest first).
+            let mut ancestors: Vec<usize> = (0..provision_taxa.len())
+                .filter(|&j| {
+                    j != idx
+                        && !provision_taxa[j].hierarchy_path.is_empty()
+                        && target_path.starts_with(&provision_taxa[j].hierarchy_path)
+                        && provision_taxa[j].hierarchy_path.len() < target_path.len()
+                        && !provision_taxa[j].governed_actors.is_empty()
+                })
+                .collect();
+            ancestors.sort_by(|&a, &b| provision_taxa[b].depth.cmp(&provision_taxa[a].depth));
+
+            if let Some(&ancestor_idx) = ancestors.first() {
+                let ancestor = &provision_taxa[ancestor_idx];
+                mutations.push(InheritedTaxa {
+                    target_idx: idx,
+                    drrp_types: ancestor.drrp_types.clone(),
+                    governed_actors: ancestor.governed_actors.clone(),
+                    government_actors: ancestor.government_actors.clone(),
+                    duty_family: ancestor.duty_family.clone(),
+                    duty_sub_type: ancestor.duty_sub_type.clone(),
+                    ancestor_sid: ancestor.section_id.clone(),
+                    distance: target_depth - ancestor.depth,
+                });
+            }
+        }
+
+        // Apply mutations.
+        for m in mutations {
+            let p = &mut provision_taxa[m.target_idx];
+            p.drrp_types = m.drrp_types;
+            p.governed_actors = m.governed_actors;
+            p.government_actors = m.government_actors;
+            p.duty_family = m.duty_family;
+            p.duty_sub_type = m.duty_sub_type;
+            p.extraction_method = "inherited".to_string();
+            p.holder_inferred_from = vec![m.ancestor_sid];
+            p.ancestor_distance = Some(m.distance);
+            inherited_count += 1;
+
+            // Also aggregate inherited actors into the law-level sets.
+            for actor in &p.governed_actors {
+                taxa.roles.insert(actor.clone());
+                taxa.duty_holders.insert(actor.clone());
+            }
+            for actor in &p.government_actors {
+                taxa.roles_gvt.insert(actor.clone());
+            }
+        }
+
+        if inherited_count > 0 {
+            eprintln!(
+                "  Gap C Tier 1: {inherited_count} provisions inherited actors from parent clauses"
+            );
+        }
+    }
+
     // Write per-provision taxa to LanceDB.
     if !provision_taxa.is_empty() {
         use arrow::array::{
@@ -3399,6 +3533,9 @@ async fn enrich_single_law(
         let mut fit_plant_b = ListBuilder::new(StringBuilder::new());
         let mut fit_property_b = ListBuilder::new(StringBuilder::new());
         let mut fit_sector_b = ListBuilder::new(StringBuilder::new());
+        let mut extraction_method_b = StringBuilder::new();
+        let mut inferred_from_b = StringBuilder::new();
+        let mut ancestor_distance_b = arrow::array::Int32Builder::new();
 
         let now_ns = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
 
@@ -3474,6 +3611,17 @@ async fn enrich_single_law(
                 fit_sector_b.values().append_value(v);
             }
             fit_sector_b.append(true);
+
+            extraction_method_b.append_value(&pt.extraction_method);
+            if pt.holder_inferred_from.is_empty() {
+                inferred_from_b.append_null();
+            } else {
+                inferred_from_b.append_value(pt.holder_inferred_from.join(","));
+            }
+            match pt.ancestor_distance {
+                Some(d) => ancestor_distance_b.append_value(d),
+                None => ancestor_distance_b.append_null(),
+            }
         }
 
         let item_field = std::sync::Arc::new(Field::new("item", DataType::Utf8, true));
@@ -3503,7 +3651,10 @@ async fn enrich_single_law(
             Field::new("fitness_place", DataType::List(item_field.clone()), true),
             Field::new("fitness_plant", DataType::List(item_field.clone()), true),
             Field::new("fitness_property", DataType::List(item_field.clone()), true),
-            Field::new("fitness_sector", DataType::List(item_field), true),
+            Field::new("fitness_sector", DataType::List(item_field.clone()), true),
+            Field::new("extraction_method", DataType::Utf8, true),
+            Field::new("holder_inferred_from", DataType::Utf8, true),
+            Field::new("ancestor_distance", DataType::Int32, true),
         ]));
 
         let taxa_batch = RecordBatch::try_new(
@@ -3527,6 +3678,9 @@ async fn enrich_single_law(
                 std::sync::Arc::new(fit_plant_b.finish()),
                 std::sync::Arc::new(fit_property_b.finish()),
                 std::sync::Arc::new(fit_sector_b.finish()),
+                std::sync::Arc::new(extraction_method_b.finish()),
+                std::sync::Arc::new(inferred_from_b.finish()),
+                std::sync::Arc::new(ancestor_distance_b.finish()),
             ],
         )
         .context("building taxa RecordBatch")?;
@@ -3663,6 +3817,7 @@ async fn cmd_taxa_enrich(
     store: &DuckStore,
     law_filter: Option<Vec<String>>,
     force: bool,
+    gap_c: bool,
 ) -> anyhow::Result<()> {
     // Ensure taxa_hash/published_hash and fitness columns exist (idempotent).
     store.ensure_taxa_hash_columns()?;
@@ -3765,7 +3920,7 @@ async fn cmd_taxa_enrich(
     let total = law_names.len();
 
     for law_name in &law_names {
-        let result = enrich_single_law(&lance, store, law_name).await?;
+        let result = enrich_single_law(&lance, store, law_name, gap_c).await?;
 
         // Prune LAT for non-making laws (no duties or responsibilities).
         if matches!(result, EnrichResult::NonMaking | EnrichResult::NoTaxa) {

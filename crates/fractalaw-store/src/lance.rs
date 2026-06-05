@@ -185,6 +185,59 @@ impl LanceStore {
         Ok(results)
     }
 
+    /// Ensure Gap C provenance columns exist on the `legislation_text` table.
+    ///
+    /// LanceDB doesn't support `ALTER TABLE ADD COLUMN IF NOT EXISTS`, so we
+    /// check the schema first and only add missing columns. Idempotent.
+    pub async fn ensure_gap_c_columns(&self) -> Result<(), StoreError> {
+        let table = self.legislation_text().await?;
+        let schema = table.schema().await.map_err(|e| {
+            StoreError::Other(format!("failed to get legislation_text schema: {e}"))
+        })?;
+
+        // Simple scalar columns can use SQL CAST. List columns need a
+        // different approach — we add them via an Arrow transform instead.
+        let scalar_needed: Vec<(&str, &str)> = vec![
+            ("extraction_method", "CAST(NULL AS STRING)"),
+            ("ancestor_distance", "CAST(NULL AS INT)"),
+        ];
+
+        for (col_name, default_expr) in &scalar_needed {
+            if schema.field_with_name(col_name).is_err() {
+                table
+                    .add_columns(
+                        lancedb::table::NewColumnTransform::SqlExpressions(vec![(
+                            col_name.to_string(),
+                            default_expr.to_string(),
+                        )]),
+                        None,
+                    )
+                    .await
+                    .map_err(|e| StoreError::Other(format!("add column {col_name}: {e}")))?;
+                info!(column = col_name, "added Gap C column to legislation_text");
+            }
+        }
+
+        // holder_inferred_from: stored as Utf8 (comma-joined section_ids) because
+        // LanceDB's SQL expression parser doesn't support LIST types for add_columns.
+        // Phase 1A typically has only one ancestor anyway.
+        if schema.field_with_name("holder_inferred_from").is_err() {
+            table
+                .add_columns(
+                    lancedb::table::NewColumnTransform::SqlExpressions(vec![(
+                        "holder_inferred_from".to_string(),
+                        "CAST(NULL AS STRING)".to_string(),
+                    )]),
+                    None,
+                )
+                .await
+                .map_err(|e| StoreError::Other(format!("add column holder_inferred_from: {e}")))?;
+            info!("added holder_inferred_from column to legislation_text");
+        }
+
+        Ok(())
+    }
+
     /// Query provisions that have taxa data but no AI refinement yet.
     pub async fn query_unpolished(
         &self,

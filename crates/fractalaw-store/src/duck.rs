@@ -534,6 +534,20 @@ impl DuckStore {
         Ok(())
     }
 
+    /// Ensure `inherited_count` column exists on `legislation`.
+    ///
+    /// Tracks how many provisions were resolved by Tier 1 deterministic
+    /// parent inheritance (Gap C). Used by QA to measure Tier 1 effectiveness.
+    ///
+    /// Idempotent — safe to call multiple times.
+    pub fn ensure_inherited_count_column(&self) -> Result<(), StoreError> {
+        self.conn.execute_batch(
+            "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS inherited_count INTEGER",
+        )?;
+        info!("ensured inherited_count column exists");
+        Ok(())
+    }
+
     /// Ensure `provisions_published_at` column exists on `legislation`.
     ///
     /// Tracks the last time provision-level taxa were published for a law.

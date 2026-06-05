@@ -331,6 +331,10 @@ pub mod esh {
                 DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
                 true,
             ),
+            // 3.10b Gap C resolution provenance (3)
+            Field::new("extraction_method", DataType::Utf8, true),
+            Field::new("holder_inferred_from", DataType::Utf8, true),
+            Field::new("ancestor_distance", DataType::Int32, true),
             // 3.11 AI-Refined DRRP — polisher output stored back in LanceDB (7)
             Field::new("ai_holder", DataType::Utf8, true),
             Field::new("ai_clause", DataType::Utf8, true),
@@ -444,7 +448,7 @@ mod tests {
 
     #[test]
     fn legislation_text_schema_field_count() {
-        assert_eq!(esh::legislation_text_schema().fields().len(), 54);
+        assert_eq!(esh::legislation_text_schema().fields().len(), 57);
     }
 
     #[test]

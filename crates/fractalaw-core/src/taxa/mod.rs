@@ -463,6 +463,33 @@ pub fn should_skip_drrp(purposes: &[&str], has_governed_actor: bool) -> bool {
     false
 }
 
+/// Check whether a provision's purposes indicate it could bear a duty.
+///
+/// Returns `true` if at least one purpose is duty-bearing (i.e., not
+/// purely structural). Used by Gap C Tier 1 to decide whether a provision
+/// with no regex-extracted DRRP is a candidate for parent inheritance.
+///
+/// Skip-only purposes (never contain duties):
+/// Enactment, Interpretation, Amendment, Repeal/Revocation, Application+Scope, Extent
+pub fn is_duty_bearing_purpose(purposes: &[String]) -> bool {
+    const NON_DUTY_PURPOSES: &[&str] = &[
+        purpose::ENACTMENT,
+        purpose::INTERPRETATION,
+        purpose::AMENDMENT,
+        purpose::REPEAL_REVOCATION,
+        purpose::APPLICATION_SCOPE,
+        purpose::EXTENT,
+    ];
+
+    if purposes.is_empty() {
+        return false;
+    }
+
+    purposes
+        .iter()
+        .any(|p| !NON_DUTY_PURPOSES.contains(&p.as_str()))
+}
+
 /// Descriptive/meta-regulatory summary pattern.
 ///
 /// Matches text that describes what the Regulations/Act do in general terms
@@ -665,6 +692,47 @@ mod tests {
         assert!(record.purposes.contains(&purpose::INTERPRETATION));
         // No non-skip purposes present — gate triggers
         assert!(record.duty_types.is_empty());
+    }
+
+    // ── is_duty_bearing_purpose tests ─────────────────────────────
+
+    #[test]
+    fn duty_bearing_process_rule() {
+        let purposes = vec!["Process+Rule+Constraint+Condition".to_string()];
+        assert!(is_duty_bearing_purpose(&purposes));
+    }
+
+    #[test]
+    fn duty_bearing_mixed_with_interpretation() {
+        let purposes = vec![
+            "Interpretation+Definition".to_string(),
+            "Process+Rule+Constraint+Condition".to_string(),
+        ];
+        assert!(is_duty_bearing_purpose(&purposes));
+    }
+
+    #[test]
+    fn not_duty_bearing_pure_interpretation() {
+        let purposes = vec!["Interpretation+Definition".to_string()];
+        assert!(!is_duty_bearing_purpose(&purposes));
+    }
+
+    #[test]
+    fn not_duty_bearing_amendment() {
+        let purposes = vec!["Amendment".to_string()];
+        assert!(!is_duty_bearing_purpose(&purposes));
+    }
+
+    #[test]
+    fn not_duty_bearing_empty() {
+        let purposes: Vec<String> = vec![];
+        assert!(!is_duty_bearing_purpose(&purposes));
+    }
+
+    #[test]
+    fn duty_bearing_offence() {
+        let purposes = vec!["Offence".to_string()];
+        assert!(is_duty_bearing_purpose(&purposes));
     }
 
     // ── Descriptive summary filter tests ────────────────────────────
