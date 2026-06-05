@@ -108,8 +108,42 @@ Key findings:
 - No section_id prefix issues found — `art.` citations flow through without problems
 - Pipeline handles EU structural hierarchy (EUTitle/EUChapter) without changes
 
-## Next Steps
+### APPLICATION_SCOPE classifier fix (purpose.rs)
 
-- [ ] Audit Fitness dictionaries for EU-specific terms
-- [ ] Monitor ongoing EU law ingestion for any new actor gaps
-- [ ] Consider whether REACH's 13% warrants further pattern tuning (object-centred prohibitions like "substances shall not be manufactured" lack a named actor)
+207 EU scope provisions were missed because the regex only matched UK structural references. Fixed:
+- Added "provisions" and "Directive" to self-ref branch
+- Handle plural provision references ("Paragraphs 1 to 5", "Articles 21, 22")
+- ~4x the fitness-eligible pool (66 → ~273 provisions)
+
+### Fitness dictionary expansion (fitness.rs)
+
+Added EU-specific terms across all dimensions:
+- **Plant**: substances, mixtures, polymers, biocidal products, waste
+- **Process**: placing on the market, manufacture, work involving hazardous agents, classification and labelling, chemical registration
+- **Place**: installation(s), undertaking(s)
+- **Person**: registrant, downstream user, applicant, distributor, authorised representative
+- **Sector**: cosmetics, food, pharmaceuticals, public/private sector
+
+### Fitness results after changes
+
+| Law | Person | Process | Place | Plant | Sector |
+|-----|--------|---------|-------|-------|--------|
+| REACH (eur/2006/1907) | 5 | 1 | 1 | 3 | 1 |
+| CLP (eur/2008/1272) | 3 | — | 2 | 3 | — |
+| Chemical Agents (eudr/1998/24) | 1 | 1 | 1 | 1 | — |
+| Waste Dir (eudr/2008/98) | — | — | 2 | 1 | — |
+| Seveso/Euratom (eudr/2013/59) | 1 | — | — | 1 | — |
+
+27 of 61 EU laws now have fitness data. 34 remain without — mostly older framework directives that delegate detail to transposing SIs.
+
+## Summary of all changes (3 commits)
+
+1. `1a730c8` — EU actor dictionaries (11 new actors) + `docs/ACTOR-DICTIONARY.md`
+2. `af610d4` — APPLICATION_SCOPE classifier fix + fitness dictionary expansion
+3. `3808cc4` — Provision-level taxa publish via zenoh (pre-EU, but enables the new data flow)
+
+## Remaining (low priority)
+
+- 34 EU laws without fitness — likely genuinely fitness-sparse framework directives
+- Object-centred prohibitions ("substances shall not be manufactured") lack a named actor — would need a new pattern tier
+- Monitor ongoing EU law ingestion for new actor gaps
