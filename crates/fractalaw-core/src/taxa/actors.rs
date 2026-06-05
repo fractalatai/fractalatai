@@ -1,7 +1,7 @@
-//! Actor definitions and extraction for UK ESH legal text.
+//! Actor definitions and extraction for ESH legal text (UK domestic + EU retained).
 //!
 //! Identifies WHO is mentioned in legislative text, split into two groups:
-//! - **Government actors**: Crown, authorities, agencies, ministers, devolved admins
+//! - **Government actors**: Crown, authorities, agencies, ministers, devolved admins, EU institutions
 //! - **Governed actors**: Businesses, individuals, specialists, supply-chain actors
 //!
 //! Ported from `Taxa.ActorDefinitions`, `Taxa.ActorLib`, and `Taxa.DutyActor`.
@@ -148,6 +148,18 @@ const GOVERNMENT_DEFS: &[(&str, &str)] = &[
         r"(?:[\s[:punct:]])(?:Oil and Gas Authority|North Sea Transition Authority|OGA|NSTA)(?:[\s[:punct:]])"
     ),
     actor!(
+        "EU: Agency: ECHA",
+        r"(?:[\s[:punct:]])(?:European Chemicals Agency|ECHA)(?:[\s[:punct:]])"
+    ),
+    actor!(
+        "EU: Agency: EFSA",
+        r"(?:[\s[:punct:]])(?:European Food Safety Authority|EFSA)(?:[\s[:punct:]])"
+    ),
+    actor!(
+        "EU: Agency: EEA",
+        r"(?:[\s[:punct:]])(?:European Environment Agency|EEA)(?:[\s[:punct:]])"
+    ),
+    actor!(
         "Gvt: Agency",
         r"(?:[\s[:punct:]])[Aa]gency(?:[\s[:punct:]])"
     ),
@@ -202,6 +214,10 @@ const GOVERNMENT_DEFS: &[(&str, &str)] = &[
     actor!(
         "EU: Commission",
         r"(?:[\s[:punct:]])[Cc]ommission(?:[\s[:punct:]])"
+    ),
+    actor!(
+        "EU: Member State",
+        r"(?:[\s[:punct:]])[Mm]ember [Ss]tates?(?:[\s[:punct:]])"
     ),
     actor!(
         "Gvt: Officer",
@@ -323,6 +339,10 @@ const GOVERNED_DEFS: &[(&str, &str)] = &[
         "Ind: Person",
         r"(?:[\s[:punct:]])(?:[Pp]ersons?|[Ii]ndividual)(?:[\s[:punct:]])"
     ),
+    actor!(
+        "SC: Downstream User",
+        r"(?:[\s[:punct:]])[Dd]ownstream [Uu]sers?(?:[\s[:punct:]])"
+    ),
     actor!("Ind: User", r"(?:[\s[:punct:]])[Uu]sers?(?:[\s[:punct:]])"),
     actor!(
         "Spc: Inspector",
@@ -371,6 +391,26 @@ const GOVERNED_DEFS: &[(&str, &str)] = &[
     actor!(
         "SC: Importer",
         r"(?:[\s[:punct:]])(?:[Ii]mporter|person who.*?imports*?)(?:[\s[:punct:]])"
+    ),
+    actor!(
+        "SC: Distributor",
+        r"(?:[\s[:punct:]])[Dd]istributors?(?:[\s[:punct:]])"
+    ),
+    actor!(
+        "SC: Registrant",
+        r"(?:[\s[:punct:]])[Rr]egistrants?(?:[\s[:punct:]])"
+    ),
+    actor!(
+        "SC: Applicant",
+        r"(?:[\s[:punct:]])[Aa]pplicants?(?:[\s[:punct:]])"
+    ),
+    actor!(
+        "SC: Authorised Representative",
+        r"(?:[\s[:punct:]])[Aa]uthoris?ed [Rr]epresentatives?(?:[\s[:punct:]])"
+    ),
+    actor!(
+        "SC: Notified Body",
+        r"(?:[\s[:punct:]])[Nn]otified [Bb]od(?:y|ies)(?:[\s[:punct:]])"
     ),
     actor!(
         "SC: Client",
@@ -849,6 +889,69 @@ mod tests {
             "dealer should be extracted for PUBLIC family, got: {:?}",
             actors.governed
         );
+    }
+
+    // ── EU actors ─────────────────────────────────────────────────
+
+    #[test]
+    fn extract_member_states() {
+        let actors = extract_actors(" Member States shall ensure compliance. ");
+        assert!(has_label(&actors.government, "EU: Member State"));
+    }
+
+    #[test]
+    fn extract_member_state_singular() {
+        let actors = extract_actors(" Each Member State shall designate an authority. ");
+        assert!(has_label(&actors.government, "EU: Member State"));
+    }
+
+    #[test]
+    fn extract_echa() {
+        let actors =
+            extract_actors(" The applicant shall submit to the European Chemicals Agency. ");
+        assert!(has_label(&actors.government, "EU: Agency: ECHA"));
+    }
+
+    #[test]
+    fn extract_echa_abbreviation() {
+        let actors = extract_actors(" ECHA shall publish the decision. ");
+        assert!(has_label(&actors.government, "EU: Agency: ECHA"));
+    }
+
+    #[test]
+    fn extract_registrant() {
+        let actors = extract_actors(" The registrant shall submit a registration dossier. ");
+        assert!(has_label(&actors.governed, "SC: Registrant"));
+    }
+
+    #[test]
+    fn extract_downstream_user() {
+        let actors = extract_actors(" A downstream user shall identify applicable conditions. ");
+        assert!(has_label(&actors.governed, "SC: Downstream User"));
+    }
+
+    #[test]
+    fn extract_applicant() {
+        let actors = extract_actors(" The applicant shall provide sufficient information. ");
+        assert!(has_label(&actors.governed, "SC: Applicant"));
+    }
+
+    #[test]
+    fn extract_authorised_representative() {
+        let actors = extract_actors(" An authorised representative shall fulfil the obligations. ");
+        assert!(has_label(&actors.governed, "SC: Authorised Representative"));
+    }
+
+    #[test]
+    fn extract_notified_body() {
+        let actors = extract_actors(" The notified body shall assess conformity. ");
+        assert!(has_label(&actors.governed, "SC: Notified Body"));
+    }
+
+    #[test]
+    fn extract_distributor() {
+        let actors = extract_actors(" A distributor shall verify the labelling. ");
+        assert!(has_label(&actors.governed, "SC: Distributor"));
     }
 
     #[test]
