@@ -91,10 +91,25 @@ Ordering matters: more specific patterns before generic ones (ECHA before generi
 
 All 424 core tests pass, 0 regressions.
 
+### Enrichment results after actor expansion
+
+| Law | Type | LAT | DRRP | DRRP % | Duties | Resps | Powers | Rights |
+|-----|------|-----|------|--------|--------|-------|--------|--------|
+| UK_eur_2006_1907 (REACH) | eur | 1,186 | 159 | 13.4% | 105 | 32 | 8 | 9 |
+| UK_eur_2008_1272 (CLP) | eur | — | — | 18.8% | — | — | — | — |
+| 89/391 Framework Directive | eudr | 122 | 47 | 38.5% | 36 | 8 | 1 | 2 |
+| 98/24 Chemical Agents | eudr | 94 | 46 | 48.9% | 32 | 13 | 1 | — |
+| 166/2006 E-PRTR | eur | 85 | 29 | 34.1% | 14 | 11 | 4 | — |
+
+Key findings:
+- Focused directives hit 34–49% DRRP, on par with UK domestic OH&S laws
+- Large regulations (REACH) are lower (~13%) due to bulk procedural/definitional content
+- New EU actors (SC: Downstream User, SC: Registrant, EU: Agency: ECHA) matching correctly
+- No section_id prefix issues found — `art.` citations flow through without problems
+- Pipeline handles EU structural hierarchy (EUTitle/EUChapter) without changes
+
 ## Next Steps
 
-- [ ] Re-enrich REACH and compare DRRP rate (target: >40%)
-- [ ] Audit section_id prefix assumptions (no issues found in taxa module so far)
 - [ ] Audit Fitness dictionaries for EU-specific terms
-- [ ] Test enrichment on UK_eudr_2010_75 (directive, should be not_making)
-- [ ] Assess whether further EU-specific duty sub-type patterns are needed
+- [ ] Monitor ongoing EU law ingestion for any new actor gaps
+- [ ] Consider whether REACH's 13% warrants further pattern tuning (object-centred prohibitions like "substances shall not be manufactured" lack a named actor)

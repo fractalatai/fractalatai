@@ -200,6 +200,14 @@ static PERSON_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
         ),
         ("(?:bind|apply\\s+to)\\s+the\\s+Crown", "Crown application"),
         ("crew", "crew"),
+        ("registrant(?:s)?", "registrant"),
+        ("downstream\\s+user(?:s)?", "downstream user"),
+        ("applicant(?:s)?", "applicant"),
+        ("distributor(?:s)?", "distributor"),
+        (
+            "authoris?ed\\s+representative(?:s)?",
+            "authorised representative",
+        ),
     ])
 });
 
@@ -248,6 +256,20 @@ static PROCESS_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
             "carriage\\s+by\\s+(?:road|rail|sea|air|vehicles?)",
             "carriage of goods",
         ),
+        ("placing\\s+on\\s+the\\s+market", "placing on the market"),
+        ("manufacture\\s+(?:of|or\\s+use)", "manufacture"),
+        (
+            "(?:work|activit\\w+)\\s+involving\\s+(?:chemical|biological|physical|carcinogen)",
+            "work involving hazardous agents",
+        ),
+        (
+            "classification\\s+(?:and\\s+)?labelling",
+            "classification and labelling",
+        ),
+        (
+            "registration\\s+(?:of\\s+)?(?:substance|chemical)",
+            "chemical registration",
+        ),
     ])
 });
 
@@ -274,6 +296,8 @@ static PLACE_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
         ("ship(?:s)?", "ship"),
         ("aircraft", "aircraft"),
         ("establishment(?:s)?", "establishment"),
+        ("installation(?:s)?", "installation"),
+        ("undertaking(?:s)?", "undertaking"),
     ])
 });
 
@@ -297,6 +321,14 @@ static PLANT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
         ("explosive(?:s)?", "explosives"),
         ("petroleum", "petroleum"),
         ("chemical(?:s)?", "chemicals"),
+        ("substance(?:s)?", "substances"),
+        ("mixture(?:s)?", "mixtures"),
+        ("polymer(?:s)?", "polymers"),
+        (
+            "(?:biocidal|plant\\s+protection)\\s+product(?:s)?",
+            "biocidal products",
+        ),
+        ("waste", "waste"),
     ])
 });
 
@@ -351,6 +383,13 @@ static SECTOR_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
         ("agricultur", "agriculture"),
         ("waste\\s+(?:management|disposal)", "waste management"),
         ("water\\s+(?:industry|undertaker|supply)", "water industry"),
+        (
+            "cosmetic(?:s)?\\s+(?:product|industry|sector)?",
+            "cosmetics",
+        ),
+        ("food\\s+(?:industry|sector|safety|production)", "food"),
+        ("medicinal\\s+product(?:s)?", "pharmaceuticals"),
+        ("(?:public|private)\\s+sector", "public/private sector"),
     ])
 });
 

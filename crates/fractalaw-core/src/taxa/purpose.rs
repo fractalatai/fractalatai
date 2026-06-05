@@ -89,7 +89,8 @@ const RAW_PATTERNS: &[(&str, &str)] = &[
         // - Self-ref branch: require "apply to/in/where/until" after the verb,
         //   rejecting "applies for the purpose of interpreting/determining"
         // - "provisions of" branch: require "apply to/in" (not bare "apply")
-        r"(?i)(?:^Application\b|(?:^|[.;,]\s+|\d\s+)(?:these|this) (?:Regulations?|Act|Order|Part|Rules?|section).{0,60}(?:shall |do(?:es)? )?(?:not )?appl(?:y|ies) (?:to|in |where|until|unless)|(?:regulation|section|paragraph|article) \d.{0,40}shall not apply|shall apply to .{0,60} as they apply to|be under a like duty|(?:any )?(?:requirement|prohibition|duty).{0,150}(?:shall (?:also )?extend|shall extend only)|shall extend only to|does not apply (?:to|where|until|in|unless)|shall have (?:no )?effect|ceases? to have effect|provisions of .{0,40}(?:shall )?apply (?:to|in)|shall bind the Crown)",
+        // 11. EU: "Paragraphs 1 to 5 shall not apply", "Articles 21, 22 shall not apply"
+        r"(?i)(?:^Application\b|(?:^|[.;,]\s+|\d\s+)(?:these|this) (?:Regulations?|Act|Order|Part|Rules?|section|provisions?|Directive).{0,60}(?:shall |do(?:es)? )?(?:not )?appl(?:y|ies) (?:to|in |where|until|unless)|(?:regulations?|sections?|paragraphs?|articles?) [\d(].{0,60}shall not apply|shall apply to .{0,60} as they apply to|be under a like duty|(?:any )?(?:requirement|prohibition|duty).{0,150}(?:shall (?:also )?extend|shall extend only)|shall extend only to|does not apply (?:to|where|until|in|unless)|shall have (?:no )?effect|ceases? to have effect|provisions of .{0,40}(?:shall )?apply (?:to|in)|shall bind the Crown)",
     ),
     (
         EXTENT,
@@ -564,6 +565,68 @@ mod tests {
         assert!(
             result.contains(&APPLICATION_SCOPE),
             "scope after paragraph number should match; got: {:?}",
+            result
+        );
+    }
+
+    // ── EU-specific APPLICATION_SCOPE tests ─────────────────────────
+
+    #[test]
+    fn classify_eu_these_provisions_shall_apply() {
+        let text = "These provisions shall apply to the manufacture, placing on the \
+                    market or use of such substances on their own, in mixtures or in articles.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "'These provisions shall apply to' should match; got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn classify_eu_paragraphs_shall_not_apply() {
+        let text = "Paragraphs 1 to 5 shall not apply to substances that have \
+                    already been registered for that use.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "'Paragraphs 1 to 5 shall not apply' should match; got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn classify_eu_articles_shall_not_apply() {
+        let text = "Articles 21, 22 and 25 to 27 shall not apply to uses of \
+                    substances regarded as registered according to Article 15.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "'Articles 21, 22 shall not apply' should match; got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn classify_eu_this_directive_shall_apply() {
+        let text = "This Directive shall apply to all sectors of activity, \
+                    both public and private.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "'This Directive shall apply to' should match; got: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn classify_eu_paragraph_singular_shall_not_apply() {
+        let text = "Paragraph 2 shall not apply to the use of substances in \
+                    cosmetic products.";
+        let result = classify(text);
+        assert!(
+            result.contains(&APPLICATION_SCOPE),
+            "'Paragraph 2 shall not apply' should match; got: {:?}",
             result
         );
     }
