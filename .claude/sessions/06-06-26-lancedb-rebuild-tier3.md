@@ -68,14 +68,39 @@ After Tier 1, for inherited provisions where `governed_actors.len() > 1`.
 - Tier 1 QA precision improves from 76% to >85%
 - Recipient data available for downstream filtering ("show me protections for workers")
 
+## Shipped (2026-06-06)
+
+### LanceDB Table Rebuild (commit `487ef6c`)
+- Backed up DuckDB + LanceDB to NAS (`/mnt/nas/.../fractalaw-backups/20260606/`)
+- Exported 162,104 rows to Parquet (174.6 MB, preserving embeddings)
+- Rebuilt table with native Arrow `List<Struct(label, role, recipient_type)>` for actors
+- Fragment bloat reduced: **8.6 GB → 401 MB** (25x write amplification eliminated)
+- All 162,104 rows verified, embeddings intact, 536 existing actor entries converted
+- Schema.rs: actors `Utf8` → native Arrow `List<Struct>`
+- main.rs: batch builder `StringBuilder` → `ListBuilder<StructBuilder>`, removed serde derive
+- lance.rs: removed actors from `ensure_gap_c_columns` (native column, not add_columns)
+- Added `scripts/rebuild_lance_actors.py` for future table rebuilds
+
+### Full corpus re-enrichment
+- Re-enriched all 80 named families with `--gap-c --force` in per-family batches
+- 6,000 empty-family laws confirmed as non-making (no LanceDB text to enrich)
+- 2 mid-run compactions needed (LanceDB bloat from merge_insert fragments)
+- Final: 161,902 rows, **67,303 provisions with native Arrow actors struct**
+- LanceDB compacted to 374 MB (started at 8.6 GB pre-rebuild)
+
+### Also this session
+- Created `scripts/compact_lance.py` — rebuild-based compaction (pylance not installed)
+- Discovered family naming drift: DuckDB has emoji-prefixed (150) and plain (13,322) family names
+- Saved memory: family naming drift, compact script reference
+
 ## Exit criteria
 
-- LanceDB table rebuilt with native actors struct
-- Embeddings verified intact
-- Full corpus re-enriched with `--gap-c --force`
-- Tier 3 firing on multi-actor provisions
-- QA precision >85%
-- Published to sertantai
+- [x] LanceDB table rebuilt with native actors struct
+- [x] Embeddings verified intact
+- [x] Full corpus re-enriched with `--gap-c --force`
+- [ ] Tier 3 firing on multi-actor provisions → **next session**
+- [ ] QA precision >85% → **next session**
+- [ ] Published to sertantai → **next session**
 
 ## References
 
