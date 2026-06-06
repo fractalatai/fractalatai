@@ -1,0 +1,99 @@
+# Skill: NAS Backup
+
+## When This Applies
+
+Before any destructive operation on LanceDB or DuckDB — table rebuilds, schema migrations, bulk enrichment with `--force`, or any operation that calls `drop_table()`. Also for periodic snapshots after significant enrichment work.
+
+## NAS Details
+
+- **Mount**: `/mnt/nas/sertantai-data` (UGREEN DXP2800, SMB3 automount via fstab)
+- **Backup dir**: `/mnt/nas/sertantai-data/data/fractalaw-backups/`
+- **Space**: 5.5 TB total, typically <1% used
+
+## What to Back Up
+
+| Source | Size (typical) | Notes |
+|--------|---------------|-------|
+| `data/fractalaw.duckdb` | ~175 MB | DuckDB — LRT metadata, taxa, publish hashes |
+| `data/lancedb/` | 370 MB–1.4 GB (clean) | LanceDB — provisions, embeddings, actors. Copy entire directory. |
+
+**Do NOT back up `target/`** — it's 29+ GB of build artifacts.
+
+## Procedure
+
+### 1. Pre-flight checks
+
+```bash
+# Verify NAS is mounted
+ls /mnt/nas/sertantai-data/data/
+
+# Check local data sizes
+du -sh data/fractalaw.duckdb data/lancedb/
+
+# Check NAS free space
+df -h /mnt/nas/sertantai-data/
+```
+
+### 2. Create dated backup
+
+```bash
+BACKUP_DIR=/mnt/nas/sertantai-data/data/fractalaw-backups/$(date +%Y%m%d)
+mkdir -p "$BACKUP_DIR"
+
+# DuckDB (fast, ~175 MB)
+cp data/fractalaw.duckdb "$BACKUP_DIR/"
+
+# LanceDB (copy entire directory — binary fragments, not individual files)
+cp -r data/lancedb/ "$BACKUP_DIR/lancedb/"
+```
+
+### 3. Verify
+
+```bash
+# Check sizes match
+du -sh "$BACKUP_DIR"/*
+
+# Optionally verify row count from backup
+python3 -c "
+import lancedb
+db = lancedb.connect('$BACKUP_DIR/lancedb')
+table = db.open_table('legislation_text')
+print(f'Backup rows: {table.count_rows():,}')
+"
+```
+
+## Compaction Before Backup
+
+If LanceDB has grown large due to merge_insert fragment bloat, compact first to reduce backup size:
+
+```bash
+/usr/bin/python3 scripts/compact_lance.py
+```
+
+This rebuilds the table from an in-memory Arrow export (pylance not installed, so native compaction unavailable). Reduces LanceDB from potentially 8+ GB of fragments down to ~370 MB.
+
+## Restore
+
+```bash
+# From NAS backup
+BACKUP_DIR=/mnt/nas/sertantai-data/data/fractalaw-backups/YYYYMMDD
+cp "$BACKUP_DIR/fractalaw.duckdb" data/
+cp -r "$BACKUP_DIR/lancedb/" data/lancedb/
+
+# From Parquet backup (if LanceDB is corrupted)
+/usr/bin/python3 -c "
+import lancedb, pyarrow.parquet as pq
+arrow = pq.read_table('backups/legislation_text_mid_enrich.parquet')
+db = lancedb.connect('data/lancedb')
+db.drop_table('legislation_text')
+db.create_table('legislation_text', data=arrow)
+print(f'Restored: {arrow.num_rows:,} rows')
+"
+```
+
+## Notes
+
+- LanceDB is binary fragments — always copy the entire `data/lancedb/` directory, never individual files
+- Embeddings take ~9 hours to recompute on CPU (161K rows × 384-dim) — the backup is the safety net
+- Multiple dated backups can coexist on the NAS (5.5 TB available)
+- Local Parquet backups in `backups/` are a secondary safety net (~175 MB each)
