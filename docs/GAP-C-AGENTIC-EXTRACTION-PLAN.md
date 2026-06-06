@@ -437,6 +437,63 @@ Narrow phasing per ChatGPT review — prove each tier independently before combi
 | `cross_ref_count` | Int32 | Provisions resolved by Tier 2 (cross-reference) |
 | `agentic_count` | Int32 | Provisions resolved by Tier 3 (LLM reasoning) |
 
+## Recipient Model (added 2026-06-06 after Phase 1C POC)
+
+### Discovery
+
+The Tier 3 POC revealed that the LLM naturally classifies actors into four roles: HOLDER, RECIPIENT, BENEFICIARY, MENTIONED. This data is being produced but discarded. Capturing it extends the DRRP model from "who holds the obligation" to "who holds it AND who is it aimed at."
+
+This closes a gap in the compliance use case: a worker asking "what protections apply to me?" currently can't find the answer because they're not tagged as a duty holder — they're the invisible beneficiary of the employer's duty.
+
+### Two distinct recipient populations
+
+The recipient of an obligation depends on whether the holder is a governed or government actor:
+
+| Holder type | Recipient type | Example | Recipient role |
+|-------------|---------------|---------|---------------|
+| Governed (Org: Employer) | Protected person | "Employer shall provide training to **employees**" | `protected_person` |
+| Governed (SC: Manufacturer) | Informed party | "Manufacturer shall inform **downstream users**" | `informed_party` |
+| Government (EU: Member State) | Regulated actor | "Member States shall ensure **employers** comply" | `regulated_actor` |
+| Government (Gvt: Agency) | Regulated actor | "HSE shall enforce against **operators**" | `regulated_actor` |
+| Any | General public | "...to protect the health of **the public**" | `beneficiary` |
+
+This is a real signal — the `recipient_type` distinguishes how the law works:
+- **Duties** protect people → recipients are `protected_person`
+- **Responsibilities** regulate actors → recipients are `regulated_actor`
+- **Rights** entitle people → recipients may be the same as the holder
+- **Powers** enable enforcement → recipients are `regulated_actor`
+
+### Definitions (must be precise for downstream consumers)
+
+| Role | Definition | Example |
+|------|-----------|---------|
+| `holder` | The actor who MUST act — bears the legal obligation | Employer in "employer shall ensure..." |
+| `recipient` | The actor to whom an action is directed or who directly receives its effect | Employee in "...provide information to employees" |
+| `beneficiary` | The actor who benefits from the obligation but has no active role in it | Public in "...to protect the health of the public" |
+| `mentioned` | An actor referenced in the text but with no holder/recipient/beneficiary role | A body mentioned in a cross-reference |
+
+**Recipient vs beneficiary**: the recipient is the direct object of the action ("provide training TO employees"); the beneficiary is the indirect purpose ("ensure safety FOR the public"). An actor can be both, but the distinction matters for filtering — a compliance professional wants to find provisions aimed at their workers (recipients), not every provision that vaguely benefits someone.
+
+### Schema
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| `recipient` | List<Utf8> | Actor labels who receive/benefit from the obligation |
+| `recipient_type` | Utf8 | "protected_person", "regulated_actor", "informed_party", "beneficiary" |
+
+### Scope
+
+Tier 3 provisions **self-select** for recipient extraction. They're the provisions where Tier 1 failed *because* multiple actors were present with different roles. The LLM resolves the holder AND produces the recipient as a byproduct — the data is already in the Tier 3 response.
+
+For the 63,260 regex-extracted provisions, recipient extraction would require a separate LLM pass. This is a different cost/scope decision — defer until recipient data from Tier 3 provisions proves its value downstream.
+
+### Relationship to EU dual extraction
+
+The `obligation_layer` field (primary/delegated) and the `recipient_type` field are complementary:
+- "Member States shall ensure employers provide training to workers"
+  - Record 1: holder=Member State, obligation_layer=primary, recipient=Employer, recipient_type=regulated_actor
+  - Record 2: holder=Employer, obligation_layer=delegated, recipient=Worker, recipient_type=protected_person
+
 ## Review Feedback (Gemini, 2026-06-05)
 
 External review identified five substantive risks. Incorporated below with resolutions.
