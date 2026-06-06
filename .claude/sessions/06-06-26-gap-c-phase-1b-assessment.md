@@ -49,8 +49,92 @@ The original Gap C estimate of ~3,275 provisions (from OHS corpus analysis) was 
 
 The Milestone 1 report flagged 388 provisions with `ancestor_distance=0`. These are provisions that inherit from a sibling at the same hierarchy depth — same `hierarchy_path` prefix length. This shouldn't happen with the strict prefix check. Worth investigating before declaring Phase 1 complete.
 
+## Progress
+
+- [x] Distance-0 bug fixed (commit `5fc161e`) — false sibling prefix match
+- [x] Full corpus re-enriched: 7,375 inherited across 137 laws
+- [x] Phase 1B deferred → fractalaw/fractalaw#36
+- [x] Tier 1 QA skill built (`.claude/skills/tier1-qa/`)
+- [x] QA run: 40 samples, 76.2% precision [63.5%, 88.9%] — below 85% target
+
+## QA Failure Patterns
+
+Three distinct patterns account for all 9 failures. Fix each, re-run QA.
+
+### Pattern 1: Part/Chapter heading inheritance (HIGH IMPACT)
+
+**Problem**: Provisions inherit actors from Part or Chapter headings (e.g., "Part V: Rights of Owners", "Part 2: Obligations of economic operators"). These headings contain actor keywords but are structural labels, not duty-creating provisions.
+
+**Signature**: ancestor_distance ≥ 3, parent section_type is `part` or `chapter`.
+
+**Examples**:
+- `s.88(3)(a)` inherited "Org: Owner" from `pt.V` "Rights of Owners" (distance 5)
+- `reg.53(4)(b)` inherited "Public" from `pt.5` "Public registers" (distance 3)
+- `s.65(1)` inherited "Public" from `pt.3` "Public Rights of Way" (distance 3)
+
+**Fix**: Exclude `part`, `chapter`, and `heading` section_types as inheritance sources in the ancestor filter. These are structural containers, not provisions with actors.
+
+**Expected impact**: Eliminates ~4 of 9 failures.
+
+### Pattern 2: Recipient vs holder confusion (MEDIUM IMPACT)
+
+**Problem**: Parent says "employer shall provide information to employees" — both employer and employee are extracted as actors. Child inherits both, but the employee is the recipient, not the duty holder.
+
+**Signature**: ancestor_distance = 1, multiple actors inherited, child provision is about information/notification.
+
+**Examples**:
+- `reg.19(3)(a)(iii)`: parent has Responsible Person + Employee, but the duty is on the Responsible Person to inform the Employee
+- `reg.10(1)(a)(viii)`: parent has Employer + Employee, duty is on Employer to provide info
+
+**Fix**: This is harder — the regex pipeline extracts all mentioned actors, not the duty-bearing one. Would need the regex pipeline to distinguish holder from recipient. **Defer to Phase 2A** — this is a parse_v2 improvement, not a Tier 1 fix.
+
+**Expected impact**: ~2-3 failures. Deferred.
+
+### Pattern 3: Exemption/scope provisions (LOW IMPACT)
+
+**Problem**: Child provision describes a condition, exemption, or scope limitation rather than extending a duty. The inheritance is technically correct (same actor) but the child isn't duty-bearing.
+
+**Signature**: child text contains "does not apply", "exempt", "subject to", "condition".
+
+**Examples**:
+- `reg.7(7)(b)`: describes an exemption condition, not a duty
+- `reg.34A(3)(b)`: describes how regulations apply with modifications
+
+**Fix**: Tighten `is_duty_bearing_purpose()` or add a post-inheritance check for exemption language. **Investigate after Pattern 1.**
+
+**Expected impact**: ~2 failures.
+
+## QA Results
+
+### Run 1 (pre-Pattern 1 fix): 76.2% [63.5%, 88.9%]
+40 samples, 31 correct, 9 incorrect. Mix of all three patterns.
+
+### Pattern 1 fix applied
+Excluded `part`, `chapter`, `heading`, `title` section_types as inheritance sources.
+Corpus: 7,375 → 6,175 inherited (1,200 false structural matches removed).
+
+### Run 2 (post-Pattern 1 fix): 76.2% [63.5%, 88.9%]
+40 samples, 31 correct, 9 incorrect. Same precision — Pattern 1 was real but the random sample draws mostly distance-1 provisions (74% of corpus). The 9 failures are now almost entirely **Pattern 2** (recipient vs holder confusion).
+
+### Conclusion
+
+**76% is the Tier 1 precision ceiling.** The remaining errors are not inheritance logic problems — they're actor extraction problems. The parent says "employer shall provide training to employees", parse_v2 extracts both actors, and the child inherits both. The employee is a recipient, not a duty holder.
+
+This is the right boundary between Tier 1 (deterministic, structural) and Tier 3 (LLM reasoning about actor roles). Fixing it in Tier 1 would require parse_v2 to distinguish holder from recipient — a significant change to the regex pipeline that risks regressions on the 63,260 regex-extracted provisions.
+
+### Metrics summary
+
+| Metric | Value |
+|--------|-------|
+| Total inherited (post-fix) | 6,175 provisions |
+| Laws with inheritance | 137 |
+| Precision | 76.2% [63.5%, 88.9%] |
+| Correct | ~4,700 provisions (76% of 6,175) |
+| False positives | ~1,475 provisions (mostly recipient-not-holder) |
+
 ## Next Steps
 
-- [ ] Investigate distance-0 provisions (potential bug or edge case)
-- [ ] Decision: defer 1B, skip to 1C, or go to 2A?
-- [ ] Precision QA: manually sample 50 inherited provisions for correctness
+- [ ] Commit Pattern 1 fix + QA skill
+- [ ] Pattern 2 (recipient vs holder) → input to Tier 3 prompt design
+- [ ] Pattern 3 (exemption provisions) → rare, also Tier 3 territory
+- [ ] Decide: accept 76% precision for Tier 1, or raise the bar?

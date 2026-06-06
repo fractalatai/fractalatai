@@ -3113,6 +3113,7 @@ async fn enrich_single_law(
         fitness_property: Vec<String>,
         fitness_sector: Vec<String>,
         // Gap C provenance
+        section_type: String,
         hierarchy_path: String,
         depth: i32,
         extraction_method: String,
@@ -3317,6 +3318,7 @@ async fn enrich_single_law(
                     fitness_plant: fp_plant,
                     fitness_property: fp_property,
                     fitness_sector: fp_sector,
+                    section_type: section_type.clone(),
                     hierarchy_path: hierarchy_path.clone(),
                     depth,
                     extraction_method: "regex".to_string(),
@@ -3454,7 +3456,11 @@ async fn enrich_single_law(
             // prefix of the target's path. The prefix must end at a hierarchy
             // boundary (next char in target is '/'), otherwise "provision.3"
             // falsely matches "provision.3A" (siblings, not parent-child).
+            // Exclude structural containers (part, chapter, heading, title) —
+            // these contain actor keywords in their titles but don't create
+            // duties (e.g., "Part V: Rights of Owners" is not a duty source).
             // Sort by depth descending (deepest first).
+            const STRUCTURAL_TYPES: &[&str] = &["part", "chapter", "heading", "title"];
             let mut ancestors: Vec<usize> = (0..provision_taxa.len())
                 .filter(|&j| {
                     let ancestor_path = &provision_taxa[j].hierarchy_path;
@@ -3464,6 +3470,7 @@ async fn enrich_single_law(
                         && target_path.starts_with(ancestor_path.as_str())
                         && target_path.as_bytes()[ancestor_path.len()] == b'/'
                         && !provision_taxa[j].governed_actors.is_empty()
+                        && !STRUCTURAL_TYPES.contains(&provision_taxa[j].section_type.as_str())
                 })
                 .collect();
             ancestors.sort_by(|&a, &b| provision_taxa[b].depth.cmp(&provision_taxa[a].depth));
