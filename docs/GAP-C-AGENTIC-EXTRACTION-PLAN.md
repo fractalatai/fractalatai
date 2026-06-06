@@ -476,10 +476,13 @@ This is a real signal — the `recipient_type` distinguishes how the law works:
 
 ### Schema
 
+Superseded by the confirmed `actors` struct (see Appendix A decision). The flat `recipient` / `recipient_type` columns are replaced by the unified struct:
+
 | Column | Type | Purpose |
 |--------|------|---------|
-| `recipient` | List<Utf8> | Actor labels who receive/benefit from the obligation |
-| `recipient_type` | Utf8 | "protected_person", "regulated_actor", "informed_party", "beneficiary" |
+| `actors` | List<Struct(label: Utf8, role: Utf8, recipient_type: Utf8)> | All actors with their roles and classifications |
+
+Replaces (Phase 2A migration): `governed_actors: List<Utf8>`, `government_actors: List<Utf8>`
 
 ### Scope
 
@@ -695,4 +698,24 @@ Sent the full Recipient Model section (from "Discovery" through "EU dual extract
 
 The strongest recommendation is to **transition to a unified `actors` struct column** rather than proliferating separate columns. This is architecturally sound but represents a significant schema change — the current `governed_actors`, `government_actors` flat lists would need migration.
 
-**Decision needed**: adopt the unified struct now (bigger change, better long-term) or keep flat columns for Phase 2A and migrate later (faster to ship, technical debt).
+**Decision (2026-06-06)**: Adopt the unified struct. Flat columns lose the edges between actors and their roles — the relationship data breaks as soon as a provision has multiple actors in different roles. The struct is also naturally extensible as a per-provision RACI model (holder=Responsible, recipient=Informed/Consulted, beneficiary=Interested party). Migration of existing `governed_actors`/`government_actors` columns is Phase 2A scope.
+
+### Confirmed actors struct
+
+```json
+{
+  "actors": [
+    {"label": "Org: Employer", "role": "holder"},
+    {"label": "Ind: Employee", "role": "recipient", "recipient_type": "protected_person"},
+    {"label": "Public", "role": "beneficiary"}
+  ]
+}
+```
+
+Arrow type: `List<Struct(label: Utf8, role: Utf8, recipient_type: Utf8)>`
+
+Roles: `holder`, `recipient`, `beneficiary`, `mentioned`
+
+Recipient types (only when role is `recipient`): `protected_person`, `regulated_actor`, `informed_party`
+
+Note: `beneficiary` is a role only, not a recipient_type — resolves the naming conflict Gemini flagged. `recipient_type` is null when role is `holder`, `beneficiary`, or `mentioned`.
