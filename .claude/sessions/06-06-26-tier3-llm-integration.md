@@ -48,18 +48,55 @@ After Tier 1 pass, for provisions where:
 - Target: precision >85% (up from 76% at Tier 1)
 - Tier 3 should correct Pattern 2 failures (recipient-as-holder)
 
-## Expected outcome
+## Shipped (2026-06-06)
 
-- Multi-actor inherited provisions get correct holder/recipient classification
-- Recipient data available for downstream filtering ("show me protections for workers")
-- `extraction_method = "agentic"` distinguishes LLM-resolved from deterministic
+### Tier 3 LLM integration (commit `acda60a`)
+- Gemini 2.5 Flash wired into `enrich_single_law()` after Tier 1 pass
+- Fires on inherited provisions with `governed_actors.len() > 1`
+- REST API via reqwest, `thinkingBudget: 256` + `maxOutputTokens: 2048`
+- Prompt constrains actor labels to dictionary values
+- Parses JSON response → populates native Arrow actors struct with roles
+- Updates flat columns (governed_actors = holders only) for backward compat
+- Sets `extraction_method = "agentic"`
+- HSWA test: **8/8 multi-actor provisions classified**
 
-## Files to modify
+### Key debugging finding
+- Gemini 2.5 Flash thinking tokens consume the `maxOutputTokens` budget
+- With `maxOutputTokens: 512`, thinking used ~490 tokens leaving ~20 for output → `MAX_TOKENS` truncation
+- Fix: `thinkingBudget: 256` caps thinking, `maxOutputTokens: 2048` gives headroom
+- Python SDK (`google.genai`) handles this transparently; REST API needs explicit config
 
-| File | Change |
-|------|--------|
-| `crates/fractalaw-cli/src/main.rs` | Gemini API call after Tier 1, response parser, actors struct update |
-| `crates/fractalaw-cli/Cargo.toml` | Already has reqwest, serde, serde_json |
+### Also this session (LanceDB rebuild)
+- LanceDB rebuilt with native Arrow `List<Struct>` actors column (commit `487ef6c`)
+- Fragment bloat reduced: 8.6 GB → 374 MB
+- Full corpus re-enriched: 67,303 provisions with native actors (commit `6e5c5a3`)
+- NAS backup skill created (`.claude/skills/nas-backup/`)
+- Bulk enrichment skill created (`.claude/skills/bulk-enrichment/`)
+- Compact script: `scripts/compact_lance.py`
+
+## Known issues for next session
+
+### Label fidelity
+- LLM sometimes invents labels not in the dictionary (e.g., `Responsible Person` without the `Ind:` prefix in one case)
+- Prompt says "use EXACT labels" but LLM may still deviate
+- Need: validate returned labels against actor dictionary, fall back to Tier 1 if unrecognised
+
+### Inference quality
+- HSWA s.19/s.21: Inspector/Person role assignments need review — HSWA has a complex enforcement chain (HSC → HSE → Inspector via warrant)
+- HSC (Health and Safety Commission) not in actor dictionary — merged into HSE in 2008 but still referenced in HSWA
+- Need: QA run on broader corpus to measure precision improvement
+
+### Prompt refinement
+- Consider injecting the full valid actor label list into the prompt so LLM can only pick from known labels
+- Consider adding `recipient_type` classification (protected_person / regulated_actor / informed_party) — currently hardcoded to `protected_person`
+
+## What's next
+
+1. Label validation — reject or map non-dictionary labels
+2. QA re-run (`run_qa.py --sample-size 40`) to measure precision improvement from Tier 3
+3. Broader corpus test — enrich customer applicable laws with Tier 3
+4. Prompt refinement based on QA failure patterns
+5. Publish updated provision taxa to sertantai
 
 ## References
 
