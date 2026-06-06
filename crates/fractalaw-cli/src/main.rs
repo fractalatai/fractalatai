@@ -3554,6 +3554,230 @@ async fn enrich_single_law(
                 "  Gap C Tier 1: {inherited_count} provisions inherited actors from parent clauses"
             );
         }
+
+        // ── Gap C Tier 3: LLM holder/recipient classification ──
+        //
+        // For inherited provisions with multiple actors, call Gemini 2.5 Flash
+        // to distinguish holder from recipient. Only fires if GEMINI_API_KEY is set.
+        if let Ok(api_key) = std::env::var("GEMINI_API_KEY") {
+            let tier3_candidates: Vec<usize> = (0..provision_taxa.len())
+                .filter(|&i| {
+                    let p = &provision_taxa[i];
+                    p.extraction_method == "inherited" && p.governed_actors.len() > 1
+                })
+                .collect();
+
+            if !tier3_candidates.is_empty() {
+                // Build section_id → text lookup from the original batches.
+                let mut text_map: std::collections::HashMap<String, String> =
+                    std::collections::HashMap::new();
+                for batch in &batches {
+                    let sid_col = batch.column_by_name("section_id");
+                    let text_col = batch.column_by_name("text");
+                    if let (Some(sid_c), Some(txt_c)) = (sid_col, text_col) {
+                        for row in 0..batch.num_rows() {
+                            if let (Some(sid), Some(txt)) = (
+                                get_string_value(sid_c.as_ref(), row),
+                                get_string_value(txt_c.as_ref(), row),
+                            ) {
+                                text_map.insert(sid, txt);
+                            }
+                        }
+                    }
+                }
+
+                let client = reqwest::Client::builder()
+                    .timeout(std::time::Duration::from_secs(30))
+                    .build()
+                    .context("building HTTP client for Tier 3")?;
+
+                let mut tier3_count = 0u32;
+                for &idx in &tier3_candidates {
+                    let p = &provision_taxa[idx];
+                    let target_sid = &p.section_id;
+                    let parent_sid = p.holder_inferred_from.first().cloned().unwrap_or_default();
+
+                    // Truncate at char boundary to avoid panics on multi-byte text
+                    fn truncate_str(s: &str, max: usize) -> &str {
+                        if s.len() <= max {
+                            s
+                        } else {
+                            let mut end = max;
+                            while end > 0 && !s.is_char_boundary(end) {
+                                end -= 1;
+                            }
+                            &s[..end]
+                        }
+                    }
+                    let target_text = text_map
+                        .get(target_sid)
+                        .map(|t| truncate_str(t, 500))
+                        .unwrap_or("");
+                    let parent_text = text_map
+                        .get(&parent_sid)
+                        .map(|t| truncate_str(t, 500))
+                        .unwrap_or("");
+
+                    if target_text.is_empty() || parent_text.is_empty() {
+                        continue;
+                    }
+
+                    let actor_list: String = p
+                        .actors
+                        .iter()
+                        .map(|a| format!("- {}", a.label))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+
+                    let prompt = format!(
+                        r#"You are a legal analyst identifying duty holders in UK and EU legislation.
+
+A provision mentions multiple actors. Your task is to identify which actor
+HOLDS the duty (the one who must act) versus which actors are RECIPIENTS,
+BENEFICIARIES, or merely MENTIONED.
+
+## Actors found in the text
+{actor_list}
+
+## Parent Provision
+Section: {parent_sid}
+Text: {parent_text}
+
+## Target Provision (child)
+Section: {target_sid}
+Text: {target_text}
+
+## Task
+For each actor, classify their ROLE in this provision:
+
+- HOLDER — this actor bears the obligation (must do something)
+- RECIPIENT — this actor receives something (information, training, protection)
+- BENEFICIARY — this actor benefits from the provision but has no active role
+- MENTIONED — this actor is referenced but neither holds nor receives
+
+Respond in JSON only, no markdown. Use the EXACT actor labels listed above — do not rename or paraphrase them:
+{{"actors": [{{"label": "Org: Employer", "role": "HOLDER|RECIPIENT|BENEFICIARY|MENTIONED"}}], "primary_holder": "Org: Employer"}}"#
+                    );
+
+                    let body = serde_json::json!({
+                        "contents": [{"parts": [{"text": prompt}]}],
+                        "generationConfig": {
+                            "temperature": 0.1,
+                            "maxOutputTokens": 2048,
+                            "thinkingConfig": {"thinkingBudget": 256}
+                        }
+                    });
+
+                    let url = format!(
+                        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
+                        api_key
+                    );
+
+                    let resp = client.post(&url).json(&body).send().await;
+
+                    let parsed = match resp {
+                        Ok(r) => {
+                            let text = r.text().await.unwrap_or_default();
+                            // Extract the generated text from Gemini response
+                            let gemini_resp: serde_json::Value =
+                                serde_json::from_str(&text).unwrap_or_default();
+                            let content_text = gemini_resp
+                                .pointer("/candidates/0/content/parts/0/text")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("");
+                            // Strip markdown code fences if present
+                            let json_text = if content_text.contains("```json") {
+                                content_text
+                                    .split("```json")
+                                    .nth(1)
+                                    .and_then(|s| s.split("```").next())
+                                    .unwrap_or(content_text)
+                                    .trim()
+                            } else if content_text.contains("```") {
+                                content_text
+                                    .split("```")
+                                    .nth(1)
+                                    .and_then(|s| s.split("```").next())
+                                    .unwrap_or(content_text)
+                                    .trim()
+                            } else {
+                                content_text.trim()
+                            };
+                            serde_json::from_str::<serde_json::Value>(json_text).ok()
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                section_id = %target_sid,
+                                error = %e,
+                                "Tier 3 API call failed, keeping Tier 1 result"
+                            );
+                            None
+                        }
+                    };
+
+                    if let Some(ref result) = parsed
+                        && let Some(actors_arr) = result.get("actors").and_then(|a| a.as_array())
+                    {
+                        let p = &mut provision_taxa[idx];
+                        p.actors.clear();
+                        let mut new_governed = Vec::new();
+                        let mut new_government = Vec::new();
+
+                        for actor_val in actors_arr {
+                            let label = actor_val
+                                .get("label")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            let role = actor_val
+                                .get("role")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("MENTIONED")
+                                .to_uppercase();
+
+                            let (role_str, recipient_type) = match role.as_str() {
+                                "HOLDER" => {
+                                    // Track holders in flat columns
+                                    if label.starts_with("Gov:") || label.starts_with("EU:") {
+                                        new_government.push(label.clone());
+                                    } else {
+                                        new_governed.push(label.clone());
+                                    }
+                                    ("holder".to_string(), None)
+                                }
+                                "RECIPIENT" => (
+                                    "recipient".to_string(),
+                                    Some("protected_person".to_string()),
+                                ),
+                                "BENEFICIARY" => ("beneficiary".to_string(), None),
+                                _ => ("mentioned".to_string(), None),
+                            };
+
+                            p.actors.push(ActorEntry {
+                                label,
+                                role: role_str,
+                                recipient_type,
+                            });
+                        }
+
+                        // Update flat columns with holders only (backward compat)
+                        if !new_governed.is_empty() || !new_government.is_empty() {
+                            p.governed_actors = new_governed;
+                            p.government_actors = new_government;
+                        }
+                        p.extraction_method = "agentic".to_string();
+                        tier3_count += 1;
+                    }
+                }
+
+                if tier3_count > 0 {
+                    eprintln!(
+                        "  Gap C Tier 3: {tier3_count}/{} multi-actor provisions classified by LLM",
+                        tier3_candidates.len()
+                    );
+                }
+            }
+        }
     }
 
     // Write per-provision taxa to LanceDB.
