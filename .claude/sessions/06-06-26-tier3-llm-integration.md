@@ -74,29 +74,51 @@ After Tier 1 pass, for provisions where:
 - Bulk enrichment skill created (`.claude/skills/bulk-enrichment/`)
 - Compact script: `scripts/compact_lance.py`
 
+### Label validation (commit `a64ab4b`)
+- `all_actor_labels()` function in actors.rs returns all valid dictionary labels
+- Per-actor `label_source`: `canonical` (in dictionary) or `invented` (LLM-created)
+- `extraction_method = "agentic_unvalidated"` when any actor has invented label
+- LLM signal preserved even with non-dictionary labels — sertantai can filter
+
+### Actors struct finalised (commit `158b834`)
+- `reason: Utf8?` per actor — LLM reasoning for the classification (null for regex/inherited)
+- `role` taxonomy extended: `primary-holder` for LLM's primary pick among multiple holders
+- Full struct: `{label, role, recipient_type, label_source, reason}`
+
+### Test suite (commit `93b6be1`)
+- Extracted `parse_gemini_response()` and `parse_tier3_actors()` as testable functions
+- 12 unit tests with canned responses — no API calls for parsing iteration
+- Covers: plain JSON, code fences, truncated responses, label validation, role mapping, primary-holder promotion
+
+### OH&S corpus enrichment
+- OH&S: Occupational / Personal Safety enriched with Tier 3
+- **131 Tier 1 inherited + 17/17 Tier 3 classified (all validated, 0 invented)**
+
+### Sertantai briefing
+- Migration briefing written: `~/Desktop/sertantai-legal/backend/data/fractalaw-actors-struct-migration.md`
+- Documents struct schema, role taxonomy, label_source, reason field
+- Flags `(inferred)` suffix bug in `baserow.ex` — duplicates every actor in single-selects
+- Migration path: phase 1 read struct alongside flat columns, phase 2 drop flat columns
+
 ## Known issues for next session
 
-### Label fidelity
-- LLM sometimes invents labels not in the dictionary (e.g., `Responsible Person` without the `Ind:` prefix in one case)
-- Prompt says "use EXACT labels" but LLM may still deviate
-- Need: validate returned labels against actor dictionary, fall back to Tier 1 if unrecognised
-
 ### Inference quality
-- HSWA s.19/s.21: Inspector/Person role assignments need review — HSWA has a complex enforcement chain (HSC → HSE → Inspector via warrant)
+- HSWA s.19/s.21: Inspector/Person role assignments need human review — complex enforcement chain (HSC → HSE → Inspector via warrant)
 - HSC (Health and Safety Commission) not in actor dictionary — merged into HSE in 2008 but still referenced in HSWA
-- Need: QA run on broader corpus to measure precision improvement
+- `recipient_type` currently hardcoded to `protected_person` — need `regulated_actor` and `informed_party` classification
 
-### Prompt refinement
-- Consider injecting the full valid actor label list into the prompt so LLM can only pick from known labels
-- Consider adding `recipient_type` classification (protected_person / regulated_actor / informed_party) — currently hardcoded to `protected_person`
+### Sertantai integration
+- Sertantai needs to consume new actors struct (currently reads flat columns only)
+- `(inferred)` suffix in `baserow.ex` `@holder_options` needs removing — doubles single-select options
+- Automated QA (LLM checking LLM) is circular — real validation is human review through sertantai UI
 
 ## What's next
 
-1. Label validation — reject or map non-dictionary labels
-2. QA re-run (`run_qa.py --sample-size 40`) to measure precision improvement from Tier 3
-3. Broader corpus test — enrich customer applicable laws with Tier 3
-4. Prompt refinement based on QA failure patterns
-5. Publish updated provision taxa to sertantai
+1. Sertantai migration — consume actors struct, remove `(inferred)` bug
+2. Re-enrich OH&S with latest schema (reason + primary-holder populated)
+3. Publish to sertantai via zenoh for human review in UI
+4. Iterate on prompt/label quality based on UI review findings
+5. Broader corpus enrichment with Tier 3
 
 ## References
 
@@ -104,5 +126,6 @@ After Tier 1 pass, for provisions where:
 - QA skill: `.claude/skills/tier1-qa/run_qa.py`
 - Actor dictionary: `docs/ACTOR-DICTIONARY.md`
 - Design doc: `docs/GAP-C-AGENTIC-EXTRACTION-PLAN.md` (Appendix A)
+- Sertantai briefing: `~/Desktop/sertantai-legal/backend/data/fractalaw-actors-struct-migration.md`
 - Phase 2A session: `.claude/sessions/06-06-26-gap-c-phase-2a-actors-struct.md`
 - LanceDB rebuild session: `.claude/sessions/06-06-26-lancedb-rebuild-tier3.md`
