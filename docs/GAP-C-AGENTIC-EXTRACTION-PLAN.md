@@ -482,7 +482,13 @@ Superseded by the confirmed `actors` struct (see Appendix A decision). The flat 
 |--------|------|---------|
 | `actors` | List<Struct(label: Utf8, role: Utf8, recipient_type: Utf8)> | All actors with their roles and classifications |
 
-Replaces (Phase 2A migration): `governed_actors: List<Utf8>`, `government_actors: List<Utf8>`
+**Migration strategy (non-breaking)**:
+1. Add `actors` struct column alongside existing flat columns (additive)
+2. Write to both: Tier 3 populates the struct AND the flat columns for backward compat
+3. Sertantai migrates to reading from `actors` struct at its own pace
+4. Tear down `governed_actors`/`government_actors` flat columns once sertantai confirms migration complete
+
+At no point does sertantai break — flat columns continue to be populated until explicitly removed.
 
 ### Scope
 
