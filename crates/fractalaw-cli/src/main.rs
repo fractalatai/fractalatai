@@ -3685,32 +3685,7 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                     let parsed = match resp {
                         Ok(r) => {
                             let text = r.text().await.unwrap_or_default();
-                            // Extract the generated text from Gemini response
-                            let gemini_resp: serde_json::Value =
-                                serde_json::from_str(&text).unwrap_or_default();
-                            let content_text = gemini_resp
-                                .pointer("/candidates/0/content/parts/0/text")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("");
-                            // Strip markdown code fences if present
-                            let json_text = if content_text.contains("```json") {
-                                content_text
-                                    .split("```json")
-                                    .nth(1)
-                                    .and_then(|s| s.split("```").next())
-                                    .unwrap_or(content_text)
-                                    .trim()
-                            } else if content_text.contains("```") {
-                                content_text
-                                    .split("```")
-                                    .nth(1)
-                                    .and_then(|s| s.split("```").next())
-                                    .unwrap_or(content_text)
-                                    .trim()
-                            } else {
-                                content_text.trim()
-                            };
-                            serde_json::from_str::<serde_json::Value>(json_text).ok()
+                            parse_gemini_response(&text)
                         }
                         Err(e) => {
                             tracing::warn!(
@@ -3723,59 +3698,30 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                     };
 
                     if let Some(ref result) = parsed
-                        && let Some(actors_arr) = result.get("actors").and_then(|a| a.as_array())
+                        && let Some(tier3_actors) = parse_tier3_actors(result, &valid_labels)
                     {
                         let p = &mut provision_taxa[idx];
                         p.actors.clear();
                         let mut new_governed = Vec::new();
                         let mut new_government = Vec::new();
-
                         let mut has_unknown_labels = false;
 
-                        for actor_val in actors_arr {
-                            let label = actor_val
-                                .get("label")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("")
-                                .to_string();
-                            let is_canonical = valid_labels.contains(label.as_str());
-                            if !is_canonical {
+                        for a in &tier3_actors {
+                            if a.label_source == "invented" {
                                 has_unknown_labels = true;
                             }
-                            let role = actor_val
-                                .get("role")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("MENTIONED")
-                                .to_uppercase();
-
-                            let (role_str, recipient_type) = match role.as_str() {
-                                "HOLDER" => {
-                                    // Track holders in flat columns
-                                    if label.starts_with("Gov:") || label.starts_with("EU:") {
-                                        new_government.push(label.clone());
-                                    } else {
-                                        new_governed.push(label.clone());
-                                    }
-                                    ("holder".to_string(), None)
-                                }
-                                "RECIPIENT" => (
-                                    "recipient".to_string(),
-                                    Some("protected_person".to_string()),
-                                ),
-                                "BENEFICIARY" => ("beneficiary".to_string(), None),
-                                _ => ("mentioned".to_string(), None),
-                            };
-
-                            p.actors.push(ActorEntry {
-                                label,
-                                role: role_str,
-                                recipient_type,
-                                label_source: if is_canonical {
-                                    "canonical"
+                            if a.role == "holder" {
+                                if a.label.starts_with("Gov:") || a.label.starts_with("EU:") {
+                                    new_government.push(a.label.clone());
                                 } else {
-                                    "invented"
+                                    new_governed.push(a.label.clone());
                                 }
-                                .into(),
+                            }
+                            p.actors.push(ActorEntry {
+                                label: a.label.clone(),
+                                role: a.role.clone(),
+                                recipient_type: a.recipient_type.clone(),
+                                label_source: a.label_source.clone(),
                             });
                         }
 
@@ -5706,6 +5652,91 @@ fn extract_f64(batch: &RecordBatch, col_idx: usize) -> f64 {
     }
 }
 
+/// Parse a Gemini REST API response body into the inner JSON content.
+///
+/// Extracts `candidates[0].content.parts[0].text`, strips markdown code
+/// fences, and parses the result as JSON.
+fn parse_gemini_response(response_body: &str) -> Option<serde_json::Value> {
+    let gemini_resp: serde_json::Value = serde_json::from_str(response_body).ok()?;
+    let content_text = gemini_resp
+        .pointer("/candidates/0/content/parts/0/text")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let json_text = if content_text.contains("```json") {
+        content_text
+            .split("```json")
+            .nth(1)
+            .and_then(|s| s.split("```").next())
+            .unwrap_or(content_text)
+            .trim()
+    } else if content_text.contains("```") {
+        content_text
+            .split("```")
+            .nth(1)
+            .and_then(|s| s.split("```").next())
+            .unwrap_or(content_text)
+            .trim()
+    } else {
+        content_text.trim()
+    };
+    serde_json::from_str(json_text).ok()
+}
+
+/// Parsed actor from Tier 3 LLM response, with label validation.
+struct ParsedTier3Actor {
+    label: String,
+    role: String,
+    recipient_type: Option<String>,
+    label_source: String,
+}
+
+/// Parse the actors array from a Tier 3 LLM response.
+///
+/// Returns `None` if the response doesn't contain a valid actors array.
+/// Labels are validated against the provided set — non-matching labels
+/// get `label_source = "invented"`.
+fn parse_tier3_actors(
+    result: &serde_json::Value,
+    valid_labels: &std::collections::HashSet<&str>,
+) -> Option<Vec<ParsedTier3Actor>> {
+    let actors_arr = result.get("actors")?.as_array()?;
+    let mut actors = Vec::new();
+    for actor_val in actors_arr {
+        let label = actor_val
+            .get("label")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let is_canonical = valid_labels.contains(label.as_str());
+        let role = actor_val
+            .get("role")
+            .and_then(|v| v.as_str())
+            .unwrap_or("MENTIONED")
+            .to_uppercase();
+        let (role_str, recipient_type) = match role.as_str() {
+            "HOLDER" => ("holder".to_string(), None),
+            "RECIPIENT" => (
+                "recipient".to_string(),
+                Some("protected_person".to_string()),
+            ),
+            "BENEFICIARY" => ("beneficiary".to_string(), None),
+            _ => ("mentioned".to_string(), None),
+        };
+        actors.push(ParsedTier3Actor {
+            label,
+            role: role_str,
+            recipient_type,
+            label_source: if is_canonical {
+                "canonical"
+            } else {
+                "invented"
+            }
+            .into(),
+        });
+    }
+    Some(actors)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -5815,6 +5846,117 @@ mod tests {
             &[],
         );
         assert_ne!(h1, h2, "different input must produce different hash");
+    }
+
+    // ── Tier 3 parsing tests (canned responses, no API calls) ──
+
+    fn test_labels() -> std::collections::HashSet<&'static str> {
+        [
+            "Org: Employer",
+            "Ind: Employee",
+            "Spc: Inspector",
+            "Ind: Person",
+            "Ind: Responsible Person",
+        ]
+        .into_iter()
+        .collect()
+    }
+
+    #[test]
+    fn parse_gemini_response_plain_json() {
+        let body = r#"{"candidates":[{"content":{"parts":[{"text":"{\"actors\":[{\"label\":\"Org: Employer\",\"role\":\"HOLDER\"}],\"primary_holder\":\"Org: Employer\"}"}],"role":"model"},"finishReason":"STOP"}]}"#;
+        let parsed = parse_gemini_response(body).unwrap();
+        assert_eq!(parsed["primary_holder"], "Org: Employer");
+    }
+
+    #[test]
+    fn parse_gemini_response_code_fence() {
+        let body = r#"{"candidates":[{"content":{"parts":[{"text":"```json\n{\"actors\":[{\"label\":\"Org: Employer\",\"role\":\"HOLDER\"}]}\n```"}],"role":"model"},"finishReason":"STOP"}]}"#;
+        let parsed = parse_gemini_response(body).unwrap();
+        let actors = parsed["actors"].as_array().unwrap();
+        assert_eq!(actors.len(), 1);
+        assert_eq!(actors[0]["label"], "Org: Employer");
+    }
+
+    #[test]
+    fn parse_gemini_response_truncated() {
+        let body = r#"{"candidates":[{"content":{"parts":[{"text":"{\"actors\":[{\"label\":\"Org: Emp"}],"role":"model"},"finishReason":"MAX_TOKENS"}]}"#;
+        assert!(parse_gemini_response(body).is_none());
+    }
+
+    #[test]
+    fn parse_gemini_response_invalid_json() {
+        let body = "not json at all";
+        assert!(parse_gemini_response(body).is_none());
+    }
+
+    #[test]
+    fn parse_tier3_actors_canonical_labels() {
+        let result: serde_json::Value = serde_json::from_str(
+            r#"{"actors":[{"label":"Org: Employer","role":"HOLDER"},{"label":"Ind: Employee","role":"RECIPIENT"}]}"#
+        ).unwrap();
+        let labels = test_labels();
+        let actors = parse_tier3_actors(&result, &labels).unwrap();
+        assert_eq!(actors.len(), 2);
+        assert_eq!(actors[0].label, "Org: Employer");
+        assert_eq!(actors[0].role, "holder");
+        assert_eq!(actors[0].label_source, "canonical");
+        assert_eq!(actors[1].label, "Ind: Employee");
+        assert_eq!(actors[1].role, "recipient");
+        assert_eq!(
+            actors[1].recipient_type,
+            Some("protected_person".to_string())
+        );
+        assert_eq!(actors[1].label_source, "canonical");
+    }
+
+    #[test]
+    fn parse_tier3_actors_invented_label() {
+        let result: serde_json::Value = serde_json::from_str(
+            r#"{"actors":[{"label":"Responsible Person","role":"HOLDER"},{"label":"Spc: Inspector","role":"RECIPIENT"}]}"#
+        ).unwrap();
+        let labels = test_labels();
+        let actors = parse_tier3_actors(&result, &labels).unwrap();
+        assert_eq!(actors[0].label, "Responsible Person");
+        assert_eq!(actors[0].label_source, "invented");
+        assert_eq!(actors[1].label, "Spc: Inspector");
+        assert_eq!(actors[1].label_source, "canonical");
+    }
+
+    #[test]
+    fn parse_tier3_actors_all_roles() {
+        let result: serde_json::Value = serde_json::from_str(
+            r#"{"actors":[
+                {"label":"Org: Employer","role":"HOLDER"},
+                {"label":"Ind: Employee","role":"RECIPIENT"},
+                {"label":"Ind: Person","role":"BENEFICIARY"},
+                {"label":"Spc: Inspector","role":"MENTIONED"}
+            ]}"#,
+        )
+        .unwrap();
+        let labels = test_labels();
+        let actors = parse_tier3_actors(&result, &labels).unwrap();
+        assert_eq!(actors[0].role, "holder");
+        assert_eq!(actors[1].role, "recipient");
+        assert_eq!(actors[2].role, "beneficiary");
+        assert_eq!(actors[3].role, "mentioned");
+    }
+
+    #[test]
+    fn parse_tier3_actors_missing_role_defaults_mentioned() {
+        let result: serde_json::Value =
+            serde_json::from_str(r#"{"actors":[{"label":"Org: Employer"}]}"#).unwrap();
+        let labels = test_labels();
+        let actors = parse_tier3_actors(&result, &labels).unwrap();
+        assert_eq!(actors[0].role, "mentioned");
+    }
+
+    #[test]
+    fn parse_tier3_actors_no_actors_key() {
+        let result: serde_json::Value =
+            serde_json::from_str(r#"{"primary_holder":"Org: Employer"}"#).unwrap();
+        let labels = test_labels();
+        assert!(parse_tier3_actors(&result, &labels).is_none());
     }
 }
 
