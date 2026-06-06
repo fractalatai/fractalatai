@@ -3093,11 +3093,9 @@ async fn enrich_single_law(
         fitness_entries: Vec::new(),
     };
 
-    #[derive(serde::Serialize)]
     struct ActorEntry {
         label: String,
         role: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
         recipient_type: Option<String>,
     }
 
@@ -3586,7 +3584,15 @@ async fn enrich_single_law(
         let mut extraction_method_b = StringBuilder::new();
         let mut inferred_from_b = StringBuilder::new();
         let mut ancestor_distance_b = arrow::array::Int32Builder::new();
-        let mut actors_b = StringBuilder::new();
+        let actors_struct_fields: Vec<Field> = vec![
+            Field::new("label", DataType::Utf8, false),
+            Field::new("role", DataType::Utf8, false),
+            Field::new("recipient_type", DataType::Utf8, true),
+        ];
+        let mut actors_b = ListBuilder::new(arrow::array::StructBuilder::from_fields(
+            actors_struct_fields.clone(),
+            0,
+        ));
 
         let now_ns = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
 
@@ -3676,7 +3682,29 @@ async fn enrich_single_law(
             if pt.actors.is_empty() {
                 actors_b.append_null();
             } else {
-                actors_b.append_value(serde_json::to_string(&pt.actors).unwrap_or_default());
+                let struct_builder = actors_b.values();
+                for actor in &pt.actors {
+                    struct_builder
+                        .field_builder::<StringBuilder>(0)
+                        .unwrap()
+                        .append_value(&actor.label);
+                    struct_builder
+                        .field_builder::<StringBuilder>(1)
+                        .unwrap()
+                        .append_value(&actor.role);
+                    match &actor.recipient_type {
+                        Some(rt) => struct_builder
+                            .field_builder::<StringBuilder>(2)
+                            .unwrap()
+                            .append_value(rt),
+                        None => struct_builder
+                            .field_builder::<StringBuilder>(2)
+                            .unwrap()
+                            .append_null(),
+                    }
+                    struct_builder.append(true);
+                }
+                actors_b.append(true);
             }
         }
 
@@ -3711,7 +3739,22 @@ async fn enrich_single_law(
             Field::new("extraction_method", DataType::Utf8, true),
             Field::new("holder_inferred_from", DataType::Utf8, true),
             Field::new("ancestor_distance", DataType::Int32, true),
-            Field::new("actors", DataType::Utf8, true),
+            Field::new(
+                "actors",
+                DataType::List(std::sync::Arc::new(Field::new(
+                    "item",
+                    DataType::Struct(
+                        vec![
+                            Field::new("label", DataType::Utf8, false),
+                            Field::new("role", DataType::Utf8, false),
+                            Field::new("recipient_type", DataType::Utf8, true),
+                        ]
+                        .into(),
+                    ),
+                    true,
+                ))),
+                true,
+            ),
         ]));
 
         let taxa_batch = RecordBatch::try_new(

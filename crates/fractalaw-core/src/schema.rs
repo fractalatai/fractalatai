@@ -335,10 +335,23 @@ pub mod esh {
             Field::new("extraction_method", DataType::Utf8, true),
             Field::new("holder_inferred_from", DataType::Utf8, true),
             Field::new("ancestor_distance", DataType::Int32, true),
-            // 3.10c Actors struct — JSON-encoded List<{label, role, recipient_type}> (1)
-            // Stored as Utf8 JSON because LanceDB can't create List<Struct> via add_columns.
-            // Migrate to proper Arrow struct when table is rebuilt.
-            Field::new("actors", DataType::Utf8, true),
+            // 3.10c Actors struct — native Arrow List<Struct> (1)
+            Field::new(
+                "actors",
+                DataType::List(Arc::new(Field::new(
+                    "item",
+                    DataType::Struct(
+                        vec![
+                            Field::new("label", DataType::Utf8, false),
+                            Field::new("role", DataType::Utf8, false),
+                            Field::new("recipient_type", DataType::Utf8, true),
+                        ]
+                        .into(),
+                    ),
+                    true,
+                ))),
+                true,
+            ),
             // 3.11 AI-Refined DRRP — polisher output stored back in LanceDB (7)
             Field::new("ai_holder", DataType::Utf8, true),
             Field::new("ai_clause", DataType::Utf8, true),
