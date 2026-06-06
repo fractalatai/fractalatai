@@ -169,6 +169,10 @@ impl LanceStore {
             "fitness_plant",
             "fitness_property",
             "fitness_sector",
+            "extraction_method",
+            "holder_inferred_from",
+            "ancestor_distance",
+            "actors",
         ]
         .iter()
         .map(|s| s.to_string())
@@ -218,21 +222,22 @@ impl LanceStore {
             }
         }
 
-        // holder_inferred_from: stored as Utf8 (comma-joined section_ids) because
-        // LanceDB's SQL expression parser doesn't support LIST types for add_columns.
-        // Phase 1A typically has only one ancestor anyway.
-        if schema.field_with_name("holder_inferred_from").is_err() {
-            table
-                .add_columns(
-                    lancedb::table::NewColumnTransform::SqlExpressions(vec![(
-                        "holder_inferred_from".to_string(),
-                        "CAST(NULL AS STRING)".to_string(),
-                    )]),
-                    None,
-                )
-                .await
-                .map_err(|e| StoreError::Other(format!("add column holder_inferred_from: {e}")))?;
-            info!("added holder_inferred_from column to legislation_text");
+        // holder_inferred_from and actors: stored as Utf8 because LanceDB's SQL
+        // expression parser doesn't support LIST or Struct types for add_columns.
+        for col in ["holder_inferred_from", "actors"] {
+            if schema.field_with_name(col).is_err() {
+                table
+                    .add_columns(
+                        lancedb::table::NewColumnTransform::SqlExpressions(vec![(
+                            col.to_string(),
+                            "CAST(NULL AS STRING)".to_string(),
+                        )]),
+                        None,
+                    )
+                    .await
+                    .map_err(|e| StoreError::Other(format!("add column {col}: {e}")))?;
+                info!(column = col, "added column to legislation_text");
+            }
         }
 
         Ok(())

@@ -3093,6 +3093,14 @@ async fn enrich_single_law(
         fitness_entries: Vec::new(),
     };
 
+    #[derive(serde::Serialize)]
+    struct ActorEntry {
+        label: String,
+        role: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        recipient_type: Option<String>,
+    }
+
     struct ProvisionTaxa {
         section_id: String,
         drrp_types: Vec<String>,
@@ -3119,6 +3127,7 @@ async fn enrich_single_law(
         extraction_method: String,
         holder_inferred_from: Vec<String>,
         ancestor_distance: Option<i32>,
+        actors: Vec<ActorEntry>,
     }
     let mut provision_taxa: Vec<ProvisionTaxa> = Vec::new();
 
@@ -3324,6 +3333,20 @@ async fn enrich_single_law(
                     extraction_method: "regex".to_string(),
                     holder_inferred_from: Vec::new(),
                     ancestor_distance: None,
+                    actors: record
+                        .governed_actors
+                        .iter()
+                        .map(|a| ActorEntry {
+                            label: a.clone(),
+                            role: "holder".into(),
+                            recipient_type: None,
+                        })
+                        .chain(record.government_actors.iter().map(|a| ActorEntry {
+                            label: a.clone(),
+                            role: "holder".into(),
+                            recipient_type: None,
+                        }))
+                        .collect(),
                 });
             }
 
@@ -3501,6 +3524,21 @@ async fn enrich_single_law(
             p.extraction_method = "inherited".to_string();
             p.holder_inferred_from = vec![m.ancestor_sid];
             p.ancestor_distance = Some(m.distance);
+            // Rebuild actors struct with inherited actors as holders.
+            p.actors = p
+                .governed_actors
+                .iter()
+                .map(|a| ActorEntry {
+                    label: a.clone(),
+                    role: "holder".into(),
+                    recipient_type: None,
+                })
+                .chain(p.government_actors.iter().map(|a| ActorEntry {
+                    label: a.clone(),
+                    role: "holder".into(),
+                    recipient_type: None,
+                }))
+                .collect();
             inherited_count += 1;
 
             // Also aggregate inherited actors into the law-level sets.
@@ -3548,6 +3586,7 @@ async fn enrich_single_law(
         let mut extraction_method_b = StringBuilder::new();
         let mut inferred_from_b = StringBuilder::new();
         let mut ancestor_distance_b = arrow::array::Int32Builder::new();
+        let mut actors_b = StringBuilder::new();
 
         let now_ns = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
 
@@ -3634,6 +3673,11 @@ async fn enrich_single_law(
                 Some(d) => ancestor_distance_b.append_value(d),
                 None => ancestor_distance_b.append_null(),
             }
+            if pt.actors.is_empty() {
+                actors_b.append_null();
+            } else {
+                actors_b.append_value(serde_json::to_string(&pt.actors).unwrap_or_default());
+            }
         }
 
         let item_field = std::sync::Arc::new(Field::new("item", DataType::Utf8, true));
@@ -3667,6 +3711,7 @@ async fn enrich_single_law(
             Field::new("extraction_method", DataType::Utf8, true),
             Field::new("holder_inferred_from", DataType::Utf8, true),
             Field::new("ancestor_distance", DataType::Int32, true),
+            Field::new("actors", DataType::Utf8, true),
         ]));
 
         let taxa_batch = RecordBatch::try_new(
@@ -3693,6 +3738,7 @@ async fn enrich_single_law(
                 std::sync::Arc::new(extraction_method_b.finish()),
                 std::sync::Arc::new(inferred_from_b.finish()),
                 std::sync::Arc::new(ancestor_distance_b.finish()),
+                std::sync::Arc::new(actors_b.finish()),
             ],
         )
         .context("building taxa RecordBatch")?;
