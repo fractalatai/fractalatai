@@ -3451,13 +3451,18 @@ async fn enrich_single_law(
             let target_depth = provision_taxa[idx].depth;
 
             // Find ancestors: provisions whose hierarchy_path is a strict
-            // prefix of the target's path. Sort by depth descending (deepest first).
+            // prefix of the target's path. The prefix must end at a hierarchy
+            // boundary (next char in target is '/'), otherwise "provision.3"
+            // falsely matches "provision.3A" (siblings, not parent-child).
+            // Sort by depth descending (deepest first).
             let mut ancestors: Vec<usize> = (0..provision_taxa.len())
                 .filter(|&j| {
+                    let ancestor_path = &provision_taxa[j].hierarchy_path;
                     j != idx
-                        && !provision_taxa[j].hierarchy_path.is_empty()
-                        && target_path.starts_with(&provision_taxa[j].hierarchy_path)
-                        && provision_taxa[j].hierarchy_path.len() < target_path.len()
+                        && !ancestor_path.is_empty()
+                        && ancestor_path.len() < target_path.len()
+                        && target_path.starts_with(ancestor_path.as_str())
+                        && target_path.as_bytes()[ancestor_path.len()] == b'/'
                         && !provision_taxa[j].governed_actors.is_empty()
                 })
                 .collect();
