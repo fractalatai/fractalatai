@@ -3095,9 +3095,10 @@ async fn enrich_single_law(
 
     struct ActorEntry {
         label: String,
-        role: String,
+        role: String, // "primary-holder" | "holder" | "recipient" | "beneficiary" | "mentioned"
         recipient_type: Option<String>,
-        label_source: String, // "canonical" or "invented"
+        label_source: String,   // "canonical" or "invented"
+        reason: Option<String>, // LLM reasoning (Tier 3 only)
     }
 
     struct ProvisionTaxa {
@@ -3340,12 +3341,14 @@ async fn enrich_single_law(
                             role: "holder".into(),
                             recipient_type: None,
                             label_source: "canonical".into(),
+                            reason: None,
                         })
                         .chain(record.government_actors.iter().map(|a| ActorEntry {
                             label: a.clone(),
                             role: "holder".into(),
                             recipient_type: None,
                             label_source: "canonical".into(),
+                            reason: None,
                         }))
                         .collect(),
                 });
@@ -3534,12 +3537,14 @@ async fn enrich_single_law(
                     role: "holder".into(),
                     recipient_type: None,
                     label_source: "canonical".into(),
+                    reason: None,
                 })
                 .chain(p.government_actors.iter().map(|a| ActorEntry {
                     label: a.clone(),
                     role: "holder".into(),
                     recipient_type: None,
                     label_source: "canonical".into(),
+                    reason: None,
                 }))
                 .collect();
             inherited_count += 1;
@@ -3710,7 +3715,7 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                             if a.label_source == "invented" {
                                 has_unknown_labels = true;
                             }
-                            if a.role == "holder" {
+                            if a.role == "holder" || a.role == "primary-holder" {
                                 if a.label.starts_with("Gov:") || a.label.starts_with("EU:") {
                                     new_government.push(a.label.clone());
                                 } else {
@@ -3722,6 +3727,7 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                                 role: a.role.clone(),
                                 recipient_type: a.recipient_type.clone(),
                                 label_source: a.label_source.clone(),
+                                reason: a.reason.clone(),
                             });
                         }
 
@@ -3784,6 +3790,7 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
             Field::new("role", DataType::Utf8, false),
             Field::new("recipient_type", DataType::Utf8, true),
             Field::new("label_source", DataType::Utf8, false),
+            Field::new("reason", DataType::Utf8, true),
         ];
         let mut actors_b = ListBuilder::new(arrow::array::StructBuilder::from_fields(
             actors_struct_fields.clone(),
@@ -3902,6 +3909,16 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                         .field_builder::<StringBuilder>(3)
                         .unwrap()
                         .append_value(&actor.label_source);
+                    match &actor.reason {
+                        Some(r) => struct_builder
+                            .field_builder::<StringBuilder>(4)
+                            .unwrap()
+                            .append_value(r),
+                        None => struct_builder
+                            .field_builder::<StringBuilder>(4)
+                            .unwrap()
+                            .append_null(),
+                    }
                     struct_builder.append(true);
                 }
                 actors_b.append(true);
@@ -3949,6 +3966,7 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                             Field::new("role", DataType::Utf8, false),
                             Field::new("recipient_type", DataType::Utf8, true),
                             Field::new("label_source", DataType::Utf8, false),
+                            Field::new("reason", DataType::Utf8, true),
                         ]
                         .into(),
                     ),
@@ -5688,6 +5706,7 @@ struct ParsedTier3Actor {
     role: String,
     recipient_type: Option<String>,
     label_source: String,
+    reason: Option<String>,
 }
 
 /// Parse the actors array from a Tier 3 LLM response.
@@ -5700,6 +5719,10 @@ fn parse_tier3_actors(
     valid_labels: &std::collections::HashSet<&str>,
 ) -> Option<Vec<ParsedTier3Actor>> {
     let actors_arr = result.get("actors")?.as_array()?;
+    let primary_holder = result
+        .get("primary_holder")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let mut actors = Vec::new();
     for actor_val in actors_arr {
         let label = actor_val
@@ -5713,8 +5736,20 @@ fn parse_tier3_actors(
             .and_then(|v| v.as_str())
             .unwrap_or("MENTIONED")
             .to_uppercase();
+        let reason = actor_val
+            .get("reason")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
         let (role_str, recipient_type) = match role.as_str() {
-            "HOLDER" => ("holder".to_string(), None),
+            "HOLDER" => {
+                // Promote to primary-holder if this is the LLM's primary pick
+                let r = if label == primary_holder {
+                    "primary-holder"
+                } else {
+                    "holder"
+                };
+                (r.to_string(), None)
+            }
             "RECIPIENT" => (
                 "recipient".to_string(),
                 Some("protected_person".to_string()),
@@ -5732,6 +5767,7 @@ fn parse_tier3_actors(
                 "invented"
             }
             .into(),
+            reason,
         });
     }
     Some(actors)
@@ -5893,14 +5929,19 @@ mod tests {
     #[test]
     fn parse_tier3_actors_canonical_labels() {
         let result: serde_json::Value = serde_json::from_str(
-            r#"{"actors":[{"label":"Org: Employer","role":"HOLDER"},{"label":"Ind: Employee","role":"RECIPIENT"}]}"#
-        ).unwrap();
+            r#"{"actors":[
+                {"label":"Org: Employer","role":"HOLDER","reason":"employer must act"},
+                {"label":"Ind: Employee","role":"RECIPIENT","reason":"receives training"}
+            ],"primary_holder":"Org: Employer"}"#,
+        )
+        .unwrap();
         let labels = test_labels();
         let actors = parse_tier3_actors(&result, &labels).unwrap();
         assert_eq!(actors.len(), 2);
         assert_eq!(actors[0].label, "Org: Employer");
-        assert_eq!(actors[0].role, "holder");
+        assert_eq!(actors[0].role, "primary-holder");
         assert_eq!(actors[0].label_source, "canonical");
+        assert_eq!(actors[0].reason, Some("employer must act".into()));
         assert_eq!(actors[1].label, "Ind: Employee");
         assert_eq!(actors[1].role, "recipient");
         assert_eq!(
@@ -5908,19 +5949,37 @@ mod tests {
             Some("protected_person".to_string())
         );
         assert_eq!(actors[1].label_source, "canonical");
+        assert_eq!(actors[1].reason, Some("receives training".into()));
     }
 
     #[test]
     fn parse_tier3_actors_invented_label() {
         let result: serde_json::Value = serde_json::from_str(
-            r#"{"actors":[{"label":"Responsible Person","role":"HOLDER"},{"label":"Spc: Inspector","role":"RECIPIENT"}]}"#
-        ).unwrap();
+            r#"{"actors":[{"label":"Responsible Person","role":"HOLDER"},{"label":"Spc: Inspector","role":"RECIPIENT"}],"primary_holder":"Responsible Person"}"#,
+        )
+        .unwrap();
         let labels = test_labels();
         let actors = parse_tier3_actors(&result, &labels).unwrap();
         assert_eq!(actors[0].label, "Responsible Person");
+        assert_eq!(actors[0].role, "primary-holder");
         assert_eq!(actors[0].label_source, "invented");
         assert_eq!(actors[1].label, "Spc: Inspector");
         assert_eq!(actors[1].label_source, "canonical");
+    }
+
+    #[test]
+    fn parse_tier3_actors_primary_holder_promotion() {
+        let result: serde_json::Value = serde_json::from_str(
+            r#"{"actors":[
+                {"label":"Org: Employer","role":"HOLDER"},
+                {"label":"Spc: Inspector","role":"HOLDER"}
+            ],"primary_holder":"Spc: Inspector"}"#,
+        )
+        .unwrap();
+        let labels = test_labels();
+        let actors = parse_tier3_actors(&result, &labels).unwrap();
+        assert_eq!(actors[0].role, "holder");
+        assert_eq!(actors[1].role, "primary-holder");
     }
 
     #[test]
@@ -5931,12 +5990,12 @@ mod tests {
                 {"label":"Ind: Employee","role":"RECIPIENT"},
                 {"label":"Ind: Person","role":"BENEFICIARY"},
                 {"label":"Spc: Inspector","role":"MENTIONED"}
-            ]}"#,
+            ],"primary_holder":"Org: Employer"}"#,
         )
         .unwrap();
         let labels = test_labels();
         let actors = parse_tier3_actors(&result, &labels).unwrap();
-        assert_eq!(actors[0].role, "holder");
+        assert_eq!(actors[0].role, "primary-holder");
         assert_eq!(actors[1].role, "recipient");
         assert_eq!(actors[2].role, "beneficiary");
         assert_eq!(actors[3].role, "mentioned");
@@ -5949,6 +6008,7 @@ mod tests {
         let labels = test_labels();
         let actors = parse_tier3_actors(&result, &labels).unwrap();
         assert_eq!(actors[0].role, "mentioned");
+        assert_eq!(actors[0].reason, None);
     }
 
     #[test]

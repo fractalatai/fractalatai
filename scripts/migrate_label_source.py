@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Add label_source field to actors struct in LanceDB.
+"""Migrate actors struct in LanceDB to latest schema.
 
-Migrates actors from struct<label, role, recipient_type> to
-struct<label, role, recipient_type, label_source>. All existing
-actors get label_source="canonical" (they came from regex/inheritance).
+Adds missing fields (label_source, reason) with defaults.
+All existing actors get label_source="canonical", reason=None.
 """
 import lancedb
 import pyarrow as pa
@@ -14,6 +13,7 @@ ACTORS_TYPE = pa.list_(pa.struct([
     pa.field("role", pa.string(), nullable=False),
     pa.field("recipient_type", pa.string(), nullable=True),
     pa.field("label_source", pa.string(), nullable=False),
+    pa.field("reason", pa.string(), nullable=True),
 ]))
 
 db = lancedb.connect("data/lancedb")
@@ -40,6 +40,7 @@ for val in actors_col:
                     "role": a.get("role", ""),
                     "recipient_type": a.get("recipient_type"),
                     "label_source": a.get("label_source", "canonical"),
+                    "reason": a.get("reason"),
                 }
                 for a in py_val
             ])
