@@ -30,6 +30,7 @@ ACTORS_TYPE = pa.list_(pa.struct([
     pa.field("label", pa.string(), nullable=False),
     pa.field("role", pa.string(), nullable=False),
     pa.field("recipient_type", pa.string(), nullable=True),
+    pa.field("label_source", pa.string(), nullable=False),
 ]))
 
 

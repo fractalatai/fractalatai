@@ -512,6 +512,26 @@ fn specialist_governed_for(family: &str) -> &'static [(&'static str, Regex)] {
 
 // ── Public API ───────────────────────────────────────────────────────
 
+/// All valid actor labels from every pattern library (core + specialist).
+///
+/// Used by Tier 3 LLM to validate that returned labels match the dictionary.
+pub fn all_actor_labels() -> std::collections::HashSet<&'static str> {
+    let mut labels = std::collections::HashSet::new();
+    for (label, _) in GOVERNMENT_DEFS {
+        labels.insert(*label);
+    }
+    for (label, _) in GOVERNED_DEFS {
+        labels.insert(*label);
+    }
+    for (label, _) in OFFSHORE_GOVERNED_DEFS {
+        labels.insert(*label);
+    }
+    for (label, _) in PUBLIC_GOVERNED_DEFS {
+        labels.insert(*label);
+    }
+    labels
+}
+
 /// Extract all actors (governed + government) from text.
 ///
 /// Applies the blacklist first, then runs each pattern library.
@@ -967,6 +987,26 @@ mod tests {
             !has_label(&actors.governed, "Public: Keeper"),
             "keeper should not be extracted for OH&S, got: {:?}",
             actors.governed
+        );
+    }
+
+    #[test]
+    fn all_actor_labels_coverage() {
+        let labels = all_actor_labels();
+        // Should contain known labels from all pattern libraries
+        assert!(labels.contains("Org: Employer"));
+        assert!(labels.contains("Ind: Employee"));
+        assert!(labels.contains("Gvt: Minister"));
+        assert!(labels.contains("Gvt: Agency: Health and Safety Executive"));
+        assert!(labels.contains("Ind: Responsible Person"));
+        // Specialist patterns
+        assert!(labels.contains("Offshore: Licensee"));
+        assert!(labels.contains("Public: Keeper"));
+        // Should have a reasonable count (50+)
+        assert!(
+            labels.len() > 50,
+            "expected 50+ labels, got {}",
+            labels.len()
         );
     }
 }

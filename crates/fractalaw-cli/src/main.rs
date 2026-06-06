@@ -3097,6 +3097,7 @@ async fn enrich_single_law(
         label: String,
         role: String,
         recipient_type: Option<String>,
+        label_source: String, // "canonical" or "invented"
     }
 
     struct ProvisionTaxa {
@@ -3338,11 +3339,13 @@ async fn enrich_single_law(
                             label: a.clone(),
                             role: "holder".into(),
                             recipient_type: None,
+                            label_source: "canonical".into(),
                         })
                         .chain(record.government_actors.iter().map(|a| ActorEntry {
                             label: a.clone(),
                             role: "holder".into(),
                             recipient_type: None,
+                            label_source: "canonical".into(),
                         }))
                         .collect(),
                 });
@@ -3530,11 +3533,13 @@ async fn enrich_single_law(
                     label: a.clone(),
                     role: "holder".into(),
                     recipient_type: None,
+                    label_source: "canonical".into(),
                 })
                 .chain(p.government_actors.iter().map(|a| ActorEntry {
                     label: a.clone(),
                     role: "holder".into(),
                     recipient_type: None,
+                    label_source: "canonical".into(),
                 }))
                 .collect();
             inherited_count += 1;
@@ -3586,15 +3591,17 @@ async fn enrich_single_law(
                     }
                 }
 
+                let valid_labels = fractalaw_core::taxa::actors::all_actor_labels();
                 let client = reqwest::Client::builder()
                     .timeout(std::time::Duration::from_secs(30))
                     .build()
                     .context("building HTTP client for Tier 3")?;
 
                 let mut tier3_count = 0u32;
+                let mut tier3_unvalidated = 0u32;
                 for &idx in &tier3_candidates {
                     let p = &provision_taxa[idx];
-                    let target_sid = &p.section_id;
+                    let target_sid = p.section_id.clone();
                     let parent_sid = p.holder_inferred_from.first().cloned().unwrap_or_default();
 
                     // Truncate at char boundary to avoid panics on multi-byte text
@@ -3610,7 +3617,7 @@ async fn enrich_single_law(
                         }
                     }
                     let target_text = text_map
-                        .get(target_sid)
+                        .get(&target_sid)
                         .map(|t| truncate_str(t, 500))
                         .unwrap_or("");
                     let parent_text = text_map
@@ -3723,12 +3730,18 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                         let mut new_governed = Vec::new();
                         let mut new_government = Vec::new();
 
+                        let mut has_unknown_labels = false;
+
                         for actor_val in actors_arr {
                             let label = actor_val
                                 .get("label")
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("")
                                 .to_string();
+                            let is_canonical = valid_labels.contains(label.as_str());
+                            if !is_canonical {
+                                has_unknown_labels = true;
+                            }
                             let role = actor_val
                                 .get("role")
                                 .and_then(|v| v.as_str())
@@ -3757,6 +3770,12 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                                 label,
                                 role: role_str,
                                 recipient_type,
+                                label_source: if is_canonical {
+                                    "canonical"
+                                } else {
+                                    "invented"
+                                }
+                                .into(),
                             });
                         }
 
@@ -3765,14 +3784,20 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                             p.governed_actors = new_governed;
                             p.government_actors = new_government;
                         }
-                        p.extraction_method = "agentic".to_string();
+                        if has_unknown_labels {
+                            p.extraction_method = "agentic_unvalidated".to_string();
+                            tier3_unvalidated += 1;
+                        } else {
+                            p.extraction_method = "agentic".to_string();
+                        }
                         tier3_count += 1;
                     }
                 }
 
                 if tier3_count > 0 {
+                    let validated = tier3_count - tier3_unvalidated;
                     eprintln!(
-                        "  Gap C Tier 3: {tier3_count}/{} multi-actor provisions classified by LLM",
+                        "  Gap C Tier 3: {tier3_count}/{} multi-actor provisions classified by LLM ({validated} validated, {tier3_unvalidated} with unknown labels)",
                         tier3_candidates.len()
                     );
                 }
@@ -3812,6 +3837,7 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
             Field::new("label", DataType::Utf8, false),
             Field::new("role", DataType::Utf8, false),
             Field::new("recipient_type", DataType::Utf8, true),
+            Field::new("label_source", DataType::Utf8, false),
         ];
         let mut actors_b = ListBuilder::new(arrow::array::StructBuilder::from_fields(
             actors_struct_fields.clone(),
@@ -3926,6 +3952,10 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                             .unwrap()
                             .append_null(),
                     }
+                    struct_builder
+                        .field_builder::<StringBuilder>(3)
+                        .unwrap()
+                        .append_value(&actor.label_source);
                     struct_builder.append(true);
                 }
                 actors_b.append(true);
@@ -3972,6 +4002,7 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                             Field::new("label", DataType::Utf8, false),
                             Field::new("role", DataType::Utf8, false),
                             Field::new("recipient_type", DataType::Utf8, true),
+                            Field::new("label_source", DataType::Utf8, false),
                         ]
                         .into(),
                     ),

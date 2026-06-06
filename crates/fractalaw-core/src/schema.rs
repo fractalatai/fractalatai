@@ -345,6 +345,7 @@ pub mod esh {
                             Field::new("label", DataType::Utf8, false),
                             Field::new("role", DataType::Utf8, false),
                             Field::new("recipient_type", DataType::Utf8, true),
+                            Field::new("label_source", DataType::Utf8, false),
                         ]
                         .into(),
                     ),
