@@ -651,4 +651,48 @@ Add to Phase 1 prompt: "For EU Directives where 'Member States shall ensure that
 - ChatGPT review round 1: 2026-06-05 (deterministic inheritance tier, externally-derived confidence, narrower phasing, reasoning_type schema, C6 scepticism)
 - Gemini review round 2: 2026-06-05 (deepest-first walk, one-hop recursion, dual records, model routing by context level, range expansion, milestone gate)
 - ChatGPT review round 2: 2026-06-05 (obligation_layer field, conflict resolution policy, citation complexity classes, precision>recall for Tier 1, ancestor_distance metric, unresolved_external_reference reasoning_type)
+- Gemini review round 3: 2026-06-06 (recipient model review — see Appendix A)
 - HSWA hierarchy example: s.2(1) → s.2(2) → s.2(2)(a)-(e) — parent chain resolves "employer"
+
+---
+
+## Appendix A: Recipient Model Review (Gemini, 2026-06-06)
+
+### Prompt
+
+Sent the full Recipient Model section (from "Discovery" through "EU dual extraction interaction") plus five specific questions:
+
+1. Are the four roles (holder/recipient/beneficiary/mentioned) the right taxonomy?
+2. Is `recipient_type` the right abstraction?
+3. Should `recipient` be a separate column or part of a richer actor-role struct?
+4. Does the single-column `recipient_type` handle multiple types per provision?
+5. Does the holder/recipient/beneficiary distinction hold for Rights and Powers?
+
+### Response (Gemini 2.5 Flash)
+
+**Q1 — Four roles are correct.** Keep all four. Merging recipient and beneficiary would lose critical nuance. Ensure schema can accommodate an actor holding multiple roles within the same provision.
+
+**Q2 — `recipient_type` is valuable but has a naming conflict.** Using "beneficiary" as both a top-level role AND a `recipient_type` value is confusing. If an actor is classified as the role `beneficiary`, then `beneficiary` as their type is tautological. Consider renaming to `target_classification` or similar.
+
+**Q3 — Strongly recommends unified `actors: List<Struct(label, roles, types)>` column.** Separate columns (`governed_actors`, `recipient`) lead to redundancy and poor extensibility. A single structured column:
+- Absorbs `governed_actors` (role = "holder")
+- Handles actors with multiple roles
+- Accommodates new roles without schema changes
+- Consolidates all actor references
+
+**Q4 — Single `recipient_type` per provision is a critical flaw.** A provision can target multiple actors with different types. Reinforces the need for per-actor structured data: `List<Struct(label, roles, recipient_types)>`.
+
+**Q5 — Core taxonomy holds across DRRP types but needs documented interpretations.** For Rights: distinguish holder-of-right from holder-of-corresponding-obligation. For Powers: recipient is the regulated actor. The LLM's consistency across DRRP types is key — if consistent, schema need not diverge by type.
+
+**Additional recommendations:**
+- Actor canonicalization (future phase): map "employees", "workers", "staff" to canonical IDs
+- LLM confidence scores per role assignment
+- Source span/provenance if LLM can output character offsets
+- `source_pipeline` field ("regex", "llm_tier3") for data provenance tracking
+- Materialized views for frequently queried patterns on top of normalized struct column
+
+### Key takeaway
+
+The strongest recommendation is to **transition to a unified `actors` struct column** rather than proliferating separate columns. This is architecturally sound but represents a significant schema change — the current `governed_actors`, `government_actors` flat lists would need migration.
+
+**Decision needed**: adopt the unified struct now (bigger change, better long-term) or keep flat columns for Phase 2A and migrate later (faster to ship, technical debt).
