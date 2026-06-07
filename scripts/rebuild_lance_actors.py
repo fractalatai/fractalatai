@@ -25,11 +25,11 @@ DB_PATH = "data/lancedb"
 TABLE_NAME = "legislation_text"
 BACKUP_DIR = Path("backups")
 
-# Target Arrow type for actors column
+# Target Arrow type for actors column (Hohfeldian position model)
 ACTORS_TYPE = pa.list_(pa.struct([
     pa.field("label", pa.string(), nullable=False),
-    pa.field("role", pa.string(), nullable=False),
-    pa.field("recipient_type", pa.string(), nullable=True),
+    pa.field("position", pa.string(), nullable=False),
+    pa.field("relates_to", pa.string(), nullable=True),
     pa.field("label_source", pa.string(), nullable=False),
     pa.field("reason", pa.string(), nullable=True),
 ]))

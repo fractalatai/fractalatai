@@ -3095,9 +3095,9 @@ async fn enrich_single_law(
 
     struct ActorEntry {
         label: String,
-        role: String, // "primary-holder" | "holder" | "recipient" | "beneficiary" | "mentioned"
-        recipient_type: Option<String>,
-        label_source: String,   // "canonical" or "invented"
+        position: String, // "active" | "counterparty" | "beneficiary" | "mentioned"
+        relates_to: Option<String>, // linked actor label for pairwise relations
+        label_source: String, // "canonical" or "invented"
         reason: Option<String>, // LLM reasoning (Tier 3 only)
     }
 
@@ -3338,15 +3338,15 @@ async fn enrich_single_law(
                         .iter()
                         .map(|a| ActorEntry {
                             label: a.clone(),
-                            role: "holder".into(),
-                            recipient_type: None,
+                            position: "active".into(),
+                            relates_to: None,
                             label_source: "canonical".into(),
                             reason: None,
                         })
                         .chain(record.government_actors.iter().map(|a| ActorEntry {
                             label: a.clone(),
-                            role: "holder".into(),
-                            recipient_type: None,
+                            position: "active".into(),
+                            relates_to: None,
                             label_source: "canonical".into(),
                             reason: None,
                         }))
@@ -3534,15 +3534,15 @@ async fn enrich_single_law(
                 .iter()
                 .map(|a| ActorEntry {
                     label: a.clone(),
-                    role: "holder".into(),
-                    recipient_type: None,
+                    position: "active".into(),
+                    relates_to: None,
                     label_source: "canonical".into(),
                     reason: None,
                 })
                 .chain(p.government_actors.iter().map(|a| ActorEntry {
                     label: a.clone(),
-                    role: "holder".into(),
-                    recipient_type: None,
+                    position: "active".into(),
+                    relates_to: None,
                     label_source: "canonical".into(),
                     reason: None,
                 }))
@@ -3642,11 +3642,9 @@ async fn enrich_single_law(
                         .join("\n");
 
                     let prompt = format!(
-                        r#"You are a legal analyst identifying duty holders in UK and EU legislation.
+                        r#"You are a legal analyst classifying actor positions in UK and EU legislation using Hohfeldian legal relations.
 
-A provision mentions multiple actors. Your task is to identify which actor
-HOLDS the duty (the one who must act) versus which actors are RECIPIENTS,
-BENEFICIARIES, or merely MENTIONED.
+A provision mentions multiple actors. Classify each actor's POSITION relative to the legal obligation in this provision.
 
 ## Actors found in the text
 {actor_list}
@@ -3660,15 +3658,17 @@ Section: {target_sid}
 Text: {target_text}
 
 ## Task
-For each actor, classify their ROLE in this provision:
+For each actor, classify their POSITION:
 
-- HOLDER — this actor bears the obligation (must do something)
-- RECIPIENT — this actor receives something (information, training, protection)
-- BENEFICIARY — this actor benefits from the provision but has no active role
-- MENTIONED — this actor is referenced but neither holds nor receives
+- ACTIVE — this actor bears the duty, exercises the power, or holds the right (the doer)
+- COUNTERPARTY — this actor is on the receiving end (holds a claim against a duty, is subject to a power)
+- BENEFICIARY — this actor benefits from the provision without a direct legal relation
+- MENTIONED — this actor is referenced but has no active legal role
+
+If an active actor's obligation relates specifically to one counterparty (not all), include "relates_to" with that counterparty's label.
 
 Respond in JSON only, no markdown. Use the EXACT actor labels listed above — do not rename or paraphrase them:
-{{"actors": [{{"label": "Org: Employer", "role": "HOLDER|RECIPIENT|BENEFICIARY|MENTIONED"}}], "primary_holder": "Org: Employer"}}"#
+{{"actors": [{{"label": "Org: Employer", "position": "ACTIVE|COUNTERPARTY|BENEFICIARY|MENTIONED", "relates_to": null, "reason": "..."}}]}}"#
                     );
 
                     let body = serde_json::json!({
@@ -3715,7 +3715,7 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                             if a.label_source == "invented" {
                                 has_unknown_labels = true;
                             }
-                            if a.role == "holder" || a.role == "primary-holder" {
+                            if a.position == "active" {
                                 if a.label.starts_with("Gov:") || a.label.starts_with("EU:") {
                                     new_government.push(a.label.clone());
                                 } else {
@@ -3724,8 +3724,8 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                             }
                             p.actors.push(ActorEntry {
                                 label: a.label.clone(),
-                                role: a.role.clone(),
-                                recipient_type: a.recipient_type.clone(),
+                                position: a.position.clone(),
+                                relates_to: a.relates_to.clone(),
                                 label_source: a.label_source.clone(),
                                 reason: a.reason.clone(),
                             });
@@ -3787,8 +3787,8 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
         let mut ancestor_distance_b = arrow::array::Int32Builder::new();
         let actors_struct_fields: Vec<Field> = vec![
             Field::new("label", DataType::Utf8, false),
-            Field::new("role", DataType::Utf8, false),
-            Field::new("recipient_type", DataType::Utf8, true),
+            Field::new("position", DataType::Utf8, false),
+            Field::new("relates_to", DataType::Utf8, true),
             Field::new("label_source", DataType::Utf8, false),
             Field::new("reason", DataType::Utf8, true),
         ];
@@ -3894,8 +3894,8 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                     struct_builder
                         .field_builder::<StringBuilder>(1)
                         .unwrap()
-                        .append_value(&actor.role);
-                    match &actor.recipient_type {
+                        .append_value(&actor.position);
+                    match &actor.relates_to {
                         Some(rt) => struct_builder
                             .field_builder::<StringBuilder>(2)
                             .unwrap()
@@ -3963,8 +3963,8 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                     DataType::Struct(
                         vec![
                             Field::new("label", DataType::Utf8, false),
-                            Field::new("role", DataType::Utf8, false),
-                            Field::new("recipient_type", DataType::Utf8, true),
+                            Field::new("position", DataType::Utf8, false),
+                            Field::new("relates_to", DataType::Utf8, true),
                             Field::new("label_source", DataType::Utf8, false),
                             Field::new("reason", DataType::Utf8, true),
                         ]
@@ -5703,8 +5703,8 @@ fn parse_gemini_response(response_body: &str) -> Option<serde_json::Value> {
 /// Parsed actor from Tier 3 LLM response, with label validation.
 struct ParsedTier3Actor {
     label: String,
-    role: String,
-    recipient_type: Option<String>,
+    position: String,
+    relates_to: Option<String>,
     label_source: String,
     reason: Option<String>,
 }
@@ -5719,10 +5719,6 @@ fn parse_tier3_actors(
     valid_labels: &std::collections::HashSet<&str>,
 ) -> Option<Vec<ParsedTier3Actor>> {
     let actors_arr = result.get("actors")?.as_array()?;
-    let primary_holder = result
-        .get("primary_holder")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
     let mut actors = Vec::new();
     for actor_val in actors_arr {
         let label = actor_val
@@ -5731,36 +5727,29 @@ fn parse_tier3_actors(
             .unwrap_or("")
             .to_string();
         let is_canonical = valid_labels.contains(label.as_str());
-        let role = actor_val
-            .get("role")
+        let position = actor_val
+            .get("position")
             .and_then(|v| v.as_str())
-            .unwrap_or("MENTIONED")
-            .to_uppercase();
+            .unwrap_or("mentioned")
+            .to_lowercase();
+        let position_str = match position.as_str() {
+            "active" => "active",
+            "counterparty" => "counterparty",
+            "beneficiary" => "beneficiary",
+            _ => "mentioned",
+        };
+        let relates_to = actor_val
+            .get("relates_to")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
         let reason = actor_val
             .get("reason")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        let (role_str, recipient_type) = match role.as_str() {
-            "HOLDER" => {
-                // Promote to primary-holder if this is the LLM's primary pick
-                let r = if label == primary_holder {
-                    "primary-holder"
-                } else {
-                    "holder"
-                };
-                (r.to_string(), None)
-            }
-            "RECIPIENT" => (
-                "recipient".to_string(),
-                Some("protected_person".to_string()),
-            ),
-            "BENEFICIARY" => ("beneficiary".to_string(), None),
-            _ => ("mentioned".to_string(), None),
-        };
         actors.push(ParsedTier3Actor {
             label,
-            role: role_str,
-            recipient_type,
+            position: position_str.into(),
+            relates_to,
             label_source: if is_canonical {
                 "canonical"
             } else {
@@ -5930,85 +5919,82 @@ mod tests {
     fn parse_tier3_actors_canonical_labels() {
         let result: serde_json::Value = serde_json::from_str(
             r#"{"actors":[
-                {"label":"Org: Employer","role":"HOLDER","reason":"employer must act"},
-                {"label":"Ind: Employee","role":"RECIPIENT","reason":"receives training"}
-            ],"primary_holder":"Org: Employer"}"#,
+                {"label":"Org: Employer","position":"ACTIVE","reason":"employer bears the duty"},
+                {"label":"Ind: Employee","position":"COUNTERPARTY","reason":"employee holds the claim"}
+            ]}"#,
         )
         .unwrap();
         let labels = test_labels();
         let actors = parse_tier3_actors(&result, &labels).unwrap();
         assert_eq!(actors.len(), 2);
         assert_eq!(actors[0].label, "Org: Employer");
-        assert_eq!(actors[0].role, "primary-holder");
+        assert_eq!(actors[0].position, "active");
         assert_eq!(actors[0].label_source, "canonical");
-        assert_eq!(actors[0].reason, Some("employer must act".into()));
+        assert_eq!(actors[0].reason, Some("employer bears the duty".into()));
         assert_eq!(actors[1].label, "Ind: Employee");
-        assert_eq!(actors[1].role, "recipient");
-        assert_eq!(
-            actors[1].recipient_type,
-            Some("protected_person".to_string())
-        );
+        assert_eq!(actors[1].position, "counterparty");
         assert_eq!(actors[1].label_source, "canonical");
-        assert_eq!(actors[1].reason, Some("receives training".into()));
+        assert_eq!(actors[1].reason, Some("employee holds the claim".into()));
     }
 
     #[test]
     fn parse_tier3_actors_invented_label() {
         let result: serde_json::Value = serde_json::from_str(
-            r#"{"actors":[{"label":"Responsible Person","role":"HOLDER"},{"label":"Spc: Inspector","role":"RECIPIENT"}],"primary_holder":"Responsible Person"}"#,
+            r#"{"actors":[{"label":"Responsible Person","position":"ACTIVE"},{"label":"Spc: Inspector","position":"COUNTERPARTY"}]}"#,
         )
         .unwrap();
         let labels = test_labels();
         let actors = parse_tier3_actors(&result, &labels).unwrap();
         assert_eq!(actors[0].label, "Responsible Person");
-        assert_eq!(actors[0].role, "primary-holder");
+        assert_eq!(actors[0].position, "active");
         assert_eq!(actors[0].label_source, "invented");
         assert_eq!(actors[1].label, "Spc: Inspector");
         assert_eq!(actors[1].label_source, "canonical");
     }
 
     #[test]
-    fn parse_tier3_actors_primary_holder_promotion() {
+    fn parse_tier3_actors_relates_to() {
         let result: serde_json::Value = serde_json::from_str(
             r#"{"actors":[
-                {"label":"Org: Employer","role":"HOLDER"},
-                {"label":"Spc: Inspector","role":"HOLDER"}
-            ],"primary_holder":"Spc: Inspector"}"#,
+                {"label":"Org: Employer","position":"ACTIVE","relates_to":"Ind: Employee","reason":"employer must train employees"},
+                {"label":"Ind: Employee","position":"COUNTERPARTY","reason":"receives training"}
+            ]}"#,
         )
         .unwrap();
         let labels = test_labels();
         let actors = parse_tier3_actors(&result, &labels).unwrap();
-        assert_eq!(actors[0].role, "holder");
-        assert_eq!(actors[1].role, "primary-holder");
+        assert_eq!(actors[0].relates_to, Some("Ind: Employee".into()));
+        assert_eq!(actors[1].relates_to, None);
     }
 
     #[test]
-    fn parse_tier3_actors_all_roles() {
+    fn parse_tier3_actors_all_positions() {
         let result: serde_json::Value = serde_json::from_str(
             r#"{"actors":[
-                {"label":"Org: Employer","role":"HOLDER"},
-                {"label":"Ind: Employee","role":"RECIPIENT"},
-                {"label":"Ind: Person","role":"BENEFICIARY"},
-                {"label":"Spc: Inspector","role":"MENTIONED"}
-            ],"primary_holder":"Org: Employer"}"#,
+                {"label":"Org: Employer","position":"ACTIVE"},
+                {"label":"Ind: Employee","position":"COUNTERPARTY"},
+                {"label":"Ind: Person","position":"BENEFICIARY"},
+                {"label":"Spc: Inspector","position":"MENTIONED"}
+            ]}"#,
         )
         .unwrap();
         let labels = test_labels();
         let actors = parse_tier3_actors(&result, &labels).unwrap();
-        assert_eq!(actors[0].role, "primary-holder");
-        assert_eq!(actors[1].role, "recipient");
-        assert_eq!(actors[2].role, "beneficiary");
-        assert_eq!(actors[3].role, "mentioned");
+        assert_eq!(actors[0].position, "active");
+        assert_eq!(actors[1].position, "counterparty");
+        assert_eq!(actors[2].position, "beneficiary");
+        assert_eq!(actors[3].position, "mentioned");
     }
 
     #[test]
-    fn parse_tier3_actors_missing_role_defaults_mentioned() {
+    fn parse_tier3_actors_missing_position_defaults_mentioned() {
         let result: serde_json::Value =
             serde_json::from_str(r#"{"actors":[{"label":"Org: Employer"}]}"#).unwrap();
         let labels = test_labels();
         let actors = parse_tier3_actors(&result, &labels).unwrap();
-        assert_eq!(actors[0].role, "mentioned");
+        assert_eq!(actors[0].position, "mentioned");
         assert_eq!(actors[0].reason, None);
+        assert_eq!(actors[0].relates_to, None);
     }
 
     #[test]

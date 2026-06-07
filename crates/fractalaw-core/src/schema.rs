@@ -335,7 +335,7 @@ pub mod esh {
             Field::new("extraction_method", DataType::Utf8, true),
             Field::new("holder_inferred_from", DataType::Utf8, true),
             Field::new("ancestor_distance", DataType::Int32, true),
-            // 3.10c Actors struct — native Arrow List<Struct> (1)
+            // 3.10c Actors struct — Hohfeldian position model (1)
             Field::new(
                 "actors",
                 DataType::List(Arc::new(Field::new(
@@ -343,8 +343,8 @@ pub mod esh {
                     DataType::Struct(
                         vec![
                             Field::new("label", DataType::Utf8, false),
-                            Field::new("role", DataType::Utf8, false),
-                            Field::new("recipient_type", DataType::Utf8, true),
+                            Field::new("position", DataType::Utf8, false),
+                            Field::new("relates_to", DataType::Utf8, true),
                             Field::new("label_source", DataType::Utf8, false),
                             Field::new("reason", DataType::Utf8, true),
                         ]

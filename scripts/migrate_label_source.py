@@ -10,8 +10,8 @@ import pyarrow.parquet as pq
 
 ACTORS_TYPE = pa.list_(pa.struct([
     pa.field("label", pa.string(), nullable=False),
-    pa.field("role", pa.string(), nullable=False),
-    pa.field("recipient_type", pa.string(), nullable=True),
+    pa.field("position", pa.string(), nullable=False),
+    pa.field("relates_to", pa.string(), nullable=True),
     pa.field("label_source", pa.string(), nullable=False),
     pa.field("reason", pa.string(), nullable=True),
 ]))
@@ -37,8 +37,8 @@ for val in actors_col:
             new_entries.append([
                 {
                     "label": a.get("label", ""),
-                    "role": a.get("role", ""),
-                    "recipient_type": a.get("recipient_type"),
+                    "position": a.get("position", a.get("role", "active")).replace("holder", "active").replace("primary-active", "active").replace("recipient", "counterparty"),
+                    "relates_to": a.get("relates_to"),
                     "label_source": a.get("label_source", "canonical"),
                     "reason": a.get("reason"),
                 }

@@ -275,14 +275,14 @@ const GOVERNMENT_DEFS: &[(&str, &str)] = &[
         "Gvt: Devolved Admin",
         r"(?:[\s[:punct:]])Assembly(?:[\s[:punct:]])"
     ),
-    actor!(
-        "HM Forces",
-        r"(?:[\s[:punct:]])(?:(?:His|Her) Majesty[''\u{2019}]s forces|armed forces)(?:[\s[:punct:]])"
-    ),
 ];
 
 /// Governed actor definitions (businesses, individuals, supply chain, etc.)
 const GOVERNED_DEFS: &[(&str, &str)] = &[
+    actor!(
+        "HM Forces",
+        r"(?:[\s[:punct:]])(?:(?:His|Her) Majesty[''\u{2019}]s forces|armed forces)(?:[\s[:punct:]])"
+    ),
     actor!(
         "Org: Employer",
         r"(?:[\s[:punct:]])[Ee]mployers?(?:[\s[:punct:]])"
