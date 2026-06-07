@@ -1,4 +1,4 @@
-# Classification Cascade Strategy
+# Classification Cascade Strategy (v0.2)
 
 ## Problem
 
@@ -146,6 +146,53 @@ fractalaw taxa enrich --gap-c --force-low-confidence --priority customer
 fractalaw taxa enrich --gap-c
 ```
 
+## Forward Feedback: LLM → Regex
+
+The cascade is not one-directional. Tier 3 LLM findings should feed back to improve Tier 1 regex patterns, systematically reducing the volume that needs escalation.
+
+**Process:**
+1. Collect Tier 3 classifications where the LLM found a DRRP that Tier 1 missed
+2. Categorise the failure pattern (passive voice, thing-subject, separated qualifier, etc.)
+3. If the pattern is regular enough, add a new regex to Tier 1
+4. Re-run on the corpus — provisions previously escalated now handled at Tier 1
+
+**Examples from this session:**
+- "Any person installing..." → added participial pattern to `PERSON_QUALIFIERS`
+- "Any person— (a) who..." → added sub-paragraph separator to `PERSON_QUALIFIERS`
+
+This creates a virtuous cycle: LLM calls generate insights → regex patterns expand → fewer LLM calls needed → cost decreases permanently.
+
+## Correct "None" Handling
+
+Provisions that genuinely have no DRRP (definitions, conditions, commencement clauses) should be stamped as **done with high confidence** immediately, not treated as classification failures. Currently these get `taxa_confidence = 0.0` and appear as low-confidence provisions, wasting escalation budget.
+
+**Fix:** When the purpose classifier identifies a provision as purely structural (`ENACTMENT`, `INTERPRETATION`, `AMENDMENT`, `REPEAL_REVOCATION`, `APPLICATION_SCOPE`, `EXTENT`) AND the provision passes the `should_skip_drrp` gate, assign `taxa_confidence = 0.9` and `classification_tier = "regex"`. These are correct classifications, not failures.
+
+**Impact:** Removes ~40% of provisions from the escalation pipeline — they're correctly classified as non-DRRP and should never be sent to Tier 2 or 3.
+
+## Versioning and Lineage
+
+Every provision classification should carry full lineage so that model upgrades can selectively re-evaluate provisions.
+
+### Fields
+
+```
+classification_tier: Utf8      -- "regex" | "model" | "llm"
+classification_version: Utf8   -- "v2.3" (parser version) or "gemini-2.5-flash-20260607"
+classification_config: Utf8    -- hash of thresholds/settings used
+```
+
+### Re-evaluation on upgrade
+
+`--force-low-confidence` works on absolute confidence threshold. But a major model upgrade (new Tier 2 model, improved regex patterns) should allow version-aware re-evaluation:
+
+```bash
+# Re-evaluate provisions classified by an older version
+fractalaw taxa enrich --gap-c --reclassify-before v2.4
+```
+
+This prevents permanent lock-in to early (potentially wrong) high-confidence classifications while still avoiding unnecessary re-processing of provisions classified by the current version.
+
 ## Active Learning Loop
 
 The cascade generates training data for Tier 2 as a byproduct:
@@ -156,6 +203,13 @@ The cascade generates training data for Tier 2 as a byproduct:
 4. Tier 2 handles more cases → fewer Tier 3 calls → cost decreases over time
 
 The [active learning](https://lilianweng.github.io/posts/2022-02-20-active-learning/) strategy is **uncertainty sampling**: pick the provisions where Tier 2 is least confident and send those to Tier 3. This maximises the information gain per LLM call.
+
+### Cold start mitigation
+
+Tier 2 will initially be weak. To avoid poor uncertainty estimates driving wasteful LLM calls:
+- Seed with diverse data: sample from every law family, every section type, every DRRP type
+- Use **diversity sampling** alongside uncertainty: cluster uncertain provisions by embedding similarity, select representatives from each cluster rather than the N most uncertain (which may all be similar)
+- Set a minimum Tier 3 batch size per active learning round to ensure breadth
 
 ## Estimated Coverage
 
@@ -170,13 +224,38 @@ Based on QA results (OH&S family, 10 samples each across 3 QA runs):
 | Narrative duty, complex clauses | ~5% | Tier 3 (LLM) | Working but expensive |
 | Definitional/conditional (not DRRP) | ~5% | Correct "none" | No action needed |
 
+## Confidence Calibration
+
+The thresholds (0.7 done / 0.5 escalate) are starting points. Calibration requires a golden dataset and cost-benefit analysis.
+
+### Golden Dataset
+
+Build a set of 500-1000 expertly annotated provisions as ground truth. Requirements:
+- Diverse: all law families, section types, DRRP types, and edge cases
+- Includes correct "none" provisions (not just DRRP-bearing)
+- Annotated with: DRRP type, actor positions, extraction difficulty
+- Used for: threshold calibration, regression testing, Tier 2 evaluation
+
+### Calibration Metrics
+
+| Metric | Purpose |
+|--------|---------|
+| Tier 1 "Done" precision | Are high-confidence regex classifications correct? False positives are permanent. |
+| Tier 1 "Escalate" recall | Are hard cases reaching higher tiers? False negatives are missed signal. |
+| Inter-tier disagreement | How often does Tier 3 contradict Tier 1's "done"? Indicates threshold drift. |
+| LLM cost per provision | Tracks cascade efficiency over time. |
+| Coverage by tier | % provisions handled at each tier — shifts show model improvement or degradation. |
+
 ## What to Build Next
 
 1. **`--force-low-confidence` flag** — only re-parse provisions below confidence threshold
-2. **`classification_tier` column** — track which tier classified each provision
-3. **Tier 2 prototype** — nearest-neighbour on embeddings, transfer classification from similar high-confidence provision
-4. **Active learning harness** — select uncertain Tier 2 provisions, send to Tier 3, accumulate labels
-5. **Customer priority routing** — cascade depth based on register membership
+2. **`classification_tier` + `classification_version` columns** — track which tier and version classified each provision
+3. **Correct "none" confidence** — assign high confidence to provisions correctly skipped by purpose gate
+4. **Customer priority routing** — cascade depth based on register membership
+5. **Forward feedback tooling** — systematic collection of LLM findings → regex pattern improvements
+6. **Golden dataset** — 500-1000 annotated provisions for threshold calibration
+7. **Tier 2 prototype** — nearest-neighbour on embeddings, transfer classification from similar high-confidence provision
+8. **Active learning harness** — uncertainty + diversity sampling, select → LLM → ingest → retrain loop
 
 ## References
 
