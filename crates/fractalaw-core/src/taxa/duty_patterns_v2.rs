@@ -51,7 +51,7 @@ const EXTENDED_WINDOW: usize = 200;
 
 static PERSON_QUALIFIERS: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?i)(?:a person (?:who|with a duty|must|shall)|every person|no person|(?:each|any) person (?:who|at work|with)|the duty of (?:every|any|each) person)",
+        r"(?i)(?:a person (?:who|with a duty|must|shall)|every person|no person|(?:each|any) person (?:who|at work|with|[a-z]+ing )|the duty of (?:every|any|each) person)",
     )
     .unwrap()
 });
@@ -1135,6 +1135,37 @@ mod tests {
         let text = "where an employer has made an assessment, the employer shall \
                      ensure that the risk is eliminated or controlled";
         let actors = vec![actor("Org: Employer", "employer")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+    }
+
+    // ── Participial person patterns (Bug 1 fix) ────────────────────
+
+    #[test]
+    fn any_person_installing_shall_ensure() {
+        // UK_uksi_1998_2451:art.7(1) — was missing DRRP
+        let text = "Any person installing a gas fitting shall ensure that it is \
+                    properly supported and so placed or protected as to avoid any \
+                    undue risk of damage to the fitting.";
+        let actors = vec![actor("Ind: Person", "person")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+    }
+
+    #[test]
+    fn any_person_carrying_on_shall_not() {
+        let text = "Any person carrying on a business shall not sell or supply \
+                    any substance unless it has been tested.";
+        let actors = vec![actor("Ind: Person", "person")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+    }
+
+    #[test]
+    fn any_person_having_control_shall_ensure() {
+        let text = "Any person having control of premises shall ensure that the \
+                    premises are maintained in a safe condition.";
+        let actors = vec![actor("Ind: Person", "person")];
         let dc = match_governed_v2(text, &actors).unwrap();
         assert_eq!(dc.family, DutyFamily::Governed);
     }
