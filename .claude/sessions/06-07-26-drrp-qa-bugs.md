@@ -42,16 +42,70 @@ For regex provisions with multiple actors, all get `position: active` because th
 
 **Recommendation:** Option 2 (heuristic) + Option 3 (selective Tier 3 for ambiguous cases). The heuristic handles the obvious cases (Employee is always counterparty in an Employer duty), and Tier 3 handles the edge cases.
 
+## Shipped (2026-06-07)
+
+### Bug 1 fixes
+- **Participial person patterns** (commit `a45bfb7`): `PERSON_QUALIFIERS` now matches "any person [verb]ing" (installing, carrying, having)
+- **Sub-paragraph separated patterns** (commit `75288c3`): allows em-dash + sub-paragraph marker between "any person" and qualifier ("Any person— (a) who... shall ensure")
+- 444 core tests pass, zero regressions
+
+### Bug 2 fix: Regex position heuristic (commit `da47b3c`)
+- Derives Hohfeldian positions from match span: actor before modal = active, actor after modal = counterparty
+- Eliminates need for LLM calls on multi-actor regex provisions
+- Tier 3 LLM reserved for inherited provisions only (28 calls for OH&S vs 244 without heuristic)
+- 3 position tests added to core
+
+### QA results after fixes
+- 3 QA runs at 10 samples each: consistent 33% precision
+- Failures now dominated by parser coverage gaps (DRRP=none on provisions with duties) not position classification
+- Position heuristic working correctly when DRRP match exists
+- Remaining failures: schedule fragments, passive voice, thing-subject obligations, narrative duty refs
+
+### Regex ceiling reached
+Investigation confirmed the regex parser handles the clear cases but cannot solve:
+- Thing-subject obligations ("policy must") — actor not in subject position
+- Passive voice ("can be taken") — no explicit actor
+- Narrative duty references ("the duty he owes them") — "duty" as a noun
+- Schedule fragments — text only meaningful with parent clause context
+
+### Classification Cascade Strategy (v0.2)
+- Strategy doc: `docs/CLASSIFICATION-CASCADE-STRATEGY.md`
+- Gemini review: `docs/reviews/gemini-cascade-strategy-review-20260607.md`
+- Architecture: Regex (free) → Own model (cheap) → LLM (expensive)
+- "Done" stamping at high confidence — never re-parse
+- Customer priority routing — full cascade only on registered laws
+- Forward feedback: LLM findings → regex pattern improvements
+- Active learning with diversity sampling for Tier 2 training
+- Golden dataset (500-1000 provisions) needed for threshold calibration
+
+### Also this session
+- Hohfeldian position model implemented (commit `4a1e544`): `position` field replaces `role`
+- HM Forces moved from government to governed defs
+- `--skip-recent` flag for enrichment (24h window)
+- `enrich-and-publish` skill created
+- `drrp-qa` skill created (renamed from `tier1-qa`)
+- OH&S enriched with position heuristic + published to sertantai
+- QQ applicable laws enriched and published (71,908 provisions)
+- NAS backup taken (20260607)
+- Sertantai briefing doc updated with final Hohfeldian schema
+
 ## What's next
 
-1. **Bug 1 first** — investigate and fix purpose classifier misses on schedule/article provisions
-2. **Bug 2** — implement heuristic position assignment for regex provisions, then selective Tier 3
-3. Re-run QA after fixes to measure improvement
+1. **`--force-low-confidence` flag** — only re-parse provisions below confidence threshold
+2. **`classification_tier` + `classification_version` columns** — lineage tracking
+3. **Correct "none" confidence** — high confidence stamp for genuinely non-DRRP provisions
+4. **Golden dataset** — 500-1000 annotated provisions for calibration
+5. **Tier 2 prototype** — NN on embeddings for DRRP type
+6. **Forward feedback tooling** — systematic LLM → regex improvement cycle
 
 ## References
 
 - Purpose classifier: `fractalaw-core/src/taxa/purpose.rs`
 - DRRP parser: `fractalaw-core/src/taxa/mod.rs` (`parse_v2`)
-- Clause decomposition: `fractalaw-core/src/taxa/clause.rs`
-- QA results: `data/qa-results/drrp-qa-all-20260607-144621.json`
+- Pattern matcher: `fractalaw-core/src/taxa/duty_patterns_v2.rs`
+- Cascade strategy: `docs/CLASSIFICATION-CASCADE-STRATEGY.md`
+- Gemini cascade review: `docs/reviews/gemini-cascade-strategy-review-20260607.md`
+- Gemini actors review: `docs/reviews/gemini-actors-struct-review-20260607.md`
+- QA results: `data/qa-results/drrp-qa-all-20260607-*.json`
 - QA skill: `.claude/skills/drrp-qa/`
+- Prior session: `.claude/sessions/06-07-26-hohfeldian-position-build.md`
