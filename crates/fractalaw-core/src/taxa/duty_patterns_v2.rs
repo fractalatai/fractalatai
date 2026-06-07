@@ -51,7 +51,7 @@ const EXTENDED_WINDOW: usize = 200;
 
 static PERSON_QUALIFIERS: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?i)(?:a person (?:who|with a duty|must|shall)|every person|no person|(?:each|any) person (?:who|at work|with|[a-z]+ing )|the duty of (?:every|any|each) person)",
+        r"(?i)(?:a person (?:who|with a duty|must|shall)|every person|no person|(?:each|any) person[—–\-]?\s*(?:\([a-z]\)\s*)?(?:who|at work|with|[a-z]+ing )|the duty of (?:every|any|each) person)",
     )
     .unwrap()
 });
@@ -1165,6 +1165,26 @@ mod tests {
     fn any_person_having_control_shall_ensure() {
         let text = "Any person having control of premises shall ensure that the \
                     premises are maintained in a safe condition.";
+        let actors = vec![actor("Ind: Person", "person")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+    }
+
+    #[test]
+    fn any_person_em_dash_sub_para_who_shall_ensure() {
+        // UK_uksi_1998_2451:art.16(2) — person separated from "who" by
+        // em-dash + sub-paragraph marker
+        let text = "Any person—\n(a) who first provides gas through any service \
+                    pipe\nshall ensure that a notice is displayed.";
+        let actors = vec![actor("Ind: Person", "person")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+    }
+
+    #[test]
+    fn any_person_dash_sub_para_with() {
+        let text = "Any person—\n(b) with responsibility for maintenance\nshall \
+                    ensure that equipment is safe.";
         let actors = vec![actor("Ind: Person", "person")];
         let dc = match_governed_v2(text, &actors).unwrap();
         assert_eq!(dc.family, DutyFamily::Governed);
