@@ -3342,17 +3342,29 @@ async fn enrich_single_law(
                         .iter()
                         .map(|a| ActorEntry {
                             label: a.clone(),
-                            position: "active".into(),
+                            position: record
+                                .actor_positions
+                                .get(a)
+                                .copied()
+                                .unwrap_or("active")
+                                .into(),
                             relates_to: None,
                             label_source: "canonical".into(),
                             reason: None,
                         })
-                        .chain(record.government_actors.iter().map(|a| ActorEntry {
-                            label: a.clone(),
-                            position: "active".into(),
-                            relates_to: None,
-                            label_source: "canonical".into(),
-                            reason: None,
+                        .chain(record.government_actors.iter().map(|a| {
+                            ActorEntry {
+                                label: a.clone(),
+                                position: record
+                                    .actor_positions
+                                    .get(a)
+                                    .copied()
+                                    .unwrap_or("active")
+                                    .into(),
+                                relates_to: None,
+                                label_source: "canonical".into(),
+                                reason: None,
+                            }
                         }))
                         .collect(),
                 });
@@ -3569,10 +3581,12 @@ async fn enrich_single_law(
             );
         }
 
-        // ── Gap C Tier 3: LLM holder/recipient classification ──
+        // ── Gap C Tier 3: LLM position classification ──
         //
         // For inherited provisions with multiple actors, call Gemini 2.5 Flash
-        // to distinguish holder from recipient. Only fires if GEMINI_API_KEY is set.
+        // to classify Hohfeldian positions. Regex provisions use the span-based
+        // heuristic instead (actor_positions from parse_v2).
+        // Only fires if GEMINI_API_KEY is set.
         if let Ok(api_key) = std::env::var("GEMINI_API_KEY") {
             let tier3_candidates: Vec<usize> = (0..provision_taxa.len())
                 .filter(|&i| {
@@ -3611,9 +3625,7 @@ async fn enrich_single_law(
                 for &idx in &tier3_candidates {
                     let p = &provision_taxa[idx];
                     let target_sid = p.section_id.clone();
-                    let parent_sid = p.holder_inferred_from.first().cloned().unwrap_or_default();
 
-                    // Truncate at char boundary to avoid panics on multi-byte text
                     fn truncate_str(s: &str, max: usize) -> &str {
                         if s.len() <= max {
                             s
@@ -3629,14 +3641,26 @@ async fn enrich_single_law(
                         .get(&target_sid)
                         .map(|t| truncate_str(t, 500))
                         .unwrap_or("");
-                    let parent_text = text_map
-                        .get(&parent_sid)
-                        .map(|t| truncate_str(t, 500))
-                        .unwrap_or("");
 
-                    if target_text.is_empty() || parent_text.is_empty() {
+                    if target_text.is_empty() {
                         continue;
                     }
+
+                    // For inherited provisions, include parent text as context
+                    let parent_sid = p.holder_inferred_from.first().cloned().unwrap_or_default();
+                    let parent_context = if !parent_sid.is_empty() {
+                        text_map
+                            .get(&parent_sid)
+                            .map(|t| {
+                                format!(
+                                    "\n## Parent Provision (context)\nSection: {parent_sid}\nText: {}",
+                                    truncate_str(t, 500)
+                                )
+                            })
+                            .unwrap_or_default()
+                    } else {
+                        String::new()
+                    };
 
                     let actor_list: String = p
                         .actors
@@ -3653,14 +3677,10 @@ A provision mentions multiple actors. Classify each actor's POSITION relative to
 ## Actors found in the text
 {actor_list}
 
-## Parent Provision
-Section: {parent_sid}
-Text: {parent_text}
-
-## Target Provision (child)
+## Provision
 Section: {target_sid}
 Text: {target_text}
-
+{parent_context}
 ## Task
 For each actor, classify their POSITION:
 

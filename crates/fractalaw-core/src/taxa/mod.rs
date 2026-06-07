@@ -81,6 +81,11 @@ pub struct TaxaRecord {
     /// Fitness rules — law-level applicability (polarity + p-dimension tags).
     /// Populated for Application+Scope provisions only.
     pub fitness_rules: Vec<fitness::FitnessRule>,
+
+    /// Hohfeldian actor positions derived from regex pattern match span.
+    /// Maps actor label → "active" | "counterparty" | "mentioned".
+    /// Only populated when a v2 match span is available.
+    pub actor_positions: std::collections::HashMap<String, &'static str>,
 }
 
 /// Run the full Taxa classification pipeline on raw legislative text.
@@ -160,6 +165,38 @@ pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
         vec![]
     };
 
+    // Derive Hohfeldian positions from match span + actor offsets.
+    // Actor at span.actor_start = active (the subject of the obligation).
+    // Actors appearing after span.modal_end = counterparty (in object position).
+    // Actors appearing before the modal but not at actor_start = mentioned.
+    let actor_positions = {
+        let mut positions = std::collections::HashMap::new();
+        if let Some(ref dc) = cr.classification
+            && let Some(span) = dc.span
+        {
+            // Find which actor label matched at the span's actor position
+            let all_actors: Vec<&actors::ActorMatch> = extracted
+                .governed
+                .iter()
+                .chain(extracted.government.iter())
+                .collect();
+
+            for actor in &all_actors {
+                if actor.offset == span.actor_start
+                    || (actor.offset < span.modal_start
+                        && actor.offset + actor.keyword.len() + 2 >= span.actor_start)
+                {
+                    positions.insert(actor.label.clone(), "active");
+                } else if actor.offset > span.modal_end {
+                    positions.insert(actor.label.clone(), "counterparty");
+                } else {
+                    positions.insert(actor.label.clone(), "mentioned");
+                }
+            }
+        }
+        positions
+    };
+
     TaxaRecord {
         cleaned_text: cleaned,
         governed_actors: extracted.governed_labels(),
@@ -172,6 +209,7 @@ pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
         taxa_confidence,
         clause_structure,
         fitness_rules,
+        actor_positions,
     }
 }
 
@@ -1490,6 +1528,47 @@ mod tests {
                 .any(|a| a.contains("Duty Holder")),
             "should extract Duty Holder, got: {:?}",
             record.governed_actors
+        );
+    }
+
+    // ── Actor position heuristic tests ─────────────────────────────
+
+    #[test]
+    fn position_employer_active_employee_counterparty() {
+        let text = "The employer shall ensure the health and safety of employees.";
+        let record = parse(text);
+        assert_eq!(
+            record.actor_positions.get("Org: Employer").copied(),
+            Some("active")
+        );
+        assert_eq!(
+            record.actor_positions.get("Ind: Employee").copied(),
+            Some("counterparty")
+        );
+    }
+
+    #[test]
+    fn position_employer_shall_provide_training_to_employee() {
+        let text =
+            "Every employer shall ensure that adequate training is provided to each employee.";
+        let record = parse(text);
+        assert_eq!(
+            record.actor_positions.get("Org: Employer").copied(),
+            Some("active")
+        );
+        assert_eq!(
+            record.actor_positions.get("Ind: Employee").copied(),
+            Some("counterparty")
+        );
+    }
+
+    #[test]
+    fn position_single_actor_is_active() {
+        let text = "The employer shall ensure a safe workplace.";
+        let record = parse(text);
+        assert_eq!(
+            record.actor_positions.get("Org: Employer").copied(),
+            Some("active")
         );
     }
 }
