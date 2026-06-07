@@ -403,7 +403,7 @@ enum TaxaAction {
         /// Enable Gap C Tier 1: deterministic parent-clause inheritance for implicit duty holders
         #[arg(long)]
         gap_c: bool,
-        /// Skip laws where all provisions were enriched within the last hour
+        /// Skip laws where all provisions were enriched within the last 24 hours
         #[arg(long)]
         skip_recent: bool,
     },
@@ -4239,9 +4239,9 @@ async fn cmd_taxa_enrich(
         names
     };
 
-    // --skip-recent: filter out laws enriched within the last hour
+    // --skip-recent: filter out laws enriched within the last 24 hours
     let law_names = if skip_recent {
-        let cutoff = chrono::Utc::now() - chrono::Duration::hours(1);
+        let cutoff = chrono::Utc::now() - chrono::Duration::hours(24);
         let cutoff_ns = cutoff.timestamp_nanos_opt().unwrap_or(0);
         let mut filtered = Vec::new();
         let mut skipped = 0usize;
@@ -4267,7 +4267,7 @@ async fn cmd_taxa_enrich(
             }
         }
         if skipped > 0 {
-            eprintln!("  --skip-recent: skipping {skipped} laws enriched within the last hour");
+            eprintln!("  --skip-recent: skipping {skipped} laws enriched within the last 24 hours");
         }
         filtered
     } else {
