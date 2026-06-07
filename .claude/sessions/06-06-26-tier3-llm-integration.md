@@ -100,25 +100,71 @@ After Tier 1 pass, for provisions where:
 - Flags `(inferred)` suffix bug in `baserow.ex` — duplicates every actor in single-selects
 - Migration path: phase 1 read struct alongside flat columns, phase 2 drop flat columns
 
-## Known issues for next session
+### OH&S publish + sertantai validation
+- Removed flat actor columns (`governed_actors`, `government_actors`) from zenoh provision payload (commit `5a51c34`)
+- Published OH&S family to sertantai: **14,100 provisions across 68 making laws**
+- Sertantai analysis confirmed:
+  - 4,800 provisions with actors, 8,849 total actor entries
+  - Extraction methods: regex (4,185), inherited (802), agentic (251)
+  - Roles: holder (8,588), mentioned (112), recipient (90), beneficiary (59)
+  - 100% canonical labels
+  - **1,409 provisions with struct data but no flat columns** — entirely new coverage from Tier 1 tree walk
+  - **37% more actors per provision** vs flat columns (1.49 vs 1.09)
+  - Flat columns were silently dropping ~30% of holder actors
 
-### Inference quality
-- HSWA s.19/s.21: Inspector/Person role assignments need human review — complex enforcement chain (HSC → HSE → Inspector via warrant)
-- HSC (Health and Safety Commission) not in actor dictionary — merged into HSE in 2008 but still referenced in HSWA
-- `recipient_type` currently hardcoded to `protected_person` — need `regulated_actor` and `informed_party` classification
+### Crown/HM Forces classification discovery
+- Crown and HM Forces are in `GOVERNMENT_DEFS` but act as duty holders in many provisions (HSWA s.48 binds the Crown)
+- Gemini confirmed: Crown is **both** authority and duty holder depending on context
+- The actors struct `role` field handles this per-provision — but current role taxonomy doesn't map to DRRP
 
-### Sertantai integration
-- Sertantai needs to consume new actors struct (currently reads flat columns only)
-- `(inferred)` suffix in `baserow.ex` `@holder_options` needs removing — doubles single-select options
-- Automated QA (LLM checking LLM) is circular — real validation is human review through sertantai UI
+## Critical design issue: role taxonomy must align with DRRP
+
+The `role` field currently uses: `primary-holder | holder | recipient | beneficiary | mentioned`
+
+This fails to capture the core DRRP taxonomy we extract per provision. `holder` is doing all the lifting — a duty-bearing employer and a power-wielding inspector both get `role: holder`, losing the distinction that DRRP already captures.
+
+### Proposed role taxonomy
+
+```
+duty-holder        -- bears a duty (must act) — maps to DRRP "Duty"
+right-holder       -- holds a right — maps to DRRP "Right"
+responsibility-holder -- bears a responsibility — maps to DRRP "Responsibility"
+power-holder       -- exercises a power — maps to DRRP "Power"
+recipient          -- receives protection/information/training
+beneficiary        -- benefits without active obligation
+mentioned          -- referenced but no active role
+```
+
+Plus `primary-` prefix for the LLM's primary pick (e.g., `primary-duty-holder`).
+
+### Why this matters
+- Sertantai currently uses the `Gov:`/`Ind:`/`Org:` label prefix to infer governed vs government — a proxy for what the role should tell it directly
+- `drrp_types` already classifies each provision as Duty/Right/Responsibility/Power — the role should reflect which actor holds which DRRP type
+- Crown/HM Forces dual nature is naturally handled: `power-holder` in enforcement provisions, `duty-holder` in workplace safety provisions
+- Removes the need for the governed/government dictionary split as the primary classification axis
+
+### Implementation scope
+- Schema: role field values change
+- Tier 3 prompt: ask LLM to classify using DRRP roles
+- Tier 1/regex: map from `drrp_types` on the provision to set role (e.g., if provision is a Duty, actors are duty-holders)
+- Tests: update canned responses and assertions
+- Sertantai briefing: update role taxonomy
+- LanceDB: re-enrich to populate new roles
+
+## Known issues
+
+- HSWA s.19/s.21: Inspector/Person role assignments need human review
+- HSC (Health and Safety Commission) not in actor dictionary
+- `recipient_type` currently hardcoded to `protected_person`
+- `(inferred)` suffix in sertantai `baserow.ex` needs removing
 
 ## What's next
 
-1. Sertantai migration — consume actors struct, remove `(inferred)` bug
-2. Re-enrich OH&S with latest schema (reason + primary-holder populated)
-3. Publish to sertantai via zenoh for human review in UI
-4. Iterate on prompt/label quality based on UI review findings
-5. Broader corpus enrichment with Tier 3
+1. **DRRP role taxonomy** — extend role values to align with Duty/Right/Responsibility/Power
+2. Re-enrich OH&S with DRRP roles + reason + primary-holder
+3. Publish to sertantai for human review
+4. Sertantai migration — consume actors struct with DRRP roles, drop flat columns
+5. Broader corpus enrichment
 
 ## References
 
