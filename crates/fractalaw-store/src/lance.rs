@@ -153,8 +153,8 @@ impl LanceStore {
         let columns: Vec<String> = [
             "section_id",
             "drrp_types",
-            "governed_actors",
-            "government_actors",
+            // governed_actors and government_actors omitted — replaced by actors struct.
+            // Sertantai retains old flat data for comparison.
             "duty_family",
             "duty_sub_type",
             "popimar",
