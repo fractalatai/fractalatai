@@ -160,15 +160,11 @@ Plus `primary-` prefix for the LLM's primary pick (e.g., `primary-duty-holder`).
 
 ### Gaps to close (from Gemini review)
 
-**Gap 1: Actor-to-actor linkage.** Current model lists active and counterparty actors as flat lists within a provision. No explicit link between *which* active actor's duty maps to *which* counterparty's claim. Example: CDM 2015 multi-contractor sites where Client has duty to Principal Designer and separate duty to Principal Contractor. The `List<Struct>` can't express these pairwise relations. Options:
-- Add optional `relates_to` field per actor entry (label of the linked actor)
-- Accept the limitation — most provisions have a single active/counterparty pair
-- Model pairwise relations as separate provisions (clause decomposition)
+**Gap 1: Actor-to-actor linkage.** Current model lists active and counterparty actors as flat lists within a provision. No explicit link between *which* active actor's duty maps to *which* counterparty's claim. Example: CDM 2015 multi-contractor sites where Client has duty to Principal Designer and separate duty to Principal Contractor.
+- **Resolution:** Add optional `relates_to: Utf8?` field per actor entry — the label of the linked actor. Null when the relation is provision-wide (most cases).
 
-**Gap 2: Consultative/advisory roles without formal DRRP.** HSWA s.2(6) imposes a duty to consult safety representatives — this is modellable (active duty, counterparty claim). But informal consultation without legal backing gets `mentioned`, which loses the nature of the interaction. Options:
-- Add `consulted` as a position (extends beyond strict Hohfeld)
-- Keep `mentioned` and accept the signal loss
-- Let the provision text carry the detail
+**Gap 2: Consultative/advisory roles without formal DRRP.** HSWA s.2(6) imposes a duty to consult safety representatives — this is modellable (active duty, counterparty claim). But informal consultation without legal backing gets `mentioned`, which loses the nature of the interaction.
+- **Resolution:** Accept signal loss — use `mentioned` for informal consultation. The provision text carries the detail. Keeps the position taxonomy clean and Hohfeldian.
 
 ### Legal ontology research
 
@@ -191,6 +187,7 @@ Plus `primary-` prefix for the LLM's primary pick (e.g., `primary-duty-holder`).
 actors: List<Struct>
 ├── label: Utf8          -- "Org: Employer", "Gvt: Agency: HSE"
 ├── position: Utf8       -- "active" | "counterparty" | "beneficiary" | "mentioned"
+├── relates_to: Utf8?    -- linked actor label for pairwise relations (null when provision-wide)
 ├── label_source: Utf8   -- "canonical" | "invented"
 └── reason: Utf8?        -- LLM reasoning (null for regex/inherited)
 
