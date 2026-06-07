@@ -151,20 +151,75 @@ Plus `primary-` prefix for the LLM's primary pick (e.g., `primary-duty-holder`).
 - Sertantai briefing: update role taxonomy
 - LanceDB: re-enrich to populate new roles
 
+### Gemini review of Hohfeldian model (2026-06-07)
+- Review saved: `docs/reviews/gemini-actors-struct-review-20260607.md`
+- Agreed decisions: `correlative` → **`counterparty`**, Crown stays government, HM Forces to governed
+- Beneficiary survives as a position (practical value for "who benefits" filtering)
+- Keep Duty/Responsibility split at provision level
+- Allow multiple entries per actor when they hold distinct legal relations
+
+### Gaps to close (from Gemini review)
+
+**Gap 1: Actor-to-actor linkage.** Current model lists active and counterparty actors as flat lists within a provision. No explicit link between *which* active actor's duty maps to *which* counterparty's claim. Example: CDM 2015 multi-contractor sites where Client has duty to Principal Designer and separate duty to Principal Contractor. The `List<Struct>` can't express these pairwise relations. Options:
+- Add optional `relates_to` field per actor entry (label of the linked actor)
+- Accept the limitation — most provisions have a single active/counterparty pair
+- Model pairwise relations as separate provisions (clause decomposition)
+
+**Gap 2: Consultative/advisory roles without formal DRRP.** HSWA s.2(6) imposes a duty to consult safety representatives — this is modellable (active duty, counterparty claim). But informal consultation without legal backing gets `mentioned`, which loses the nature of the interaction. Options:
+- Add `consulted` as a position (extends beyond strict Hohfeld)
+- Keep `mentioned` and accept the signal loss
+- Let the provision text carry the detail
+
+### Legal ontology research
+
+**LKIF-Core** (most relevant): 15-module OWL ontology from the ESTRELLA project. Three legal modules:
+- `legal-role.owl` — `Legal_Role` → `Social_Legal_Role` → `Professional_Legal_Role`, connected to agents via `played_by`
+- `norm.owl` — explicitly models Hohfeldian concepts: `Right` (Permissive, Liberty, Obligative, Liability, Exclusionary), `Hohfeldian_Power` (Action, Enabling, Declarative, Immunity), `Obligation`/`Permission`
+- Agent-norm relationship via `qualified_by` (thing qualified by norm) and `bears` (document carries norms)
+- **Key insight**: LKIF models norms as qualifications of propositions, not as direct agent-norm pairs. The `qualified_by` property connects a state of affairs to the norm that qualifies it. Our `position` field is a pragmatic simplification of this.
+- Source: [github.com/RinkeHoekstra/lkif-core](https://github.com/RinkeHoekstra/lkif-core)
+
+**ELI** (European Legislation Identifier): metadata standard for legislation identification, not actor-provision relationships. Useful for document-level metadata but doesn't model legal relations within provisions.
+
+**LegalRuleML**: XML standard for legal rule interchange. Models rules with `ruleTarget`, `ruleContext`, `ruleRequirement`, `ruleCondition`, `deonticAction`. More about rule logic than actor classification.
+
+**Assessment**: LKIF-Core's norm module validates our approach — it models the same Hohfeldian concepts (rights, powers, immunities) but with more granularity than we need. Our `active | counterparty | beneficiary | mentioned` is a practical projection of LKIF's richer ontology onto a flat struct suitable for Arrow/LanceDB storage.
+
+## Agreed struct schema (pending implementation)
+
+```
+actors: List<Struct>
+├── label: Utf8          -- "Org: Employer", "Gvt: Agency: HSE"
+├── position: Utf8       -- "active" | "counterparty" | "beneficiary" | "mentioned"
+├── label_source: Utf8   -- "canonical" | "invented"
+└── reason: Utf8?        -- LLM reasoning (null for regex/inherited)
+
+extraction_method: Utf8  -- "regex" | "inherited" | "agentic" | "agentic_unvalidated"
+drrp_types: List<Utf8>   -- ["DUTY"] — position derives meaning from this
+```
+
+Position + DRRP type = full Hohfeldian relation:
+- `active` on DUTY = duty-holder
+- `counterparty` on DUTY = claim-holder
+- `active` on POWER = power-holder
+- `counterparty` on POWER = liable party
+
+`recipient_type` field removed — redundant when position + DRRP tells the full story.
+
 ## Known issues
 
-- HSWA s.19/s.21: Inspector/Person role assignments need human review
 - HSC (Health and Safety Commission) not in actor dictionary
-- `recipient_type` currently hardcoded to `protected_person`
-- `(inferred)` suffix in sertantai `baserow.ex` needs removing
+- Actor-to-actor linkage gap (pairwise relations in multi-actor provisions)
+- Consultative roles without formal DRRP backing
 
 ## What's next
 
-1. **DRRP role taxonomy** — extend role values to align with Duty/Right/Responsibility/Power
-2. Re-enrich OH&S with DRRP roles + reason + primary-holder
-3. Publish to sertantai for human review
-4. Sertantai migration — consume actors struct with DRRP roles, drop flat columns
-5. Broader corpus enrichment
+1. **Implement agreed struct** — `role` → `position` with values `active | counterparty | beneficiary | mentioned`
+2. Update Tier 3 prompt to classify position (not role)
+3. Update tests with new position values
+4. Re-enrich OH&S with new schema
+5. Publish to sertantai for human review
+6. Broader corpus enrichment
 
 ## References
 
@@ -173,5 +228,8 @@ Plus `primary-` prefix for the LLM's primary pick (e.g., `primary-duty-holder`).
 - Actor dictionary: `docs/ACTOR-DICTIONARY.md`
 - Design doc: `docs/GAP-C-AGENTIC-EXTRACTION-PLAN.md` (Appendix A)
 - Sertantai briefing: `~/Desktop/sertantai-legal/backend/data/fractalaw-actors-struct-migration.md`
+- Gemini review: `docs/reviews/gemini-actors-struct-review-20260607.md`
+- LKIF-Core ontology: [github.com/RinkeHoekstra/lkif-core](https://github.com/RinkeHoekstra/lkif-core)
+- Hohfeldian analysis: [legaldesire.com](https://legaldesire.com/legal-rights-and-duties-hohfeldian-analysis/)
 - Phase 2A session: `.claude/sessions/06-06-26-gap-c-phase-2a-actors-struct.md`
 - LanceDB rebuild session: `.claude/sessions/06-06-26-lancedb-rebuild-tier3.md`
