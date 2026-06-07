@@ -403,6 +403,9 @@ enum TaxaAction {
         /// Enable Gap C Tier 1: deterministic parent-clause inheritance for implicit duty holders
         #[arg(long)]
         gap_c: bool,
+        /// Skip laws where all provisions were enriched within the last hour
+        #[arg(long)]
+        skip_recent: bool,
     },
     /// Generate clause eyeball review markdown for manual QA
     Eyeball {
@@ -543,6 +546,7 @@ async fn main() -> anyhow::Result<()> {
                 family,
                 force,
                 gap_c,
+                skip_recent,
             } => {
                 let store = open_duck(&data_dir)?;
                 let law_filter = if let Some(ref fam) = family {
@@ -560,7 +564,7 @@ async fn main() -> anyhow::Result<()> {
                             .collect::<Vec<_>>()
                     })
                 };
-                cmd_taxa_enrich(&data_dir, &store, law_filter, force, gap_c).await
+                cmd_taxa_enrich(&data_dir, &store, law_filter, force, gap_c, skip_recent).await
             }
             TaxaAction::Eyeball {
                 laws,
@@ -4138,6 +4142,7 @@ async fn cmd_taxa_enrich(
     law_filter: Option<Vec<String>>,
     force: bool,
     gap_c: bool,
+    skip_recent: bool,
 ) -> anyhow::Result<()> {
     // Ensure taxa_hash/published_hash and fitness columns exist (idempotent).
     store.ensure_taxa_hash_columns()?;
@@ -4232,6 +4237,41 @@ async fn cmd_taxa_enrich(
             lance_law_names.len()
         );
         names
+    };
+
+    // --skip-recent: filter out laws enriched within the last hour
+    let law_names = if skip_recent {
+        let cutoff = chrono::Utc::now() - chrono::Duration::hours(1);
+        let cutoff_ns = cutoff.timestamp_nanos_opt().unwrap_or(0);
+        let mut filtered = Vec::new();
+        let mut skipped = 0usize;
+        for name in &law_names {
+            let filter = format!(
+                "law_name = '{}' AND taxa_classified_at IS NOT NULL",
+                name.replace('\'', "''")
+            );
+            let batches = lance.query_legislation_text(&filter, 1, 0).await?;
+            let recent = batches.iter().any(|b| {
+                b.column_by_name("taxa_classified_at")
+                    .and_then(|col| {
+                        col.as_any()
+                            .downcast_ref::<arrow::array::TimestampNanosecondArray>()
+                            .map(|a| !a.is_null(0) && a.value(0) > cutoff_ns)
+                    })
+                    .unwrap_or(false)
+            });
+            if recent {
+                skipped += 1;
+            } else {
+                filtered.push(name.clone());
+            }
+        }
+        if skipped > 0 {
+            eprintln!("  --skip-recent: skipping {skipped} laws enriched within the last hour");
+        }
+        filtered
+    } else {
+        law_names
     };
 
     let mut enriched = 0usize;
