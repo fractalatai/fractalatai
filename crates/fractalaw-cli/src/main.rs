@@ -3222,10 +3222,20 @@ async fn enrich_single_law(
                 } else {
                     (None, None)
                 };
-                let taxa_confidence = if record.taxa_confidence > 0.0 {
-                    Some(record.taxa_confidence)
+                // v0.3 confidence: based on routing decision, not regex match quality
+                let has_actors =
+                    !record.governed_actors.is_empty() || !record.government_actors.is_empty();
+                let actor_count = record.governed_actors.len() + record.government_actors.len();
+                let has_drrp = !record.duty_types.is_empty();
+                let taxa_confidence = if !has_actors {
+                    // No actors, structural provision → high confidence "none"
+                    Some(0.90)
+                } else if actor_count == 1 && has_drrp {
+                    // Single-actor + DRRP match → regex reliable core
+                    Some(0.80)
                 } else {
-                    None
+                    // Multi-actor or DRRP=none with actors → low confidence, Tier 2 candidate
+                    Some(0.30)
                 };
                 // Extract per-provision fitness tags from fitness_rules.
                 let mut fp_polarity = Vec::new();
@@ -3618,10 +3628,14 @@ async fn enrich_single_law(
                         .get(&p.section_id)
                         .copied()
                         .unwrap_or(0.0);
-                    p.actors.len() > 1
-                        && !p.drrp_types.is_empty() // No position to classify if no DRRP
-                        && p.actors.iter().all(|a| a.position == "active")
-                        && existing_conf < 0.80 // Don't overwrite Tier 2+ classifications
+                    let has_actors =
+                        !p.governed_actors.is_empty() || !p.government_actors.is_empty();
+                    let multi_actor = p.actors.len() > 1;
+                    let drrp_none_with_actors = p.drrp_types.is_empty() && has_actors;
+                    // v0.3: route by actor count, not confidence
+                    // Multi-actor → always Tier 2 (position classification)
+                    // Single-actor + DRRP=none + has actors → Tier 2 (DRRP classification)
+                    (multi_actor || drrp_none_with_actors) && existing_conf < 0.80 // Don't overwrite Tier 2+ classifications
                 })
                 .collect();
 
@@ -3706,18 +3720,19 @@ async fn enrich_single_law(
                             .join("\n");
 
                         let prompt = format!(
-                            r#"Classify each actor's POSITION in this legal provision.
+                            r#"Classify this legal provision.
 
 Text: {text}
-DRRP type: {drrp}
+Regex DRRP hint: {drrp}
 
-Actors:
+Actors found:
 {actor_list}
 
-For each actor respond with one of: ACTIVE (bears the duty), COUNTERPARTY (other side), BENEFICIARY, MENTIONED.
+1. What is the DRRP type? One of: Duty, Right, Responsibility, Power, or none.
+2. For each actor, what is their POSITION? One of: ACTIVE (bears the duty/exercises the power), COUNTERPARTY (other side of the legal relation), BENEFICIARY, MENTIONED.
 
 Respond in JSON only. Use the EXACT actor labels above:
-{{"actors": [{{"label": "Org_Employer", "position": "ACTIVE", "reason": "..."}}]}}"#
+{{"drrp_type": "Duty|Right|Responsibility|Power|none", "actors": [{{"label": "Org_Employer", "position": "ACTIVE", "reason": "..."}}]}}"#
                         );
 
                         let body = serde_json::json!({
@@ -3814,6 +3829,23 @@ Respond in JSON only. Use the EXACT actor labels above:
                                 p.governed_actors = new_governed;
                                 p.government_actors = new_government;
                             }
+
+                            // Write DRRP type from Tier 2 if provided
+                            if let Some(drrp_val) = result.get("drrp_type").and_then(|v| v.as_str())
+                            {
+                                let drrp_lower = drrp_val.to_lowercase();
+                                let mapped = match drrp_lower.as_str() {
+                                    "duty" => Some("Duty"),
+                                    "right" => Some("Right"),
+                                    "responsibility" => Some("Responsibility"),
+                                    "power" => Some("Power"),
+                                    _ => None,
+                                };
+                                if let Some(dt) = mapped {
+                                    p.drrp_types = vec![dt.to_string()];
+                                }
+                            }
+
                             if has_unknown_labels {
                                 p.extraction_method = "local_unvalidated".to_string();
                                 p.taxa_confidence = Some(0.60);
