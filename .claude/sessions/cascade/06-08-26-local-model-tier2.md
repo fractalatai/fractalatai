@@ -144,14 +144,45 @@ The local model runs on every enrichment — no API cost. It processes the ~30% 
 - Reference doc: `docs/howto/gemini-api-python.md`
 - Covers Python SDK, REST API, thinkingBudget, JSON output
 
-## What's next
+### Tier 2 DRRP=none filter (commit `614f818`)
+- Exclusion/scope clauses with no DRRP no longer sent to Tier 2
+- Prevents wasting CPU on provisions where positions are meaningless
 
-1. Iteratively improve: run QA on more SIs → corrections flow back → data quality improves
-2. Upgrade to Gemma 12B when disk allows (better legal parsing than 4B)
-3. Implement `--force-low-confidence` CLI flag for targeted re-processing
-4. Add `classification_version` column for lineage tracking
-5. Build golden dataset from accumulated QA corrections (target: 500-1000 provisions)
-6. Consider Tier 2 for DRRP type classification (not just positions)
+### QA-driven analysis — regex confidence not predictive
+- Aggregated 53 QA samples across 6 runs
+- Regex INCORRECT avg confidence (0.76) > CORRECT avg (0.68) — confidence score lies
+- Single-actor + DRRP found: ~80% precision (reliable core)
+- Multi-actor: 12% precision (unreliable)
+- DRRP=none with actors: 5% precision (parser misses)
+
+### Cascade strategy v0.3 (commit `3b79dcd`)
+- Regex demoted from classifier to sieve
+- Actor-count routing replaces confidence-based routing
+- Single-actor + DRRP → regex definitive (0.80)
+- Multi-actor OR DRRP=none with actors → always Tier 2
+- Gemini review confirms approach (commit `06c6d0a`)
+
+### Upstream issue raised
+- shotleybuilder/sertantai-legal#108 — sub-paragraph hierarchy_path flattening
+- fractalaw does NOT parse laws into provisions — receives pre-parsed LAT from sertantai
+
+## Key learnings
+
+1. **Regex confidence is not predictive** — measures match quality, not classification correctness
+2. **Actor count is the discriminator** — single-actor is reliable, multi-actor is not
+3. **Data quality ratchet works** — QA corrections at 0.90 survive re-enrichment
+4. **Friendly labels fix 4B truncation** — `Org_Employer` → `Org: Employer` mapping
+5. **DRRP=none provisions shouldn't get position classification** — no obligation = no positions
+6. **The iterative loop** — enrich → QA → correct → protect → repeat — incrementally improves the dataset
+
+## What's next → v0.3 implementation session
+
+1. **Revise Tier 2 filter** — fire on multi-actor OR (single-actor + DRRP=none with actors)
+2. **Extend Tier 2 prompt** — classify DRRP type as well as positions
+3. **Revise confidence scoring** — based on routing decision, not regex match quality
+4. **Remove confidence-based escalation** — replace with actor-count routing
+5. Upgrade to Gemma 12B when disk allows
+6. Build golden dataset from accumulated QA corrections
 
 ## Starting Ollama
 
