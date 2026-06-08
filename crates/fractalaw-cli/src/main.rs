@@ -3790,9 +3790,11 @@ Respond in JSON only. Use the EXACT actor labels above:
                             }
                             if has_unknown_labels {
                                 p.extraction_method = "local_unvalidated".to_string();
+                                p.taxa_confidence = Some(0.60);
                                 tier2_unvalidated += 1;
                             } else {
                                 p.extraction_method = "local".to_string();
+                                p.taxa_confidence = Some(0.80);
                             }
                             tier2_count += 1;
                         }
@@ -3988,9 +3990,11 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
                         }
                         if has_unknown_labels {
                             p.extraction_method = "agentic_unvalidated".to_string();
+                            p.taxa_confidence = Some(0.70);
                             tier3_unvalidated += 1;
                         } else {
                             p.extraction_method = "agentic".to_string();
+                            p.taxa_confidence = Some(0.90);
                         }
                         tier3_count += 1;
                     }
