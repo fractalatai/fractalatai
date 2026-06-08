@@ -38,7 +38,17 @@ source ~/.bashrc && GEMINI_API_KEY="$GEMINI_API_KEY" \
 
 # Dry run — assemble samples without LLM calls (for inspection)
 /usr/bin/python3 .claude/skills/drrp-qa/run_qa.py --dry-run --family "OH&S"
+
+# Generate human-readable DRRP report for a specific law (no LLM calls)
+/usr/bin/python3 .claude/skills/drrp-qa/run_qa.py --report UK_uksi_1992_2793
 ```
+
+## Workflow: Human-Gated QA
+
+1. **Report** — generate markdown table of all DRRP provisions for a law
+2. **Human review** — read the report, identify provisions that look wrong
+3. **QA with write-back** — run Gemini QA on the full law (or flagged provisions) with `--write-back`
+4. **Re-report** — verify corrections landed
 
 ## What It Validates
 

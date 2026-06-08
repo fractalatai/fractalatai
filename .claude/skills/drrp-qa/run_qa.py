@@ -274,6 +274,116 @@ def apply_correction(lancedb_path: str, section_id: str, correction: dict):
         return False
 
 
+# ── Report generation ────────────────────────────────────────────────
+
+def generate_report(lancedb_path: str, law_name: str, data_dir: Path):
+    """Generate a human-readable markdown DRRP report for a law."""
+    import lancedb as ldb
+    from datetime import datetime
+
+    db = ldb.connect(str(lancedb_path))
+    tbl = db.open_table("legislation_text")
+
+    results = (
+        tbl.search()
+        .where(f"law_name = '{law_name.replace(chr(39), chr(39)+chr(39))}'", prefilter=True)
+        .select([
+            "section_id", "section_type", "text", "drrp_types",
+            "extraction_method", "taxa_confidence", "actors", "purposes",
+        ])
+        .limit(10000)
+        .to_arrow()
+    )
+
+    if results.num_rows == 0:
+        print(f"No provisions found for {law_name}")
+        return
+
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    report_path = data_dir / "qa-results" / f"drrp-report-{law_name}-{ts}.md"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(report_path, "w") as f:
+        f.write(f"# DRRP Report: {law_name}\n\n")
+        f.write(f"Generated: {datetime.now().isoformat()}\n\n")
+
+        # Summary
+        total = results.num_rows
+        methods = {}
+        has_drrp = 0
+        has_actors = 0
+        for i in range(total):
+            m = results.column("extraction_method")[i].as_py() or "none"
+            methods[m] = methods.get(m, 0) + 1
+            drrp = results.column("drrp_types")[i].as_py()
+            actors = results.column("actors")[i].as_py()
+            if drrp and len(drrp) > 0:
+                has_drrp += 1
+            if actors and len(actors) > 0:
+                has_actors += 1
+
+        f.write(f"## Summary\n\n")
+        f.write(f"| Metric | Value |\n|---|---|\n")
+        f.write(f"| Total provisions | {total} |\n")
+        f.write(f"| With DRRP | {has_drrp} ({100*has_drrp//total}%) |\n")
+        f.write(f"| With actors | {has_actors} ({100*has_actors//total}%) |\n")
+        f.write(f"| Methods | {methods} |\n\n")
+
+        # DRRP provisions table
+        f.write(f"## DRRP Provisions\n\n")
+        f.write("| Section | Type | DRRP | Method | Conf | Actors | Text |\n")
+        f.write("|---|---|---|---|---|---|---|\n")
+
+        for i in range(total):
+            drrp = results.column("drrp_types")[i].as_py() or []
+            actors = results.column("actors")[i].as_py() or []
+            if not drrp and not actors:
+                continue
+
+            sid = results.column("section_id")[i].as_py() or ""
+            # Strip law prefix for readability
+            short_sid = sid.split(":", 1)[1] if ":" in sid else sid
+            st = results.column("section_type")[i].as_py() or ""
+            method = results.column("extraction_method")[i].as_py() or ""
+            conf = results.column("taxa_confidence")[i].as_py()
+            conf_str = f"{conf:.2f}" if conf is not None else "-"
+            text = (results.column("text")[i].as_py() or "")[:100].replace("|", "\\|").replace("\n", " ")
+            drrp_str = ", ".join(drrp) if drrp else "-"
+
+            actor_parts = []
+            for a in actors:
+                label = a.get("label", "?")
+                pos = a.get("position", "?")
+                actor_parts.append(f"{label}={pos}")
+            actors_str = "; ".join(actor_parts) if actor_parts else "-"
+
+            f.write(f"| {short_sid} | {st} | {drrp_str} | {method} | {conf_str} | {actors_str} | {text} |\n")
+
+        # Non-DRRP structural provisions
+        f.write(f"\n## Structural (no DRRP)\n\n")
+        f.write("| Section | Type | Purposes | Conf |\n")
+        f.write("|---|---|---|---|\n")
+
+        for i in range(total):
+            drrp = results.column("drrp_types")[i].as_py() or []
+            actors = results.column("actors")[i].as_py() or []
+            if drrp or actors:
+                continue
+
+            sid = results.column("section_id")[i].as_py() or ""
+            short_sid = sid.split(":", 1)[1] if ":" in sid else sid
+            st = results.column("section_type")[i].as_py() or ""
+            purposes = results.column("purposes")[i].as_py() or []
+            conf = results.column("taxa_confidence")[i].as_py()
+            conf_str = f"{conf:.2f}" if conf is not None else "-"
+            purposes_str = ", ".join(purposes) if purposes else "-"
+
+            f.write(f"| {short_sid} | {st} | {purposes_str} | {conf_str} |\n")
+
+    print(f"Report saved to: {report_path}")
+    print(f"  {total} provisions, {has_drrp} with DRRP, {has_actors} with actors")
+
+
 # ── Main ─────────────────────────────────────────────────────────────
 
 def main():
@@ -288,6 +398,8 @@ def main():
                         help="Assemble samples without LLM calls")
     parser.add_argument("--write-back", action="store_true",
                         help="Write Gemini corrections back to LanceDB (stamps as agentic, conf=0.90)")
+    parser.add_argument("--report", type=str, default=None,
+                        help="Generate human-readable DRRP report for a specific law (e.g., UK_uksi_1992_2793)")
     parser.add_argument("--data-dir", type=str, default="data",
                         help="Data directory (default: data)")
     args = parser.parse_args()
@@ -299,6 +411,11 @@ def main():
     duckdb_path = data_dir / "fractalaw.duckdb"
     ts = datetime.now().strftime("%Y%m%d-%H%M%S")
     output_path = data_dir / "qa-results" / f"drrp-qa-{args.method}-{ts}.json"
+
+    # ── Report mode: dump human-readable DRRP table for a law ──
+    if args.report:
+        generate_report(str(lancedb_path), args.report, data_dir)
+        return
 
     api_key = None
     if not args.dry_run:
