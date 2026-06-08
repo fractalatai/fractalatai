@@ -72,9 +72,12 @@ Respond with EXACTLY one of:
 
 Then a brief explanation (1-2 sentences).
 
+If INCORRECT, also provide the corrected classification as JSON. Use the EXACT actor labels from above.
+
 Format:
 VERDICT: [CORRECT|INCORRECT|AMBIGUOUS]
 REASON: [your explanation]
+CORRECTION: {{"drrp_types": ["Duty"], "actors": [{{"label": "Org: Employer", "position": "active", "reason": "..."}}]}}
 """
 
 
@@ -91,6 +94,7 @@ def verify_with_gemini(prompt: str, api_key: str) -> dict:
 
     verdict = "UNKNOWN"
     reason = text
+    correction = None
     for line in text.split("\n"):
         line = line.strip()
         if line.upper().startswith("VERDICT:"):
@@ -103,8 +107,26 @@ def verify_with_gemini(prompt: str, api_key: str) -> dict:
                 verdict = "AMBIGUOUS"
         elif line.upper().startswith("REASON:"):
             reason = line.split(":", 1)[1].strip()
+        elif line.upper().startswith("CORRECTION:"):
+            json_str = line.split(":", 1)[1].strip()
+            try:
+                correction = json.loads(json_str)
+            except json.JSONDecodeError:
+                # Try to find JSON in the rest of the text
+                pass
 
-    return {"verdict": verdict, "reason": reason, "raw": text}
+    # If no inline correction found, try to extract JSON block from full text
+    if correction is None and verdict == "INCORRECT" and "{" in text:
+        import re
+        # Find last JSON object in the response
+        json_matches = re.findall(r'\{[^{}]*"actors"[^{}]*\[.*?\].*?\}', text, re.DOTALL)
+        if json_matches:
+            try:
+                correction = json.loads(json_matches[-1])
+            except json.JSONDecodeError:
+                pass
+
+    return {"verdict": verdict, "reason": reason, "correction": correction, "raw": text}
 
 
 # ── Sample assembly ─────────────────────────────────────────────────
@@ -197,6 +219,61 @@ def format_actors(actors: list) -> str:
     return "\n".join(lines)
 
 
+# ── Correction write-back ────────────────────────────────────────────
+
+def apply_correction(lancedb_path: str, section_id: str, correction: dict):
+    """Write a Gemini QA correction back to LanceDB.
+
+    Updates the provision's actors and drrp_types with Gemini's corrected
+    classification, stamped as agentic with 0.90 confidence.
+    """
+    import lancedb as ldb
+    import pyarrow as pa
+
+    db = ldb.connect(str(lancedb_path))
+    tbl = db.open_table("legislation_text")
+
+    # Build the corrected actors as Arrow struct
+    corrected_actors = correction.get("actors", [])
+    corrected_drrp = correction.get("drrp_types", [])
+
+    if not corrected_actors:
+        return False
+
+    ACTORS_TYPE = pa.list_(pa.struct([
+        pa.field("label", pa.string(), nullable=False),
+        pa.field("position", pa.string(), nullable=False),
+        pa.field("relates_to", pa.string(), nullable=True),
+        pa.field("label_source", pa.string(), nullable=False),
+        pa.field("reason", pa.string(), nullable=True),
+    ]))
+
+    actors_data = [{
+        "label": a.get("label", ""),
+        "position": a.get("position", "mentioned").lower(),
+        "relates_to": a.get("relates_to"),
+        "label_source": "canonical",  # Gemini uses our labels
+        "reason": a.get("reason"),
+    } for a in corrected_actors]
+
+    # Update via merge_insert on section_id
+    update_data = pa.table({
+        "section_id": [section_id],
+        "actors": pa.array([actors_data], type=ACTORS_TYPE),
+        "drrp_types": pa.array([corrected_drrp], type=pa.list_(pa.string())),
+        "extraction_method": ["agentic"],
+        "taxa_confidence": pa.array([0.90], type=pa.float32()),
+    })
+
+    try:
+        tbl.merge_insert("section_id").when_matched_update_all().execute(update_data)
+        return True
+    except Exception as e:
+        print(f"  WARNING: Failed to write correction for {section_id}: {e}",
+              file=sys.stderr)
+        return False
+
+
 # ── Main ─────────────────────────────────────────────────────────────
 
 def main():
@@ -209,6 +286,8 @@ def main():
                         help="Extraction method: all, regex, inherited, agentic (default: all)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Assemble samples without LLM calls")
+    parser.add_argument("--write-back", action="store_true",
+                        help="Write Gemini corrections back to LanceDB (stamps as agentic, conf=0.90)")
     parser.add_argument("--data-dir", type=str, default="data",
                         help="Data directory (default: data)")
     args = parser.parse_args()
@@ -292,6 +371,16 @@ def main():
         elif verdict == "INCORRECT":
             beta_param += 1
             incorrect += 1
+            # Write correction back to LanceDB if available and --write-back enabled
+            correction = verdict_result.get("correction")
+            if correction and args.write_back:
+                ok = apply_correction(
+                    str(lancedb_path), sample["section_id"], correction
+                )
+                if ok:
+                    print(f"  >> Correction applied to LanceDB (agentic, conf=0.90)")
+                else:
+                    print(f"  >> Correction not applied (parse failed or no actors)")
         elif verdict == "AMBIGUOUS":
             ambiguous += 1
 
@@ -304,6 +393,7 @@ def main():
             "actors": sample["actors"],
             "verdict": verdict,
             "reason": verdict_result["reason"],
+            "correction": verdict_result.get("correction"),
             "text": sample["text"][:300],
         })
 
