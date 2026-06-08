@@ -115,13 +115,43 @@ The local model runs on every enrichment — no API cost. It processes the ~30% 
 - 27.5 GB available for inference
 - **Recommendation**: add a second M.2 NVMe SSD (500 GB, ~£30-40) for model storage and build overflow. Or reclaim the 120 GB Windows partition (never used).
 
+### Tier 2 wired into enrichment (commit `6d528ac`)
+- Fires on multi-actor provisions where span heuristic couldn't classify (all defaulted to active)
+- Confidence gate: only provisions with existing LanceDB confidence < 0.80
+- Friendly labels for prompt (`Org_Employer` → `Org: Employer` on response) — fixed 4B label truncation
+- MHR test: 7/7 classified, all canonical labels, sensible positions
+
+### Confidence stamps (commit `912849f`)
+- Tier 2 validated: 0.80, unvalidated: 0.60
+- Tier 3 validated: 0.90, unvalidated: 0.70
+- Provisions above threshold skip future re-enrichment
+
+### QA correction write-back (commit `5944ad8`)
+- DRRP QA prompt now asks Gemini for corrected classification when INCORRECT
+- `--write-back` flag applies corrections to LanceDB at agentic/0.90 confidence
+- Corrections include corrected DRRP types and actor positions
+- Each QA run incrementally improves the dataset
+
+### Confidence protection (commit `bf46152`)
+- Reads existing LanceDB confidence at start of `enrich_single_law`
+- Tier 2 skips provisions with existing confidence >= 0.80
+- Tier 3 skips provisions with existing confidence >= 0.90
+- Batch writer skips provisions where existing confidence > new confidence
+- **Verified**: Gemini 0.90 correction survives `--force` re-enrichment
+- Data quality ratchet — only goes up
+
+### Gemini API how-to (commit `6c10fcb`)
+- Reference doc: `docs/howto/gemini-api-python.md`
+- Covers Python SDK, REST API, thinkingBudget, JSON output
+
 ## What's next
 
-1. Wire Ollama into the enrichment pipeline as Tier 2
-2. Update prompt to enforce exact label format (reuse existing parsing functions)
-3. Benchmark on OH&S: accuracy vs Gemini, speed for targeted provisions
-4. Implement confidence-based routing: Tier 1 low-confidence → Tier 2
-5. Consider upgrading to Gemma 12B when disk space allows (12B better for legal parsing but needs ~8 GB)
+1. Iteratively improve: run QA on more SIs → corrections flow back → data quality improves
+2. Upgrade to Gemma 12B when disk allows (better legal parsing than 4B)
+3. Implement `--force-low-confidence` CLI flag for targeted re-processing
+4. Add `classification_version` column for lineage tracking
+5. Build golden dataset from accumulated QA corrections (target: 500-1000 provisions)
+6. Consider Tier 2 for DRRP type classification (not just positions)
 
 ## Starting Ollama
 
@@ -135,8 +165,10 @@ curl -s http://localhost:11434/api/tags | /usr/bin/python3 -c "import sys,json; 
 
 ## References
 
-- Cascade strategy: `docs/CLASSIFICATION-CASCADE-STRATEGY.md`
+- Cascade strategy: `docs/CLASSIFICATION-CASCADE-STRATEGY.md` v0.2
 - Gemini cascade review: `docs/reviews/gemini-cascade-strategy-review-20260607.md`
-- Prior QA results: `data/qa-results/drrp-qa-all-20260607-*.json`
+- Gemini API how-to: `docs/howto/gemini-api-python.md`
+- QA results: `data/qa-results/drrp-qa-*.json`
 - DRRP QA skill: `.claude/skills/drrp-qa/`
 - Enrichment skill: `.claude/skills/enrich-and-publish/`
+- Prior session: `.claude/sessions/cascade/06-07-26-drrp-qa-bugs.md`
