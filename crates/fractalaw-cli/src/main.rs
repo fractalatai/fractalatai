@@ -3619,6 +3619,7 @@ async fn enrich_single_law(
                         .copied()
                         .unwrap_or(0.0);
                     p.actors.len() > 1
+                        && !p.drrp_types.is_empty() // No position to classify if no DRRP
                         && p.actors.iter().all(|a| a.position == "active")
                         && existing_conf < 0.80 // Don't overwrite Tier 2+ classifications
                 })
