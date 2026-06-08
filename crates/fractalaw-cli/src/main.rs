@@ -3054,6 +3054,28 @@ async fn enrich_single_law(
         tracing::warn!("{law_name}: {row_count} provisions — large law");
     }
 
+    // Read existing confidence scores from LanceDB to protect higher-tier
+    // classifications from being overwritten by lower tiers.
+    let existing_confidence: std::collections::HashMap<String, f32> = {
+        let mut map = std::collections::HashMap::new();
+        for batch in &batches {
+            let sid_col = batch.column_by_name("section_id");
+            let conf_col = batch.column_by_name("taxa_confidence");
+            if let (Some(sid_c), Some(conf_c)) = (sid_col, conf_col)
+                && let Some(conf_arr) = conf_c.as_any().downcast_ref::<arrow::array::Float32Array>()
+            {
+                for row in 0..batch.num_rows() {
+                    if let Some(sid) = get_string_value(sid_c.as_ref(), row)
+                        && !conf_arr.is_null(row)
+                    {
+                        map.insert(sid, conf_arr.value(row));
+                    }
+                }
+            }
+        }
+        map
+    };
+
     struct LawTaxa {
         duty_holders: BTreeSet<String>,
         rights_holders: BTreeSet<String>,
@@ -3592,10 +3614,13 @@ async fn enrich_single_law(
             let tier2_candidates: Vec<usize> = (0..provision_taxa.len())
                 .filter(|&i| {
                     let p = &provision_taxa[i];
+                    let existing_conf = existing_confidence
+                        .get(&p.section_id)
+                        .copied()
+                        .unwrap_or(0.0);
                     p.actors.len() > 1
-                        && p.extraction_method != "agentic"
                         && p.actors.iter().all(|a| a.position == "active")
-                        && p.taxa_confidence.unwrap_or(0.0) < 0.7
+                        && existing_conf < 0.80 // Don't overwrite Tier 2+ classifications
                 })
                 .collect();
 
@@ -3819,7 +3844,13 @@ Respond in JSON only. Use the EXACT actor labels above:
             let tier3_candidates: Vec<usize> = (0..provision_taxa.len())
                 .filter(|&i| {
                     let p = &provision_taxa[i];
-                    p.extraction_method == "inherited" && p.governed_actors.len() > 1
+                    let existing_conf = existing_confidence
+                        .get(&p.section_id)
+                        .copied()
+                        .unwrap_or(0.0);
+                    p.extraction_method == "inherited"
+                        && p.governed_actors.len() > 1
+                        && existing_conf < 0.90 // Don't overwrite Tier 3 classifications
                 })
                 .collect();
 
@@ -4053,7 +4084,16 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
 
         let now_ns = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
 
+        let mut skipped_high_conf = 0u32;
         for pt in &provision_taxa {
+            // Protect higher-tier classifications from being overwritten
+            let new_conf = pt.taxa_confidence.unwrap_or(0.0);
+            if let Some(&existing_conf) = existing_confidence.get(&pt.section_id)
+                && existing_conf > new_conf
+            {
+                skipped_high_conf += 1;
+                continue;
+            }
             section_ids.append_value(&pt.section_id);
 
             for v in &pt.drrp_types {
@@ -4258,6 +4298,12 @@ Respond in JSON only, no markdown. Use the EXACT actor labels listed above — d
             ],
         )
         .context("building taxa RecordBatch")?;
+
+        if skipped_high_conf > 0 {
+            eprintln!(
+                "  Protected {skipped_high_conf} provisions with higher-confidence classifications"
+            );
+        }
 
         lance
             .update_taxa(taxa_batch)
