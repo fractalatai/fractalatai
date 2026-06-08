@@ -228,5 +228,5 @@ Position + DRRP type = full Hohfeldian relation:
 - Gemini review: `docs/reviews/gemini-actors-struct-review-20260607.md`
 - LKIF-Core ontology: [github.com/RinkeHoekstra/lkif-core](https://github.com/RinkeHoekstra/lkif-core)
 - Hohfeldian analysis: [legaldesire.com](https://legaldesire.com/legal-rights-and-duties-hohfeldian-analysis/)
-- Phase 2A session: `.claude/sessions/06-06-26-gap-c-phase-2a-actors-struct.md`
-- LanceDB rebuild session: `.claude/sessions/06-06-26-lancedb-rebuild-tier3.md`
+- Phase 2A session: `.claude/sessions/cascade/06-06-26-gap-c-phase-2a-actors-struct.md`
+- LanceDB rebuild session: `.claude/sessions/cascade/06-06-26-lancedb-rebuild-tier3.md`

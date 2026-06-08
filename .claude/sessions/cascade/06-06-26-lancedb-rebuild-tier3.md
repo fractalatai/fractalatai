@@ -109,4 +109,4 @@ After Tier 1, for inherited provisions where `governed_actors.len() > 1`.
 - Actors struct design: `docs/GAP-C-AGENTIC-EXTRACTION-PLAN.md` Appendix A
 - Tier 3 POC: `.claude/skills/tier1-qa/tier3_poc.py`
 - QA skill: `.claude/skills/tier1-qa/run_qa.py`
-- Phase 2A session: `.claude/sessions/06-06-26-gap-c-phase-2a-actors-struct.md`
+- Phase 2A session: `.claude/sessions/cascade/06-06-26-gap-c-phase-2a-actors-struct.md`

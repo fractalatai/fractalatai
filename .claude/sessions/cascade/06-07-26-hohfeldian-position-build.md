@@ -2,7 +2,7 @@
 
 ## Context
 
-**Prior session**: `.claude/sessions/06-06-26-tier3-llm-integration.md`
+**Prior session**: `.claude/sessions/cascade/06-06-26-tier3-llm-integration.md`
 **Gemini review**: `docs/reviews/gemini-actors-struct-review-20260607.md`
 **Sertantai briefing**: `~/Desktop/sertantai-legal/backend/data/fractalaw-actors-struct-migration.md`
 
@@ -80,4 +80,4 @@ Position derives meaning from the provision's `drrp_types`:
 - Hohfeldian analysis: [legaldesire.com](https://legaldesire.com/legal-rights-and-duties-hohfeldian-analysis/)
 - LKIF-Core norm.owl: [github.com/RinkeHoekstra/lkif-core](https://github.com/RinkeHoekstra/lkif-core)
 - Gemini review: `docs/reviews/gemini-actors-struct-review-20260607.md`
-- Prior session: `.claude/sessions/06-06-26-tier3-llm-integration.md`
+- Prior session: `.claude/sessions/cascade/06-06-26-tier3-llm-integration.md`

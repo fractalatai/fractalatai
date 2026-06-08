@@ -114,6 +114,6 @@ Risk: embeddings (97K rows, ~9 hours CPU). Mitigated by export-to-Parquet before
 - Tier 3 POC: `.claude/skills/tier1-qa/tier3_poc.py`
 - QA skill: `.claude/skills/tier1-qa/run_qa.py`
 - Actor dictionary: `docs/ACTOR-DICTIONARY.md`
-- Phase 1A results: `.claude/sessions/06-05-26-gap-c-phase-1a.md`
-- Phase 1C results: `.claude/sessions/06-06-26-gap-c-phase-1c-tier3-poc.md`
+- Phase 1A results: `.claude/sessions/cascade/06-05-26-gap-c-phase-1a.md`
+- Phase 1C results: `.claude/sessions/cascade/06-06-26-gap-c-phase-1c-tier3-poc.md`
 - LanceDB backup strategy: memory `feedback_lancedb_enrichment.md`

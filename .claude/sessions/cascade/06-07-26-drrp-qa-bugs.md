@@ -2,7 +2,7 @@
 
 ## Context
 
-**Prior session**: `.claude/sessions/06-07-26-hohfeldian-position-build.md`
+**Prior session**: `.claude/sessions/cascade/06-07-26-hohfeldian-position-build.md`
 **QA results**: `data/qa-results/drrp-qa-all-20260607-144621.json`
 **QA precision**: 33% (3/10 correct) — but measuring two different bugs
 
@@ -108,4 +108,4 @@ Investigation confirmed the regex parser handles the clear cases but cannot solv
 - Gemini actors review: `docs/reviews/gemini-actors-struct-review-20260607.md`
 - QA results: `data/qa-results/drrp-qa-all-20260607-*.json`
 - QA skill: `.claude/skills/drrp-qa/`
-- Prior session: `.claude/sessions/06-07-26-hohfeldian-position-build.md`
+- Prior session: `.claude/sessions/cascade/06-07-26-hohfeldian-position-build.md`
