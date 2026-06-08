@@ -277,9 +277,13 @@ def apply_correction(lancedb_path: str, section_id: str, correction: dict):
 # ── Report generation ────────────────────────────────────────────────
 
 def generate_report(lancedb_path: str, law_name: str, data_dir: Path):
-    """Generate a human-readable markdown DRRP report for a law."""
+    """Print a human-readable DRRP report for a law to stdout.
+
+    Shows regulation-level provisions (article, sub_article, section, sub_section)
+    — the level at which DRRP is meaningful. Fragments (paragraph, sub_paragraph)
+    are counted but not listed — they inherit from their parent regulation.
+    """
     import lancedb as ldb
-    from datetime import datetime
 
     db = ldb.connect(str(lancedb_path))
     tbl = db.open_table("legislation_text")
@@ -299,89 +303,63 @@ def generate_report(lancedb_path: str, law_name: str, data_dir: Path):
         print(f"No provisions found for {law_name}")
         return
 
-    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
-    report_path = data_dir / "qa-results" / f"drrp-report-{law_name}-{ts}.md"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
+    # Regulation-level types (where DRRP lives)
+    REGULATION_TYPES = {"article", "sub_article", "section", "sub_section"}
 
-    with open(report_path, "w") as f:
-        f.write(f"# DRRP Report: {law_name}\n\n")
-        f.write(f"Generated: {datetime.now().isoformat()}\n\n")
+    total = results.num_rows
+    reg_count = 0
+    frag_count = 0
+    structural_count = 0
+    methods = {}
+    has_drrp = 0
 
-        # Summary
-        total = results.num_rows
-        methods = {}
-        has_drrp = 0
-        has_actors = 0
-        for i in range(total):
-            m = results.column("extraction_method")[i].as_py() or "none"
-            methods[m] = methods.get(m, 0) + 1
-            drrp = results.column("drrp_types")[i].as_py()
-            actors = results.column("actors")[i].as_py()
-            if drrp and len(drrp) > 0:
-                has_drrp += 1
-            if actors and len(actors) > 0:
-                has_actors += 1
+    for i in range(total):
+        st = results.column("section_type")[i].as_py() or ""
+        m = results.column("extraction_method")[i].as_py() or "none"
+        methods[m] = methods.get(m, 0) + 1
+        drrp = results.column("drrp_types")[i].as_py()
+        if drrp and len(drrp) > 0:
+            has_drrp += 1
+        if st in REGULATION_TYPES:
+            reg_count += 1
+        elif st in ("paragraph", "sub_paragraph"):
+            frag_count += 1
+        else:
+            structural_count += 1
 
-        f.write(f"## Summary\n\n")
-        f.write(f"| Metric | Value |\n|---|---|\n")
-        f.write(f"| Total provisions | {total} |\n")
-        f.write(f"| With DRRP | {has_drrp} ({100*has_drrp//total}%) |\n")
-        f.write(f"| With actors | {has_actors} ({100*has_actors//total}%) |\n")
-        f.write(f"| Methods | {methods} |\n\n")
+    print(f"# {law_name}")
+    print(f"")
+    print(f"Provisions: {total} total, {reg_count} regulations, {frag_count} fragments, {structural_count} structural")
+    print(f"DRRP: {has_drrp} classified | Methods: {methods}")
+    print()
 
-        # DRRP provisions table
-        f.write(f"## DRRP Provisions\n\n")
-        f.write("| Section | Type | DRRP | Method | Conf | Actors | Text |\n")
-        f.write("|---|---|---|---|---|---|---|\n")
+    # Regulation-level provisions
+    print(f"| Section | DRRP | Conf | Method | Actors | Text |")
+    print(f"|---|---|---|---|---|---|")
 
-        for i in range(total):
-            drrp = results.column("drrp_types")[i].as_py() or []
-            actors = results.column("actors")[i].as_py() or []
-            if not drrp and not actors:
-                continue
+    for i in range(total):
+        st = results.column("section_type")[i].as_py() or ""
+        if st not in REGULATION_TYPES:
+            continue
 
-            sid = results.column("section_id")[i].as_py() or ""
-            # Strip law prefix for readability
-            short_sid = sid.split(":", 1)[1] if ":" in sid else sid
-            st = results.column("section_type")[i].as_py() or ""
-            method = results.column("extraction_method")[i].as_py() or ""
-            conf = results.column("taxa_confidence")[i].as_py()
-            conf_str = f"{conf:.2f}" if conf is not None else "-"
-            text = (results.column("text")[i].as_py() or "")[:100].replace("|", "\\|").replace("\n", " ")
-            drrp_str = ", ".join(drrp) if drrp else "-"
+        drrp = results.column("drrp_types")[i].as_py() or []
+        actors = results.column("actors")[i].as_py() or []
+        sid = results.column("section_id")[i].as_py() or ""
+        short_sid = sid.split(":", 1)[1] if ":" in sid else sid
+        method = results.column("extraction_method")[i].as_py() or ""
+        conf = results.column("taxa_confidence")[i].as_py()
+        conf_str = f"{conf:.2f}" if conf is not None else "-"
+        text = (results.column("text")[i].as_py() or "")[:120].replace("|", "\\|").replace("\n", " ")
+        drrp_str = ", ".join(drrp) if drrp else "-"
 
-            actor_parts = []
-            for a in actors:
-                label = a.get("label", "?")
-                pos = a.get("position", "?")
-                actor_parts.append(f"{label}={pos}")
-            actors_str = "; ".join(actor_parts) if actor_parts else "-"
+        actor_parts = []
+        for a in actors:
+            label = a.get("label", "?")
+            pos = a.get("position", "?")
+            actor_parts.append(f"{label}({pos})")
+        actors_str = ", ".join(actor_parts) if actor_parts else "-"
 
-            f.write(f"| {short_sid} | {st} | {drrp_str} | {method} | {conf_str} | {actors_str} | {text} |\n")
-
-        # Non-DRRP structural provisions
-        f.write(f"\n## Structural (no DRRP)\n\n")
-        f.write("| Section | Type | Purposes | Conf |\n")
-        f.write("|---|---|---|---|\n")
-
-        for i in range(total):
-            drrp = results.column("drrp_types")[i].as_py() or []
-            actors = results.column("actors")[i].as_py() or []
-            if drrp or actors:
-                continue
-
-            sid = results.column("section_id")[i].as_py() or ""
-            short_sid = sid.split(":", 1)[1] if ":" in sid else sid
-            st = results.column("section_type")[i].as_py() or ""
-            purposes = results.column("purposes")[i].as_py() or []
-            conf = results.column("taxa_confidence")[i].as_py()
-            conf_str = f"{conf:.2f}" if conf is not None else "-"
-            purposes_str = ", ".join(purposes) if purposes else "-"
-
-            f.write(f"| {short_sid} | {st} | {purposes_str} | {conf_str} |\n")
-
-    print(f"Report saved to: {report_path}")
-    print(f"  {total} provisions, {has_drrp} with DRRP, {has_actors} with actors")
+        print(f"| {short_sid} | {drrp_str} | {conf_str} | {method} | {actors_str} | {text} |")
 
 
 # ── Main ─────────────────────────────────────────────────────────────

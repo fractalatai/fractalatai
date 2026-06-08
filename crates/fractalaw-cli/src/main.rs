@@ -3662,20 +3662,12 @@ async fn enrich_single_law(
                             !p.governed_actors.is_empty() || !p.government_actors.is_empty();
                         let multi_actor = p.actors.len() > 1;
                         let drrp_none_with_actors = p.drrp_types.is_empty() && has_actors;
-                        // Structural types never contain DRRP — don't waste LLM calls
-                        const NON_DRRP_TYPES: &[&str] = &[
-                            "title",
-                            "signed",
-                            "heading",
-                            "table",
-                            "schedule",
-                            "part",
-                            "chapter",
-                            "commencement",
-                            "note",
-                        ];
-                        let is_structural = NON_DRRP_TYPES.contains(&p.section_type.as_str());
-                        !is_structural
+                        // Only classify at regulation level — fragments inherit.
+                        // Structural types and fragments don't get LLM calls.
+                        const REGULATION_TYPES: &[&str] =
+                            &["article", "sub_article", "section", "sub_section"];
+                        let is_regulation = REGULATION_TYPES.contains(&p.section_type.as_str());
+                        is_regulation
                             && (multi_actor || drrp_none_with_actors)
                             && existing_conf < 0.80
                     })
