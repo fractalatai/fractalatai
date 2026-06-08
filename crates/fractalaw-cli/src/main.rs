@@ -3613,45 +3613,59 @@ async fn enrich_single_law(
             );
         }
 
-        // ── Tier 2: Local model position classification (Ollama) ──
+        // ── Tier 2: LLM classification (local or Gemini) ──
         //
-        // For provisions with multiple actors where the span heuristic
-        // couldn't classify positions (all defaulted to "active"), send
-        // to local Gemma model via Ollama. Zero API cost, CPU inference.
-        // Only fires if Ollama is available at localhost:11434.
+        // Routes multi-actor and DRRP=none provisions to an LLM for
+        // position + DRRP classification. Provider selected by TIER2_PROVIDER:
+        //   "local"  → Ollama (CPU/GPU, zero API cost)
+        //   "gemini" → Gemini API (requires GEMINI_API_KEY)
+        //   unset    → skip Tier 2
         {
-            // Check which provisions need Tier 2: multi-actor, all "active"
-            let tier2_candidates: Vec<usize> = (0..provision_taxa.len())
-                .filter(|&i| {
-                    let p = &provision_taxa[i];
-                    let existing_conf = existing_confidence
-                        .get(&p.section_id)
-                        .copied()
-                        .unwrap_or(0.0);
-                    let has_actors =
-                        !p.governed_actors.is_empty() || !p.government_actors.is_empty();
-                    let multi_actor = p.actors.len() > 1;
-                    let drrp_none_with_actors = p.drrp_types.is_empty() && has_actors;
-                    // v0.3: route by actor count, not confidence
-                    // Multi-actor → always Tier 2 (position classification)
-                    // Single-actor + DRRP=none + has actors → Tier 2 (DRRP classification)
-                    (multi_actor || drrp_none_with_actors) && existing_conf < 0.80 // Don't overwrite Tier 2+ classifications
-                })
-                .collect();
+            let tier2_provider = std::env::var("TIER2_PROVIDER").ok();
+            let tier2_candidates: Vec<usize> = if tier2_provider.is_some() {
+                (0..provision_taxa.len())
+                    .filter(|&i| {
+                        let p = &provision_taxa[i];
+                        let existing_conf = existing_confidence
+                            .get(&p.section_id)
+                            .copied()
+                            .unwrap_or(0.0);
+                        let has_actors =
+                            !p.governed_actors.is_empty() || !p.government_actors.is_empty();
+                        let multi_actor = p.actors.len() > 1;
+                        let drrp_none_with_actors = p.drrp_types.is_empty() && has_actors;
+                        (multi_actor || drrp_none_with_actors) && existing_conf < 0.80
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
 
             if !tier2_candidates.is_empty() {
-                // Probe Ollama availability (fast health check)
-                let ollama_available = reqwest::Client::new()
-                    .get("http://localhost:11434/api/tags")
-                    .timeout(std::time::Duration::from_secs(2))
-                    .send()
-                    .await
-                    .is_ok();
+                let use_gemini = tier2_provider.as_deref() == Some("gemini");
+                let gemini_key = std::env::var("GEMINI_API_KEY").ok();
 
-                if ollama_available {
+                // Check provider availability
+                let provider_available = if use_gemini {
+                    gemini_key.is_some()
+                } else {
+                    reqwest::Client::new()
+                        .get("http://localhost:11434/api/tags")
+                        .timeout(std::time::Duration::from_secs(2))
+                        .send()
+                        .await
+                        .is_ok()
+                };
+
+                if provider_available {
+                    let provider_label = if use_gemini { "Gemini" } else { "Gemma" };
                     let valid_labels = fractalaw_core::taxa::actors::all_actor_labels();
                     let client = reqwest::Client::builder()
-                        .timeout(std::time::Duration::from_secs(60))
+                        .timeout(std::time::Duration::from_secs(if use_gemini {
+                            30
+                        } else {
+                            60
+                        }))
                         .build()
                         .context("building HTTP client for Tier 2")?;
 
@@ -3735,28 +3749,57 @@ Respond in JSON only. Use the EXACT actor labels above:
 {{"drrp_type": "Duty|Right|Responsibility|Power|none", "actors": [{{"label": "Org_Employer", "position": "ACTIVE", "reason": "..."}}]}}"#
                         );
 
-                        let body = serde_json::json!({
-                            "model": "gemma3:4b",
-                            "prompt": prompt,
-                            "stream": false,
-                            "options": {"temperature": 0.0}
-                        });
-
-                        let resp = client
-                            .post("http://localhost:11434/api/generate")
-                            .json(&body)
-                            .send()
-                            .await;
+                        let resp = if use_gemini {
+                            let api_key = gemini_key.as_deref().unwrap_or("");
+                            let url = format!(
+                                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
+                                api_key
+                            );
+                            let body = serde_json::json!({
+                                "contents": [{"parts": [{"text": prompt}]}],
+                                "generationConfig": {
+                                    "temperature": 0.1,
+                                    "maxOutputTokens": 2048,
+                                    "thinkingConfig": {"thinkingBudget": 256}
+                                }
+                            });
+                            client.post(&url).json(&body).send().await
+                        } else {
+                            let body = serde_json::json!({
+                                "model": "gemma3:4b",
+                                "prompt": prompt,
+                                "stream": false,
+                                "options": {"temperature": 0.0}
+                            });
+                            client
+                                .post("http://localhost:11434/api/generate")
+                                .json(&body)
+                                .send()
+                                .await
+                        };
 
                         let parsed = match resp {
                             Ok(r) => {
                                 let text = r.text().await.unwrap_or_default();
-                                let ollama_resp: serde_json::Value =
-                                    serde_json::from_str(&text).unwrap_or_default();
-                                let content = ollama_resp
-                                    .get("response")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("");
+                                // Extract content from either Gemini or Ollama response format
+                                let content = if use_gemini {
+                                    let gemini_resp: serde_json::Value =
+                                        serde_json::from_str(&text).unwrap_or_default();
+                                    gemini_resp
+                                        .pointer("/candidates/0/content/parts/0/text")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .to_string()
+                                } else {
+                                    let ollama_resp: serde_json::Value =
+                                        serde_json::from_str(&text).unwrap_or_default();
+                                    ollama_resp
+                                        .get("response")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("")
+                                        .to_string()
+                                };
+                                let content = content.as_str();
                                 // Strip markdown code fences if present
                                 let json_text = if content.contains("```json") {
                                     content
@@ -3847,12 +3890,18 @@ Respond in JSON only. Use the EXACT actor labels above:
                             }
 
                             if has_unknown_labels {
-                                p.extraction_method = "local_unvalidated".to_string();
-                                p.taxa_confidence = Some(0.60);
+                                p.extraction_method = if use_gemini {
+                                    "agentic_unvalidated"
+                                } else {
+                                    "local_unvalidated"
+                                }
+                                .to_string();
+                                p.taxa_confidence = Some(if use_gemini { 0.70 } else { 0.60 });
                                 tier2_unvalidated += 1;
                             } else {
-                                p.extraction_method = "local".to_string();
-                                p.taxa_confidence = Some(0.80);
+                                p.extraction_method =
+                                    if use_gemini { "agentic" } else { "local" }.to_string();
+                                p.taxa_confidence = Some(if use_gemini { 0.90 } else { 0.80 });
                             }
                             tier2_count += 1;
                         }
@@ -3861,7 +3910,7 @@ Respond in JSON only. Use the EXACT actor labels above:
                     if tier2_count > 0 {
                         let validated = tier2_count - tier2_unvalidated;
                         eprintln!(
-                            "  Tier 2 local: {tier2_count}/{} provisions classified by Gemma ({validated} validated, {tier2_unvalidated} with unknown labels)",
+                            "  Tier 2 ({provider_label}): {tier2_count}/{} provisions classified ({validated} validated, {tier2_unvalidated} with unknown labels)",
                             tier2_candidates.len()
                         );
                     }
