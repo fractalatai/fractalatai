@@ -3352,13 +3352,25 @@ async fn enrich_single_law(
 
                 provision_taxa.push(ProvisionTaxa {
                     section_id,
-                    drrp_types: record
-                        .duty_types
-                        .iter()
-                        .map(|d| format!("{:?}", d))
-                        .collect(),
-                    governed_actors: record.governed_actors.clone(),
-                    government_actors: record.government_actors.clone(),
+                    drrp_types: if is_structural {
+                        Vec::new()
+                    } else {
+                        record
+                            .duty_types
+                            .iter()
+                            .map(|d| format!("{:?}", d))
+                            .collect()
+                    },
+                    governed_actors: if is_structural {
+                        Vec::new()
+                    } else {
+                        record.governed_actors.clone()
+                    },
+                    government_actors: if is_structural {
+                        Vec::new()
+                    } else {
+                        record.government_actors.clone()
+                    },
                     duty_family,
                     duty_sub_type,
                     popimar: record.popimar.iter().map(|s| s.to_string()).collect(),
@@ -3381,23 +3393,13 @@ async fn enrich_single_law(
                     extraction_method: "regex".to_string(),
                     holder_inferred_from: Vec::new(),
                     ancestor_distance: None,
-                    actors: record
-                        .governed_actors
-                        .iter()
-                        .map(|a| ActorEntry {
-                            label: a.clone(),
-                            position: record
-                                .actor_positions
-                                .get(a)
-                                .copied()
-                                .unwrap_or("active")
-                                .into(),
-                            relates_to: None,
-                            label_source: "canonical".into(),
-                            reason: None,
-                        })
-                        .chain(record.government_actors.iter().map(|a| {
-                            ActorEntry {
+                    actors: if is_structural {
+                        Vec::new()
+                    } else {
+                        record
+                            .governed_actors
+                            .iter()
+                            .map(|a| ActorEntry {
                                 label: a.clone(),
                                 position: record
                                     .actor_positions
@@ -3408,9 +3410,23 @@ async fn enrich_single_law(
                                 relates_to: None,
                                 label_source: "canonical".into(),
                                 reason: None,
-                            }
-                        }))
-                        .collect(),
+                            })
+                            .chain(record.government_actors.iter().map(|a| {
+                                ActorEntry {
+                                    label: a.clone(),
+                                    position: record
+                                        .actor_positions
+                                        .get(a)
+                                        .copied()
+                                        .unwrap_or("active")
+                                        .into(),
+                                    relates_to: None,
+                                    label_source: "canonical".into(),
+                                    reason: None,
+                                }
+                            }))
+                            .collect()
+                    },
                 });
             }
 
