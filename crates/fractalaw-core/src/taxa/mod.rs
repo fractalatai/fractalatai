@@ -478,12 +478,15 @@ pub fn should_skip_drrp(purposes: &[&str], has_governed_actor: bool) -> bool {
         return true;
     }
 
-    // Interpretation-primary: if Interpretation is first (highest priority)
-    // purpose, skip DRRP — UNLESS a governed actor is present, indicating
-    // a mixed-content provision (definitions + duties in the same block).
-    // Product safety SIs commonly have long provisions where definitions
-    // appear first but real duties follow (e.g. "employer" shall ...).
+    // Interpretation-primary: if Interpretation is the ONLY purpose, always
+    // skip — pure definitions never contain DRRP even when actors are mentioned.
+    // If Interpretation is primary but other purposes exist (mixed-content),
+    // skip UNLESS a governed actor is present (product safety SIs with
+    // definitions + duties in the same block).
     if purposes.first() == Some(&purpose::INTERPRETATION) {
+        if purposes.len() == 1 {
+            return true; // Pure definition — actor mentions are noise
+        }
         return !has_governed_actor;
     }
 
@@ -708,6 +711,21 @@ mod tests {
         assert!(
             !record.governed_actors.is_empty(),
             "governed actor should be extracted"
+        );
+    }
+
+    #[test]
+    fn pure_definition_with_actor_mentions_skipped() {
+        // Pure Interpretation+Definition provision that mentions actors
+        // (e.g., "approved by the Health and Safety Executive") should
+        // still skip DRRP — the actor mention is noise, not a duty.
+        let text = r#"In these Regulations "the approved poster" means a poster in the form approved and published by the Health and Safety Executive."#;
+        let record = parse(text);
+        assert!(record.purposes.contains(&purpose::INTERPRETATION));
+        assert!(
+            record.duty_types.is_empty(),
+            "pure definition should have no DRRP even with actor mention, got: {:?}",
+            record.duty_types
         );
     }
 
