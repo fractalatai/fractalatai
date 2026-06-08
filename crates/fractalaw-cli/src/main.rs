@@ -3223,12 +3223,24 @@ async fn enrich_single_law(
                     (None, None)
                 };
                 // v0.3 confidence: based on routing decision, not regex match quality
+                const NON_DRRP_TYPES: &[&str] = &[
+                    "title",
+                    "signed",
+                    "heading",
+                    "table",
+                    "schedule",
+                    "part",
+                    "chapter",
+                    "commencement",
+                    "note",
+                ];
+                let is_structural = NON_DRRP_TYPES.contains(&section_type.as_str());
                 let has_actors =
                     !record.governed_actors.is_empty() || !record.government_actors.is_empty();
                 let actor_count = record.governed_actors.len() + record.government_actors.len();
                 let has_drrp = !record.duty_types.is_empty();
-                let taxa_confidence = if !has_actors {
-                    // No actors, structural provision → high confidence "none"
+                let taxa_confidence = if is_structural || !has_actors {
+                    // Structural types or no actors → high confidence "none"
                     Some(0.90)
                 } else if actor_count == 1 && has_drrp {
                     // Single-actor + DRRP match → regex reliable core
@@ -3634,7 +3646,22 @@ async fn enrich_single_law(
                             !p.governed_actors.is_empty() || !p.government_actors.is_empty();
                         let multi_actor = p.actors.len() > 1;
                         let drrp_none_with_actors = p.drrp_types.is_empty() && has_actors;
-                        (multi_actor || drrp_none_with_actors) && existing_conf < 0.80
+                        // Structural types never contain DRRP — don't waste LLM calls
+                        const NON_DRRP_TYPES: &[&str] = &[
+                            "title",
+                            "signed",
+                            "heading",
+                            "table",
+                            "schedule",
+                            "part",
+                            "chapter",
+                            "commencement",
+                            "note",
+                        ];
+                        let is_structural = NON_DRRP_TYPES.contains(&p.section_type.as_str());
+                        !is_structural
+                            && (multi_actor || drrp_none_with_actors)
+                            && existing_conf < 0.80
                     })
                     .collect()
             } else {
