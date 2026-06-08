@@ -126,13 +126,41 @@ Current 40 GB system RAM is sufficient — no upgrade needed until dual-GPU.
 
 **What transfers to 12B**: all pipeline code, friendly labels, confidence protection, write-back loop. Just `ollama pull gemma3:12b` and set `TIER2_PROVIDER=local`.
 
+### Pure definition gate fix (commit `b761360`)
+- Pure `Interpretation+Definition` provisions (single purpose) now always skip DRRP
+- Previously, actor mentions in definitions ("approved by the Health and Safety Executive") triggered the override
+- Mixed-content (Interpretation + other purposes) still overrides for product safety SIs
+- 445 tests pass
+
+### Corpus-wide enrichment + QA
+- **16 typical OH&S SIs**: enriched (Gemini Tier 2), 12 confirmed from QA
+- **8 Fire laws** (small + medium): enriched, 18 confirmed from QA
+- **50 laws across 21 families**: enriched (Gemini Tier 2), 35 confirmed from QA (API timeout at sample 36/92)
+- Total QA confirmed examples: **~95 toward 500 target**
+
+### Golden dataset progress
+
+| Batch | Laws | Confirmed | Running total |
+|---|---|---|---|
+| OH&S typical SIs | 16 | ~42 | 42 |
+| Fire (small + medium) | 8 | ~18 | 60 |
+| 21-family spread | 50 (35 sampled) | 35 | 95 |
+
+Correction patterns across 95 samples:
+- Missing counterparty actors — most common failure
+- Responsibility should be Duty/Power — DRRP type refinement  
+- Wrong active actor — regex picked wrong entity
+- Definitions leaking through — fixed with purpose gate
+- DRRP type accuracy: ~100% for single-actor regex provisions
+
 ## What's next
 
-1. Run v0.3 across more customer SIs — `TIER2_PROVIDER=local` for bulk, `gemini` for QA
-2. Human review via `--report` → QA with `--write-back` on flagged laws
-3. Publish improved data to sertantai
-4. Hardware upgrade → RTX 3090 → Gemma 12B for better counterparty detection
-5. sertantai-legal#108 — sub-paragraph hierarchy path fix for inheritance
+1. Resume QA on remaining ~57 samples from the 50-law batch
+2. Continue QA passes across QQ corpus — each adds ~35 confirmed examples
+3. At 500 confirmed: train Tier 2 embedding classifier (no LLM needed at runtime)
+4. Hardware upgrade → RTX 3090 → Gemma 12B as local Tier 2
+5. Publish improved data to sertantai
+6. sertantai-legal#108 — sub-paragraph hierarchy path fix
 
 ## Key learnings
 
@@ -141,6 +169,9 @@ Current 40 GB system RAM is sufficient — no upgrade needed until dual-GPU.
 3. **DRRP type is the reliable signal** — 100% accuracy on primary classification. Counterparty detection is secondary and improving.
 4. **Structural provisions are noise** — titles, schedules, headings should never reach the model.
 5. **The QA report in the CLI** — human review before Gemini QA prevents circular LLM-checking-LLM.
+6. **Pure definitions leak through the purpose gate** — actor keyword mentions in definitions triggered the override. Fixed.
+7. **Spread over depth** — 21 families gives a more representative golden dataset than deep coverage of one family.
+8. **Gemini API timeout** — QA script needs retry logic for long batches.
 
 ## References
 
