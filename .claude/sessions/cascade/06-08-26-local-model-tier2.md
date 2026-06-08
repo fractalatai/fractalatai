@@ -80,27 +80,58 @@ Ollama exposes a REST API at `http://localhost:11434/api/generate`. Replace the 
 ```
 Tier 1: Regex (parse_v2) — FREE, ~70% coverage
     ↓ low confidence
-Tier 2: Local Gemma 12B — CHEAP (CPU time only), target ~20% coverage
+Tier 2: Local Gemma 4B — CHEAP (CPU time only), target ~20% coverage
     ↓ low confidence
 Tier 3: Gemini API — EXPENSIVE, ~10% coverage (customer laws only)
 ```
 
 The local model runs on every enrichment — no API cost. It processes the ~30% that regex can't handle. Only genuinely ambiguous provisions on customer-registered laws escalate to Gemini.
 
-## Gemini's Guidance (from briefing)
+## Shipped (2026-06-08)
 
-Key points from the Gemini analysis:
-- Anchor extraction to modals of obligation (shall, must, is required to)
-- Isolate the "true entity" vs qualifications
-- Enforce strict JSON output
-- Temperature 0.0 for deterministic extraction
-- The model excels at complex syntax parsing (passive voice, nested clauses, delayed subjects)
+### Infrastructure
+- NAS backup taken (20260608) — DuckDB 202 MB + LanceDB 375 MB (compacted)
+- LanceDB compacted: 8.4 GB → 375 MB
+- Old local Parquet backups removed (NAS has copies) — recovered 900 MB
+- Build artifacts swept — recovered 2.67 GB
+- Disk: 9.3 GB free (from 2.6 GB)
 
-## Risks
+### Ollama + Gemma 3 4B installed
+- Brew formula missing llama-server → downloaded full tarball from GitHub releases
+- Installed to `~/.local/ollama/` (1.29 GB tarball, extracts to bin + lib)
+- Model: `gemma3:4b` (3.3 GB, Q4 quantization)
+- Server: `nohup ~/.local/ollama/bin/ollama serve`
+- API: `http://localhost:11434/api/generate`
 
-- **Speed**: CPU inference at ~5-10 tok/s means ~2-5 seconds per provision. OH&S corpus (~14K provisions) = ~8-20 hours. May need batching strategy or selective application.
-- **Disk**: Ollama + model weights = ~8 GB. With 11 GB free, tight. May need to sweep build artifacts first.
-- **Quality**: 4-bit quantization may degrade legal parsing accuracy vs full precision. Need to benchmark against Gemini.
+### First test result
+- Input: "The employer shall ensure the health and safety of employees."
+- Output: Employer=ACTIVE, Employee=COUNTERPARTY (correct)
+- Speed: 5.6 tok/s, 19.9 seconds for 112 tokens
+- Issues: wraps response in markdown code fences, uses bare labels not prefixed (same parsing issues as Gemini, already have solutions)
+
+### Hardware note
+- No discrete GPU — Intel UHD 630 only
+- CPU inference: ~5.6 tok/s (Gemma 4B Q4)
+- 27.5 GB available for inference
+- **Recommendation**: add a second M.2 NVMe SSD (500 GB, ~£30-40) for model storage and build overflow. Or reclaim the 120 GB Windows partition (never used).
+
+## What's next
+
+1. Wire Ollama into the enrichment pipeline as Tier 2
+2. Update prompt to enforce exact label format (reuse existing parsing functions)
+3. Benchmark on OH&S: accuracy vs Gemini, speed for targeted provisions
+4. Implement confidence-based routing: Tier 1 low-confidence → Tier 2
+5. Consider upgrading to Gemma 12B when disk space allows (12B better for legal parsing but needs ~8 GB)
+
+## Starting Ollama
+
+```bash
+# Start server (run once per session)
+nohup ~/.local/ollama/bin/ollama serve > /tmp/ollama.log 2>&1 &
+
+# Verify
+curl -s http://localhost:11434/api/tags | /usr/bin/python3 -c "import sys,json; [print(m['name']) for m in json.load(sys.stdin)['models']]"
+```
 
 ## References
 
