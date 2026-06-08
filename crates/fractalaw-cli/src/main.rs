@@ -3581,12 +3581,238 @@ async fn enrich_single_law(
             );
         }
 
-        // ── Gap C Tier 3: LLM position classification ──
+        // ── Tier 2: Local model position classification (Ollama) ──
+        //
+        // For provisions with multiple actors where the span heuristic
+        // couldn't classify positions (all defaulted to "active"), send
+        // to local Gemma model via Ollama. Zero API cost, CPU inference.
+        // Only fires if Ollama is available at localhost:11434.
+        {
+            // Check which provisions need Tier 2: multi-actor, all "active"
+            let tier2_candidates: Vec<usize> = (0..provision_taxa.len())
+                .filter(|&i| {
+                    let p = &provision_taxa[i];
+                    p.actors.len() > 1
+                        && p.extraction_method != "agentic"
+                        && p.actors.iter().all(|a| a.position == "active")
+                        && p.taxa_confidence.unwrap_or(0.0) < 0.7
+                })
+                .collect();
+
+            if !tier2_candidates.is_empty() {
+                // Probe Ollama availability (fast health check)
+                let ollama_available = reqwest::Client::new()
+                    .get("http://localhost:11434/api/tags")
+                    .timeout(std::time::Duration::from_secs(2))
+                    .send()
+                    .await
+                    .is_ok();
+
+                if ollama_available {
+                    let valid_labels = fractalaw_core::taxa::actors::all_actor_labels();
+                    let client = reqwest::Client::builder()
+                        .timeout(std::time::Duration::from_secs(60))
+                        .build()
+                        .context("building HTTP client for Tier 2")?;
+
+                    // Build section_id → text lookup
+                    let mut text_map: std::collections::HashMap<String, String> =
+                        std::collections::HashMap::new();
+                    for batch in &batches {
+                        let sid_col = batch.column_by_name("section_id");
+                        let text_col = batch.column_by_name("text");
+                        if let (Some(sid_c), Some(txt_c)) = (sid_col, text_col) {
+                            for row in 0..batch.num_rows() {
+                                if let (Some(sid), Some(txt)) = (
+                                    get_string_value(sid_c.as_ref(), row),
+                                    get_string_value(txt_c.as_ref(), row),
+                                ) {
+                                    text_map.insert(sid, txt);
+                                }
+                            }
+                        }
+                    }
+
+                    let mut tier2_count = 0u32;
+                    let mut tier2_unvalidated = 0u32;
+                    for &idx in &tier2_candidates {
+                        let p = &provision_taxa[idx];
+                        let target_sid = p.section_id.clone();
+                        let drrp = if p.drrp_types.is_empty() {
+                            "unknown".to_string()
+                        } else {
+                            p.drrp_types.join(", ")
+                        };
+
+                        fn truncate_str(s: &str, max: usize) -> &str {
+                            if s.len() <= max {
+                                s
+                            } else {
+                                let mut end = max;
+                                while end > 0 && !s.is_char_boundary(end) {
+                                    end -= 1;
+                                }
+                                &s[..end]
+                            }
+                        }
+                        let text = text_map
+                            .get(&target_sid)
+                            .map(|t| truncate_str(t, 500))
+                            .unwrap_or("");
+                        if text.is_empty() {
+                            continue;
+                        }
+
+                        // Build friendly labels for the local model (no colons/spaces)
+                        // and a map to convert back to canonical
+                        let friendly_to_canonical: std::collections::HashMap<String, String> = p
+                            .actors
+                            .iter()
+                            .map(|a| {
+                                let friendly = a.label.replace(": ", "_").replace(' ', "_");
+                                (friendly, a.label.clone())
+                            })
+                            .collect();
+                        let actor_list: String = friendly_to_canonical
+                            .keys()
+                            .map(|f| format!("- {f}"))
+                            .collect::<Vec<_>>()
+                            .join("\n");
+
+                        let prompt = format!(
+                            r#"Classify each actor's POSITION in this legal provision.
+
+Text: {text}
+DRRP type: {drrp}
+
+Actors:
+{actor_list}
+
+For each actor respond with one of: ACTIVE (bears the duty), COUNTERPARTY (other side), BENEFICIARY, MENTIONED.
+
+Respond in JSON only. Use the EXACT actor labels above:
+{{"actors": [{{"label": "Org_Employer", "position": "ACTIVE", "reason": "..."}}]}}"#
+                        );
+
+                        let body = serde_json::json!({
+                            "model": "gemma3:4b",
+                            "prompt": prompt,
+                            "stream": false,
+                            "options": {"temperature": 0.0}
+                        });
+
+                        let resp = client
+                            .post("http://localhost:11434/api/generate")
+                            .json(&body)
+                            .send()
+                            .await;
+
+                        let parsed = match resp {
+                            Ok(r) => {
+                                let text = r.text().await.unwrap_or_default();
+                                let ollama_resp: serde_json::Value =
+                                    serde_json::from_str(&text).unwrap_or_default();
+                                let content = ollama_resp
+                                    .get("response")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("");
+                                // Strip markdown code fences if present
+                                let json_text = if content.contains("```json") {
+                                    content
+                                        .split("```json")
+                                        .nth(1)
+                                        .and_then(|s| s.split("```").next())
+                                        .unwrap_or(content)
+                                        .trim()
+                                } else if content.contains("```") {
+                                    content
+                                        .split("```")
+                                        .nth(1)
+                                        .and_then(|s| s.split("```").next())
+                                        .unwrap_or(content)
+                                        .trim()
+                                } else {
+                                    content.trim()
+                                };
+                                serde_json::from_str::<serde_json::Value>(json_text).ok()
+                            }
+                            Err(_) => None,
+                        };
+
+                        // Map friendly labels back to canonical before validation
+                        let parsed = parsed.map(|mut v| {
+                            if let Some(actors) = v.get_mut("actors").and_then(|a| a.as_array_mut())
+                            {
+                                for actor in actors.iter_mut() {
+                                    if let Some(label) = actor.get("label").and_then(|l| l.as_str())
+                                        && let Some(canonical) = friendly_to_canonical.get(label)
+                                    {
+                                        actor["label"] =
+                                            serde_json::Value::String(canonical.clone());
+                                    }
+                                }
+                            }
+                            v
+                        });
+
+                        if let Some(ref result) = parsed
+                            && let Some(tier2_actors) = parse_tier3_actors(result, &valid_labels)
+                        {
+                            let p = &mut provision_taxa[idx];
+                            p.actors.clear();
+                            let mut new_governed = Vec::new();
+                            let mut new_government = Vec::new();
+                            let mut has_unknown_labels = false;
+
+                            for a in &tier2_actors {
+                                if a.label_source == "invented" {
+                                    has_unknown_labels = true;
+                                }
+                                if a.position == "active" {
+                                    if a.label.starts_with("Gov:") || a.label.starts_with("EU:") {
+                                        new_government.push(a.label.clone());
+                                    } else {
+                                        new_governed.push(a.label.clone());
+                                    }
+                                }
+                                p.actors.push(ActorEntry {
+                                    label: a.label.clone(),
+                                    position: a.position.clone(),
+                                    relates_to: a.relates_to.clone(),
+                                    label_source: a.label_source.clone(),
+                                    reason: a.reason.clone(),
+                                });
+                            }
+
+                            if !new_governed.is_empty() || !new_government.is_empty() {
+                                p.governed_actors = new_governed;
+                                p.government_actors = new_government;
+                            }
+                            if has_unknown_labels {
+                                p.extraction_method = "local_unvalidated".to_string();
+                                tier2_unvalidated += 1;
+                            } else {
+                                p.extraction_method = "local".to_string();
+                            }
+                            tier2_count += 1;
+                        }
+                    }
+
+                    if tier2_count > 0 {
+                        let validated = tier2_count - tier2_unvalidated;
+                        eprintln!(
+                            "  Tier 2 local: {tier2_count}/{} provisions classified by Gemma ({validated} validated, {tier2_unvalidated} with unknown labels)",
+                            tier2_candidates.len()
+                        );
+                    }
+                }
+            }
+        }
+
+        // ── Gap C Tier 3: LLM position classification (Gemini) ──
         //
         // For inherited provisions with multiple actors, call Gemini 2.5 Flash
-        // to classify Hohfeldian positions. Regex provisions use the span-based
-        // heuristic instead (actor_positions from parse_v2).
-        // Only fires if GEMINI_API_KEY is set.
+        // to classify Hohfeldian positions. Only fires if GEMINI_API_KEY is set.
         if let Ok(api_key) = std::env::var("GEMINI_API_KEY") {
             let tier3_candidates: Vec<usize> = (0..provision_taxa.len())
                 .filter(|&i| {
