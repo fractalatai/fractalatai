@@ -178,8 +178,24 @@ Agentic breakdown: Responsibility (812), Duty (536), Power (378), none (324), Ri
 - [x] Development workflow tested — agentic 0.90 data survives production run
 - [x] QQ corpus classified (40,272 provisions in 400s)
 - [x] Data verified (DRRP distribution, taxonomy uniform, agentic protected)
-- [ ] Published to sertantai via zenoh
-- [ ] Sertantai confirms receipt
+- [x] Published MHR to sertantai — 38 of 53 provisions accepted, 15 schedule orphans skipped
+- [x] Sertantai confirmed: struct richer than flat, position classification correct
+
+## Deferred: Full QQ publish
+
+Held back from full corpus publish. Sertantai feedback surfaced actor label issues:
+- 24 `agentic_unvalidated` provisions with invented labels (`Org_Employer`, novel actors)
+- Novel labels are signal — LLM discovering actors not in our dictionary
+- Need to explore: let LLM name actors freely, match to dictionary, flag new discoveries
+- New session: actor dictionary and label strategy
+
+## Key learnings
+
+1. **Classifier in production works** — 40,272 provisions in 400s, no API calls
+2. **Development/production coexistence proven** — agentic gold survives production runs
+3. **DRRP decomposition at classification time** — LanceDB speaks DRRP, not Obligation/Liberty
+4. **Schedule provisions stay but don't publish** — training value, sertantai skips automatically
+5. **Invented labels are discoveries** — `water undertaker`, `liquidator`, `special negotiating body` are real actors the LLM found that our dictionary doesn't have
 
 ## References
 
