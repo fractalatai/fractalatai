@@ -394,15 +394,26 @@ Deferred — start with manual/cron. When ready, add to the watch loop:
 - [x] Resilient error handling (retry_count on failure, continues to next law)
 - [x] 19/19 tests passing, fmt + clippy clean
 
+### Committed: `b809eaf` — Rust DRRP classifier from JSON weights
+
+**Pivot from ONNX**: `ort` 2.0-rc.11's output parsing for string labels + probability maps is complex for a trivial model. LogisticRegression is just `softmax(X @ W + b)` — implemented directly from exported JSON weights (25 KB).
+
+**Steps completed:**
+- [x] Step 3: ~~Export to ONNX~~ → exported weights to JSON (`docs/drrp_classifier_v6.json`)
+- [x] Step 5: Modal feature extraction in Rust (`modal_features()`, `build_features()` in `fractalaw-ai/src/drrp_classifier.rs`)
+- [x] `DrrpClassifier::load()` / `predict()` / `predict_batch()`
+- [x] `decompose_drrp()` — Obligation+Gvt→Responsibility, Obligation+Org→Duty, etc.
+- [x] Validated: 50/50 random + 100/100 real provisions match sklearn exactly
+- [x] 30/30 fractalaw-ai tests passing (including 7 new classifier tests)
+
 **Steps remaining:**
-- [ ] Step 3: Export classifier to ONNX (`skl2onnx`)
-- [ ] Step 5: Modal feature extraction in Rust (397-dim vector)
+- [ ] Wire classifier into `enrich --pending` (embed + classify in the enrichment loop)
 - [ ] Step 7: Observability logging (pending count, per-law timings, fragment count)
-- [ ] Wire ONNX classifier into `enrich --pending` (embed + classify in Rust)
 - [ ] Step 8 (future): Auto-trigger in watch (timer/threshold)
 
 **What works now:**
 - `sync watch` ingests LAT + acks in ~2s/law (no blocking)
-- `taxa enrich --pending` processes the queue (regex-only for now, ONNX classifier next)
+- `taxa enrich --pending` processes the queue (regex-only for now, classifier wiring next)
 - `sync publish --provisions --pending` publishes enriched laws as a batch
+- `DrrpClassifier` loaded from JSON weights — microsecond inference per provision
 - Dev flow (`--gap-c --laws`) coexists — clears pending flag, confidence protection prevents downgrades

@@ -342,6 +342,29 @@ impl LanceStore {
         Ok(total_rows)
     }
 
+    /// Upsert embeddings for provisions by section_id.
+    ///
+    /// The input batch must contain `section_id` (Utf8) and `embedding`
+    /// (FixedSizeList<Float32, 384>) columns. Only these columns are
+    /// updated — all other columns remain untouched.
+    pub async fn upsert_embeddings(&self, batch: &RecordBatch) -> Result<(), StoreError> {
+        if batch.num_rows() == 0 {
+            return Ok(());
+        }
+        let table = self.legislation_text().await?;
+        let schema = batch.schema();
+        let reader = RecordBatchIterator::new(std::iter::once(Ok(batch.clone())), schema);
+        let mut builder = table.merge_insert(&["section_id"]);
+        builder.when_matched_update_all(None);
+        // Don't insert new rows — only update existing provisions
+        builder
+            .execute(Box::new(reader))
+            .await
+            .map_err(|e| StoreError::Other(format!("merge_insert embeddings: {e}")))?;
+        info!(rows = batch.num_rows(), "upserted embeddings");
+        Ok(())
+    }
+
     /// Delete all legislation text rows for a given law.
     ///
     /// Uses LanceDB row-level deletion. Returns the number of rows that

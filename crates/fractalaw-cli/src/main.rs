@@ -605,7 +605,16 @@ async fn main() -> anyhow::Result<()> {
                             .collect::<Vec<_>>()
                     })
                 };
-                cmd_taxa_enrich(&data_dir, &store, law_filter, force, gap_c, skip_recent).await
+                cmd_taxa_enrich(
+                    &data_dir,
+                    &store,
+                    law_filter,
+                    force,
+                    gap_c,
+                    skip_recent,
+                    pending,
+                )
+                .await
             }
             TaxaAction::Eyeball {
                 laws,
@@ -4535,6 +4544,7 @@ async fn cmd_taxa_enrich(
     force: bool,
     gap_c: bool,
     skip_recent: bool,
+    pending: bool,
 ) -> anyhow::Result<()> {
     // Ensure taxa_hash/published_hash and fitness columns exist (idempotent).
     store.ensure_taxa_hash_columns()?;
@@ -4715,6 +4725,266 @@ async fn cmd_taxa_enrich(
 
     if enriched >= 100 {
         eprintln!();
+    }
+
+    // ── Embed + Classify pass (--pending only) ──
+    //
+    // After regex enrichment, compute embeddings for provisions with null
+    // embeddings and run the DRRP classifier. This is the production
+    // pipeline for new laws arriving via sync watch.
+    if pending && enriched > 0 {
+        let model_dir = data_dir.join("../models/all-MiniLM-L6-v2");
+        let weights_path = std::path::Path::new("docs/drrp_classifier_v6.json");
+
+        if model_dir.exists() && weights_path.exists() {
+            eprintln!("  Embed + classify pass for {enriched} laws...");
+            let mut embedder =
+                fractalaw_ai::Embedder::load(&model_dir).context("loading embedding model")?;
+            let classifier = fractalaw_ai::DrrpClassifier::load(weights_path)
+                .context("loading DRRP classifier")?;
+            let actor_matcher = ActorMatcher::load("docs/actor-dictionary.yaml")
+                .context("loading actor dictionary for classifier")?;
+
+            let mut total_embedded = 0usize;
+            let mut total_classified = 0usize;
+
+            for law_name in &law_names {
+                let escaped = law_name.replace('\'', "''");
+                // Query provisions needing embeddings or classification
+                let filter = format!("law_name = '{escaped}'");
+                let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+
+                // (section_id, text, embedding, confidence, section_type, has_govt_active)
+                type Prov = (String, String, Option<Vec<f32>>, f32, String, bool);
+                let mut provisions: Vec<Prov> = Vec::new();
+                for batch in &batches {
+                    let sid_col = batch.column_by_name("section_id");
+                    let text_col = batch.column_by_name("text");
+                    let emb_col = batch.column_by_name("embedding");
+                    let conf_col = batch.column_by_name("taxa_confidence");
+                    let st_col = batch.column_by_name("section_type");
+                    let actors_col = batch.column_by_name("actors");
+
+                    for row in 0..batch.num_rows() {
+                        let sid = sid_col
+                            .and_then(|c| get_string_value(c.as_ref(), row))
+                            .unwrap_or_default();
+                        let text = text_col
+                            .and_then(|c| get_string_value(c.as_ref(), row))
+                            .unwrap_or_default();
+                        let section_type = st_col
+                            .and_then(|c| get_string_value(c.as_ref(), row))
+                            .unwrap_or_default();
+
+                        let conf = conf_col
+                            .and_then(|c| c.as_any().downcast_ref::<arrow::array::Float32Array>())
+                            .filter(|a| !a.is_null(row))
+                            .map(|a| a.value(row))
+                            .unwrap_or(0.0);
+
+                        // Extract existing embedding if present
+                        let emb = emb_col
+                            .and_then(|c| {
+                                c.as_any()
+                                    .downcast_ref::<arrow::array::FixedSizeListArray>()
+                            })
+                            .filter(|a| !a.is_null(row))
+                            .and_then(|a| {
+                                let values = a
+                                    .values()
+                                    .as_any()
+                                    .downcast_ref::<arrow::array::Float32Array>()?;
+                                let dim = a.value_length() as usize;
+                                let offset = row * dim;
+                                Some(values.values()[offset..offset + dim].to_vec())
+                            });
+
+                        // Check if any active actor is government (for DRRP decomposition)
+                        let has_govt_active = actors_col
+                            .and_then(|c| {
+                                use arrow::array::AsArray;
+                                let list = c.as_list_opt::<i32>()?;
+                                if list.is_null(row) {
+                                    return None;
+                                }
+                                let struct_arr = list.value(row);
+                                let struct_arr = struct_arr.as_struct_opt()?;
+                                let label_col = struct_arr.column_by_name("label")?;
+                                let pos_col = struct_arr.column_by_name("position")?;
+                                for i in 0..struct_arr.len() {
+                                    let pos =
+                                        get_string_value(pos_col.as_ref(), i).unwrap_or_default();
+                                    if pos == "active" {
+                                        let label = get_string_value(label_col.as_ref(), i)
+                                            .unwrap_or_default();
+                                        if actor_matcher.is_government(&label) {
+                                            return Some(true);
+                                        }
+                                    }
+                                }
+                                Some(false)
+                            })
+                            .unwrap_or(false);
+
+                        provisions.push((sid, text, emb, conf, section_type, has_govt_active));
+                    }
+                }
+
+                if provisions.is_empty() {
+                    continue;
+                }
+
+                // Phase 1: Embed provisions with null embeddings
+                let needs_embedding: Vec<usize> = (0..provisions.len())
+                    .filter(|&i| provisions[i].2.is_none())
+                    .collect();
+
+                if !needs_embedding.is_empty() {
+                    // Collect texts to embed (clone to avoid borrow conflict)
+                    let texts: Vec<String> = needs_embedding
+                        .iter()
+                        .map(|&i| provisions[i].1.clone())
+                        .collect();
+
+                    // Embed in batches of 64
+                    for chunk_start in (0..texts.len()).step_by(64) {
+                        let chunk_end = (chunk_start + 64).min(texts.len());
+                        let chunk: Vec<&str> = texts[chunk_start..chunk_end]
+                            .iter()
+                            .map(|s| s.as_str())
+                            .collect();
+                        let embeddings = embedder.embed_batch(&chunk)?;
+                        for (j, emb) in embeddings.into_iter().enumerate() {
+                            let idx = needs_embedding[chunk_start + j];
+                            provisions[idx].2 = Some(emb);
+                        }
+                    }
+                    total_embedded += needs_embedding.len();
+                }
+
+                // Phase 2: Write embeddings via merge_insert
+                {
+                    use arrow::array::{
+                        FixedSizeListBuilder, Float32Builder, StringBuilder as SB2,
+                    };
+
+                    let mut sid_b = SB2::new();
+                    let mut emb_b = FixedSizeListBuilder::new(Float32Builder::new(), 384);
+                    let mut count = 0usize;
+
+                    for prov in &provisions {
+                        if let Some(ref e) = prov.2 {
+                            let e: &Vec<f32> = e;
+                            if e.len() == 384 {
+                                sid_b.append_value(&prov.0);
+                                let vals = emb_b.values();
+                                for &v in e {
+                                    vals.append_value(v);
+                                }
+                                emb_b.append(true);
+                                count += 1;
+                            }
+                        }
+                    }
+
+                    if count > 0 {
+                        let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
+                            arrow::datatypes::Field::new(
+                                "section_id",
+                                arrow::datatypes::DataType::Utf8,
+                                false,
+                            ),
+                            arrow::datatypes::Field::new(
+                                "embedding",
+                                arrow::datatypes::DataType::FixedSizeList(
+                                    std::sync::Arc::new(arrow::datatypes::Field::new(
+                                        "item",
+                                        arrow::datatypes::DataType::Float32,
+                                        true,
+                                    )),
+                                    384,
+                                ),
+                                true,
+                            ),
+                        ]));
+                        let batch = arrow::record_batch::RecordBatch::try_new(
+                            schema,
+                            vec![
+                                std::sync::Arc::new(sid_b.finish()),
+                                std::sync::Arc::new(emb_b.finish()),
+                            ],
+                        )?;
+                        lance.upsert_embeddings(&batch).await?;
+                    }
+                }
+
+                // Phase 3: Classify regulation-level provisions with confidence < 0.85
+                const REGULATION_TYPES: &[&str] =
+                    &["article", "sub_article", "section", "sub_section"];
+
+                for prov in &provisions {
+                    let sid: &str = &prov.0;
+                    let text: &str = &prov.1;
+                    let conf: f32 = prov.3;
+                    let section_type: &str = &prov.4;
+                    let is_govt: bool = prov.5;
+
+                    if conf >= 0.85 || !REGULATION_TYPES.contains(&section_type) {
+                        continue;
+                    }
+                    let embedding: &[f32] = match prov.2 {
+                        Some(ref e) => {
+                            let e: &Vec<f32> = e;
+                            if e.len() != 384 {
+                                continue;
+                            }
+                            e.as_slice()
+                        }
+                        None => continue,
+                    };
+
+                    let features = fractalaw_ai::drrp_classifier::build_features(embedding, text);
+                    let prediction = classifier.predict(&features);
+
+                    if prediction.class == fractalaw_ai::DrrpClass::None {
+                        continue;
+                    }
+
+                    if let Some(drrp_type) =
+                        fractalaw_ai::drrp_classifier::decompose_drrp(prediction.class, is_govt)
+                    {
+                        tracing::debug!(
+                            section_id = %sid,
+                            drrp_type,
+                            confidence = prediction.confidence,
+                            "classified"
+                        );
+                        total_classified += 1;
+                    }
+                }
+
+                eprintln!(
+                    "  {law_name}: {}/{} embedded, {total_classified} classified",
+                    needs_embedding.len(),
+                    provisions.len()
+                );
+            }
+
+            eprintln!("  Embed+classify: {total_embedded} embedded, {total_classified} classified");
+        } else {
+            if !model_dir.exists() {
+                eprintln!(
+                    "  Skipping embed+classify: embedding model not found at {}",
+                    model_dir.display()
+                );
+            }
+            if !weights_path.exists() {
+                eprintln!(
+                    "  Skipping embed+classify: classifier weights not found at {}",
+                    weights_path.display()
+                );
+            }
+        }
     }
 
     // Count how many actually got data.
