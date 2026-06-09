@@ -145,6 +145,13 @@ pub mod keys {
     pub fn events_sync(tenant: &str) -> String {
         format!("{PREFIX}/@{tenant}/events/sync")
     }
+
+    /// Key expression for the actor dictionary queryable.
+    ///
+    /// Example: `fractalaw/@acme/dictionary/actors`
+    pub fn dictionary_actors(tenant: &str) -> String {
+        format!("{PREFIX}/@{tenant}/dictionary/actors")
+    }
 }
 
 // ── Arrow IPC helpers ──
@@ -314,6 +321,49 @@ impl ZenohSync {
             .map_err(ZenohError::Session)?;
 
         Ok(())
+    }
+
+    /// Publish the actor dictionary YAML to zenoh.
+    ///
+    /// Puts the raw YAML content at `fractalaw/@{tenant}/dictionary/actors`.
+    /// Sertantai can subscribe or get this to stay in sync with canonical labels.
+    pub async fn publish_dictionary(&self, yaml_content: &[u8]) -> Result<(), ZenohError> {
+        let key = keys::dictionary_actors(&self.tenant);
+        info!(key = %key, bytes = yaml_content.len(), "publishing actor dictionary");
+        self.session
+            .put(&key, yaml_content.to_vec())
+            .await
+            .map_err(ZenohError::Session)?;
+        Ok(())
+    }
+
+    /// Declare a queryable that serves the actor dictionary YAML on demand.
+    ///
+    /// Returns a handle that keeps the queryable alive. Drop it to stop serving.
+    /// Sertantai queries `fractalaw/@{tenant}/dictionary/actors` and receives
+    /// the raw YAML bytes in the reply.
+    pub async fn serve_dictionary(
+        &self,
+        yaml_content: Vec<u8>,
+    ) -> Result<tokio::task::JoinHandle<()>, ZenohError> {
+        let key = keys::dictionary_actors(&self.tenant);
+        let queryable = self
+            .session
+            .declare_queryable(&key)
+            .await
+            .map_err(ZenohError::Session)?;
+        info!(key = %key, "serving actor dictionary via queryable");
+
+        let handle = tokio::spawn(async move {
+            while let Ok(query) = queryable.recv_async().await {
+                let reply_key = query.key_expr().as_str().to_string();
+                if let Err(e) = query.reply(&reply_key, yaml_content.clone()).await {
+                    tracing::warn!(error = %e, "failed to reply to dictionary query");
+                }
+            }
+        });
+
+        Ok(handle)
     }
 
     /// Query sertantai for legislation text (LAT) for a specific law.
@@ -749,6 +799,14 @@ mod tests {
         assert_eq!(
             keys::lrt("acme", "UK_ukpga_1974_37"),
             "fractalaw/@acme/data/legislation/lrt/UK_ukpga_1974_37"
+        );
+    }
+
+    #[test]
+    fn key_dictionary_actors() {
+        assert_eq!(
+            keys::dictionary_actors("dev"),
+            "fractalaw/@dev/dictionary/actors"
         );
     }
 

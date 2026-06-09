@@ -127,7 +127,7 @@
 
 - canonical: "Gvt: Authority"
   category: Gvt
-  triggers: [authority, competent authority]
+  triggers: [authority, competent authority, competent authorities, competent national authorities, national authority]
 
 - canonical: "Gvt: Commissioners"
   category: Gvt
@@ -396,3 +396,61 @@
 - canonical: "Offshore: Licensee"
   category: Offshore
   triggers: [licensee, offshore licensee]
+
+# ── Insolvency / Corporate ──────────────────────────────────────
+
+- canonical: "Spc: Liquidator"
+  category: Spc
+  triggers: [liquidator, liquidators]
+
+- canonical: "Spc: Administrator"
+  category: Spc
+  triggers: [administrator, administrators]
+
+- canonical: "Spc: Receiver"
+  category: Spc
+  triggers: [receiver, receivers]
+
+- canonical: "Spc: Trustee in Bankruptcy"
+  category: Spc
+  triggers: [trustee in bankruptcy]
+
+# ── EU / International ──────────────────────────────────────────
+
+- canonical: "EU: Certification Body"
+  category: EU
+  triggers: [certification body, certification bodies]
+
+- canonical: "EU: Central Management"
+  category: EU
+  triggers: [central management]
+
+- canonical: "EU: Special Negotiating Body"
+  category: EU
+  triggers: [special negotiating body]
+
+- canonical: "Ind: Young Person"
+  category: Ind
+  triggers: [young person, young persons, young people, young worker, young workers]
+
+- canonical: "Org: Trade Association"
+  category: Org
+  triggers: [trade association, trade associations]
+
+- canonical: "Svc: Water Undertaker"
+  category: Svc
+  triggers: [water undertaker, water undertakers, sewerage undertaker]
+
+# ── Procedural / Generic Roles ──────────────────────────────────
+
+- canonical: "Spc: Appellant"
+  category: Spc
+  triggers: [appellant, appellants]
+
+- canonical: "Spc: Licence Holder"
+  category: Spc
+  triggers: [licence holder, license holder, the licence holder, the license holder]
+
+- canonical: "Gvt: Consultation Body"
+  category: Gvt
+  triggers: [consultation body, consultation bodies, consultee, consultees]
