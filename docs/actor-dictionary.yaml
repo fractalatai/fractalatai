@@ -1,0 +1,398 @@
+# Actor Dictionary — Single Source of Truth
+#
+# Each entry: canonical label + trigger phrases for fuzzy matching.
+# LLMs output natural language actor names. The matcher resolves
+# them to canonical labels using these triggers.
+#
+# Ordering matters: specific entries before generic (e.g., "Secretary
+# of State for Defence" before "Secretary of State"). The matcher
+# checks in order and takes the first exact trigger match.
+#
+# Categories: Gvt (government), EU, Org (organisation), Ind (individual),
+# SC (supply chain), Spc (specialist), Svc (service), Public, Offshore
+
+# ── Government ───────────────────────────────────────────────────────
+
+- canonical: Crown
+  category: other
+  triggers: [crown, the crown]
+
+- canonical: HM Forces
+  category: other
+  triggers: [hm forces, armed forces, his majesty's forces, her majesty's forces, military]
+
+- canonical: "Gvt: Minister: Secretary of State for Defence"
+  category: Gvt
+  triggers: [secretary of state for defence, defence secretary]
+
+- canonical: "Gvt: Minister: Secretary of State for Transport"
+  category: Gvt
+  triggers: [secretary of state for transport, transport secretary]
+
+- canonical: "Gvt: Minister: Attorney General"
+  category: Gvt
+  triggers: [attorney general]
+
+- canonical: "Gvt: Minister"
+  category: Gvt
+  triggers: [secretary of state, minister, ministers]
+
+- canonical: "Gvt: Agency: Health and Safety Executive for Northern Ireland"
+  category: Gvt
+  triggers: [health and safety executive for northern ireland, hseni]
+
+- canonical: "Gvt: Agency: Health and Safety Executive"
+  category: Gvt
+  triggers: [health and safety executive, hse, the executive]
+
+- canonical: "Gvt: Agency: Environment Agency"
+  category: Gvt
+  triggers: [environment agency]
+
+- canonical: "Gvt: Agency: Scottish Environment Protection Agency"
+  category: Gvt
+  triggers: [scottish environment protection agency, sepa]
+
+- canonical: "Gvt: Agency: Office for Nuclear Regulation"
+  category: Gvt
+  triggers: [office for nuclear regulation, onr]
+
+- canonical: "Gvt: Agency: Office for Environmental Protection"
+  category: Gvt
+  triggers: [office for environmental protection, oep]
+
+- canonical: "Gvt: Agency: Office of Rail and Road"
+  category: Gvt
+  triggers: [office of rail and road]
+
+- canonical: "Gvt: Agency: OFCOM"
+  category: Gvt
+  triggers: [ofcom, office of communications]
+
+- canonical: "Gvt: Agency: Natural Resources Body for Wales"
+  category: Gvt
+  triggers: [natural resources body for wales]
+
+- canonical: "Gvt: Agency: Maritime and Coastguard Agency"
+  category: Gvt
+  triggers: [maritime and coastguard agency, mca]
+
+- canonical: "Gvt: Agency: Oil and Gas Authority"
+  category: Gvt
+  triggers: [oil and gas authority, north sea transition authority, oga, nsta]
+
+- canonical: "Gvt: Agency"
+  category: Gvt
+  triggers: [agency]
+
+- canonical: "Gvt: Authority: Enforcement"
+  category: Gvt
+  triggers: [enforcing authority, enforcement authority, regulatory authority, regulator]
+
+- canonical: "Gvt: Authority: Local"
+  category: Gvt
+  triggers: [local authority, local authorities, county council, district council, london borough council]
+
+- canonical: "Gvt: Authority: Planning"
+  category: Gvt
+  triggers: [planning authority, planning authorities]
+
+- canonical: "Gvt: Authority: Fire and Rescue"
+  category: Gvt
+  triggers: [fire and rescue authority, fire authority]
+
+- canonical: "Gvt: Authority: Harbour"
+  category: Gvt
+  triggers: [harbour authority, harbour master]
+
+- canonical: "Gvt: Authority: Licensing"
+  category: Gvt
+  triggers: [licensing authority]
+
+- canonical: "Gvt: Authority: Waste"
+  category: Gvt
+  triggers: [waste collection authority, waste disposal authority, disposal authority]
+
+- canonical: "Gvt: Authority: Public"
+  category: Gvt
+  triggers: [public authority, public authorities]
+
+- canonical: "Gvt: Authority: Traffic"
+  category: Gvt
+  triggers: [traffic authority]
+
+- canonical: "Gvt: Authority: Market"
+  category: Gvt
+  triggers: [market authority, market surveillance authority]
+
+- canonical: "Gvt: Authority"
+  category: Gvt
+  triggers: [authority, competent authority]
+
+- canonical: "Gvt: Commissioners"
+  category: Gvt
+  triggers: [commissioners]
+
+- canonical: "Gvt: Officer"
+  category: Gvt
+  triggers: [officer]
+
+- canonical: "Gvt: Judiciary"
+  category: Gvt
+  triggers: [court, tribunal, judge, judiciary, employment tribunal, magistrates]
+
+- canonical: "Gvt: Emergency Services: Police"
+  category: Gvt
+  triggers: [police, constable]
+
+- canonical: "Gvt: Emergency Services"
+  category: Gvt
+  triggers: [emergency services, fire brigade, ambulance]
+
+- canonical: "Gvt: Appropriate Person"
+  category: Gvt
+  triggers: [appropriate person]
+
+- canonical: "Gvt: Ministry: Treasury"
+  category: Gvt
+  triggers: [treasury]
+
+- canonical: "Gvt: Ministry: HMRC"
+  category: Gvt
+  triggers: [hmrc, customs officer, revenue and customs, her majesty's commissioners]
+
+- canonical: "Gvt: Ministry: Ministry of Defence"
+  category: Gvt
+  triggers: [ministry of defence, mod]
+
+- canonical: "Gvt: Ministry: Department of Enterprise, Trade and Investment"
+  category: Gvt
+  triggers: [department of enterprise, trade and investment]
+
+- canonical: "Gvt: Ministry"
+  category: Gvt
+  triggers: [ministry, department, government department]
+
+- canonical: "Gvt: Devolved Admin: National Assembly for Wales"
+  category: Gvt
+  triggers: [national assembly for wales, welsh assembly, senedd]
+
+- canonical: "Gvt: Devolved Admin: Scottish Parliament"
+  category: Gvt
+  triggers: [scottish parliament, scottish ministers]
+
+- canonical: "Gvt: Devolved Admin: Northern Ireland Assembly"
+  category: Gvt
+  triggers: [northern ireland assembly]
+
+- canonical: "Gvt: Devolved Admin"
+  category: Gvt
+  triggers: [assembly, devolved administration]
+
+# ── EU ───────────────────────────────────────────────────────────────
+
+- canonical: "EU: Agency: ECHA"
+  category: EU
+  triggers: [european chemicals agency, echa]
+
+- canonical: "EU: Agency: EFSA"
+  category: EU
+  triggers: [european food safety authority, efsa]
+
+- canonical: "EU: Agency: EEA"
+  category: EU
+  triggers: [european environment agency, eea]
+
+- canonical: "EU: Commission"
+  category: EU
+  triggers: [european commission, the commission, commission]
+
+- canonical: "EU: Member State"
+  category: EU
+  triggers: [member state, member states]
+
+# ── Organisations ────────────────────────────────────────────────────
+
+- canonical: "Org: Employer"
+  category: Org
+  triggers: [employer, employers, the employer]
+
+- canonical: "Org: Owner"
+  category: Org
+  triggers: [owner, owners, the owner]
+
+- canonical: "Org: Occupier"
+  category: Org
+  triggers: [occupier, occupiers, the occupier]
+
+- canonical: "Org: Company"
+  category: Org
+  triggers: [company, companies, body corporate, corporation]
+
+- canonical: "Org: Landlord"
+  category: Org
+  triggers: [landlord, landlords]
+
+# ── Individuals ──────────────────────────────────────────────────────
+
+- canonical: "Ind: Employee"
+  category: Ind
+  triggers: [employee, employees, his employees, their employees]
+
+- canonical: "Ind: Worker"
+  category: Ind
+  triggers: [worker, workers]
+
+- canonical: "Ind: Self-employed Worker"
+  category: Ind
+  triggers: [self-employed person, self-employed worker, self-employed, freelancer]
+
+- canonical: "Ind: Responsible Person"
+  category: Ind
+  triggers: [responsible person, the responsible person]
+
+- canonical: "Ind: Competent Person"
+  category: Ind
+  triggers: [competent person, competent persons]
+
+- canonical: "Ind: Duty Holder"
+  category: Ind
+  triggers: [duty holder, the duty holder]
+
+- canonical: "Ind: Manager"
+  category: Ind
+  triggers: [manager, managers]
+
+- canonical: "Ind: Supervisor"
+  category: Ind
+  triggers: [supervisor, supervisors]
+
+- canonical: "Ind: Person"
+  category: Ind
+  triggers: [person, persons, individual, any person, every person, no person]
+
+- canonical: "Ind: User"
+  category: Ind
+  triggers: [user, users]
+
+# ── Supply Chain ─────────────────────────────────────────────────────
+
+- canonical: "SC: Downstream User"
+  category: SC
+  triggers: [downstream user, downstream users]
+
+- canonical: "SC: Manufacturer"
+  category: SC
+  triggers: [manufacturer, manufacturers]
+
+- canonical: "SC: C: Principal Designer"
+  category: SC
+  triggers: [principal designer]
+
+- canonical: "SC: C: Designer"
+  category: SC
+  triggers: [designer, designers]
+
+- canonical: "SC: C: Principal Contractor"
+  category: SC
+  triggers: [principal contractor]
+
+- canonical: "SC: C: Contractor"
+  category: SC
+  triggers: [contractor, contractors]
+
+- canonical: "SC: Supplier"
+  category: SC
+  triggers: [supplier, suppliers]
+
+- canonical: "SC: Importer"
+  category: SC
+  triggers: [importer, importers]
+
+- canonical: "SC: Distributor"
+  category: SC
+  triggers: [distributor, distributors]
+
+- canonical: "SC: Registrant"
+  category: SC
+  triggers: [registrant, registrants]
+
+- canonical: "SC: Applicant"
+  category: SC
+  triggers: [applicant, applicants]
+
+- canonical: "SC: Authorised Representative"
+  category: SC
+  triggers: [authorised representative, authorized representative]
+
+- canonical: "SC: Notified Body"
+  category: SC
+  triggers: [notified body, notified bodies]
+
+- canonical: "SC: Client"
+  category: SC
+  triggers: [client, clients, the client]
+
+- canonical: "SC: T&L: Carrier"
+  category: SC
+  triggers: [carrier, carriers]
+
+- canonical: "SC: T&L: Driver"
+  category: SC
+  triggers: [driver, drivers]
+
+# ── Specialists ──────────────────────────────────────────────────────
+
+- canonical: "Spc: Inspector"
+  category: Spc
+  triggers: [inspector, inspectors]
+
+- canonical: "Spc: Employees' Representative"
+  category: Spc
+  triggers: [employees' representative, employees representative, safety representative, workers representative]
+
+- canonical: "Spc: Trade Union"
+  category: Spc
+  triggers: [trade union, trade unions, union]
+
+- canonical: "Spc: Assessor"
+  category: Spc
+  triggers: [assessor, assessors]
+
+- canonical: "Spc: Engineer"
+  category: Spc
+  triggers: [engineer, engineers]
+
+# ── Services ─────────────────────────────────────────────────────────
+
+- canonical: "Svc: Installer"
+  category: Svc
+  triggers: [installer, installers]
+
+# ── Public ───────────────────────────────────────────────────────────
+
+- canonical: "Public: Provider"
+  category: Public
+  triggers: [provider, providers, service provider]
+
+- canonical: "Public: Keeper"
+  category: Public
+  triggers: [keeper, keepers]
+
+- canonical: "Public: Dealer"
+  category: Public
+  triggers: [dealer, dealers]
+
+- canonical: Public
+  category: other
+  triggers: [public, the public, general public, members of the public]
+
+- canonical: Operator
+  category: other
+  triggers: [operator, operators, the operator]
+
+# ── Offshore ─────────────────────────────────────────────────────────
+
+- canonical: "Offshore: Licensee"
+  category: Offshore
+  triggers: [licensee, offshore licensee]
