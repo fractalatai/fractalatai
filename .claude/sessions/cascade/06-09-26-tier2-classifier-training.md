@@ -43,11 +43,14 @@ Start with logistic regression — simplest, interpretable, fast to train and ev
 
 ## Implementation plan
 
-1. Export training data from LanceDB (embeddings + labels)
-2. Train logistic regression on DRRP type
-3. Evaluate on held-out test set
-4. If >80% accuracy: wire into enrichment pipeline as Tier 2
-5. Train actor position classifier (harder, may need MLP)
+1. ~~Export training data from LanceDB (embeddings + labels)~~ ✓
+2. ~~Train logistic regression on DRRP type~~ ✓ (v1: 51.2%, v2: 64.0%)
+3. ~~Evaluate on held-out test set~~ ✓
+4. ~~Backfill missing embeddings~~ ✓ (1,539 in 35.6s)
+5. Fix class imbalance (Phase 2) — Right and Responsibility underrepresented
+6. Add modal features (Phase 3) — complement embeddings with legal signals
+7. Retrain → if >80% accuracy: wire into enrichment pipeline as Tier 2
+8. Train actor position classifier (harder, may need MLP)
 
 ## Integration
 
