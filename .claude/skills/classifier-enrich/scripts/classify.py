@@ -27,19 +27,33 @@ from tokenizers import Tokenizer
 # ── DRRP decomposition ──────────────────────────────────────────────
 
 def decompose_drrp(classifier_label: str, actors: list) -> str:
-    """Map Obligation/Liberty to DRRP sub-type using actor label prefix."""
+    """Map Obligation/Liberty to DRRP sub-type using ACTIVE actor label prefix.
+
+    Uses the active actor's prefix to determine the DRRP sub-type.
+    If any active actor is Gvt:/EU:, the provision is about government
+    authority → Responsibility/Power. Otherwise → Duty/Right.
+
+    For mixed provisions where both governed and government actors are
+    active, government takes precedence (the provision regulates
+    government conduct toward governed entities).
+    """
     if classifier_label == "none":
         return "none"
 
-    has_gvt = any(
+    # Check active actors only — not all actors
+    active_actors = [a for a in (actors or []) if a.get("position") == "active"]
+    # Fall back to all actors if none are marked active (regex provisions)
+    check_actors = active_actors if active_actors else (actors or [])
+
+    has_gvt_active = any(
         a.get("label", "").startswith("Gvt:") or a.get("label", "").startswith("EU:")
-        for a in (actors or [])
+        for a in check_actors
     )
 
     if classifier_label == "Obligation":
-        return "Responsibility" if has_gvt else "Duty"
+        return "Responsibility" if has_gvt_active else "Duty"
     elif classifier_label == "Liberty":
-        return "Power" if has_gvt else "Right"
+        return "Power" if has_gvt_active else "Right"
     return classifier_label
 
 
@@ -103,8 +117,6 @@ def main():
                         help="Path to classifier pickle")
     parser.add_argument("--confidence", type=float, default=0.85,
                         help="Confidence to assign classified provisions (default: 0.85)")
-    parser.add_argument("--protect-threshold", type=float, default=0.85,
-                        help="Skip provisions with existing confidence >= this (default: 0.85)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be classified without writing")
     parser.add_argument("--data-dir", type=str, default="data")
@@ -139,10 +151,10 @@ def main():
         .to_arrow()
     )
 
-    # Find candidates
+    # Find candidates — classify everything except structural and agentic (dev gold)
     candidates = []
     skipped_structural = 0
-    skipped_protected = 0
+    skipped_agentic = 0
 
     for i in range(len(results)):
         st = results.column("section_type")[i].as_py()
@@ -150,15 +162,15 @@ def main():
             skipped_structural += 1
             continue
 
-        conf = results.column("taxa_confidence")[i].as_py() or 0.0
-        if conf >= args.protect_threshold:
-            skipped_protected += 1
+        method = results.column("extraction_method")[i].as_py() or ""
+        if method in ("agentic", "agentic_unvalidated"):
+            skipped_agentic += 1
             continue
 
         candidates.append(i)
 
     print(f"Laws: {len(law_list)}, Provisions: {len(results)}")
-    print(f"Candidates: {len(candidates)} (skipped {skipped_structural} structural, {skipped_protected} protected)")
+    print(f"Candidates: {len(candidates)} (skipped {skipped_structural} structural, {skipped_agentic} agentic)")
 
     if args.dry_run:
         print("[DRY RUN] Would classify {len(candidates)} provisions")

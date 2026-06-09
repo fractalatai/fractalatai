@@ -34,14 +34,20 @@ This is the **production** Tier 2 — no API calls, no Ollama, microsecond infer
 7. Writes back with `extraction_method = "classifier"`, confidence from model probability
 8. Compacts LanceDB after batch write
 
-## Confidence protection
+## Protection gate
 
-| Existing data | Confidence | Protected? |
-|---|---|---|
-| Agentic (Gemini QA) | 0.90 | Yes — classifier skips |
-| Classifier | 0.85 | Yes — won't re-classify |
-| Local (Gemma) | 0.80 | No — classifier overwrites |
-| Regex | 0.30-0.80 | No — classifier overwrites |
+The classifier overwrites everything **except agentic** (development gold data):
+
+| Existing method | Action |
+|---|---|
+| `agentic` / `agentic_unvalidated` | **Skip** — development gold, verified by Gemini |
+| `classifier` | **Overwrite** — re-classify with latest model |
+| `local` | **Overwrite** |
+| `regex` | **Overwrite** |
+| `inherited` | **Overwrite** |
+| `none` | **Overwrite** |
+
+Structural provision types (title, heading, schedule, etc.) are always skipped — no DRRP to classify.
 
 ## Notes
 
