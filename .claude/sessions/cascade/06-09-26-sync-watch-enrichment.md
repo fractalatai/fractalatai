@@ -1,4 +1,4 @@
-# Session: Sync Watch Enrichment — Embed + Classify Inline
+# Session: Sync Watch Enrichment — Decoupled Ingest + Batch Enrich
 
 ## Context
 
@@ -375,7 +375,34 @@ Deferred — start with manual/cron. When ready, add to the watch loop:
 2. Add queue columns, verify `ensure_enrichment_queue_columns()` is idempotent
 3. Simulate: send events to watch, verify LAT stored + ack sent + law marked pending
 4. Run `taxa enrich --pending` — verify embed + classify + compact + queue cleared
-5. Run `sync publish --pending` — verify sertantai receives batch
+5. Run `sync publish --provisions --pending` — verify sertantai receives batch
 6. Failure test: kill mid-batch, re-run — verify idempotent recovery
 7. Monitor disk: LanceDB size before/after embed, after compact
 8. Monitor memory: watch process RSS over 1-hour session with ONNX loaded
+
+## Progress
+
+### Committed: `a10fe8e` — Decoupled sync watch infrastructure
+
+**Steps completed:**
+- [x] Step 1: DuckDB queue columns (`ensure_enrichment_queue_columns`)
+- [x] Step 2: Simplified watch loop (ingest + ack only, no enrich/publish)
+- [x] Step 4b: Dev flow (`--gap-c --laws`) clears `enrichment_pending`
+- [x] Step 6: `sync publish --provisions --pending` flag
+- [x] Zenoh ack key + `publish_ack()` with JSON payload
+- [x] `taxa enrich --pending` flag (queries queue, dead-letters at 3 retries)
+- [x] Resilient error handling (retry_count on failure, continues to next law)
+- [x] 19/19 tests passing, fmt + clippy clean
+
+**Steps remaining:**
+- [ ] Step 3: Export classifier to ONNX (`skl2onnx`)
+- [ ] Step 5: Modal feature extraction in Rust (397-dim vector)
+- [ ] Step 7: Observability logging (pending count, per-law timings, fragment count)
+- [ ] Wire ONNX classifier into `enrich --pending` (embed + classify in Rust)
+- [ ] Step 8 (future): Auto-trigger in watch (timer/threshold)
+
+**What works now:**
+- `sync watch` ingests LAT + acks in ~2s/law (no blocking)
+- `taxa enrich --pending` processes the queue (regex-only for now, ONNX classifier next)
+- `sync publish --provisions --pending` publishes enriched laws as a batch
+- Dev flow (`--gap-c --laws`) coexists — clears pending flag, confidence protection prevents downgrades

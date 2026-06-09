@@ -10,6 +10,9 @@ mod extractor;
 #[cfg(feature = "onnx")]
 pub use extractor::{DrrpExtraction, DrrpExtractor};
 
+pub mod drrp_classifier;
+pub use drrp_classifier::{DrrpClass, DrrpClassifier, DrrpPrediction};
+
 pub mod classifier;
 pub mod labels;
 pub use classifier::{
