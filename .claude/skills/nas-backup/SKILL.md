@@ -16,6 +16,7 @@ Before any destructive operation on LanceDB or DuckDB — table rebuilds, schema
 |--------|---------------|-------|
 | `data/fractalaw.duckdb` | ~175 MB | DuckDB — LRT metadata, taxa, publish hashes |
 | `data/lancedb/` | 370 MB–1.4 GB (clean) | LanceDB — provisions, embeddings, actors. Copy entire directory. |
+| `data/drrp_classifier_v*.pkl` | ~5 MB each | Trained classifier models (gitignored, not in repo) |
 
 **Do NOT back up `target/`** — it's 29+ GB of build artifacts.
 
@@ -45,6 +46,9 @@ cp data/fractalaw.duckdb "$BACKUP_DIR/"
 
 # LanceDB (copy entire directory — binary fragments, not individual files)
 cp -r data/lancedb/ "$BACKUP_DIR/lancedb/"
+
+# Classifier models (gitignored — only live in data/)
+cp data/drrp_classifier_v*.pkl "$BACKUP_DIR/" 2>/dev/null
 ```
 
 ### 3. Verify
