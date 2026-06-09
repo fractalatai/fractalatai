@@ -22,25 +22,25 @@ After enrichment to validate the quality of DRRP extraction and actor position c
 ```bash
 # QA all extraction methods from OH&S family (30 samples)
 source ~/.bashrc && GEMINI_API_KEY="$GEMINI_API_KEY" \
-  /usr/bin/python3 .claude/skills/drrp-qa/run_qa.py --family "OH&S" --sample-size 30
+  /usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/run_qa.py --family "OH&S" --sample-size 30
 
 # QA only agentic (Tier 3 LLM) provisions
 source ~/.bashrc && GEMINI_API_KEY="$GEMINI_API_KEY" \
-  /usr/bin/python3 .claude/skills/drrp-qa/run_qa.py --method agentic --sample-size 20
+  /usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/run_qa.py --method agentic --sample-size 20
 
 # QA inherited (Tier 1) provisions only
 source ~/.bashrc && GEMINI_API_KEY="$GEMINI_API_KEY" \
-  /usr/bin/python3 .claude/skills/drrp-qa/run_qa.py --method inherited --family "OH&S"
+  /usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/run_qa.py --method inherited --family "OH&S"
 
 # QA all methods across all families
 source ~/.bashrc && GEMINI_API_KEY="$GEMINI_API_KEY" \
-  /usr/bin/python3 .claude/skills/drrp-qa/run_qa.py --method all --sample-size 40
+  /usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/run_qa.py --method all --sample-size 40
 
 # Dry run — assemble samples without LLM calls (for inspection)
-/usr/bin/python3 .claude/skills/drrp-qa/run_qa.py --dry-run --family "OH&S"
+/usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/run_qa.py --dry-run --family "OH&S"
 
 # Generate human-readable DRRP report for a specific law (no LLM calls)
-/usr/bin/python3 .claude/skills/drrp-qa/run_qa.py --report UK_uksi_1992_2793
+/usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/run_qa.py --report UK_uksi_1992_2793
 ```
 
 ## Workflow: Human-Gated QA
@@ -94,4 +94,4 @@ This is LLM-checking-LLM for agentic provisions — useful for regression detect
 
 - Hohfeldian position model: `docs/reviews/gemini-actors-struct-review-20260607.md`
 - Design doc: `docs/GAP-C-AGENTIC-EXTRACTION-PLAN.md`
-- Tier 3 POC: `.claude/skills/drrp-qa/tier3_poc.py`
+- Tier 3 POC: `${CLAUDE_SKILL_DIR}/scripts/tier3_poc.py`

@@ -5,3 +5,4 @@ guests/*/target
 .zed
 nohup.out
 backups/*.parquet
+.claude/skills/drrp-qa/__pycache__/

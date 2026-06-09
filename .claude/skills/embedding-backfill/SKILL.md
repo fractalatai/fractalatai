@@ -18,16 +18,16 @@ The embedding gap prevents these provisions from being used as training data for
 
 ```bash
 # Backfill all agentic provisions missing embeddings
-/usr/bin/python3 .claude/skills/embedding-backfill/backfill.py
+/usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/backfill.py
 
 # Backfill a specific extraction method
-/usr/bin/python3 .claude/skills/embedding-backfill/backfill.py --method agentic
+/usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/backfill.py --method agentic
 
 # Backfill specific laws
-/usr/bin/python3 .claude/skills/embedding-backfill/backfill.py --laws UK_uksi_1992_2793,UK_uksi_2005_735
+/usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/backfill.py --laws UK_uksi_1992_2793,UK_uksi_2005_735
 
 # Dry run — count how many need backfill without computing
-/usr/bin/python3 .claude/skills/embedding-backfill/backfill.py --dry-run
+/usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/backfill.py --dry-run
 ```
 
 ## How It Works
