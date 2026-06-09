@@ -219,6 +219,27 @@ def format_actors(actors: list) -> str:
     return "\n".join(lines)
 
 
+# ── LanceDB compaction ───────────────────────────────────────────────
+
+def compact_lancedb(lancedb_path: str):
+    """Compact LanceDB to reclaim fragment bloat from write-backs.
+
+    Each merge_insert creates new fragments. A batch of 120 corrections
+    can bloat the table from 450 MB to 8+ GB. This rebuilds the table
+    in-memory to eliminate fragments.
+    """
+    import lancedb as ldb
+
+    db = ldb.connect(str(lancedb_path))
+    tbl = db.open_table("legislation_text")
+    rows = tbl.count_rows()
+    arrow = tbl.to_arrow()
+    db.drop_table("legislation_text")
+    db.create_table("legislation_text", data=arrow)
+    print(f"  [compacted: {rows:,} rows]")
+    sys.stdout.flush()
+
+
 # ── Correction write-back ────────────────────────────────────────────
 
 def apply_correction(lancedb_path: str, section_id: str, correction: dict):
@@ -525,6 +546,10 @@ def main():
 
     _save_results(output_path, args, results,
                   correct, incorrect, ambiguous, alpha, beta_param)
+
+    # Compact LanceDB after write-back to prevent fragment bloat
+    if args.write_back and incorrect > 0:
+        compact_lancedb(str(lancedb_path))
 
 
 def _save_results(output_path, args, results,
