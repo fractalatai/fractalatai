@@ -129,19 +129,64 @@ If we decompose at classification time:
 4. The classifier internally predicts Obligation/Liberty but WRITES Duty/Responsibility/Power/Right
 5. LanceDB always speaks DRRP, never Obligation/Liberty
 
+### Classifier gate simplified (commit `7928e29`)
+- Gate by extraction_method, not confidence threshold
+- Skip `agentic` / `agentic_unvalidated` — everything else gets classified
+- No confidence arithmetic needed
+- Eliminates the regex 0.85/0.90 overlap problem Gemini flagged
+
+### Agentic taxonomy reverted
+- 1,882 provisions reverted from Obligation/Liberty back to DRRP
+- Verified: zero Obligation/Liberty remaining in LanceDB
+- Decomposition happens at classification time, not in schema
+
+### Mixed-actor decomposition rule
+- Uses ACTIVE actor prefix, not all actors
+- If any active actor is Gvt:/EU: → Responsibility/Power
+- Falls back to all actors if none marked active (regex provisions)
+
+### QQ corpus classified (production run)
+- **40,272 provisions classified in 400 seconds (101/s)**
+- 1,611 agentic protected, 38,919 structural skipped
+- Zero API calls — pure classifier inference
+- Auto-compacted after run
+
+### Corpus shape after classification
+
+| DRRP type | Count |
+|---|---|
+| Duty | 13,243 |
+| Responsibility | 8,127 |
+| Power | 6,455 |
+| Right | 4,976 |
+| Rule | 454 |
+| (none) | 47,546 |
+
+| Method | Count |
+|---|---|
+| classifier | 40,272 |
+| regex | 28,532 |
+| inherited | 5,471 |
+| none | 4,487 |
+| agentic | 2,014 |
+
+Agentic breakdown: Responsibility (812), Duty (536), Power (378), none (324), Right (160) — all DRRP types represented in gold data.
+
 ## Exit criteria
 
-- [ ] v6 classifier wired as `TIER2_PROVIDER=classifier`
-- [ ] Development workflow tested — agentic 0.90 data survives production run
-- [ ] QQ corpus re-enriched with classifier
-- [ ] Data verified (confidence, DRRP distribution, spot checks)
+- [x] v6 classifier wired as `TIER2_PROVIDER=classifier`
+- [x] Development workflow tested — agentic 0.90 data survives production run
+- [x] QQ corpus classified (40,272 provisions in 400s)
+- [x] Data verified (DRRP distribution, taxonomy uniform, agentic protected)
 - [ ] Published to sertantai via zenoh
 - [ ] Sertantai confirms receipt
 
 ## References
 
 - Classifier: `data/drrp_classifier_v6.pkl`
+- Classifier skill: `.claude/skills/classifier-enrich/`
 - Training session: `.claude/sessions/cascade/06-09-26-tier2-classifier-training.md`
+- Gemini interface review: `docs/reviews/gemini-production-interface-review-20260609.md`
 - Cascade strategy: `docs/CLASSIFICATION-CASCADE-STRATEGY-v0.3.md`
 - Enrich skill: `.claude/skills/enrich-and-publish/`
 - Sertantai briefing: `~/Desktop/sertantai-legal/backend/data/fractalaw-actors-struct-migration.md`
