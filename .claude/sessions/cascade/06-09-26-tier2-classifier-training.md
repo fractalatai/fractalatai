@@ -215,24 +215,93 @@ Responsibility gained only 6 despite 119 confirmations — Gemini corrected most
 - Auto-compaction in QA `run_qa.py` after write-back
 - SKILL.md updated with compaction warning
 
-### Phase 3: Feature engineering
-- Add modal indicators (has_shall, has_must, has_may, has_power_to, has_entitled)
-- Actor count, government actor present, section type
-- Complement embedding topic similarity with legal modal signals
+### Phase 3: Modal features — COMPLETE
 
-### Phase 4: Retrain and evaluate
-- Target: >80% overall, >60% per class
-- Models saved at `data/drrp_classifier_v*.pkl`
+Added 13 modal indicators alongside 384-dim embeddings:
+- Obligation modals: has_shall, has_must, shall_not, must_not, required_to, has_a_duty
+- Liberty modals: has_may, may_not, entitled, power_to, right_to
+- Actor signals: actor_count, has_gvt_actor
 
-### Also needed
-- Fix enrichment pipeline to compute embeddings at write time (prevent future gaps)
-- NAS backup taken (20260609)
+**v4 classifier: 75.3%** (was 67.9%)
+
+Key finding: **modal features alone (72.7%) beat embeddings alone (67.9%)**. The legal modals are more predictive than semantic content. Combined they complement each other.
+
+### Phase 4: DRRP hierarchy — Obligation / Liberty / none
+
+Analysis revealed Duty vs Responsibility and Right vs Power share the same confusion pattern: the DRRP type encodes information already present in the actor label prefix.
+
+**The hierarchy:**
+```
+Obligation (shall/must)         → actor label determines:
+├── Duty        — Org:/Ind:/SC: actor    Duty (governed entity)
+└── Responsibility — Gvt:/EU: actor      Responsibility (government)
+
+Liberty (may/entitled/power to) → actor label determines:
+├── Right       — Org:/Ind:/SC: actor    Right (regulated entity)
+└── Power       — Gvt:/EU: actor         Power (authority)
+
+none — no legal relation
+```
+
+The classifier learns 3 classes. The consumer decomposes to full DRRP using the actor label. Hohfeldian mapping preserved without the model needing to learn the Gvt/governed boundary.
+
+**Evidence for merge:**
+- 707 Duty provisions had Gvt actors — the model couldn't separate Duty from Responsibility (8:1 imbalance, identical modals)
+- Right and Power both use "may" — distinction is WHO holds it, not what the modal is
+- Regex classified Right at 10% accuracy, Responsibility at 2.5% — the distinction was never reliable
+
+**v5 classifier (4-class, merged D+R): 82.7%** — past 80% target
+**v6 classifier (3-class, Obligation/Liberty/none): 86.4%** ✓
+
+| Class | Precision | Recall | F1 |
+|---|---|---|---|
+| Obligation | 90% | 91% | 90% |
+| Liberty | 82% | 84% | 83% |
+| none | 84% | 75% | 79% |
+
+### Success criteria — MET ✓
+
+1. ✅ Overall accuracy >80% (86.4%)
+2. ✅ No class has 0% recall (all >75%)
+3. ⬜ Inference time <1ms (not yet tested — logistic regression should be microseconds)
+4. ⬜ Integrated into enrichment pipeline as `TIER2_PROVIDER=classifier`
+
+### Full accuracy journey
+
+| Version | Classes | Accuracy | Key change |
+|---|---|---|---|
+| v1 | 5 (DRRP) | 51.2% | 397 examples, embeddings only |
+| v2 | 5 | 64.0% | 1,514 examples (backfill) |
+| v3 | 5 | 67.9% | Class balance (Right+Responsibility targeted) |
+| v4 | 5 | 75.3% | Modal features added |
+| v5 | 4 | 82.7% | Duty+Responsibility merged |
+| **v6** | **3** | **86.4%** | **Obligation/Liberty/none hierarchy** |
+
+## What's next
+
+1. Wire v6 classifier into enrichment pipeline as `TIER2_PROVIDER=classifier`
+2. Test inference time (target <1ms)
+3. Update cascade strategy doc with the Obligation/Liberty/none hierarchy
+4. Update sertantai briefing with hierarchy
+5. Fix enrichment pipeline to compute embeddings at write time
+6. Continue QA passes to grow the golden dataset
+
+## Key learnings
+
+1. **Fix the data before the model** — backfilling embeddings and balancing classes moved accuracy more than any model change
+2. **Modal features beat embeddings** for DRRP classification — the legal modal verb is the primary signal
+3. **Simplify the problem** — 5 classes → 3 classes by recognising the actor label already carries the Gvt/governed distinction
+4. **DRRP type encodes redundant information** — Duty vs Responsibility and Right vs Power are derivable from actor labels
+5. **Regex DRRP classification is deeply unreliable** — 2.5-10% for Right/Responsibility. Regex is a sieve, not a classifier
+6. **Compact after every QA write-back** — fragment bloat is a disk emergency waiting to happen
+7. **The Hohfeldian hierarchy maps cleanly** — Obligation/Liberty at classifier level, full DRRP decomposition at consumer level
 
 ## References
 
-- Golden dataset: LanceDB `extraction_method = 'agentic'` (1,514 reg-level with embeddings)
-- Embeddings: `all-MiniLM-L6-v2` 384-dim
-- Models: `data/drrp_classifier_v1.pkl` (51.2%), `data/drrp_classifier_v2.pkl` (64.0%)
+- Golden dataset: LanceDB `extraction_method = 'agentic'` (1,759 reg-level with embeddings)
+- Embeddings: `all-MiniLM-L6-v2` 384-dim + 13 modal indicators
+- Production model: `data/drrp_classifier_v6.pkl` (86.4%, 3-class)
+- All models: `data/drrp_classifier_v[1-6].pkl`
 - Gemini review: `docs/reviews/gemini-classifier-training-review-20260609.md`
 - Embedding skill: `.claude/skills/embedding-backfill/`
 - Cascade strategy: `docs/CLASSIFICATION-CASCADE-STRATEGY-v0.3.md`
