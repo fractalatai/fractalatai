@@ -63,9 +63,76 @@ The classifier outputs 3 classes. The consumer (sertantai or the publish step) d
 | Liberty | Gvt:/EU: | Power |
 | none | any | none |
 
+## Shipped
+
+### DRRP taxonomy migration
+- 1,881 agentic provisions migrated: Duty→Obligation, Responsibility→Obligation, Right→Liberty, Power→Liberty
+- 330 skipped (already `none`)
+- Actors, confidence, extraction_method untouched — only `drrp_types` changed
+- Verified on test provision (s.43B: Power+Duty → Liberty+Obligation)
+- Compacted + NAS backup
+
+## Development / Production Interface Rules
+
+Two workflows operate on the same LanceDB dataset. They must not destroy each other's work.
+
+### Development workflow
+- **Purpose**: Improve data quality through QA, corrections, model training
+- **Writes at**: `extraction_method = "agentic"`, `taxa_confidence = 0.90`
+- **Tools**: Gemini QA with write-back, targeted enrichment, embedding backfill
+- **Output**: Gold-standard provisions — verified by Gemini, corrected where wrong
+- **Frequency**: Ad-hoc, per-law, small batches
+
+### Production workflow
+- **Purpose**: Classify the full corpus using the trained model
+- **Writes at**: `extraction_method = "classifier"`, `taxa_confidence = 0.85`
+- **Tools**: v6 classifier (embedding + modal features), no API calls
+- **Output**: Bulk-classified provisions — 86.4% accurate, consistent taxonomy
+- **Frequency**: Corpus-wide runs, hundreds of laws at once
+
+### Interface rules
+
+**Rule 1: Development always wins over production.**
+Agentic (0.90) > classifier (0.85) > regex (0.30-0.80). The confidence hierarchy enforces this. A production run cannot overwrite a development correction.
+
+**Rule 2: Production always wins over regex.**
+The classifier at 86.4% is strictly better than regex at 22% for DRRP type. Every regex-classified provision should be reclassified by the production classifier. The classifier writes at 0.85, which is above the regex multi-actor confidence of 0.30.
+
+**Rule 3: Taxonomy must be uniform before publish.**
+LanceDB currently contains a mix of old taxonomy (Duty/Responsibility/Power/Right/Rule from regex) and new taxonomy (Obligation/Liberty/none from classifier + migrated agentic). Before publishing, ALL provisions must speak the same taxonomy. Options:
+- (a) Classifier overwrites all regex provisions → uniform new taxonomy
+- (b) Map old→new at publish time → LanceDB stays mixed but zenoh payload is uniform
+- (c) Migrate all DRRP labels in LanceDB to new taxonomy first, then classifier fills gaps
+
+**Rule 4: Re-running development after production is safe.**
+If we QA a provision that the classifier already classified at 0.85, and Gemini corrects it, the correction writes at 0.90 → overwrites the classifier result. Next production run skips it (0.90 > 0.85). The ratchet works in both directions.
+
+**Rule 5: Re-running production after development is safe.**
+The classifier skips anything at ≥0.85. Development corrections at 0.90 are protected. New regex provisions (from re-enrichment) get classified by production.
+
+### The taxonomy question
+
+The classifier outputs Obligation/Liberty/none. The DRRP decomposition (Obligation→Duty or Responsibility based on actor prefix) should happen:
+- **At classification time** (write Duty/Responsibility/Power/Right to LanceDB) — sertantai gets familiar DRRP types
+- **At publish time** (write Obligation/Liberty to LanceDB, decompose in zenoh payload) — LanceDB stays pure hierarchy
+
+**Recommendation**: Decompose at classification time. Write Duty/Responsibility/Power/Right to LanceDB. Sertantai already expects these types. The Obligation/Liberty hierarchy is an internal model concept, not a data schema.
+
+This means the classifier writes the SAME taxonomy as the old regex — but with much better accuracy. No taxonomy migration needed. The agentic provisions we already migrated to Obligation/Liberty need to be migrated back.
+
+### What this changes
+
+If we decompose at classification time:
+1. No taxonomy migration needed for regex provisions
+2. No taxonomy migration needed at publish time
+3. The migrated agentic provisions (1,881 that we changed to Obligation/Liberty) need reverting back to Duty/Responsibility/Power/Right
+4. The classifier internally predicts Obligation/Liberty but WRITES Duty/Responsibility/Power/Right
+5. LanceDB always speaks DRRP, never Obligation/Liberty
+
 ## Exit criteria
 
 - [ ] v6 classifier wired as `TIER2_PROVIDER=classifier`
+- [ ] Development workflow tested — agentic 0.90 data survives production run
 - [ ] QQ corpus re-enriched with classifier
 - [ ] Data verified (confidence, DRRP distribution, spot checks)
 - [ ] Published to sertantai via zenoh
