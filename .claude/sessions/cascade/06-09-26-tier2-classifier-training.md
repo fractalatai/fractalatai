@@ -142,10 +142,65 @@ The Tier 2 classifier is ready for production when:
 3. Inference time <1ms per provision
 4. Integrated into the enrichment pipeline as `TIER2_PROVIDER=classifier`
 
+## Shipped (2026-06-09)
+
+### Phase 1: Embedding backfill — COMPLETE
+- 1,539 embeddings computed in 35.6 seconds (43/s) via ONNX on CPU
+- Training set: 397 → 1,514 regulation-level examples with embeddings
+- Created `embedding-backfill` skill (commit `5c3c302`) for reuse
+
+### v2 classifier results (after backfill)
+
+| Metric | v1 (397 examples) | v2 (1,514 examples) |
+|---|---|---|
+| Overall accuracy | 51.2% | **64.0%** |
+| Duty | 55% precision | 67% precision, 85% recall |
+| Power | 41% | 56% |
+| Responsibility | 0% (no predictions) | 55% |
+| Right | 0% (no predictions) | 75% precision, 17% recall |
+| none | 57% | 61% |
+
+Class distribution in training data:
+- Duty: 758 (50%) — dominant
+- Power: 292 (19%)
+- none: 273 (18%)
+- Responsibility: 98 (6%)
+- Right: 93 (6%)
+
+### Gemini review of training plan
+- Saved: `docs/reviews/gemini-classifier-training-review-20260609.md`
+- Phase order validated
+- Backfill now, fix pipeline long-term (embeddings at write time)
+- Active learning for class balance — use temporary model to find likely Right/Responsibility provisions
+- Modal indicators will complement embeddings
+- Biggest risk: 80% accuracy may be unreachable with lightweight models
+
+## What's next
+
+### Phase 2: Balance the classes
+- Right (93) and Responsibility (98) need more examples
+- Target employment rights SIs for Right, environmental permits for Responsibility
+- Active learning: use v2 model to find likely Right/Responsibility in unlabelled corpus
+
+### Phase 3: Feature engineering
+- Add modal indicators (has_shall, has_must, has_may, has_power_to, has_entitled)
+- Actor count, government actor present, section type
+- Complement embedding topic similarity with legal modal signals
+
+### Phase 4: Retrain and evaluate
+- Target: >80% overall, >60% per class
+- Models saved at `data/drrp_classifier_v*.pkl`
+
+### Also needed
+- Fix enrichment pipeline to compute embeddings at write time (prevent future gaps)
+- NAS backup taken (20260609)
+
 ## References
 
-- Golden dataset: LanceDB `extraction_method = 'agentic'` (1,515 reg-level, 397 with embeddings)
-- Embeddings: `all-MiniLM-L6-v2` 384-dim, already in LanceDB for 96K provisions
-- Baseline model: `data/drrp_classifier_v1.pkl` (51.2% accuracy — not production-ready)
+- Golden dataset: LanceDB `extraction_method = 'agentic'` (1,514 reg-level with embeddings)
+- Embeddings: `all-MiniLM-L6-v2` 384-dim
+- Models: `data/drrp_classifier_v1.pkl` (51.2%), `data/drrp_classifier_v2.pkl` (64.0%)
+- Gemini review: `docs/reviews/gemini-classifier-training-review-20260609.md`
+- Embedding skill: `.claude/skills/embedding-backfill/`
 - Cascade strategy: `docs/CLASSIFICATION-CASCADE-STRATEGY-v0.3.md`
 - Prior session: `.claude/sessions/cascade/06-08-26-cascade-v03-implementation.md`
