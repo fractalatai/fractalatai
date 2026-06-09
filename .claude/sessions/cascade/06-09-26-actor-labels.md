@@ -1,4 +1,4 @@
-# Session: Actor Labels — Let the LLM Name, Dictionary Match
+# Session: Actor Labels — Let the LLM Name, Dictionary Match (CLOSED)
 
 ## Context
 

@@ -317,6 +317,10 @@ enum SyncAction {
         /// Publish provision-level taxa (from LanceDB) instead of law-level
         #[arg(long)]
         provisions: bool,
+        /// Publish laws recently enriched but not yet published
+        /// (enrichment_pending = false AND provisions_published_at < updated_at)
+        #[arg(long)]
+        pending: bool,
     },
     /// Pull legislation text (LAT) from sertantai via zenoh
     PullLat {
@@ -406,6 +410,10 @@ enum TaxaAction {
         /// Skip laws where all provisions were enriched within the last 24 hours
         #[arg(long)]
         skip_recent: bool,
+        /// Process laws queued by sync watch (enrichment_pending = true).
+        /// Runs embed + classify + regex DRRP in batch, then clears the queue.
+        #[arg(long)]
+        pending: bool,
     },
     /// Generate clause eyeball review markdown for manual QA
     Eyeball {
@@ -502,9 +510,13 @@ async fn main() -> anyhow::Result<()> {
                 all,
                 changed,
                 provisions,
+                pending,
             } => {
                 if provisions {
-                    cmd_sync_publish_provisions(&data_dir, &zenoh, laws, family, all, changed).await
+                    cmd_sync_publish_provisions(
+                        &data_dir, &zenoh, laws, family, all, changed, pending,
+                    )
+                    .await
                 } else {
                     cmd_sync_publish(&data_dir, &zenoh, laws, family, all, changed).await
                 }
@@ -547,9 +559,38 @@ async fn main() -> anyhow::Result<()> {
                 force,
                 gap_c,
                 skip_recent,
+                pending,
             } => {
                 let store = open_duck(&data_dir)?;
-                let law_filter = if let Some(ref fam) = family {
+                let law_filter = if pending {
+                    // Process the enrichment queue from sync watch
+                    store.ensure_enrichment_queue_columns()?;
+                    let batches = store.query_arrow(
+                        "SELECT name FROM legislation \
+                         WHERE enrichment_pending = true \
+                           AND (enrichment_retry_count IS NULL OR enrichment_retry_count < 3) \
+                         ORDER BY enrichment_added_at ASC",
+                    )?;
+                    let mut names = Vec::new();
+                    for batch in &batches {
+                        if let Some(col) = batch.column_by_name("name")
+                            && let Some(arr) =
+                                col.as_any().downcast_ref::<arrow::array::StringArray>()
+                        {
+                            for i in 0..arr.len() {
+                                if !arr.is_null(i) {
+                                    names.push(arr.value(i).to_string());
+                                }
+                            }
+                        }
+                    }
+                    if names.is_empty() {
+                        println!("No laws pending enrichment.");
+                        return Ok(());
+                    }
+                    println!("Enrichment queue: {} laws pending", names.len());
+                    Some(names)
+                } else if let Some(ref fam) = family {
                     // Resolve family to law names via DuckDB query
                     let names = laws_in_family(&store, fam)?;
                     if names.is_empty() {
@@ -926,6 +967,7 @@ async fn cmd_sync_publish_provisions(
     family: Option<String>,
     all: bool,
     changed: bool,
+    pending: bool,
 ) -> anyhow::Result<()> {
     let store = open_duck(data_dir)?;
     store.ensure_taxa_hash_columns()?;
@@ -935,8 +977,35 @@ async fn cmd_sync_publish_provisions(
         .await
         .context("opening LanceDB")?;
 
-    // Resolve law names — same logic as law-level publish.
-    let law_names: Vec<String> = if let Some(ref fam) = family {
+    // Resolve law names.
+    let law_names: Vec<String> = if pending {
+        store.ensure_enrichment_queue_columns()?;
+        let batches = store.query_arrow(
+            "SELECT name FROM legislation \
+             WHERE enrichment_pending = false \
+               AND enrichment_added_at IS NOT NULL \
+               AND (provisions_published_at IS NULL \
+                    OR provisions_published_at < updated_at) \
+             ORDER BY name",
+        )?;
+        let mut names = Vec::new();
+        for batch in &batches {
+            if let Some(col) = batch.column_by_name("name")
+                && let Some(arr) = col.as_any().downcast_ref::<arrow::array::StringArray>()
+            {
+                for i in 0..arr.len() {
+                    if !arr.is_null(i) {
+                        names.push(arr.value(i).to_string());
+                    }
+                }
+            }
+        }
+        println!(
+            "Publishing provisions for {} recently enriched laws (--pending)",
+            names.len()
+        );
+        names
+    } else if let Some(ref fam) = family {
         let names = laws_in_family(&store, fam)?;
         if names.is_empty() {
             anyhow::bail!("No laws found with family '{fam}'");
@@ -1135,6 +1204,7 @@ async fn cmd_sync_watch(
     let duck = open_duck(data_dir)?;
     duck.ensure_taxa_hash_columns()?;
     duck.ensure_provisions_published_column()?;
+    duck.ensure_enrichment_queue_columns()?;
 
     let config = zenoh.build_zenoh_config()?;
     let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
@@ -1170,7 +1240,7 @@ async fn cmd_sync_watch(
         "Watching for sync events (tenant: {}, timeout: {timeout_secs}s per pull)...",
         zenoh.tenant
     );
-    println!("Pipeline: ensure LRT → pull LAT → enrich → publish taxa + provisions");
+    println!("Pipeline: ensure LRT → pull LAT → ack → queue for enrichment");
     println!("Press Ctrl+C to stop.\n");
 
     let mut total_events = 0usize;
@@ -1178,7 +1248,6 @@ async fn cmd_sync_watch(
     let mut total_lat_pulls = 0usize;
     let mut total_rows = 0usize;
     let mut total_enriched = 0usize;
-    let mut total_published = 0usize;
     let mut total_deletions = 0usize;
 
     loop {
@@ -1254,7 +1323,7 @@ async fn cmd_sync_watch(
 
                 // Step 2: Pull LAT from sertantai → LanceDB.
                 eprint!(" → pull LAT");
-                match sync.query_lat(law_name, timeout).await {
+                let lat_rows: usize = match sync.query_lat(law_name, timeout).await {
                     Ok(batches) if batches.is_empty() => {
                         eprintln!(" → no LAT data");
                         continue;
@@ -1266,6 +1335,7 @@ async fn cmd_sync_watch(
                                 eprint!(" → {rows} provisions");
                                 total_lat_pulls += 1;
                                 total_rows += rows;
+                                rows
                             }
                             Err(e) => {
                                 eprintln!(" → LAT upsert error: {e}");
@@ -1277,105 +1347,26 @@ async fn cmd_sync_watch(
                         eprintln!(" → LAT query error: {e}");
                         continue;
                     }
-                }
-
-                // Step 3: Taxa enrichment (DRRP parse).
-                eprint!(" → enrich");
-                let enrich_result = match enrich_single_law(&lance, &duck, law_name, false).await {
-                    Ok(result) => {
-                        match result {
-                            EnrichResult::Making => {
-                                eprint!(" → ok");
-                                total_enriched += 1;
-                            }
-                            EnrichResult::NonMaking => {
-                                eprint!(" → non-making");
-                                total_enriched += 1;
-                            }
-                            EnrichResult::NoTaxa => {
-                                eprint!(" → no taxa signal");
-                            }
-                        }
-                        result
-                    }
-                    Err(e) => {
-                        eprintln!(" → enrich error: {e}");
-                        continue;
-                    }
                 };
 
-                // Step 3b: Prune LAT from LanceDB for non-making laws (no duties
-                // or responsibilities). The LRT metadata in DuckDB is kept and
-                // published — only the per-provision text is pruned.
-                if matches!(enrich_result, EnrichResult::NonMaking | EnrichResult::NoTaxa) {
-                    let pruned = lance.delete_law_lat(law_name).await.unwrap_or(0);
-                    if pruned > 0 {
-                        eprint!(" → pruned {pruned} LAT rows");
-                    }
+                // Step 3: Ack to sertantai + queue for enrichment.
+                //
+                // No enrichment or publish here — that happens in batch via
+                // `taxa enrich --pending` and `sync publish --pending`.
+                if let Err(e) = sync.publish_ack(law_name, lat_rows).await {
+                    eprint!(" → ack error: {e}");
                 }
 
-                // Step 4: Publish law-level taxa from DuckDB (LRT) back to sertantai.
-                eprint!(" → publish");
-                let sql = format!(
-                    "SELECT name, duty_holder, rights_holder, responsibility_holder, power_holder, \
-                            duty_type, role, role_gvt, \
-                            duties, rights, responsibilities, powers, \
-                            fitness_person, fitness_process, fitness_place, \
-                            fitness_plant, fitness_property, fitness_sector, fitness \
-                     FROM legislation WHERE name = '{}'",
-                    law_name.replace('\'', "''")
-                );
-                match duck.query_arrow(&sql) {
-                    Ok(batches)
-                        if !batches.is_empty()
-                            && batches.iter().any(|b| b.num_rows() > 0) =>
-                    {
-                        match sync.publish_taxa(law_name, &batches).await {
-                            Ok(_) => {
-                                // Mark published_hash = taxa_hash.
-                                let _ = duck.execute(&format!(
-                                    "UPDATE legislation SET published_hash = taxa_hash \
-                                     WHERE name = '{}'",
-                                    law_name.replace('\'', "''")
-                                ));
-                                eprint!(" → lrt ok");
-                                total_published += 1;
-                            }
-                            Err(e) => eprintln!(" → publish error: {e}"),
-                        }
-
-                        // Step 5: Publish provision-level taxa from LanceDB.
-                        match lance.query_provision_taxa(law_name).await {
-                            Ok(prov_batches) => {
-                                let prov_rows: usize =
-                                    prov_batches.iter().map(|b| b.num_rows()).sum();
-                                if prov_rows > 0 {
-                                    match sync
-                                        .publish_provision_taxa(law_name, &prov_batches)
-                                        .await
-                                    {
-                                        Ok(_) => {
-                                            let _ = duck.execute(&format!(
-                                                "UPDATE legislation \
-                                                 SET provisions_published_at = CURRENT_TIMESTAMP \
-                                                 WHERE name = '{}'",
-                                                law_name.replace('\'', "''")
-                                            ));
-                                            eprint!(" + {prov_rows} provisions");
-                                        }
-                                        Err(e) => {
-                                            eprint!(" → provision publish error: {e}");
-                                        }
-                                    }
-                                }
-                            }
-                            Err(e) => eprint!(" → provision query error: {e}"),
-                        }
-                        eprintln!(" → done");
-                    }
-                    Ok(_) => eprintln!(" → no taxa in DuckDB"),
-                    Err(e) => eprintln!(" → DuckDB taxa query error: {e}"),
-                }
+                // Mark law as pending enrichment in DuckDB.
+                let escaped = law_name.replace('\'', "''");
+                let _ = duck.execute(&format!(
+                    "UPDATE legislation \
+                     SET enrichment_pending = true, \
+                         enrichment_added_at = CURRENT_TIMESTAMP \
+                     WHERE name = '{escaped}'"
+                ));
+                total_enriched += 1;
+                eprintln!(" → queued for enrichment");
             }
             _ = tokio::signal::ctrl_c() => {
                 println!("\nShutting down...");
@@ -1387,8 +1378,7 @@ async fn cmd_sync_watch(
     println!(
         "Done. {total_events} events, {total_lrt_pulls} LRT pulls, \
          {total_lat_pulls} LAT pulls ({total_rows} provisions), \
-         {total_enriched} enriched, {total_published} published, \
-         {total_deletions} deletions."
+         {total_enriched} queued for enrichment, {total_deletions} deletions."
     );
 
     Ok(())
@@ -4681,8 +4671,23 @@ async fn cmd_taxa_enrich(
     let mut pruned_rows = 0usize;
     let total = law_names.len();
 
+    let mut failed = 0usize;
     for law_name in &law_names {
-        let result = enrich_single_law(&lance, store, law_name, gap_c).await?;
+        let result = match enrich_single_law(&lance, store, law_name, gap_c).await {
+            Ok(r) => r,
+            Err(e) => {
+                eprintln!("  {law_name}: enrich error: {e}");
+                // Increment retry count so dead-letter kicks in at 3
+                let escaped = law_name.replace('\'', "''");
+                let _ = store.execute(&format!(
+                    "UPDATE legislation \
+                     SET enrichment_retry_count = COALESCE(enrichment_retry_count, 0) + 1 \
+                     WHERE name = '{escaped}'"
+                ));
+                failed += 1;
+                continue;
+            }
+        };
 
         // Prune LAT for non-making laws (no duties or responsibilities).
         if matches!(result, EnrichResult::NonMaking | EnrichResult::NoTaxa) {
@@ -4692,6 +4697,15 @@ async fn cmd_taxa_enrich(
                 pruned_rows += n;
             }
         }
+
+        // Clear enrichment_pending — this law has been enriched
+        // (whether via dev --gap-c or production --pending).
+        let escaped = law_name.replace('\'', "''");
+        let _ = store.execute(&format!(
+            "UPDATE legislation \
+             SET enrichment_pending = false, enrichment_retry_count = 0 \
+             WHERE name = '{escaped}'"
+        ));
 
         enriched += 1;
         if enriched.is_multiple_of(100) {
@@ -4711,6 +4725,9 @@ async fn cmd_taxa_enrich(
     let filled_count = extract_i64(&filled[0], 0);
 
     println!("Processed {enriched} laws. LRT now has {filled_count} laws with DRRP taxa data.");
+    if failed > 0 {
+        eprintln!("  {failed} laws failed enrichment (retry count incremented).");
+    }
     if pruned_laws > 0 {
         println!("Pruned {pruned_rows} LAT rows from {pruned_laws} non-making laws.");
     }

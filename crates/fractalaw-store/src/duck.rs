@@ -562,6 +562,26 @@ impl DuckStore {
         Ok(())
     }
 
+    /// Ensure enrichment queue columns exist on `legislation`.
+    ///
+    /// Used by `sync watch` (ingest phase) and `taxa enrich --pending` (batch phase)
+    /// to track which laws need enrichment after LAT ingestion.
+    ///
+    /// - `enrichment_pending` — true if LAT ingested but not yet enriched
+    /// - `enrichment_added_at` — when the law was queued for enrichment
+    /// - `enrichment_retry_count` — how many times enrichment has failed (dead-letter at 3)
+    ///
+    /// Idempotent — safe to call multiple times.
+    pub fn ensure_enrichment_queue_columns(&self) -> Result<(), StoreError> {
+        self.conn.execute_batch(
+            "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS enrichment_pending BOOLEAN DEFAULT false; \
+             ALTER TABLE legislation ADD COLUMN IF NOT EXISTS enrichment_added_at TIMESTAMP; \
+             ALTER TABLE legislation ADD COLUMN IF NOT EXISTS enrichment_retry_count INTEGER DEFAULT 0",
+        )?;
+        info!("ensured enrichment queue columns exist");
+        Ok(())
+    }
+
     // ── Training data extraction ──
 
     /// Extract all DRRPEntry records as flat rows from the four DRRP columns.

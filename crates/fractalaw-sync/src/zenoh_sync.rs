@@ -152,6 +152,13 @@ pub mod keys {
     pub fn dictionary_actors(tenant: &str) -> String {
         format!("{PREFIX}/@{tenant}/dictionary/actors")
     }
+
+    /// Key expression for ingestion acknowledgement.
+    ///
+    /// Example: `fractalaw/@acme/ack/UK_ukpga_1974_37`
+    pub fn ack(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/ack/{law_name}")
+    }
 }
 
 // ── Arrow IPC helpers ──
@@ -332,6 +339,25 @@ impl ZenohSync {
         info!(key = %key, bytes = yaml_content.len(), "publishing actor dictionary");
         self.session
             .put(&key, yaml_content.to_vec())
+            .await
+            .map_err(ZenohError::Session)?;
+        Ok(())
+    }
+
+    /// Publish an ingestion acknowledgement for a law.
+    ///
+    /// Puts a JSON payload at `fractalaw/@{tenant}/ack/{law_name}`.
+    /// Sertantai can subscribe to show "Enrichment Pending" in the UI.
+    pub async fn publish_ack(&self, law_name: &str, provisions: usize) -> Result<(), ZenohError> {
+        let key = keys::ack(&self.tenant, law_name);
+        let payload = serde_json::json!({
+            "law_name": law_name,
+            "state": "ingested",
+            "provisions": provisions,
+        });
+        info!(key = %key, provisions, "ack ingestion");
+        self.session
+            .put(&key, payload.to_string().into_bytes())
             .await
             .map_err(ZenohError::Session)?;
         Ok(())
