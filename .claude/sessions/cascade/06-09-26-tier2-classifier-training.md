@@ -180,10 +180,40 @@ Class distribution in training data:
 
 ## What's next
 
-### Phase 2: Balance the classes
-- Right (93) and Responsibility (98) need more examples
-- Target employment rights SIs for Right, environmental permits for Responsibility
-- Active learning: use v2 model to find likely Right/Responsibility in unlabelled corpus
+### Phase 2: Class balance — COMPLETE
+
+Sent 120 Right + 120 Responsibility regex provisions through Gemini QA with write-back.
+
+**Results:**
+- Right: 12 correct, 106 corrected, 2 failed → 118 confirmed
+- Responsibility: 3 correct, 116 corrected, 1 failed → 119 confirmed
+- **Regex precision for these classes: ~6%** — almost everything was wrong
+
+| Class | Before | After |
+|---|---|---|
+| Duty | 758 | 880 |
+| Power | 292 | 356 |
+| Right | 93 | **145** (+52) |
+| Responsibility | 98 | **104** (+6) |
+| none | 273 | 274 |
+| **Total** | **1,514** | **1,759** |
+
+Responsibility gained only 6 despite 119 confirmations — Gemini corrected most "Responsibility" provisions to Duty or Power. The regex was systematically mislabelling these.
+
+**v3 classifier: 67.9%** (was 64.0%)
+
+**Critical learning: regex DRRP classification is deeply unreliable.**
+- Right provisions: 10% correct (12/120)
+- Responsibility provisions: 2.5% correct (3/120)
+- The regex correctly identifies that a provision EXISTS but misclassifies the TYPE
+- This reinforces v0.3: regex is a sieve, not a classifier
+
+**Disk emergency:** QA write-back bloated LanceDB from 452 MB to 8.2 GB (698 MB free). Added auto-compaction to QA workflow.
+
+### Phase 2 also shipped
+- `compact_lance_no_backup.py` for emergency disk recovery
+- Auto-compaction in QA `run_qa.py` after write-back
+- SKILL.md updated with compaction warning
 
 ### Phase 3: Feature engineering
 - Add modal indicators (has_shall, has_must, has_may, has_power_to, has_entitled)
