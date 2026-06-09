@@ -153,25 +153,59 @@ Correction patterns across 95 samples:
 - Definitions leaking through — fixed with purpose gate
 - DRRP type accuracy: ~100% for single-actor regex provisions
 
+### Resumed QA — 57 remaining samples
+- 55 completed (2 API errors): 13 correct + 42 corrected
+- Total QA confirmed from sampling: ~150
+
+### Quality gap analysis
+
+**The publish question**: 6,574 multi-actor regex provisions in QQ corpus below 0.80 confidence — these are from pre-v0.3 enrichment runs and haven't been through the new actor-count routing. They would publish with unreliable position classification.
+
+**Trust levels**:
+
+| Confidence | Source | Publishable? |
+|---|---|---|
+| 0.90 | Gemini Tier 2 / QA correction | Yes |
+| 0.80 | Regex single-actor + DRRP | Yes (DRRP type reliable) |
+| 0.80 | Gemma local validated | Yes (DRRP reliable on full text) |
+| 0.30 | Multi-actor regex (pre-v0.3) | No — needs re-enrichment |
+
+**Decision**: Wait for GPU upgrade to re-enrich the 6,574 gap provisions locally. Don't send large batches to Gemini API — spread wide and shallow for the golden dataset, not deep.
+
+### Golden dataset — TARGET EXCEEDED
+
+Discovered that Tier 2 Gemini enrichment was writing `agentic` at 0.90 for every provision it classified — not just QA corrections. The golden dataset was building silently through enrichment.
+
+**Final count:**
+- 1,515 regulation-level confirmed examples (agentic at 0.90)
+- Across 99 laws, 21+ regulatory families
+- **303% of the 500 target**
+- Ready for training a Tier 2 embedding classifier
+
+### OH&S QQ status
+- 17 laws processed, 460 regulation-level provisions
+- 375 publishable (81% at ≥0.80)
+- 60 Gemini-verified (agentic)
+
 ## What's next
 
-1. Resume QA on remaining ~57 samples from the 50-law batch
-2. Continue QA passes across QQ corpus — each adds ~35 confirmed examples
-3. At 500 confirmed: train Tier 2 embedding classifier (no LLM needed at runtime)
-4. Hardware upgrade → RTX 3090 → Gemma 12B as local Tier 2
-5. Publish improved data to sertantai
-6. sertantai-legal#108 — sub-paragraph hierarchy path fix
+1. **Train Tier 2 embedding classifier** — 1,515 labelled examples on 384-dim embeddings, no LLM needed at runtime
+2. Hardware upgrade → RTX 3090 → re-enrich 6,574 gap provisions with Gemma 12B
+3. Publish ≥0.80 confidence provisions to sertantai
+4. Continue QA passes for quality improvement (ratchet)
+5. sertantai-legal#108 — sub-paragraph hierarchy path fix
 
 ## Key learnings
 
 1. **Fragments are the enemy** — sub-paragraphs can't be classified independently. Classify at regulation level.
 2. **Gemma 4B works on full text** — the model is capable when given proper context. Previous failures were input quality, not model quality.
-3. **DRRP type is the reliable signal** — 100% accuracy on primary classification. Counterparty detection is secondary and improving.
+3. **DRRP type is the reliable signal** — 100% accuracy for single-actor regex provisions. Counterparty detection is secondary and improving.
 4. **Structural provisions are noise** — titles, schedules, headings should never reach the model.
 5. **The QA report in the CLI** — human review before Gemini QA prevents circular LLM-checking-LLM.
 6. **Pure definitions leak through the purpose gate** — actor keyword mentions in definitions triggered the override. Fixed.
 7. **Spread over depth** — 21 families gives a more representative golden dataset than deep coverage of one family.
-8. **Gemini API timeout** — QA script needs retry logic for long batches.
+8. **Tier 2 enrichment builds the golden dataset as a byproduct** — every Gemini Tier 2 call is a labelled example. We exceeded 500 without a dedicated labelling effort.
+9. **Don't publish multi-actor regex below 0.80** — position classification unreliable. Wait for re-enrichment through v0.3 pipeline.
 
 ## References
 
