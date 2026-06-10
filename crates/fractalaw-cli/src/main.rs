@@ -4837,9 +4837,15 @@ async fn cmd_taxa_enrich(
                     continue;
                 }
 
-                // Phase 1: Embed provisions with null embeddings
+                // Phase 1: Embed provisions.
+                // Always re-embed for --pending laws (text may have changed
+                // since last embed if sertantai re-parsed the law).
                 let needs_embedding: Vec<usize> = (0..provisions.len())
-                    .filter(|&i| provisions[i].2.is_none())
+                    .filter(|&i| {
+                        let text = &provisions[i].1;
+                        // Skip empty/tiny provisions — no useful embedding
+                        text.len() > 20 && (pending || provisions[i].2.is_none())
+                    })
                     .collect();
 
                 if !needs_embedding.is_empty() {
