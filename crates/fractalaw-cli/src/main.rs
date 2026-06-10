@@ -4737,6 +4737,7 @@ async fn cmd_taxa_enrich(
         let weights_path = std::path::Path::new("docs/drrp_classifier_v6.json");
 
         if model_dir.exists() && weights_path.exists() {
+            let batch_start = std::time::Instant::now();
             eprintln!("  Embed + classify pass for {enriched} laws...");
             let mut embedder =
                 fractalaw_ai::Embedder::load(&model_dir).context("loading embedding model")?;
@@ -4747,9 +4748,11 @@ async fn cmd_taxa_enrich(
 
             let mut total_embedded = 0usize;
             let mut total_classified = 0usize;
+            let mut total_provisions = 0usize;
 
             for law_name in &law_names {
                 let escaped = law_name.replace('\'', "''");
+                let law_start = std::time::Instant::now();
                 // Query provisions needing embeddings or classification
                 let filter = format!("law_name = '{escaped}'");
                 let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
@@ -4919,58 +4922,125 @@ async fn cmd_taxa_enrich(
                 }
 
                 // Phase 3: Classify regulation-level provisions with confidence < 0.85
+                // and write back DRRP results
                 const REGULATION_TYPES: &[&str] =
                     &["article", "sub_article", "section", "sub_section"];
-
-                for prov in &provisions {
-                    let sid: &str = &prov.0;
-                    let text: &str = &prov.1;
-                    let conf: f32 = prov.3;
-                    let section_type: &str = &prov.4;
-                    let is_govt: bool = prov.5;
-
-                    if conf >= 0.85 || !REGULATION_TYPES.contains(&section_type) {
-                        continue;
-                    }
-                    let embedding: &[f32] = match prov.2 {
-                        Some(ref e) => {
-                            let e: &Vec<f32> = e;
-                            if e.len() != 384 {
-                                continue;
-                            }
-                            e.as_slice()
-                        }
-                        None => continue,
+                {
+                    use arrow::array::{
+                        ArrayBuilder, Float32Builder, ListBuilder, StringBuilder as SB3,
                     };
 
-                    let features = fractalaw_ai::drrp_classifier::build_features(embedding, text);
-                    let prediction = classifier.predict(&features);
+                    let mut cls_sid_b = SB3::new();
+                    let mut cls_drrp_b = ListBuilder::new(SB3::new());
+                    let mut cls_method_b = SB3::new();
+                    let mut cls_conf_b = Float32Builder::new();
 
-                    if prediction.class == fractalaw_ai::DrrpClass::None {
-                        continue;
+                    for prov in &provisions {
+                        let sid: &str = &prov.0;
+                        let text: &str = &prov.1;
+                        let conf: f32 = prov.3;
+                        let section_type: &str = &prov.4;
+                        let is_govt: bool = prov.5;
+
+                        if conf >= 0.85 || !REGULATION_TYPES.contains(&section_type) {
+                            continue;
+                        }
+                        let embedding: &[f32] = match prov.2 {
+                            Some(ref e) => {
+                                let e: &Vec<f32> = e;
+                                if e.len() != 384 {
+                                    continue;
+                                }
+                                e.as_slice()
+                            }
+                            None => continue,
+                        };
+
+                        let features =
+                            fractalaw_ai::drrp_classifier::build_features(embedding, text);
+                        let prediction = classifier.predict(&features);
+
+                        if prediction.class == fractalaw_ai::DrrpClass::None {
+                            continue;
+                        }
+
+                        if let Some(drrp_type) =
+                            fractalaw_ai::drrp_classifier::decompose_drrp(prediction.class, is_govt)
+                        {
+                            cls_sid_b.append_value(sid);
+                            let drrp_vals = cls_drrp_b.values();
+                            drrp_vals.append_value(drrp_type);
+                            cls_drrp_b.append(true);
+                            cls_method_b.append_value("classifier");
+                            cls_conf_b.append_value(0.85);
+                            total_classified += 1;
+                        }
                     }
 
-                    if let Some(drrp_type) =
-                        fractalaw_ai::drrp_classifier::decompose_drrp(prediction.class, is_govt)
-                    {
-                        tracing::debug!(
-                            section_id = %sid,
-                            drrp_type,
-                            confidence = prediction.confidence,
-                            "classified"
-                        );
-                        total_classified += 1;
+                    let cls_count = cls_sid_b.len();
+                    if cls_count > 0 {
+                        let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
+                            arrow::datatypes::Field::new(
+                                "section_id",
+                                arrow::datatypes::DataType::Utf8,
+                                false,
+                            ),
+                            arrow::datatypes::Field::new(
+                                "drrp_types",
+                                arrow::datatypes::DataType::List(std::sync::Arc::new(
+                                    arrow::datatypes::Field::new(
+                                        "item",
+                                        arrow::datatypes::DataType::Utf8,
+                                        true,
+                                    ),
+                                )),
+                                true,
+                            ),
+                            arrow::datatypes::Field::new(
+                                "extraction_method",
+                                arrow::datatypes::DataType::Utf8,
+                                true,
+                            ),
+                            arrow::datatypes::Field::new(
+                                "taxa_confidence",
+                                arrow::datatypes::DataType::Float32,
+                                true,
+                            ),
+                        ]));
+                        let batch = arrow::record_batch::RecordBatch::try_new(
+                            schema,
+                            vec![
+                                std::sync::Arc::new(cls_sid_b.finish()),
+                                std::sync::Arc::new(cls_drrp_b.finish()),
+                                std::sync::Arc::new(cls_method_b.finish()),
+                                std::sync::Arc::new(cls_conf_b.finish()),
+                            ],
+                        )?;
+                        lance.upsert_embeddings(&batch).await?;
                     }
                 }
 
+                total_provisions += provisions.len();
+                let law_elapsed = law_start.elapsed();
                 eprintln!(
-                    "  {law_name}: {}/{} embedded, {total_classified} classified",
+                    "  {law_name}: {}/{} embedded, {total_classified} classified ({:.1}s)",
                     needs_embedding.len(),
-                    provisions.len()
+                    provisions.len(),
+                    law_elapsed.as_secs_f64()
                 );
             }
 
-            eprintln!("  Embed+classify: {total_embedded} embedded, {total_classified} classified");
+            let batch_elapsed = batch_start.elapsed();
+            eprintln!(
+                "  Embed+classify: {total_embedded}/{total_provisions} embedded, \
+                 {total_classified} classified ({:.1}s, {:.0} provisions/s)",
+                batch_elapsed.as_secs_f64(),
+                if batch_elapsed.as_secs_f64() > 0.0 {
+                    total_provisions as f64 / batch_elapsed.as_secs_f64()
+                } else {
+                    0.0
+                }
+            );
         } else {
             if !model_dir.exists() {
                 eprintln!(
@@ -5001,6 +5071,29 @@ async fn cmd_taxa_enrich(
     if pruned_laws > 0 {
         println!("Pruned {pruned_rows} LAT rows from {pruned_laws} non-making laws.");
     }
+
+    // Queue stats (when running in --pending mode)
+    if pending {
+        let still_pending = store
+            .query_arrow("SELECT count(*)::BIGINT FROM legislation WHERE enrichment_pending = true")
+            .ok()
+            .and_then(|b| b.first().map(|b| extract_i64(b, 0)))
+            .unwrap_or(0);
+        let dead_lettered = store
+            .query_arrow(
+                "SELECT count(*)::BIGINT FROM legislation \
+                 WHERE enrichment_pending = true AND enrichment_retry_count >= 3",
+            )
+            .ok()
+            .and_then(|b| b.first().map(|b| extract_i64(b, 0)))
+            .unwrap_or(0);
+        if still_pending > 0 {
+            eprintln!("  Queue: {still_pending} still pending ({dead_lettered} dead-lettered)");
+        } else {
+            eprintln!("  Queue: empty");
+        }
+    }
+
     Ok(())
 }
 

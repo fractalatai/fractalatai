@@ -406,14 +406,35 @@ Deferred — start with manual/cron. When ready, add to the watch loop:
 - [x] Validated: 50/50 random + 100/100 real provisions match sklearn exactly
 - [x] 30/30 fractalaw-ai tests passing (including 7 new classifier tests)
 
+### Committed: `7c5c0b5` — Embed + classify wired into enrich --pending
+
+**Full production pipeline now operational in Rust:**
+
+1. Regex enrich (parse_v2 + Tier 1 inheritance) — as before
+2. Compute embeddings for null-embedding provisions (ONNX MiniLM, batch_size=64, ~43 emb/s CPU)
+3. Run DrrpClassifier on regulation-level provisions with confidence < 0.85
+4. Decompose Obligation/Liberty → Duty/Right/Responsibility/Power using actor government check
+5. `upsert_embeddings()` — single merge_insert for embedding column only
+6. Clear `enrichment_pending`, reset `enrichment_retry_count`
+
+**Implementation notes:**
+- Embedding model loaded from `models/all-MiniLM-L6-v2/` (ONNX via `ort`)
+- Classifier loaded from `docs/drrp_classifier_v6.json` (25 KB JSON weights)
+- Actor dictionary loaded from `docs/actor-dictionary.yaml` for `is_government()` check
+- Graceful skip if models not found — regex enrichment still runs
+- `upsert_embeddings()` added to `fractalaw-store/src/lance.rs`
+- Clippy-clean: extracted `type Prov` alias, fixed `eprintln!`
+
 **Steps remaining:**
-- [ ] Wire classifier into `enrich --pending` (embed + classify in the enrichment loop)
 - [ ] Step 7: Observability logging (pending count, per-law timings, fragment count)
 - [ ] Step 8 (future): Auto-trigger in watch (timer/threshold)
+- [ ] End-to-end test: simulate sync watch event → enrich --pending → publish --pending
 
 **What works now:**
 - `sync watch` ingests LAT + acks in ~2s/law (no blocking)
-- `taxa enrich --pending` processes the queue (regex-only for now, classifier wiring next)
+- `taxa enrich --pending` processes the queue with full pipeline (regex + embed + classify)
 - `sync publish --provisions --pending` publishes enriched laws as a batch
-- `DrrpClassifier` loaded from JSON weights — microsecond inference per provision
+- `DrrpClassifier` — microsecond inference, 100/100 match with sklearn
+- `Embedder` — 384-dim MiniLM, batch embedding in chunks of 64
 - Dev flow (`--gap-c --laws`) coexists — clears pending flag, confidence protection prevents downgrades
+- All models gracefully optional — pipeline degrades to regex-only if not found
