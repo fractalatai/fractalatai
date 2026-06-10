@@ -1,4 +1,4 @@
-# Session: Sync Watch Enrichment — Decoupled Ingest + Batch Enrich
+# Session: Sync Watch Enrichment — Decoupled Ingest + Batch Enrich (CLOSED)
 
 ## Context
 
@@ -425,16 +425,57 @@ Deferred — start with manual/cron. When ready, add to the watch loop:
 - `upsert_embeddings()` added to `fractalaw-store/src/lance.rs`
 - Clippy-clean: extracted `type Prov` alias, fixed `eprintln!`
 
-**Steps remaining:**
-- [ ] Step 7: Observability logging (pending count, per-law timings, fragment count)
-- [ ] Step 8 (future): Auto-trigger in watch (timer/threshold)
-- [ ] End-to-end test: simulate sync watch event → enrich --pending → publish --pending
+### Committed: `e6e0238` — Classifier write-back + observability + end-to-end test
 
-**What works now:**
-- `sync watch` ingests LAT + acks in ~2s/law (no blocking)
-- `taxa enrich --pending` processes the queue with full pipeline (regex + embed + classify)
-- `sync publish --provisions --pending` publishes enriched laws as a batch
-- `DrrpClassifier` — microsecond inference, 100/100 match with sklearn
-- `Embedder` — 384-dim MiniLM, batch embedding in chunks of 64
-- Dev flow (`--gap-c --laws`) coexists — clears pending flag, confidence protection prevents downgrades
-- All models gracefully optional — pipeline degrades to regex-only if not found
+**Classifier results now persisted to LanceDB:**
+- `drrp_types` (e.g. `["Duty"]`), `extraction_method = "classifier"`, `taxa_confidence = 0.85`
+- Written via merge_insert on `section_id` — only updates classified provisions
+
+**Observability added:**
+- Per-law timing: `UK_uksi_2003_164: 0/103 embedded, 15 classified (3.3s)`
+- Batch summary: `Embed+classify: 0/103 embedded, 15 classified (3.6s, 29 provisions/s)`
+- Queue stats: `Queue: empty` / `Queue: 5 still pending (1 dead-lettered)`
+
+**End-to-end test verified:**
+- Marked UK_uksi_2003_164 as pending in DuckDB
+- Ran `taxa enrich --pending`
+- 15 provisions classified (regex → classifier upgrade), 49 protected (agentic at 0.90)
+- Confirmed in LanceDB: 15 provisions now `extraction_method = "classifier"`
+- Queue cleared after processing
+
+### Committed: `68c7e36` — Stale embedding fix
+
+**Problem identified**: when sertantai re-parses a law, `upsert_lat` overwrites the text but the old embedding remains (not null, just stale). The `is_none()` check missed this.
+
+**Fix**: `--pending` laws always re-embed all provisions (text may have changed on re-parse). Non-pending enrichment (dev flow) still skips existing embeddings.
+
+| Path | Embedding behaviour |
+|---|---|
+| `--pending` (production) | Always re-embed (text may have changed) |
+| `--gap-c --laws` (dev) | Skip existing embeddings |
+| New law (null embeddings) | Embeds all (both paths) |
+
+**Steps remaining:**
+- [ ] Step 8 (future): Auto-trigger in watch (timer/threshold) — deferred to when event frequency warrants it
+
+## Session Complete
+
+All deliverables:
+1. **Decoupled architecture**: watch loop ingests + acks in ~2s/law, no blocking
+2. **Enrichment queue**: DuckDB columns (pending, added_at, retry_count), dead-letter at 3
+3. **`taxa enrich --pending`**: regex + embed + classify, full production pipeline in Rust
+4. **`sync publish --provisions --pending`**: batch publish recently enriched laws
+5. **Rust DRRP classifier**: JSON weights, softmax(X @ W + b), 100/100 match with sklearn
+6. **Classifier write-back**: drrp_types + extraction_method + taxa_confidence to LanceDB
+7. **Observability**: per-law timing, throughput, queue stats
+8. **Confidence protection**: classifier at 0.85 never overwrites agentic at 0.90
+9. **Dev/production coexistence**: `--gap-c --laws` clears pending, both flows respect confidence
+10. **Zenoh ack**: JSON payload at `fractalaw/@{tenant}/ack/{law_name}`
+11. **Stale embedding protection**: `--pending` always re-embeds, dev flow skips existing
+
+**Commits:**
+- `a10fe8e` — Decoupled sync watch infrastructure
+- `b809eaf` — Rust DRRP classifier from JSON weights
+- `7c5c0b5` — Embed + classify wired into enrich --pending
+- `e6e0238` — Classifier write-back + observability + end-to-end test
+- `68c7e36` — Always re-embed for --pending laws (stale embedding fix)
