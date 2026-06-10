@@ -365,6 +365,27 @@ impl LanceStore {
         Ok(())
     }
 
+    /// Compact the legislation_text table to reduce fragment bloat.
+    ///
+    /// Merges small data fragments created by merge_insert operations.
+    /// Should be called periodically during batch enrichment to prevent
+    /// disk usage from spiralling (merge_insert creates ~25x write amplification).
+    pub async fn compact(&self) -> Result<(), StoreError> {
+        let table = self.legislation_text().await?;
+        let stats = table
+            .optimize(lancedb::table::OptimizeAction::All)
+            .await
+            .map_err(|e| StoreError::Other(format!("compact: {e}")))?;
+        if let Some(c) = stats.compaction {
+            info!(
+                added = c.files_added,
+                removed = c.files_removed,
+                "compacted legislation_text"
+            );
+        }
+        Ok(())
+    }
+
     /// Delete all legislation text rows for a given law.
     ///
     /// Uses LanceDB row-level deletion. Returns the number of rows that

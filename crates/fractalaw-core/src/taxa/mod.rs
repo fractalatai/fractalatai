@@ -165,33 +165,49 @@ pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
         vec![]
     };
 
-    // Derive Hohfeldian positions from match span + actor offsets.
-    // Actor at span.actor_start = active (the subject of the obligation).
-    // Actors appearing after span.modal_end = counterparty (in object position).
-    // Actors appearing before the modal but not at actor_start = mentioned.
+    // Derive Hohfeldian positions from the DRRP match.
+    //
+    // The regex DRRP pattern already matched a specific actor with a modal
+    // verb — that actor IS the obligation/right/power holder (active).
+    // All other actors in the provision are counterparties.
+    //
+    // We identify the matched actor by checking which ActorMatch overlaps
+    // with the span's actor_start position.
     let actor_positions = {
         let mut positions = std::collections::HashMap::new();
         if let Some(ref dc) = cr.classification
             && let Some(span) = dc.span
         {
-            // Find which actor label matched at the span's actor position
             let all_actors: Vec<&actors::ActorMatch> = extracted
                 .governed
                 .iter()
                 .chain(extracted.government.iter())
                 .collect();
 
+            // Find the actor that the DRRP pattern matched — mark as active
+            let mut found_active = false;
             for actor in &all_actors {
-                if actor.offset == span.actor_start
-                    || (actor.offset < span.modal_start
-                        && actor.offset + actor.keyword.len() + 2 >= span.actor_start)
-                {
+                let actor_end = actor.offset + actor.keyword.len();
+                // Allow ±3 byte tolerance for padding/whitespace differences
+                // between actor extraction and DRRP pattern matching
+                let near_start =
+                    actor.offset <= span.actor_start + 3 && actor_end + 3 >= span.actor_start;
+                if near_start {
                     positions.insert(actor.label.clone(), "active");
-                } else if actor.offset > span.modal_end {
-                    positions.insert(actor.label.clone(), "counterparty");
-                } else {
-                    positions.insert(actor.label.clone(), "mentioned");
+                    found_active = true;
                 }
+            }
+
+            // Everyone else is counterparty
+            for actor in &all_actors {
+                if !positions.contains_key(&actor.label) {
+                    positions.insert(actor.label.clone(), "counterparty");
+                }
+            }
+
+            // If no actor matched the span (shouldn't happen), default first to active
+            if !found_active && let Some(first) = all_actors.first() {
+                positions.insert(first.label.clone(), "active");
             }
         }
         positions

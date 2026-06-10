@@ -4721,6 +4721,18 @@ async fn cmd_taxa_enrich(
         if enriched.is_multiple_of(100) {
             eprint!("\r  Enriched {enriched}/{total}...");
         }
+
+        // Compact LanceDB every 50 laws to prevent fragment bloat.
+        // merge_insert creates ~25x write amplification — without periodic
+        // compaction, a 274-law --force run would bloat from 452MB to 8+GB.
+        if enriched.is_multiple_of(20) && total > 20 {
+            eprint!("\r  Compacting LanceDB after {enriched} laws...");
+            if let Err(e) = lance.compact().await {
+                eprintln!(" compact error: {e}");
+            } else {
+                eprintln!(" done");
+            }
+        }
     }
 
     if enriched >= 100 {
