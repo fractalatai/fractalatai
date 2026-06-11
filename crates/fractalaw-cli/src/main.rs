@@ -3051,6 +3051,22 @@ enum EnrichResult {
 
 /// Enrich a single law: run DRRP parser on its provisions from LanceDB, write
 /// per-provision taxa back to LanceDB, and update law-level taxa in DuckDB.
+/// Source-tier protection: higher-tier classifications are never overwritten
+/// by lower-tier sources. Uses extraction_method (not numeric confidence)
+/// as the arbiter — this is simpler and more correct than comparing
+/// confidence scores that conflated routing signals with quality signals.
+fn source_tier(method: &str) -> u8 {
+    match method {
+        "agentic" => 6,
+        "agentic_unvalidated" => 5,
+        "classifier" => 4,
+        "local" | "local_unvalidated" => 3,
+        "inherited" => 2,
+        "regex" => 1,
+        _ => 0,
+    }
+}
+
 async fn enrich_single_law(
     lance: &LanceStore,
     store: &DuckStore,
@@ -3087,21 +3103,16 @@ async fn enrich_single_law(
         tracing::warn!("{law_name}: {row_count} provisions — large law");
     }
 
-    // Read existing confidence scores from LanceDB to protect higher-tier
-    // classifications from being overwritten by lower tiers.
-    let existing_confidence: std::collections::HashMap<String, f32> = {
+    let existing_tiers: std::collections::HashMap<String, u8> = {
         let mut map = std::collections::HashMap::new();
         for batch in &batches {
             let sid_col = batch.column_by_name("section_id");
-            let conf_col = batch.column_by_name("taxa_confidence");
-            if let (Some(sid_c), Some(conf_c)) = (sid_col, conf_col)
-                && let Some(conf_arr) = conf_c.as_any().downcast_ref::<arrow::array::Float32Array>()
-            {
+            let method_col = batch.column_by_name("extraction_method");
+            if let (Some(sid_c), Some(method_c)) = (sid_col, method_col) {
                 for row in 0..batch.num_rows() {
-                    if let Some(sid) = get_string_value(sid_c.as_ref(), row)
-                        && !conf_arr.is_null(row)
-                    {
-                        map.insert(sid, conf_arr.value(row));
+                    if let Some(sid) = get_string_value(sid_c.as_ref(), row) {
+                        let method = get_string_value(method_c.as_ref(), row).unwrap_or_default();
+                        map.insert(sid, source_tier(&method));
                     }
                 }
             }
@@ -3687,10 +3698,7 @@ async fn enrich_single_law(
                 (0..provision_taxa.len())
                     .filter(|&i| {
                         let p = &provision_taxa[i];
-                        let existing_conf = existing_confidence
-                            .get(&p.section_id)
-                            .copied()
-                            .unwrap_or(0.0);
+                        let existing_tier = existing_tiers.get(&p.section_id).copied().unwrap_or(0);
                         let has_actors =
                             !p.governed_actors.is_empty() || !p.government_actors.is_empty();
                         let multi_actor = p.actors.len() > 1;
@@ -3700,9 +3708,10 @@ async fn enrich_single_law(
                         const REGULATION_TYPES: &[&str] =
                             &["article", "sub_article", "section", "sub_section"];
                         let is_regulation = REGULATION_TYPES.contains(&p.section_type.as_str());
+                        // Only Tier 2 if not already classified by a higher source
                         is_regulation
                             && (multi_actor || drrp_none_with_actors)
-                            && existing_conf < 0.80
+                            && existing_tier < source_tier("local")
                     })
                     .collect()
             } else {
@@ -3960,13 +3969,10 @@ Respond in JSON only:
             let tier3_candidates: Vec<usize> = (0..provision_taxa.len())
                 .filter(|&i| {
                     let p = &provision_taxa[i];
-                    let existing_conf = existing_confidence
-                        .get(&p.section_id)
-                        .copied()
-                        .unwrap_or(0.0);
+                    let existing_tier = existing_tiers.get(&p.section_id).copied().unwrap_or(0);
                     p.extraction_method == "inherited"
                         && p.governed_actors.len() > 1
-                        && existing_conf < 0.90 // Don't overwrite Tier 3 classifications
+                        && existing_tier < source_tier("agentic")
                 })
                 .collect();
 
@@ -4189,14 +4195,15 @@ Respond in JSON only, no markdown:
 
         let now_ns = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
 
-        let mut skipped_high_conf = 0u32;
+        let mut skipped_high_tier = 0u32;
         for pt in &provision_taxa {
-            // Protect higher-tier classifications from being overwritten
-            let new_conf = pt.taxa_confidence.unwrap_or(0.0);
-            if let Some(&existing_conf) = existing_confidence.get(&pt.section_id)
-                && existing_conf > new_conf
+            // Source-tier protection: never overwrite a higher-tier classification
+            let new_tier = source_tier(&pt.extraction_method);
+            if let Some(&existing_tier) = existing_tiers.get(&pt.section_id)
+                && existing_tier >= new_tier
+                && new_tier > 0
             {
-                skipped_high_conf += 1;
+                skipped_high_tier += 1;
                 continue;
             }
             section_ids.append_value(&pt.section_id);
@@ -4404,9 +4411,9 @@ Respond in JSON only, no markdown:
         )
         .context("building taxa RecordBatch")?;
 
-        if skipped_high_conf > 0 {
+        if skipped_high_tier > 0 {
             eprintln!(
-                "  Protected {skipped_high_conf} provisions with higher-confidence classifications"
+                "  Protected {skipped_high_tier} provisions with higher-tier classifications"
             );
         }
 
@@ -4771,14 +4778,14 @@ async fn cmd_taxa_enrich(
                 let filter = format!("law_name = '{escaped}'");
                 let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
 
-                // (section_id, text, embedding, confidence, section_type, has_govt_active)
-                type Prov = (String, String, Option<Vec<f32>>, f32, String, bool);
+                // (section_id, text, embedding, source_tier, section_type, has_govt_active)
+                type Prov = (String, String, Option<Vec<f32>>, u8, String, bool);
                 let mut provisions: Vec<Prov> = Vec::new();
                 for batch in &batches {
                     let sid_col = batch.column_by_name("section_id");
                     let text_col = batch.column_by_name("text");
                     let emb_col = batch.column_by_name("embedding");
-                    let conf_col = batch.column_by_name("taxa_confidence");
+                    let method_col = batch.column_by_name("extraction_method");
                     let st_col = batch.column_by_name("section_type");
                     let actors_col = batch.column_by_name("actors");
 
@@ -4793,11 +4800,10 @@ async fn cmd_taxa_enrich(
                             .and_then(|c| get_string_value(c.as_ref(), row))
                             .unwrap_or_default();
 
-                        let conf = conf_col
-                            .and_then(|c| c.as_any().downcast_ref::<arrow::array::Float32Array>())
-                            .filter(|a| !a.is_null(row))
-                            .map(|a| a.value(row))
-                            .unwrap_or(0.0);
+                        let tier = method_col
+                            .and_then(|c| get_string_value(c.as_ref(), row))
+                            .map(|m| source_tier(&m))
+                            .unwrap_or(0);
 
                         // Extract existing embedding if present
                         let emb = emb_col
@@ -4843,7 +4849,7 @@ async fn cmd_taxa_enrich(
                             })
                             .unwrap_or(false);
 
-                        provisions.push((sid, text, emb, conf, section_type, has_govt_active));
+                        provisions.push((sid, text, emb, tier, section_type, has_govt_active));
                     }
                 }
 
@@ -4958,11 +4964,13 @@ async fn cmd_taxa_enrich(
                     for prov in &provisions {
                         let sid: &str = &prov.0;
                         let text: &str = &prov.1;
-                        let conf: f32 = prov.3;
+                        let tier: u8 = prov.3;
                         let section_type: &str = &prov.4;
                         let is_govt: bool = prov.5;
 
-                        if conf >= 0.85 || !REGULATION_TYPES.contains(&section_type) {
+                        if tier >= source_tier("classifier")
+                            || !REGULATION_TYPES.contains(&section_type)
+                        {
                             continue;
                         }
                         let embedding: &[f32] = match prov.2 {
