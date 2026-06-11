@@ -1605,4 +1605,22 @@ mod tests {
             Some("active")
         );
     }
+
+    #[test]
+    fn position_government_pattern_has_active_actor() {
+        // Government pattern — "secretary of state shall make regulations"
+        // Previously returned no positions because government patterns had span: None.
+        let text = "The Secretary of State shall by regulations make provision for the safety of employees.";
+        let record = parse(text);
+        assert!(
+            !record.actor_positions.is_empty(),
+            "government pattern should now populate actor_positions"
+        );
+        assert_eq!(
+            record.actor_positions.get("Gvt: Minister").copied(),
+            Some("active"),
+            "Secretary of State should be active, got: {:?}",
+            record.actor_positions
+        );
+    }
 }

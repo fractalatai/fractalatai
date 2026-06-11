@@ -183,6 +183,28 @@ pub fn has_enabling(text: &str) -> bool {
     ENABLING.is_match(text)
 }
 
+/// Find the government actor and modal verb byte offsets in downcased text.
+///
+/// Used to populate `MatchSpan` for government patterns so the position
+/// heuristic in `mod.rs` can assign active/counterparty positions.
+/// Returns `None` if either component can't be located.
+fn find_government_span(text: &str) -> Option<MatchSpan> {
+    // Find the first government actor keyword
+    let (actor_start, _actor_len) = GOVERNMENT_ACTORS
+        .iter()
+        .filter_map(|frag| text.find(frag).map(|pos| (pos, frag.len())))
+        .min_by_key(|&(pos, _)| pos)?;
+
+    // Find the modal verb (obligation or enabling)
+    let modal_match = OBLIGATION.find(text).or_else(|| ENABLING.find(text))?;
+
+    Some(MatchSpan {
+        actor_start,
+        modal_start: modal_match.start(),
+        modal_end: modal_match.end(),
+    })
+}
+
 /// Clamp a float to the 0.0..=1.0 range, rounded to 3 decimal places.
 pub fn clamp01(v: f32) -> f32 {
     ((v.clamp(0.0, 1.0)) * 1000.0).round() / 1000.0
@@ -197,7 +219,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::RegulationMaking,
             confidence: 0.90,
-            span: None,
+            span: find_government_span(text),
         });
     }
     if GOV_REG_MAKING_2.is_match(text) {
@@ -205,7 +227,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::RegulationMaking,
             confidence: 0.85,
-            span: None,
+            span: find_government_span(text),
         });
     }
     if GOV_CODE_APPROVAL.is_match(text) {
@@ -213,7 +235,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::CodeApproval,
             confidence: 0.85,
-            span: None,
+            span: find_government_span(text),
         });
     }
     if GOV_ENFORCEMENT_1.is_match(text) {
@@ -221,7 +243,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Enforcement,
             confidence: 0.85,
-            span: None,
+            span: find_government_span(text),
         });
     }
     if GOV_ENFORCEMENT_2.is_match(text) {
@@ -229,7 +251,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Enforcement,
             confidence: 0.80,
-            span: None,
+            span: find_government_span(text),
         });
     }
     if has_government_actor(text) && has_obligation(text) {
@@ -237,7 +259,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Prescriptive,
             confidence: 0.60,
-            span: None,
+            span: find_government_span(text),
         });
     }
     if has_government_actor(text) && has_enabling(text) {
@@ -245,7 +267,7 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Enabling,
             confidence: 0.55,
-            span: None,
+            span: find_government_span(text),
         });
     }
     None
@@ -258,7 +280,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Direction,
             confidence: 0.80,
-            span: None,
+            span: find_government_span(text),
         });
     }
     if GOV_GUIDANCE.is_match(text) && has_government_actor(text) {
@@ -266,7 +288,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Guidance,
             confidence: 0.75,
-            span: None,
+            span: find_government_span(text),
         });
     }
     if GOV_CONSULTATION.is_match(text) {
@@ -274,7 +296,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::ConsultationObligation,
             confidence: 0.75,
-            span: None,
+            span: find_government_span(text),
         });
     }
     if GOV_APPOINTMENT.is_match(text) {
@@ -282,7 +304,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Appointment,
             confidence: 0.80,
-            span: None,
+            span: find_government_span(text),
         });
     }
     if GOV_DELEGATION.is_match(text) && has_government_actor(text) {
@@ -290,7 +312,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Delegation,
             confidence: 0.70,
-            span: None,
+            span: find_government_span(text),
         });
     }
     if GOV_FEES.is_match(text) && has_government_actor(text) {
@@ -298,7 +320,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::Fees,
             confidence: 0.65,
-            span: None,
+            span: find_government_span(text),
         });
     }
     if GOV_PARL_REPORTING.is_match(text) {
@@ -306,7 +328,7 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
             family: DutyFamily::Government,
             sub_type: DutySubType::ParliamentaryReporting,
             confidence: 0.80,
-            span: None,
+            span: find_government_span(text),
         });
     }
     None
@@ -318,13 +340,21 @@ pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
 mod tests {
     use super::*;
 
-    fn dc(family: DutyFamily, sub_type: DutySubType, confidence: f32) -> DutyClassification {
-        DutyClassification {
-            family,
-            sub_type,
-            confidence,
-            span: None,
-        }
+    /// Assert that a government pattern match has the expected family/sub_type/confidence.
+    /// Span is tested separately — we only check the classification fields here.
+    fn assert_gov_match(
+        result: Option<DutyClassification>,
+        family: DutyFamily,
+        sub_type: DutySubType,
+        confidence: f32,
+    ) {
+        let dc = result.expect("expected a match");
+        assert_eq!(dc.family, family);
+        assert_eq!(dc.sub_type, sub_type);
+        assert!(
+            (dc.confidence - confidence).abs() < 0.001,
+            "confidence mismatch"
+        );
     }
 
     // ── Government v1 ────────────────────────────────────────────────
@@ -332,35 +362,33 @@ mod tests {
     #[test]
     fn gov_v1_regulation_making_sos() {
         let text = "the secretary of state shall have power to make regulations";
-        assert_eq!(
+        assert_gov_match(
             match_government_v1(text),
-            Some(dc(
-                DutyFamily::Government,
-                DutySubType::RegulationMaking,
-                0.90
-            ))
+            DutyFamily::Government,
+            DutySubType::RegulationMaking,
+            0.90,
         );
     }
 
     #[test]
     fn gov_v1_regulation_making_power_to() {
         let text = "there is a power to make regulations under this section";
-        assert_eq!(
+        assert_gov_match(
             match_government_v1(text),
-            Some(dc(
-                DutyFamily::Government,
-                DutySubType::RegulationMaking,
-                0.85
-            ))
+            DutyFamily::Government,
+            DutySubType::RegulationMaking,
+            0.85,
         );
     }
 
     #[test]
     fn gov_v1_code_approval() {
         let text = "the commission may approve a code of practice";
-        assert_eq!(
+        assert_gov_match(
             match_government_v1(text),
-            Some(dc(DutyFamily::Government, DutySubType::CodeApproval, 0.85))
+            DutyFamily::Government,
+            DutySubType::CodeApproval,
+            0.85,
         );
     }
 
@@ -427,71 +455,77 @@ mod tests {
     #[test]
     fn gov_v2_direction() {
         let text = "the secretary of state may give directions to the executive";
-        assert_eq!(
+        assert_gov_match(
             match_government_v2(text),
-            Some(dc(DutyFamily::Government, DutySubType::Direction, 0.80))
+            DutyFamily::Government,
+            DutySubType::Direction,
+            0.80,
         );
     }
 
     #[test]
     fn gov_v2_guidance() {
         let text = "the executive may issue guidance on the application of these regulations";
-        assert_eq!(
+        assert_gov_match(
             match_government_v2(text),
-            Some(dc(DutyFamily::Government, DutySubType::Guidance, 0.75))
+            DutyFamily::Government,
+            DutySubType::Guidance,
+            0.75,
         );
     }
 
     #[test]
     fn gov_v2_consultation() {
         let text = "the secretary of state shall consult such bodies as appear appropriate";
-        assert_eq!(
+        assert_gov_match(
             match_government_v2(text),
-            Some(dc(
-                DutyFamily::Government,
-                DutySubType::ConsultationObligation,
-                0.75
-            ))
+            DutyFamily::Government,
+            DutySubType::ConsultationObligation,
+            0.75,
         );
     }
 
     #[test]
     fn gov_v2_appointment() {
         let text = "the executive may appoint any suitably qualified person as an inspector";
-        assert_eq!(
+        assert_gov_match(
             match_government_v2(text),
-            Some(dc(DutyFamily::Government, DutySubType::Appointment, 0.80))
+            DutyFamily::Government,
+            DutySubType::Appointment,
+            0.80,
         );
     }
 
     #[test]
     fn gov_v2_delegation() {
         let text = "the authority may delegate any of its functions to a committee";
-        assert_eq!(
+        assert_gov_match(
             match_government_v2(text),
-            Some(dc(DutyFamily::Government, DutySubType::Delegation, 0.70))
+            DutyFamily::Government,
+            DutySubType::Delegation,
+            0.70,
         );
     }
 
     #[test]
     fn gov_v2_fees() {
         let text = "the authority may charge fees for the performance of functions";
-        assert_eq!(
+        assert_gov_match(
             match_government_v2(text),
-            Some(dc(DutyFamily::Government, DutySubType::Fees, 0.65))
+            DutyFamily::Government,
+            DutySubType::Fees,
+            0.65,
         );
     }
 
     #[test]
     fn gov_v2_parliamentary_reporting() {
         let text = "a copy of the report shall be laid before parliament";
-        assert_eq!(
+        assert_gov_match(
             match_government_v2(text),
-            Some(dc(
-                DutyFamily::Government,
-                DutySubType::ParliamentaryReporting,
-                0.80
-            ))
+            DutyFamily::Government,
+            DutySubType::ParliamentaryReporting,
+            0.80,
         );
     }
 
@@ -546,5 +580,41 @@ mod tests {
         assert!((clamp01(-0.1) - 0.0).abs() < 0.001);
         assert!((clamp01(1.5) - 1.0).abs() < 0.001);
         assert!((clamp01(0.1234) - 0.123).abs() < 0.001);
+    }
+
+    // ── Government span propagation ─────────────────────────────────
+
+    #[test]
+    fn gov_v1_regulation_making_has_span() {
+        let text = "the secretary of state shall make regulations prescribing requirements";
+        let dc = match_government_v1(text).unwrap();
+        let span = dc.span.expect("government pattern should populate span");
+        assert_eq!(span.actor_start, text.find("secretary").unwrap());
+        assert_eq!(span.modal_start, text.find("shall").unwrap());
+    }
+
+    #[test]
+    fn gov_v1_enforcement_has_span() {
+        let text = "an inspector may serve an improvement notice on a person";
+        let dc = match_government_v1(text).unwrap();
+        let span = dc.span.expect("enforcement pattern should populate span");
+        assert_eq!(span.actor_start, text.find("inspector").unwrap());
+    }
+
+    #[test]
+    fn gov_v1_prescriptive_fallback_has_span() {
+        let text = "the authority shall ensure compliance with the requirements";
+        let dc = match_government_v1(text).unwrap();
+        let span = dc.span.expect("fallback pattern should populate span");
+        assert_eq!(span.actor_start, text.find("authority").unwrap());
+        assert_eq!(span.modal_start, text.find("shall").unwrap());
+    }
+
+    #[test]
+    fn gov_v2_direction_has_span() {
+        let text = "the secretary of state may give directions to the executive";
+        let dc = match_government_v2(text).unwrap();
+        let span = dc.span.expect("direction pattern should populate span");
+        assert_eq!(span.actor_start, text.find("secretary").unwrap());
     }
 }
