@@ -1,4 +1,4 @@
-# Session: Position Classifier — Actor Role Prediction
+# Session: Position Classifier — Actor Role Prediction (CLOSED)
 
 ## Context
 
@@ -86,28 +86,80 @@ Option B is pragmatic — the main signal sertantai needs is "who bears the obli
 
 ## Implementation Plan
 
-### Step 1: Extract training data from agentic provisions
+### Step 1: Extract training data from agentic provisions — DONE
 
-Query LanceDB for provisions with `extraction_method = 'agentic'` and actors with position labels. Build training examples: (provision_text, actor_label, drrp_type, features) → position.
+Queried 1,815 agentic provisions with 3,258 actor-position pairs. Features: embedding(384) + modal(13) + drrp(5) + category(10) + offset(1) = 413 dims.
 
-### Step 2: Train position classifier
+### Step 2: Train position classifier — DONE
 
-Python scikit-learn (same approach as DRRP classifier):
-- LogisticRegression on embedding + actor features + modal features
-- Train/test split on provision-level (not actor-level, to avoid leakage)
-- Evaluate: precision/recall for active vs counterparty
+3-class LogisticRegression (active/counterparty/other):
+- 74% precision, 70% recall on active class
+- 68% overall accuracy
+- Trained on Gemini gold-standard agentic data
 
-### Step 3: Export to JSON weights
+### Step 3: Export to JSON weights — DONE
 
-Same pattern as DRRP classifier — `softmax(X @ W + b)` from JSON.
+`docs/position_classifier_v1.json` (26 KB). Same softmax(X @ W + b) pattern as DRRP classifier.
 
-### Step 4: Wire into enrichment pipeline
+### Step 4: Wire detection into enrichment pipeline — DONE (`0f8ee7a`)
 
-After DRRP classification, run position classifier per (provision, actor) pair. Write `classifier_position` and `classifier_confidence` to actors struct. Don't overwrite regex `position` — dual-write.
+Phase 4 in embed+classify pass. Guardrails from Gemini review:
+- **Skip agentic provisions** — already gold-standard, don't touch
+- **Don't overwrite LLM reasons** — if `reason` has non-classifier content, leave it
+- **Don't auto-override `position`** — regex position stays as source of truth
+- **Detection only** — counts disagreements, doesn't write back yet
 
-### Step 5: QA report — disagreements
+HSWA test: 883 actors classified, 346 provision disagreements (39%).
 
-Query for provisions where `position != classifier_position`. These are:
+### Step 5: Write-back — reason field update — NEXT
+
+On disagreement, write `reason = "classifier:active@0.82"` into the actors struct. Requires rebuilding the Arrow `List<Struct>` per provision and merge_insert.
+
+Sertantai detects disagreements via `reason.startsWith("classifier:")`.
+
+### Step 6: QA report — disagreements
+
+Query for provisions where any actor has `reason` starting with `classifier:`. These are:
 - Candidates for dictionary/heuristic improvement
-- Training data for Gemini re-classification
+- Training data for Gemini re-classification (human-reviewed first)
 - QA review items for human validation
+
+## Progress
+
+### Committed: `c9a77e4` — Position classifier module + schema
+
+- `PositionClassifier` in `fractalaw-ai/src/position_classifier.rs`
+- `build_position_features()` helper (413-dim vector)
+- JSON weights at `docs/position_classifier_v1.json`
+- 2 unit tests passing
+
+### Committed: `0f8ee7a` — Position detection wired into enrich --pending
+
+- Phase 4 runs per (provision, actor) during embed+classify pass
+- Skip agentic, skip existing LLM reasons
+- Counts disagreements (HSWA: 883 actors, 346 disagreements)
+- Reverted: removed `classifier_positions`/`position_agreement` LanceDB columns (no schema change needed — using actors struct `reason` field instead)
+
+### Committed: `ddec2c6` — Position classifier write-back
+
+**Full write-back implemented.** On disagreement, rebuilds the Arrow `List<Struct>` for the actors column and writes `reason = "classifier:active@0.82"` via merge_insert.
+
+Guardrails:
+- Skip agentic provisions (gold-standard positions from Gemini)
+- Don't overwrite existing LLM reasons (non-`classifier:` prefixed)
+- Only write on disagreement (reason stays null when regex + classifier agree)
+
+HSWA verified:
+```
+s.3(1): Org: Employer  position=active        reason=None              (agree)
+s.3(1): Ind: Person    position=counterparty   reason=classifier:other@0.70  (disagree)
+```
+346/899 HSWA provisions have at least one actor disagreement (39%).
+
+**Convention**: sertantai detects disagreements via `reason.startsWith("classifier:")`. Format: `classifier:{predicted_position}@{confidence}`.
+
+### Next
+
+- [ ] Step 6: QA report — query disagreements across QQ corpus, quantify by actor category
+- [ ] Re-enrich + publish QQ corpus with position classifier active
+- [ ] Retrain with more data — use human-validated disagreements to improve from 70% recall
