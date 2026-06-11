@@ -165,12 +165,12 @@ const SUB_TYPE_PATTERNS: &[SubTypePattern] = &[
         confidence: 0.70,
         obligation: r"\b(?:shall|must|is required to|has a duty)\b",
     },
-    // Enabling: actor + may/power to/entitled
+    // Enabling / Right: actor + may/power to/entitled/has a right to
     SubTypePattern {
         idx: 7,
         sub_type: DutySubType::Enabling,
         confidence: 0.50,
-        obligation: r"\b(?:may|power to|entitled to|authorise|authorize)\b",
+        obligation: r"\b(?:may|power to|entitled to|has a right to|have the right to|shall be entitled|authorise|authorize)\b",
     },
 ];
 
@@ -572,6 +572,16 @@ fn classify_after_modal(
     text_after_modal: &str,
     base_confidence: f32,
 ) -> Option<DutyClassification> {
+    // Reject penalty/offence provisions — "any person guilty of...",
+    // "liable to summary conviction", etc. are not duties. Let the
+    // offence tier (Tier 4) handle them instead.
+    static PENALTY_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)\b(?:guilty of|liable to|summary conviction|on indictment|punishable|sentence[d]?\b|fine not exceeding|imprisonment)").unwrap()
+    });
+    if PENALTY_RE.is_match(text_after_modal) {
+        return None;
+    }
+
     // Check for specific sub-types in the text following the modal
     static SFAIRP_RE: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?i)(?:so far as is reasonably practicable|sfairp)").unwrap()
@@ -624,6 +634,19 @@ fn classify_after_modal(
         return Some(DutyClassification {
             family: DutyFamily::Governed,
             sub_type: DutySubType::TrainingDuty,
+            confidence: base_confidence,
+            span: None,
+        });
+    }
+
+    // Right/entitlement: "shall be entitled to", "has a right to"
+    static RIGHT_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)\b(?:entitled to|has a right to|have the right to)\b").unwrap()
+    });
+    if RIGHT_RE.is_match(text_after_modal) {
+        return Some(DutyClassification {
+            family: DutyFamily::Governed,
+            sub_type: DutySubType::Enabling,
             confidence: base_confidence,
             span: None,
         });
@@ -1188,5 +1211,46 @@ mod tests {
         let actors = vec![actor("Ind: Person", "person")];
         let dc = match_governed_v2(text, &actors).unwrap();
         assert_eq!(dc.family, DutyFamily::Governed);
+    }
+
+    // ── Penalty rejection ───────────────────────────────────────────
+
+    #[test]
+    fn penalty_provision_not_classified_as_duty() {
+        // "any person who shall be guilty of an offence" — penalty, not duty
+        let text = "any person who contravenes this regulation shall be guilty of an offence and liable to a fine";
+        let actors = vec![actor("Ind: Person", "person")];
+        assert!(
+            match_governed_v2(text, &actors).is_none(),
+            "penalty provisions should not be classified as Duty"
+        );
+    }
+
+    #[test]
+    fn summary_conviction_not_classified_as_duty() {
+        let text = "a person guilty of an offence under this section shall be liable on summary conviction to imprisonment";
+        let actors = vec![actor("Ind: Person", "person")];
+        assert!(match_governed_v2(text, &actors).is_none());
+    }
+
+    // ── Right/entitlement patterns ──────────────────────────────────
+
+    #[test]
+    fn entitled_to_compensation_is_right() {
+        // "person...shall be entitled" goes through match_person_compound → classify_after_modal
+        // which detects "entitled to" and returns Enabling (→ Right)
+        let text = "any person who shall be entitled to be paid compensation by the authority";
+        let actors = vec![actor("Ind: Person", "person")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.sub_type, DutySubType::Enabling);
+    }
+
+    #[test]
+    fn has_a_right_to_is_right() {
+        // "has a right to" is in SUB_TYPE_PATTERNS Enabling — matched by actor-anchored path
+        let text = "the employee has a right to have the assessment reviewed";
+        let actors = vec![actor("Ind: Employee", "employee")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.sub_type, DutySubType::Enabling);
     }
 }
