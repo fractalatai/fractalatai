@@ -494,15 +494,12 @@ pub fn should_skip_drrp(purposes: &[&str], has_governed_actor: bool) -> bool {
         return true;
     }
 
-    // Interpretation-primary: if Interpretation is the ONLY purpose, always
-    // skip — pure definitions never contain DRRP even when actors are mentioned.
-    // If Interpretation is primary but other purposes exist (mixed-content),
-    // skip UNLESS a governed actor is present (product safety SIs with
-    // definitions + duties in the same block).
+    // Interpretation-primary: skip DRRP for pure definitions UNLESS
+    // a governed actor is present (indicating a real obligation may be
+    // embedded in the definition — 3 provisions in 161K corpus).
+    // If mixed-content (Interpretation + other purposes), same rule:
+    // skip unless governed actor overrides.
     if purposes.first() == Some(&purpose::INTERPRETATION) {
-        if purposes.len() == 1 {
-            return true; // Pure definition — actor mentions are noise
-        }
         return !has_governed_actor;
     }
 
