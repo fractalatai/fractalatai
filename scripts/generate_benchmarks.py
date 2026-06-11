@@ -221,6 +221,8 @@ def main():
     parser.add_argument("--law", help="Specific law to benchmark")
     parser.add_argument("--family", help="Family name (for output path)")
     parser.add_argument("--output", help="Override output path")
+    parser.add_argument("--max-provisions", type=int, default=150,
+                        help="Max provisions per law (random sample if exceeded)")
     args = parser.parse_args()
 
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -244,6 +246,13 @@ def main():
     if not provisions:
         print("No provisions found.")
         sys.exit(1)
+
+    # Random sample if too many provisions
+    import random
+    if len(provisions) > args.max_provisions:
+        random.seed(42)  # reproducible
+        provisions = random.sample(provisions, args.max_provisions)
+        print(f"  Sampled {len(provisions)} provisions (--max-provisions {args.max_provisions})")
 
     # Generate benchmark
     records = generate_benchmark(client, args.law, family, provisions)
