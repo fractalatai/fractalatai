@@ -118,13 +118,50 @@ Key additions from Gemini:
 - 39% position disagreement rate is concerning but expected for v1 — iterate fast
 - **Single most impactful first action**: code review of `duty_patterns_v2.rs` + `purpose.rs`
 
-## Execution Order (Refined)
+## Code Review Complete — Findings by Priority
 
-1. **Code review** (Gemini) — `duty_patterns_v2.rs` + `purpose.rs` first, then full pipeline
-2. **Coverage gap analysis** — which families/section_types have lowest DRRP coverage?
-3. **Golden benchmarks + initial regression tests** — one Act + one SI per family, Gemini-parsed
-4. **Classifier disagreements** — run position classifier across QQ, analyse by category/family
-5. **Gemini spot-check** — 50-100 random classifier provisions verified by Gemini
-6. **Ad-hoc human drill-through** — Baserow validation, 5-10 provisions per family
-7. **Statistical anomalies** — distribution checks, low-confidence flagging, actor bias detection
-8. **Full regression test suite** — codify all learnings
+Gemini reviewed 52K tokens of pipeline code against a 6-hour cache (`cachedContents/gr8fjs0ls3kt5htpmtaszat4vhkng1n0cga586em`). Five targeted reviews produced actionable findings. Full results in `data/code-review/`.
+
+### P1 CRITICAL: Position heuristic — government patterns have no span (`data/code-review/position_heuristic.md`)
+
+Government patterns (`match_government_v1/v2`) don't populate the `MatchSpan` field. All Responsibility and Power provisions classified via government patterns get **no actor positions at all** — the `actor_positions` HashMap stays empty, so everyone defaults to "active". This affects every government-sourced DRRP provision in the corpus.
+
+**Fix**: propagate span from government pattern matches, same as governed patterns.
+
+### P2 CRITICAL: Confidence protection — hierarchy not fully implemented (`data/code-review/confidence_protection.md`)
+
+The `taxa_confidence` written to LanceDB reflects regex routing heuristics (0.30/0.80/0.90), not the classifier or LLM confidence. The protection mechanism compares these routing scores against each other, which doesn't correctly implement the intended agentic > classifier > regex hierarchy. A regex provision scored at 0.90 (structural/no-actors) blocks classifier updates at 0.85.
+
+**Fix**: separate routing confidence from classification confidence, or ensure the confidence values correctly reflect the cascade hierarchy.
+
+### P3 CRITICAL: Purpose gate too aggressive (`data/code-review/purpose_gate.md`)
+
+Pure INTERPRETATION provisions with governed actors and modal verbs are skipped entirely. Duties embedded in definitions are missed. ENACTMENT and APPLICATION_SCOPE provisions are unconditionally skipped even when they contain substantive obligations.
+
+**Fix**: refine the gate to check for modal verbs before skipping, not just purpose classification.
+
+### P4 HIGH: Regex patterns — false positives in penalty clauses (`data/code-review/regex_patterns.md`)
+
+`PERSON_QUALIFIERS` regex matches "any person" in penalty/offence provisions, misclassifying offence provisions as duties. Missing "has a right to" / "is entitled to" patterns for right-type provisions.
+
+**Fix**: add penalty/offence rejection in `classify_after_modal`, add right-entitlement patterns.
+
+### P5 MEDIUM: Classifier features — text offset unreliable (`data/code-review/classifier_features.md`)
+
+The position classifier's text offset feature fails for passive voice and complex clauses. Missing negative modal features (`shall not`, `must not`). The DRRP classifier lacks full obligation/enabling phrases.
+
+**Fix**: add negative modal features, consider replacing text offset with a more robust signal.
+
+## Execution Order (Revised — Fix-Driven)
+
+1. **P1 fix**: Government pattern span propagation — unlocks position data for all Responsibility/Power provisions
+2. **P3 fix**: Purpose gate refinement — recovers missed DRRP provisions
+3. **P4 fix**: Penalty clause rejection + right patterns — improves regex precision/recall
+4. **P2 fix**: Confidence hierarchy — ensures cascade protection works correctly
+5. **P5 fix**: Classifier feature improvements — retrain with better features
+6. **Re-enrich QQ corpus** — propagate all fixes
+7. **Golden benchmarks** — build regression tests from corrected data
+8. **Classifier disagreements** — quantify position classifier gap across QQ
+9. **Gemini spot-check** — 50-100 provisions verified
+10. **Ad-hoc human drill-through** — Baserow validation
+11. **Full regression test suite** — codify all learnings
