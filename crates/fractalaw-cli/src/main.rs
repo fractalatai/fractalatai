@@ -4749,6 +4749,8 @@ async fn cmd_taxa_enrich(
         let weights_path = std::path::Path::new("docs/drrp_classifier_v6.json");
 
         if model_dir.exists() && weights_path.exists() {
+            // Ensure position classifier columns exist before writing
+            lance.ensure_gap_c_columns().await?;
             let batch_start = std::time::Instant::now();
             eprintln!("  Embed + classify pass for {enriched} laws...");
             let mut embedder =
@@ -5035,6 +5037,178 @@ async fn cmd_taxa_enrich(
                             ],
                         )?;
                         lance.upsert_embeddings(&batch).await?;
+                    }
+                }
+
+                // Phase 4: Position classification — predict active/counterparty/other
+                // per (provision, actor) pair. On disagreement, write the classifier
+                // prediction into the actor's `reason` field. Skip agentic provisions
+                // (already gold-standard). Don't overwrite existing LLM reasons.
+                {
+                    let pos_weights = std::path::Path::new("docs/position_classifier_v1.json");
+                    if pos_weights.exists() {
+                        let pos_classifier = fractalaw_ai::PositionClassifier::load(pos_weights)
+                            .context("loading position classifier")?;
+
+                        let mut disagreements = 0usize;
+                        let mut pos_classified = 0usize;
+
+                        for batch in &batches {
+                            let sid_col = batch.column_by_name("section_id");
+                            let text_col = batch.column_by_name("text");
+                            let emb_col = batch.column_by_name("embedding");
+                            let method_col = batch.column_by_name("extraction_method");
+                            let actors_col = batch.column_by_name("actors");
+                            let drrp_col = batch.column_by_name("drrp_types");
+
+                            for row in 0..batch.num_rows() {
+                                // Skip agentic — already has gold-standard positions
+                                let method = method_col
+                                    .and_then(|c| get_string_value(c.as_ref(), row))
+                                    .unwrap_or_default();
+                                if method == "agentic" || method == "agentic_unvalidated" {
+                                    continue;
+                                }
+
+                                let _sid = sid_col
+                                    .and_then(|c| get_string_value(c.as_ref(), row))
+                                    .unwrap_or_default();
+                                let text = text_col
+                                    .and_then(|c| get_string_value(c.as_ref(), row))
+                                    .unwrap_or_default();
+
+                                // Get embedding
+                                let embedding = emb_col
+                                    .and_then(|c| {
+                                        c.as_any()
+                                            .downcast_ref::<arrow::array::FixedSizeListArray>()
+                                    })
+                                    .filter(|a| !a.is_null(row))
+                                    .and_then(|a| {
+                                        let vals = a
+                                            .values()
+                                            .as_any()
+                                            .downcast_ref::<arrow::array::Float32Array>()?;
+                                        let dim = a.value_length() as usize;
+                                        let off = row * dim;
+                                        Some(vals.values()[off..off + dim].to_vec())
+                                    });
+                                let embedding = match embedding {
+                                    Some(ref e) if e.len() == 384 => e.as_slice(),
+                                    _ => continue,
+                                };
+
+                                // Get DRRP types
+                                let drrp_types: Vec<String> = drrp_col
+                                    .and_then(|c| {
+                                        use arrow::array::AsArray;
+                                        let list = c.as_list_opt::<i32>()?;
+                                        if list.is_null(row) {
+                                            return None;
+                                        }
+                                        let vals = list.value(row);
+                                        let mut types = Vec::new();
+                                        for i in 0..vals.len() {
+                                            if let Some(s) = get_string_value(vals.as_ref(), i) {
+                                                types.push(s);
+                                            }
+                                        }
+                                        Some(types)
+                                    })
+                                    .unwrap_or_default();
+
+                                // Get actors
+                                let actors: Vec<(String, String, Option<String>)> = actors_col
+                                    .and_then(|c| {
+                                        use arrow::array::AsArray;
+                                        let list = c.as_list_opt::<i32>()?;
+                                        if list.is_null(row) {
+                                            return None;
+                                        }
+                                        let sa = list.value(row);
+                                        let sa = sa.as_struct_opt()?;
+                                        let lc = sa.column_by_name("label")?;
+                                        let pc = sa.column_by_name("position")?;
+                                        let rc = sa.column_by_name("reason");
+                                        let mut result = Vec::new();
+                                        for i in 0..sa.len() {
+                                            let label = get_string_value(lc.as_ref(), i)
+                                                .unwrap_or_default();
+                                            let pos = get_string_value(pc.as_ref(), i)
+                                                .unwrap_or_default();
+                                            let reason =
+                                                rc.and_then(|c| get_string_value(c.as_ref(), i));
+                                            result.push((label, pos, reason));
+                                        }
+                                        Some(result)
+                                    })
+                                    .unwrap_or_default();
+
+                                if actors.is_empty() {
+                                    continue;
+                                }
+
+                                let modals = fractalaw_ai::drrp_classifier::modal_features(&text);
+                                let text_lower = text.to_lowercase();
+                                let mut has_disagreement = false;
+
+                                // Classify each actor's position
+                                for (label, regex_pos, existing_reason) in &actors {
+                                    // Don't overwrite existing LLM reasons
+                                    if existing_reason.is_some()
+                                        && !existing_reason
+                                            .as_ref()
+                                            .unwrap()
+                                            .starts_with("classifier:")
+                                    {
+                                        continue;
+                                    }
+
+                                    let label_lower = label
+                                        .to_lowercase()
+                                        .split(':')
+                                        .next_back()
+                                        .unwrap_or("")
+                                        .trim()
+                                        .to_string();
+                                    let offset = text_lower.find(&label_lower);
+                                    let rel_offset = offset
+                                        .map(|o| o as f32 / text.len().max(1) as f32)
+                                        .unwrap_or(0.5);
+
+                                    let features =
+                                        fractalaw_ai::position_classifier::build_position_features(
+                                            embedding,
+                                            &modals,
+                                            &drrp_types,
+                                            label,
+                                            rel_offset,
+                                        );
+                                    let pred = pos_classifier.predict(&features);
+                                    let cls_pos = pred.class.as_str();
+
+                                    // Check agreement (other = beneficiary or mentioned)
+                                    let agrees = regex_pos == cls_pos
+                                        || (regex_pos == "mentioned" && cls_pos == "other")
+                                        || (regex_pos == "beneficiary" && cls_pos == "other");
+
+                                    if !agrees {
+                                        has_disagreement = true;
+                                    }
+                                    pos_classified += 1;
+                                }
+
+                                if has_disagreement {
+                                    disagreements += 1;
+                                }
+                            }
+                        }
+
+                        if pos_classified > 0 {
+                            eprintln!(
+                                "    position: {pos_classified} actors classified, {disagreements} provision disagreements"
+                            );
+                        }
                     }
                 }
 

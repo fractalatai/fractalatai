@@ -22,26 +22,42 @@ Instead of overriding regex positions, **capture the difference in the actors st
 - **Training feed**: disagreements become candidate training data for Gemini
 - **Provenance**: each actor carries both regex-assigned and classifier-assigned positions
 
-### Actor struct extension
+### Actor struct extension — overload `reason` field
+
+**Rejected approach**: separate LanceDB columns (`classifier_positions`, `position_agreement`). Adds schema complexity, separates the signal from the actor it belongs to.
+
+**Adopted approach**: use the existing `reason` field in the actors struct to carry the classifier's position prediction when it disagrees with the regex position. No schema migration needed — `reason` is already nullable Utf8.
 
 Current actors struct:
 ```json
 {"label": "Org: Employer", "position": "active", "relates_to": null, "label_source": "canonical", "reason": null}
 ```
 
-Extended with classifier position:
+When regex and classifier **agree**, `reason` stays null:
 ```json
-{
-  "label": "Org: Employer",
-  "position": "active",              // regex-assigned (existing)
-  "position_source": "regex",        // who assigned the position
-  "classifier_position": "active",   // classifier prediction (new)
-  "classifier_confidence": 0.92,     // classifier confidence (new)
-  "relates_to": null,
-  "label_source": "canonical",
-  "reason": null
-}
+{"label": "Org: Employer", "position": "active", "label_source": "canonical", "reason": null}
 ```
+
+When regex and classifier **disagree**, `reason` carries the classifier signal:
+```json
+{"label": "Org: Employer", "position": "counterparty", "label_source": "canonical", "reason": "classifier:active@0.82"}
+```
+
+This provides:
+- **QA signal**: `reason` is non-null → regex and classifier disagree, needs review
+- **Training feed**: disagreements are candidate examples for Gemini re-classification
+- **Provenance**: the regex position stays in `position`, the classifier prediction is in `reason`
+- **No schema change**: `reason` field already exists in the Arrow List<Struct>
+- **Sertantai compatibility**: sertantai already receives `reason` in the actors struct
+
+**Convention for `reason` field**:
+- `null` — no classifier signal (agree or not yet classified)
+- `"classifier:active@0.82"` — classifier predicts active with 82% confidence
+- `"classifier:counterparty@0.71"` — classifier predicts counterparty with 71% confidence
+- `"classifier:other@0.65"` — classifier predicts other (beneficiary/mentioned) with 65% confidence
+- Existing LLM reasons (from agentic tier) remain as free text — no prefix
+
+Sertantai can detect classifier disagreements by checking `reason.startsWith("classifier:")`.
 
 When regex and classifier agree → high confidence, ship as-is.
 When they disagree → flag for QA, potential Gemini training example.

@@ -240,30 +240,8 @@ impl LanceStore {
             );
         }
         // actors: native List<Struct> — created during table rebuild, not via add_columns
-
-        // Position classifier output — stored alongside actors for QA comparison.
-        // classifier_positions: JSON string mapping actor label → predicted position.
-        // position_agreement: true if regex and classifier agree on all actor positions.
-        for col in ["classifier_positions", "position_agreement"] {
-            if schema.field_with_name(col).is_err() {
-                let expr = if col == "position_agreement" {
-                    "CAST(NULL AS BOOLEAN)"
-                } else {
-                    "CAST(NULL AS STRING)"
-                };
-                table
-                    .add_columns(
-                        lancedb::table::NewColumnTransform::SqlExpressions(vec![(
-                            col.to_string(),
-                            expr.to_string(),
-                        )]),
-                        None,
-                    )
-                    .await
-                    .map_err(|e| StoreError::Other(format!("add column {col}: {e}")))?;
-                info!(column = col, "added position classifier column");
-            }
-        }
+        // Position classifier output is stored in the actors struct `reason` field
+        // (only when classifier disagrees with regex position).
 
         Ok(())
     }
