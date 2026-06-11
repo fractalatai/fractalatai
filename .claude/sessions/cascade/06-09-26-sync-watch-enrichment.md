@@ -473,9 +473,20 @@ All deliverables:
 10. **Zenoh ack**: JSON payload at `fractalaw/@{tenant}/ack/{law_name}`
 11. **Stale embedding protection**: `--pending` always re-embeds, dev flow skips existing
 
+### Committed: `ae822a7` — Actor position heuristic fix + periodic compaction
+
+**Position fix**: the regex DRRP pattern already identifies the duty-bearer — the matched actor IS the active party. Replaced span word-order heuristic with simple logic: matched actor = active, all others = counterparty. Fixed ±3 byte padding tolerance.
+
+**Impact on QQ corpus**: +3,369 actors correctly reclassified as counterparty (active: 58,533→48,915, counterparty: 1,464→4,833).
+
+**Periodic compaction**: `LanceStore::compact()` via LanceDB optimize API, called every 20 laws during batch enrichment. Prevents fragment bloat that was hitting 8+ GB on 274-law `--force` runs.
+
+**NAS backup**: 20260610 — DuckDB (202 MB) + LanceDB (452 MB, 161,888 rows) + classifier models.
+
 **Commits:**
 - `a10fe8e` — Decoupled sync watch infrastructure
 - `b809eaf` — Rust DRRP classifier from JSON weights
 - `7c5c0b5` — Embed + classify wired into enrich --pending
 - `e6e0238` — Classifier write-back + observability + end-to-end test
 - `68c7e36` — Always re-embed for --pending laws (stale embedding fix)
+- `ae822a7` — Actor position heuristic fix + periodic LanceDB compaction

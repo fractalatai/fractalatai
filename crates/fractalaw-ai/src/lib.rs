@@ -13,6 +13,9 @@ pub use extractor::{DrrpExtraction, DrrpExtractor};
 pub mod drrp_classifier;
 pub use drrp_classifier::{DrrpClass, DrrpClassifier, DrrpPrediction};
 
+pub mod position_classifier;
+pub use position_classifier::{PositionClass, PositionClassifier, PositionPrediction};
+
 pub mod classifier;
 pub mod labels;
 pub use classifier::{
