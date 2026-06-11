@@ -5050,8 +5050,9 @@ async fn cmd_taxa_enrich(
                         let pos_classifier = fractalaw_ai::PositionClassifier::load(pos_weights)
                             .context("loading position classifier")?;
 
-                        let mut disagreements = 0usize;
                         let mut pos_classified = 0usize;
+                        type ActorTuple = (String, String, Option<String>, String, Option<String>);
+                        let mut pos_updates: Vec<(String, Vec<ActorTuple>)> = Vec::new();
 
                         for batch in &batches {
                             let sid_col = batch.column_by_name("section_id");
@@ -5070,7 +5071,7 @@ async fn cmd_taxa_enrich(
                                     continue;
                                 }
 
-                                let _sid = sid_col
+                                let sid = sid_col
                                     .and_then(|c| get_string_value(c.as_ref(), row))
                                     .unwrap_or_default();
                                 let text = text_col
@@ -5117,8 +5118,8 @@ async fn cmd_taxa_enrich(
                                     })
                                     .unwrap_or_default();
 
-                                // Get actors
-                                let actors: Vec<(String, String, Option<String>)> = actors_col
+                                // Get actors (all 5 fields)
+                                let actors: Vec<ActorTuple> = actors_col
                                     .and_then(|c| {
                                         use arrow::array::AsArray;
                                         let list = c.as_list_opt::<i32>()?;
@@ -5129,16 +5130,21 @@ async fn cmd_taxa_enrich(
                                         let sa = sa.as_struct_opt()?;
                                         let lc = sa.column_by_name("label")?;
                                         let pc = sa.column_by_name("position")?;
+                                        let rtc = sa.column_by_name("relates_to");
+                                        let lsc = sa.column_by_name("label_source");
                                         let rc = sa.column_by_name("reason");
                                         let mut result = Vec::new();
                                         for i in 0..sa.len() {
-                                            let label = get_string_value(lc.as_ref(), i)
-                                                .unwrap_or_default();
-                                            let pos = get_string_value(pc.as_ref(), i)
-                                                .unwrap_or_default();
-                                            let reason =
-                                                rc.and_then(|c| get_string_value(c.as_ref(), i));
-                                            result.push((label, pos, reason));
+                                            result.push((
+                                                get_string_value(lc.as_ref(), i)
+                                                    .unwrap_or_default(),
+                                                get_string_value(pc.as_ref(), i)
+                                                    .unwrap_or_default(),
+                                                rtc.and_then(|c| get_string_value(c.as_ref(), i)),
+                                                lsc.and_then(|c| get_string_value(c.as_ref(), i))
+                                                    .unwrap_or_else(|| "canonical".into()),
+                                                rc.and_then(|c| get_string_value(c.as_ref(), i)),
+                                            ));
                                         }
                                         Some(result)
                                     })
@@ -5151,62 +5157,139 @@ async fn cmd_taxa_enrich(
                                 let modals = fractalaw_ai::drrp_classifier::modal_features(&text);
                                 let text_lower = text.to_lowercase();
                                 let mut has_disagreement = false;
+                                let mut updated_actors: Vec<ActorTuple> = Vec::new();
 
-                                // Classify each actor's position
-                                for (label, regex_pos, existing_reason) in &actors {
-                                    // Don't overwrite existing LLM reasons
-                                    if existing_reason.is_some()
+                                for (label, regex_pos, relates_to, label_source, existing_reason) in
+                                    &actors
+                                {
+                                    let has_llm_reason = existing_reason.is_some()
                                         && !existing_reason
                                             .as_ref()
                                             .unwrap()
-                                            .starts_with("classifier:")
-                                    {
-                                        continue;
-                                    }
+                                            .starts_with("classifier:");
 
-                                    let label_lower = label
-                                        .to_lowercase()
-                                        .split(':')
-                                        .next_back()
-                                        .unwrap_or("")
-                                        .trim()
-                                        .to_string();
-                                    let offset = text_lower.find(&label_lower);
-                                    let rel_offset = offset
-                                        .map(|o| o as f32 / text.len().max(1) as f32)
-                                        .unwrap_or(0.5);
+                                    let new_reason = if has_llm_reason {
+                                        // Preserve LLM reason — don't overwrite
+                                        existing_reason.clone()
+                                    } else {
+                                        let label_lower = label
+                                            .to_lowercase()
+                                            .split(':')
+                                            .next_back()
+                                            .unwrap_or("")
+                                            .trim()
+                                            .to_string();
+                                        let offset = text_lower.find(&label_lower);
+                                        let rel_offset = offset
+                                            .map(|o| o as f32 / text.len().max(1) as f32)
+                                            .unwrap_or(0.5);
 
-                                    let features =
-                                        fractalaw_ai::position_classifier::build_position_features(
-                                            embedding,
-                                            &modals,
-                                            &drrp_types,
-                                            label,
-                                            rel_offset,
+                                        let features = fractalaw_ai::position_classifier::build_position_features(
+                                            embedding, &modals, &drrp_types, label, rel_offset,
                                         );
-                                    let pred = pos_classifier.predict(&features);
-                                    let cls_pos = pred.class.as_str();
+                                        let pred = pos_classifier.predict(&features);
+                                        let cls_pos = pred.class.as_str();
+                                        pos_classified += 1;
 
-                                    // Check agreement (other = beneficiary or mentioned)
-                                    let agrees = regex_pos == cls_pos
-                                        || (regex_pos == "mentioned" && cls_pos == "other")
-                                        || (regex_pos == "beneficiary" && cls_pos == "other");
+                                        let agrees = regex_pos == cls_pos
+                                            || (regex_pos == "mentioned" && cls_pos == "other")
+                                            || (regex_pos == "beneficiary" && cls_pos == "other");
 
-                                    if !agrees {
-                                        has_disagreement = true;
-                                    }
-                                    pos_classified += 1;
+                                        if agrees {
+                                            None
+                                        } else {
+                                            has_disagreement = true;
+                                            Some(format!(
+                                                "classifier:{}@{:.2}",
+                                                cls_pos, pred.confidence
+                                            ))
+                                        }
+                                    };
+
+                                    updated_actors.push((
+                                        label.clone(),
+                                        regex_pos.clone(),
+                                        relates_to.clone(),
+                                        label_source.clone(),
+                                        new_reason,
+                                    ));
                                 }
 
                                 if has_disagreement {
-                                    disagreements += 1;
+                                    pos_updates.push((sid, updated_actors));
                                 }
                             }
                         }
 
+                        // Write back actors with updated reason fields
+                        if !pos_updates.is_empty() {
+                            use arrow::array::StringBuilder as SB4;
+                            use arrow::datatypes::{DataType, Field};
+
+                            let actors_fields = vec![
+                                Field::new("label", DataType::Utf8, false),
+                                Field::new("position", DataType::Utf8, false),
+                                Field::new("relates_to", DataType::Utf8, true),
+                                Field::new("label_source", DataType::Utf8, false),
+                                Field::new("reason", DataType::Utf8, true),
+                            ];
+                            let mut sid_b = SB4::new();
+                            let mut actors_b = arrow::array::ListBuilder::new(
+                                arrow::array::StructBuilder::from_fields(actors_fields.clone(), 0),
+                            );
+
+                            for (sid, actors) in &pos_updates {
+                                sid_b.append_value(sid);
+                                let sb = actors_b.values();
+                                for (label, position, relates_to, label_source, reason) in actors {
+                                    sb.field_builder::<SB4>(0).unwrap().append_value(label);
+                                    sb.field_builder::<SB4>(1).unwrap().append_value(position);
+                                    match relates_to {
+                                        Some(rt) => {
+                                            sb.field_builder::<SB4>(2).unwrap().append_value(rt)
+                                        }
+                                        None => sb.field_builder::<SB4>(2).unwrap().append_null(),
+                                    }
+                                    sb.field_builder::<SB4>(3)
+                                        .unwrap()
+                                        .append_value(label_source);
+                                    match reason {
+                                        Some(r) => {
+                                            sb.field_builder::<SB4>(4).unwrap().append_value(r)
+                                        }
+                                        None => sb.field_builder::<SB4>(4).unwrap().append_null(),
+                                    }
+                                    sb.append(true);
+                                }
+                                actors_b.append(true);
+                            }
+
+                            let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
+                                Field::new("section_id", DataType::Utf8, false),
+                                Field::new(
+                                    "actors",
+                                    DataType::List(std::sync::Arc::new(Field::new(
+                                        "item",
+                                        DataType::Struct(actors_fields.into()),
+                                        true,
+                                    ))),
+                                    true,
+                                ),
+                            ]));
+                            let batch = arrow::record_batch::RecordBatch::try_new(
+                                schema,
+                                vec![
+                                    std::sync::Arc::new(sid_b.finish()),
+                                    std::sync::Arc::new(actors_b.finish()),
+                                ],
+                            )?;
+                            lance.upsert_embeddings(&batch).await?;
+                        }
+
                         if pos_classified > 0 {
                             eprintln!(
-                                "    position: {pos_classified} actors classified, {disagreements} provision disagreements"
+                                "    position: {pos_classified} actors, {} disagreements written",
+                                pos_updates.len()
                             );
                         }
                     }
