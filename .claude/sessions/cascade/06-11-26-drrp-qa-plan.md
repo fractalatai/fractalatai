@@ -38,6 +38,38 @@ Fixes applied: EU directive patterns, purpose gate softening, PERSON_QUALIFIERS 
 
 **Regex ceiling confirmed at ~71%.** Remaining gap to 90% requires Tier 2 classifier + Tier 3 LLM.
 
+### POC Duty Detection (2026-06-17)
+
+POC customer only uses Duty provisions. Responsibility (government obligations) has same meaning but is filtered away. When we count Responsibility as a correct obligation finding (stale gold — Category A), the picture changes:
+
+**Regex + v7 classifier: 82.7% Duty detection** (425/514 gold Duty provisions found as Obligation)
+- 325 classified as Duty (correct)
+- 100 classified as Responsibility (correct — stale gold, government actor was reclassified)
+- 89 missed (17.3%)
+
+The 95 "Duty→Responsibility misclassifications" were the pipeline being correct and the gold standard being stale. The LLM was prompted with old actor classifications when generating benchmarks.
+
+### Remaining 89 Duty misses — root cause analysis
+
+| Category | Count | Fix |
+|----------|-------|-----|
+| No modal (offence: "is guilty of", passive) | 38 | LLM only |
+| Rule (thing-subject: "notice must", "procedures must") | 28 | Implied actor — LLM or context |
+| No actor | 31 | Actor dictionary expansion |
+| Power/Right (debatable gold) | 22 | Gold review |
+
+**~38 provisions (7.4%) are genuinely LLM-only** — no modal verb, no explicit actor, offence constructions. These cannot be caught by regex or embedding classifier.
+
+**28 Rule provisions** are thing-subject + modal ("A notice must be given"). The implied duty-bearer is contextual. The Rule classification is actually correct for the text — the provision describes a procedural requirement on a thing, not a named actor's obligation.
+
+### Gold standard correction needed (Category A)
+
+The benchmark Parquet files were generated with Gemini using old actor classifications. ~95 provisions are gold=Duty but the pipeline correctly says Responsibility (government actor bears the obligation). These need manual correction in the NAS benchmark files. Not a pipeline problem.
+
+### Actor drift skill needed (Category B)
+
+Missing governed actors that cause false negatives: relevant body, GEMA, approved body, appellant, hazardous substances authority (as governed, not government), licensee (non-offshore). Each QA cycle should surface these gaps and feed them back to the YAML dictionary. Need a systematic skill for this.
+
 ### Classifier readiness analysis (2026-06-17)
 
 Tested existing v6 classifier (3-class: Obligation/Liberty/none, 86.4% accuracy) on the 295 regex false negatives:
