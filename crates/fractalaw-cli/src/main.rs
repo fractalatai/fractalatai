@@ -4789,8 +4789,8 @@ async fn cmd_taxa_enrich(
                 let filter = format!("law_name = '{escaped}'");
                 let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
 
-                // (section_id, text, embedding, source_tier, section_type, has_govt_active)
-                type Prov = (String, String, Option<Vec<f32>>, u8, String, bool);
+                // (section_id, text, embedding, source_tier, section_type, has_govt_active, has_drrp)
+                type Prov = (String, String, Option<Vec<f32>>, u8, String, bool, bool);
                 let mut provisions: Vec<Prov> = Vec::new();
                 for batch in &batches {
                     let sid_col = batch.column_by_name("section_id");
@@ -4799,6 +4799,7 @@ async fn cmd_taxa_enrich(
                     let method_col = batch.column_by_name("extraction_method");
                     let st_col = batch.column_by_name("section_type");
                     let actors_col = batch.column_by_name("actors");
+                    let drrp_col = batch.column_by_name("drrp_types");
 
                     for row in 0..batch.num_rows() {
                         let sid = sid_col
@@ -4860,7 +4861,20 @@ async fn cmd_taxa_enrich(
                             })
                             .unwrap_or(false);
 
-                        provisions.push((sid, text, emb, tier, section_type, has_govt_active));
+                        // Check if provision already has DRRP from regex
+                        let has_drrp = drrp_col
+                            .and_then(|c| {
+                                use arrow::array::AsArray;
+                                let list = c.as_list_opt::<i32>()?;
+                                if list.is_null(row) {
+                                    return Some(false);
+                                }
+                                let vals = list.value(row);
+                                Some(vals.len() > 0)
+                            })
+                            .unwrap_or(false);
+
+                        provisions.push((sid, text, emb, tier, section_type, has_govt_active, has_drrp));
                     }
                 }
 
@@ -4981,8 +4995,12 @@ async fn cmd_taxa_enrich(
                         let tier: u8 = prov.3;
                         let section_type: &str = &prov.4;
                         let _is_govt: bool = prov.5;
+                        let has_drrp: bool = prov.6;
 
-                        if tier >= source_tier("classifier")
+                        // Only classify provisions where regex returned empty drrp_types.
+                        // Don't override correct regex results with classifier predictions.
+                        if has_drrp
+                            || tier >= source_tier("classifier")
                             || !REGULATION_TYPES.contains(&section_type)
                         {
                             continue;
