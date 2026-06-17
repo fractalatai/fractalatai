@@ -52,14 +52,16 @@ Of 1185 gold DRRP provisions, the pipeline misses 265. Root causes:
 
 **Strategy**: Regex handles the structural patterns it can (70.7% and ceiling ~75% with dictionary expansion). The DRRP classifier (Tier 2) handles provisions with embeddings but no regex match. LLM (Tier 3) handles the rest.
 
-1. **Actor dictionary expansion** — add ~10 entity patterns (NDA, Administrator, etc.) to recover ~20-30 provisions for regex. Quick win.
-2. **DRRP classifier retraining** — retrain with the 2,250 benchmark provisions as additional training data. The classifier currently only covers Obligation/Liberty/none — expand to 5-class (Duty/Right/Responsibility/Power/none).
-3. **Classifier transition trigger** — when regex returns `drrp_types = []` AND the provision has an embedding AND has a modal verb → escalate to Tier 2 classifier.
-4. **LLM escalation trigger** — when classifier confidence < 0.7 OR classifier disagrees with regex → escalate to Tier 3 LLM.
-5. **Retry 6 failed benchmark laws** — Gemini rate-limited
-6. **Position classifier P5 fix** — retrain with better features
-7. **Full regression test suite** — codify learnings
-8. **Publish QQ corpus to sertantai**
+1. **YAML unification of actor dictionary** — single source of truth replacing three disconnected lists (actors.rs, actor-dictionary.yaml, duty_patterns.rs GOVERNMENT_ACTORS). See design below.
+2. **Actor dictionary expansion + qualified person promotion** — add missing entities, promote "authorised person" etc. to own labels. Done as part of YAML unification.
+3. **DRRP classifier retraining** — retrain with the 2,250 benchmark provisions as additional training data. The classifier currently only covers Obligation/Liberty/none — expand to 5-class (Duty/Right/Responsibility/Power/none).
+4. **Classifier transition trigger** — when regex returns `drrp_types = []` AND the provision has an embedding AND has a modal verb → escalate to Tier 2 classifier.
+5. **LLM escalation trigger** — when classifier confidence < 0.7 OR classifier disagrees with regex → escalate to Tier 3 LLM.
+6. **Retry 6 failed benchmark laws** — Gemini rate-limited
+7. **Position classifier P5 fix** — retrain with better features
+8. **Full regression test suite** — codify learnings
+9. **Publish QQ corpus to sertantai**
+10. **run_patterns() refactor** — parked as fractalaw/fractalaw#37. Non-mutating overlap resolution.
 
 ### Key files
 - Session doc: `.claude/sessions/cascade/06-11-26-drrp-qa-plan.md` (this file)
@@ -443,3 +445,83 @@ Added `--text` flag to `benchmark_classifier_disagreements.py` and examined prov
 **Scale**: Almost all "both wrong" cases (197) are gold=counterparty. This is the hardest category because it requires parsing the relationship between two actors within a clause.
 
 **Fix approach**: Heuristic patterns for common counterparty signals: "serve on [actor] a notice", "consent of [actor]", "ensure that [actor] is/are [given/provided]". Longer-term: clause structure parsing to identify subject vs object actors.
+
+## YAML Unified Actor Dictionary (2026-06-17)
+
+### Three-source-of-truth problem
+
+Gemini code review (`data/code-review/gemini-actor-architecture-review.md`) confirmed three disconnected actor lists:
+
+1. **`actors.rs`** — 92 hardcoded `(label, regex)` tuples in `GOVERNMENT_DEFS` + `GOVERNED_DEFS` const arrays. Recompilation required to change.
+2. **`actor-dictionary.yaml`** — 105 entries with `canonical`, `category`, `triggers`. Used for LLM post-processing only.
+3. **`duty_patterns.rs` `GOVERNMENT_ACTORS`** — 27 downcased keywords for `has_government_actor()` check. Manually synced.
+
+Adding an actor requires updating all three. Drift is inevitable.
+
+### Unified format
+
+Extend `actor-dictionary.yaml` to be the single source of truth:
+
+```yaml
+actors:
+  - label: "Gvt: Minister"
+    type: government          # governed | government — determines DRRP mapping
+    regex_patterns:           # raw patterns, boundary wrapper added by Rust
+      - "(?:Secretary of State|Ministers?)"
+    llm_triggers:             # for LLM post-processing (actor-match skill)
+      - "secretary of state"
+      - "minister"
+    drrp_keywords:            # downcased keywords for has_government_actor()
+      - "secretary of state"
+      - "minister"
+
+  - label: "Org: Employer"
+    type: governed
+    regex_patterns:
+      - "(?i)employers?"
+    llm_triggers:
+      - "employer"
+      - "the employer"
+    drrp_keywords: []         # governed actors don't need DRRP keyword check
+```
+
+### Migration plan
+
+1. Extend YAML schema: add `type`, `regex_patterns`, `drrp_keywords` fields to existing `actor-dictionary.yaml`
+2. Add `serde_yaml` dependency to `fractalaw-core`
+3. Refactor `actors.rs`: load from YAML at startup via `LazyLock`, compile regex patterns with auto-wrapped boundaries, split into governed/government based on `type`
+4. Refactor `duty_patterns.rs`: derive `GOVERNMENT_ACTORS` keywords from YAML entries where `type = government`
+5. Delete `GOVERNMENT_DEFS`, `GOVERNED_DEFS` const arrays, specialist arrays
+6. Specialist patterns (Offshore, Public) get a `families` field in YAML: `families: ["OH&S: Offshore"]`
+
+### `run_patterns()` refactor — PARKED (fractalaw/fractalaw#37)
+
+Progressive match-and-remove is fragile (order-dependent, context-loss). Non-mutating overlap resolution is the right fix but lower priority than accuracy improvements. Tracked separately.
+
+### Missing entities — governed vs government classification
+
+From benchmark analysis, these entities appear as duty-bearers but aren't in any dictionary:
+
+| Entity | Type | Label | Reasoning |
+|--------|------|-------|-----------|
+| NDA | government | `Gvt: Agency: NDA` | Non-departmental public body, performs public functions |
+| Administrator (energy/climate) | governed | `Spc: Administrator` | Delegated role, bears duties under scheme rules |
+| scheme administrator | governed | `Spc: Administrator` | Same — "scheme administrator" is a specialist role |
+| compliance body | governed | `Spc: Compliance Body` | Independent body designated to ensure compliance |
+| certification body | governed | `Spc: Certification Body` | Independent third-party entity |
+| approval body | governed | `Spc: Approval Body` | Designated entity that grants approvals |
+| responsible undertaking | governed | `Org: Responsible Undertaking` | Business/enterprise with duties |
+| authorised person | governed | `Spc: Authorised Person` | Promoted from Ind: Person compound predicate |
+| manufacturers (plural) | governed | `SC: Manufacturer` | Already exists, needs plural regex fix |
+
+### Qualified person promotion
+
+Gemini recommends promoting qualified person roles to explicit labels, eliminating compound predicate complexity:
+
+| Current | New label | Type | Why |
+|---------|-----------|------|-----|
+| `Ind: Person` + compound predicate | `Spc: Authorised Person` | governed | Distinct role with specific qualifications |
+| `Ind: Responsible Person` (exists) | keep | governed | Already a separate label |
+| `Ind: Competent Person` (exists) | keep | governed | Already a separate label |
+
+The generic `Ind: Person` remains for truly unqualified "person" references but the compound predicate list (`PERSON_QUALIFIERS`) shrinks — most qualified patterns are now handled by their own actor label matched before `Ind: Person` in pattern order.
