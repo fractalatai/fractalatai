@@ -34,9 +34,31 @@
 | none recall | 88.5% | **90.2%** | 90% | at target |
 | **Overall accuracy** | **67.1%** | **71.0%** | **90%** | **-19.0pp** |
 
-Fixes applied: EU directive patterns, purpose gate softening, PERSON_QUALIFIERS expansion, YAML unification, entity expansion (NDA, Administrator, etc.), authorised person promotion.
+Fixes applied: EU directive patterns, purpose gate softening, PERSON_QUALIFIERS expansion, YAML unification, entity expansion, authorised person promotion, regulatory body reclassification.
 
-**Regex ceiling reached at ~71%.** Remaining gap to 90% requires Tier 2 classifier + Tier 3 LLM.
+**Regex ceiling confirmed at ~71%.** Remaining gap to 90% requires Tier 2 classifier + Tier 3 LLM.
+
+### Classifier readiness analysis (2026-06-17)
+
+Tested existing v6 classifier (3-class: Obligation/Liberty/none, 86.4% accuracy) on the 295 regex false negatives:
+- **152/295 correct (51.5%)** — recovers half the missed provisions
+- 143 incorrect, dominated by decomposition errors (actor type wrong)
+- After regulatory body reclassification: ~41 Power→Right fixes expected
+- **Net: classifier would add ~8pp to DRRP accuracy** (152 correct out of 2250 total)
+- Estimated overall after classifier: **~78%**
+
+Remaining ~12pp gap to 90% needs:
+- Classifier retraining with benchmark data (2,250 provisions as additional training)
+- Better `none` rejection (47 provisions classified as DRRP when gold says none)
+- LLM for hard cases (no modal, no actor, context-dependent)
+
+### Next: wire classifier into benchmark enrichment
+
+The classifier has never run on benchmark provisions (all are `extraction_method = regex`). Integration:
+1. In `enrich_single_law`, after regex parse: if `drrp_types = []` AND embedding exists → run classifier
+2. Use `decompose_drrp()` with actor type from the new YAML dictionary
+3. Write classifier result with `extraction_method = 'classifier'`
+4. Re-benchmark to confirm ~78% accuracy
 
 ### Regex ceiling analysis
 
