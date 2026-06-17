@@ -1,456 +1,768 @@
 # Actor Dictionary — Single Source of Truth
 #
-# Each entry: canonical label + trigger phrases for fuzzy matching.
-# LLMs output natural language actor names. The matcher resolves
-# them to canonical labels using these triggers.
+# Unified format: each entry has a canonical label, type (government/governed),
+# category, regex patterns for text extraction, triggers for LLM matching,
+# and optional drrp_keywords (downcased fragments for has_government_actor())
+# and families (for specialist family-gated patterns).
 #
 # Ordering matters: specific entries before generic (e.g., "Secretary
-# of State for Defence" before "Secretary of State"). The matcher
-# checks in order and takes the first exact trigger match.
+# of State for Defence" before "Secretary of State"). The regex matcher
+# checks in order and takes the first match.
+#
+# regex_patterns are the CORE patterns — boundary wrappers are added at
+# compile time: (?:[\s[:punct:]]) on each side.
 #
 # Categories: Gvt (government), EU, Org (organisation), Ind (individual),
 # SC (supply chain), Spc (specialist), Svc (service), Public, Offshore
 
 # ── Government ───────────────────────────────────────────────────────
 
-- canonical: Crown
+- label: Crown
+  type: government
   category: other
+  regex_patterns:
+    - "Crown"
   triggers: [crown, the crown]
+  drrp_keywords: [crown]
 
-- canonical: HM Forces
-  category: other
-  triggers: [hm forces, armed forces, his majesty's forces, her majesty's forces, military]
-
-- canonical: "Gvt: Minister: Secretary of State for Defence"
+- label: "Gvt: Minister: Secretary of State for Defence"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "Secretary of State for Defence"
   triggers: [secretary of state for defence, defence secretary]
+  drrp_keywords: [secretary of state]
 
-- canonical: "Gvt: Minister: Secretary of State for Transport"
+- label: "Gvt: Minister: Secretary of State for Transport"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "Secretary of State for Transport"
   triggers: [secretary of state for transport, transport secretary]
+  drrp_keywords: [secretary of state]
 
-- canonical: "Gvt: Minister: Attorney General"
+- label: "Gvt: Minister: Attorney General"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "Attorney General"
   triggers: [attorney general]
 
-- canonical: "Gvt: Minister"
+- label: "Gvt: Minister"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "(?:Secretary of State|[Mm]inisters?)"
   triggers: [secretary of state, minister, ministers]
+  drrp_keywords: [secretary of state, minister, regulations made]
 
-- canonical: "Gvt: Agency: Health and Safety Executive for Northern Ireland"
+- label: "Gvt: Agency: Health and Safety Executive for Northern Ireland"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "(?:Health and Safety Executive for Northern Ireland|HSENI)"
   triggers: [health and safety executive for northern ireland, hseni]
+  drrp_keywords: [health and safety executive]
 
-- canonical: "Gvt: Agency: Health and Safety Executive"
+- label: "Gvt: Agency: Health and Safety Executive"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "(?:Health and Safety Executive|[Tt]he Executive)"
   triggers: [health and safety executive, hse, the executive]
+  drrp_keywords: [health and safety executive, hse, executive]
 
-- canonical: "Gvt: Agency: Environment Agency"
+- label: "Gvt: Agency: Environment Agency"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "Environment Agency"
   triggers: [environment agency]
 
-- canonical: "Gvt: Agency: Scottish Environment Protection Agency"
+- label: "Gvt: Agency: Scottish Environment Protection Agency"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "(?:Scottish Environment Protection Agency|SEPA)"
   triggers: [scottish environment protection agency, sepa]
 
-- canonical: "Gvt: Agency: Office for Nuclear Regulation"
+- label: "Gvt: Agency: Office for Nuclear Regulation"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "(?:Office for Nuclear Regulations?|ONR)"
   triggers: [office for nuclear regulation, onr]
 
-- canonical: "Gvt: Agency: Office for Environmental Protection"
+- label: "Gvt: Agency: Office for Environmental Protection"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "(?:Office for Environmental Protection|OEP)"
   triggers: [office for environmental protection, oep]
 
-- canonical: "Gvt: Agency: Office of Rail and Road"
+- label: "Gvt: Agency: Office of Rail and Road"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "Office of Rail and Road?"
   triggers: [office of rail and road]
 
-- canonical: "Gvt: Agency: OFCOM"
+- label: "Gvt: Agency: OFCOM"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "(?:Office of Communications?|OFCOM)"
   triggers: [ofcom, office of communications]
+  drrp_keywords: [ofcom]
 
-- canonical: "Gvt: Agency: Natural Resources Body for Wales"
+- label: "Gvt: Agency: Natural Resources Body for Wales"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "Natural Resources Body for Wales"
   triggers: [natural resources body for wales]
 
-- canonical: "Gvt: Agency: Maritime and Coastguard Agency"
+- label: "Gvt: Agency: Maritime and Coastguard Agency"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "(?:Maritime and Coastguard Agency|MCA)"
   triggers: [maritime and coastguard agency, mca]
 
-- canonical: "Gvt: Agency: Oil and Gas Authority"
+- label: "Gvt: Agency: Oil and Gas Authority"
+  type: government
   category: Gvt
+  regex_patterns:
+    - "(?:Oil and Gas Authority|North Sea Transition Authority|OGA|NSTA)"
   triggers: [oil and gas authority, north sea transition authority, oga, nsta]
 
-- canonical: "Gvt: Agency"
-  category: Gvt
-  triggers: [agency]
-
-- canonical: "Gvt: Authority: Enforcement"
-  category: Gvt
-  triggers: [enforcing authority, enforcement authority, regulatory authority, regulator]
-
-- canonical: "Gvt: Authority: Local"
-  category: Gvt
-  triggers: [local authority, local authorities, county council, district council, london borough council]
-
-- canonical: "Gvt: Authority: Planning"
-  category: Gvt
-  triggers: [planning authority, planning authorities]
-
-- canonical: "Gvt: Authority: Fire and Rescue"
-  category: Gvt
-  triggers: [fire and rescue authority, fire authority]
-
-- canonical: "Gvt: Authority: Harbour"
-  category: Gvt
-  triggers: [harbour authority, harbour master]
-
-- canonical: "Gvt: Authority: Licensing"
-  category: Gvt
-  triggers: [licensing authority]
-
-- canonical: "Gvt: Authority: Waste"
-  category: Gvt
-  triggers: [waste collection authority, waste disposal authority, disposal authority]
-
-- canonical: "Gvt: Authority: Public"
-  category: Gvt
-  triggers: [public authority, public authorities]
-
-- canonical: "Gvt: Authority: Traffic"
-  category: Gvt
-  triggers: [traffic authority]
-
-- canonical: "Gvt: Authority: Market"
-  category: Gvt
-  triggers: [market authority, market surveillance authority]
-
-- canonical: "Gvt: Authority"
-  category: Gvt
-  triggers: [authority, competent authority, competent authorities, competent national authorities, national authority]
-
-- canonical: "Gvt: Commissioners"
-  category: Gvt
-  triggers: [commissioners]
-
-- canonical: "Gvt: Officer"
-  category: Gvt
-  triggers: [officer]
-
-- canonical: "Gvt: Judiciary"
-  category: Gvt
-  triggers: [court, tribunal, judge, judiciary, employment tribunal, magistrates]
-
-- canonical: "Gvt: Emergency Services: Police"
-  category: Gvt
-  triggers: [police, constable]
-
-- canonical: "Gvt: Emergency Services"
-  category: Gvt
-  triggers: [emergency services, fire brigade, ambulance]
-
-- canonical: "Gvt: Appropriate Person"
-  category: Gvt
-  triggers: [appropriate person]
-
-- canonical: "Gvt: Ministry: Treasury"
-  category: Gvt
-  triggers: [treasury]
-
-- canonical: "Gvt: Ministry: HMRC"
-  category: Gvt
-  triggers: [hmrc, customs officer, revenue and customs, her majesty's commissioners]
-
-- canonical: "Gvt: Ministry: Ministry of Defence"
-  category: Gvt
-  triggers: [ministry of defence, mod]
-
-- canonical: "Gvt: Ministry: Department of Enterprise, Trade and Investment"
-  category: Gvt
-  triggers: [department of enterprise, trade and investment]
-
-- canonical: "Gvt: Ministry"
-  category: Gvt
-  triggers: [ministry, department, government department]
-
-- canonical: "Gvt: Devolved Admin: National Assembly for Wales"
-  category: Gvt
-  triggers: [national assembly for wales, welsh assembly, senedd]
-
-- canonical: "Gvt: Devolved Admin: Scottish Parliament"
-  category: Gvt
-  triggers: [scottish parliament, scottish ministers]
-
-- canonical: "Gvt: Devolved Admin: Northern Ireland Assembly"
-  category: Gvt
-  triggers: [northern ireland assembly]
-
-- canonical: "Gvt: Devolved Admin"
-  category: Gvt
-  triggers: [assembly, devolved administration]
-
-# ── EU ───────────────────────────────────────────────────────────────
-
-- canonical: "EU: Agency: ECHA"
+- label: "EU: Agency: ECHA"
+  type: government
   category: EU
+  regex_patterns:
+    - "(?:European Chemicals Agency|ECHA)"
   triggers: [european chemicals agency, echa]
+  drrp_keywords: [commission]
 
-- canonical: "EU: Agency: EFSA"
+- label: "EU: Agency: EFSA"
+  type: government
   category: EU
+  regex_patterns:
+    - "(?:European Food Safety Authority|EFSA)"
   triggers: [european food safety authority, efsa]
 
-- canonical: "EU: Agency: EEA"
+- label: "EU: Agency: EEA"
+  type: government
   category: EU
+  regex_patterns:
+    - "(?:European Environment Agency|EEA)"
   triggers: [european environment agency, eea]
 
-- canonical: "EU: Commission"
+- label: "Gvt: Agency"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "[Aa]gency"
+  triggers: [agency]
+
+- label: "Gvt: Authority: Enforcement"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:[Rr]egulati?on?r?y?|[Ee]nforce?(?:ment|ing)) [Aa]uthority?i?e?s?"
+  triggers: [enforcing authority, enforcement authority, regulatory authority, regulator]
+  drrp_keywords: [enforcing authority, authority]
+
+- label: "Gvt: Authority: Local"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:[Ll]ocal [Aa]uthority?i?e?s?|council of a county|(?:county|district)(?: borough | )council|London Borough Council|council constituted)"
+  triggers: [local authority, local authorities, county council, district council, london borough council]
+  drrp_keywords: [local authority, authority]
+
+- label: "Gvt: Authority: Planning"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "[Pp]lanning [Aa]uthority?i?e?s?"
+  triggers: [planning authority, planning authorities]
+  drrp_keywords: [authority]
+
+- label: "Gvt: Authority: Fire and Rescue"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:[Ff]ire and [Rr]escue [Aa]uthority?i?e?s?|[Ff]ire [Aa]uthority?i?e?s?)"
+  triggers: [fire and rescue authority, fire authority]
+  drrp_keywords: [authority]
+
+- label: "Gvt: Authority: Harbour"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:[Hh]arbour [Aa]uthority?i?e?s?|harbour master)"
+  triggers: [harbour authority, harbour master]
+  drrp_keywords: [authority]
+
+- label: "Gvt: Authority: Licensing"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "[Ll]icen[cs]ing [Aa]uthority?i?e?s?"
+  triggers: [licensing authority]
+  drrp_keywords: [authority]
+
+- label: "Gvt: Authority: Waste"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:[Ww]aste collection|[Ww]aste disposal|[Dd]isposal) [Aa]uthority?i?e?s?"
+  triggers: [waste collection authority, waste disposal authority, disposal authority]
+  drrp_keywords: [authority]
+
+- label: "Gvt: Authority: Public"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "[Pp]ublic [Aa]uthority?i?e?s?"
+  triggers: [public authority, public authorities]
+  drrp_keywords: [authority]
+
+- label: "Gvt: Authority: Traffic"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "[Tt]raffic [Aa]uthority?i?e?s?"
+  triggers: [traffic authority]
+  drrp_keywords: [authority]
+
+- label: "Gvt: Authority: Market"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:market surveillance|weights and measures) authority?i?e?s?"
+  triggers: [market authority, market surveillance authority]
+  drrp_keywords: [authority]
+
+- label: "Gvt: Authority"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:(?:[Tt]he|[Aa]n|appropriate|allocating|[Cc]ompetent|[Dd]esignated) authority?i?e?s?|[Rr]egulators?|[Mm]onitoring [Aa]uthority?i?e?s?|that authority)"
+  triggers: [authority, competent authority, competent authorities, competent national authorities, national authority]
+  drrp_keywords: [authority, appropriate authority, national authority]
+
+- label: "Gvt: Commissioners"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "[Cc]ommissioners"
+  triggers: [commissioners]
+  drrp_keywords: [commissioner]
+
+- label: "EU: Commission"
+  type: government
   category: EU
+  regex_patterns:
+    - "[Cc]ommission"
   triggers: [european commission, the commission, commission]
+  drrp_keywords: [commission]
 
-- canonical: "EU: Member State"
+- label: "EU: Member State"
+  type: government
   category: EU
+  regex_patterns:
+    - "[Mm]ember [Ss]tates?"
   triggers: [member state, member states]
+  drrp_keywords: [member state]
 
-# ── Organisations ────────────────────────────────────────────────────
+- label: "Gvt: Officer"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:[Aa]uthorised [Oo]fficer|[Oo]fficer of a local authority|[Oo]fficer)"
+  triggers: [officer]
+  drrp_keywords: [inspector]
 
-- canonical: "Org: Employer"
+- label: "Gvt: Judiciary"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:court|[Jj]ustice of the [Pp]eace|[Tt]ribunal|[Ss]heriff|[Mm]agistrate|prosecutor|Lord Advocate)"
+  triggers: [court, tribunal, judge, judiciary, employment tribunal, magistrates]
+  drrp_keywords: [tribunal, court, sheriff, procurator fiscal]
+
+- label: "Gvt: Emergency Services: Police"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:[Cc]onstable|[Cc]hief(?: officer | )of [Pp]olice|police force)"
+  triggers: [police, constable]
+  drrp_keywords: [chief officer, constable, police]
+
+- label: "Gvt: Emergency Services"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "[Ee]mergency [Ss]ervices?"
+  triggers: [emergency services, fire brigade, ambulance]
+
+- label: "Gvt: Appropriate Person"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "[Aa]ppropriate [Pp]ersons?"
+  triggers: [appropriate person]
+
+- label: "Gvt: Ministry: Treasury"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "[Tt]reasury"
+  triggers: [treasury]
+
+- label: "Gvt: Ministry: HMRC"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:customs officer|Her Majesty['\u2019]s Commissioners for Revenue and Customs|Her Majesty\u2019s Revenue and Customs)"
+  triggers: [hmrc, customs officer, revenue and customs, her majesty's commissioners]
+
+- label: "Gvt: Ministry: Ministry of Defence"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "Ministry of Defence"
+  triggers: [ministry of defence, mod]
+
+- label: "Gvt: Ministry: Department of Enterprise, Trade and Investment"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "Department of Enterprise,? Trade and Investment"
+  triggers: [department of enterprise, trade and investment]
+  drrp_keywords: [department]
+
+- label: "Gvt: Ministry"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:[Mm]inistry|[Tt]he Department)"
+  triggers: [ministry, department, government department]
+  drrp_keywords: [department]
+
+- label: "Gvt: Devolved Admin: National Assembly for Wales"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:National Assembly for Wales|Senedd|Welsh Parliament)"
+  triggers: [national assembly for wales, welsh assembly, senedd]
+  drrp_keywords: [parliament]
+
+- label: "Gvt: Devolved Admin: Scottish Parliament"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "Scottish Parliament"
+  triggers: [scottish parliament, scottish ministers]
+  drrp_keywords: [parliament]
+
+- label: "Gvt: Devolved Admin: Northern Ireland Assembly"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "Northern Ireland Assembly"
+  triggers: [northern ireland assembly]
+
+- label: "Gvt: Devolved Admin"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "Assembly"
+  triggers: [assembly, devolved administration]
+
+# ── Governed ─────────────────────────────────────────────────────────
+
+- label: HM Forces
+  type: governed
+  category: other
+  regex_patterns:
+    - "(?:(?:His|Her) Majesty['\u2019]s forces|armed forces)"
+  triggers: [hm forces, armed forces, his majesty's forces, her majesty's forces, military]
+
+- label: "Org: Employer"
+  type: governed
   category: Org
+  regex_patterns:
+    - "[Ee]mployers?"
   triggers: [employer, employers, the employer]
 
-- canonical: "Org: Owner"
+- label: "Org: Owner"
+  type: governed
   category: Org
+  regex_patterns:
+    - "(?:[Oo]wners?|mine owner|owner of a non-production installation|installation owner)"
   triggers: [owner, owners, the owner]
 
-- canonical: "Org: Occupier"
+- label: "Org: Occupier"
+  type: governed
   category: Org
+  regex_patterns:
+    - "(?:[Oo]ccupiers?|[Pp]erson who is in occupation)"
   triggers: [occupier, occupiers, the occupier]
 
-- canonical: "Org: Company"
+- label: "Org: Company"
+  type: governed
   category: Org
+  regex_patterns:
+    - "(?:[Cc]ompany?i?e?s?|[Bb]usinesse?s?|[Ee]nterprises?|[Bb]ody?i?e?s? corporate)"
   triggers: [company, companies, body corporate, corporation]
 
-- canonical: "Org: Landlord"
-  category: Org
-  triggers: [landlord, landlords]
-
-# ── Individuals ──────────────────────────────────────────────────────
-
-- canonical: "Ind: Employee"
-  category: Ind
-  triggers: [employee, employees, his employees, their employees]
-
-- canonical: "Ind: Worker"
-  category: Ind
-  triggers: [worker, workers]
-
-- canonical: "Ind: Self-employed Worker"
-  category: Ind
-  triggers: [self-employed person, self-employed worker, self-employed, freelancer]
-
-- canonical: "Ind: Responsible Person"
-  category: Ind
-  triggers: [responsible person, the responsible person]
-
-- canonical: "Ind: Competent Person"
-  category: Ind
-  triggers: [competent person, competent persons]
-
-- canonical: "Ind: Duty Holder"
-  category: Ind
-  triggers: [duty holder, the duty holder]
-
-- canonical: "Ind: Manager"
-  category: Ind
-  triggers: [manager, managers]
-
-- canonical: "Ind: Supervisor"
-  category: Ind
-  triggers: [supervisor, supervisors]
-
-- canonical: "Ind: Person"
-  category: Ind
-  triggers: [person, persons, individual, any person, every person, no person]
-
-- canonical: "Ind: User"
-  category: Ind
-  triggers: [user, users]
-
-# ── Supply Chain ─────────────────────────────────────────────────────
-
-- canonical: "SC: Downstream User"
-  category: SC
-  triggers: [downstream user, downstream users]
-
-- canonical: "SC: Manufacturer"
-  category: SC
-  triggers: [manufacturer, manufacturers]
-
-- canonical: "SC: C: Principal Designer"
-  category: SC
-  triggers: [principal designer]
-
-- canonical: "SC: C: Designer"
-  category: SC
-  triggers: [designer, designers]
-
-- canonical: "SC: C: Principal Contractor"
-  category: SC
-  triggers: [principal contractor]
-
-- canonical: "SC: C: Contractor"
-  category: SC
-  triggers: [contractor, contractors]
-
-- canonical: "SC: Supplier"
-  category: SC
-  triggers: [supplier, suppliers]
-
-- canonical: "SC: Importer"
-  category: SC
-  triggers: [importer, importers]
-
-- canonical: "SC: Distributor"
-  category: SC
-  triggers: [distributor, distributors]
-
-- canonical: "SC: Registrant"
-  category: SC
-  triggers: [registrant, registrants]
-
-- canonical: "SC: Applicant"
-  category: SC
-  triggers: [applicant, applicants]
-
-- canonical: "SC: Authorised Representative"
-  category: SC
-  triggers: [authorised representative, authorized representative]
-
-- canonical: "SC: Notified Body"
-  category: SC
-  triggers: [notified body, notified bodies]
-
-- canonical: "SC: Client"
-  category: SC
-  triggers: [client, clients, the client]
-
-- canonical: "SC: T&L: Carrier"
-  category: SC
-  triggers: [carrier, carriers]
-
-- canonical: "SC: T&L: Driver"
-  category: SC
-  triggers: [driver, drivers]
-
-# ── Specialists ──────────────────────────────────────────────────────
-
-- canonical: "Spc: Inspector"
-  category: Spc
-  triggers: [inspector, inspectors]
-
-- canonical: "Spc: Employees' Representative"
-  category: Spc
-  triggers: [employees' representative, employees representative, safety representative, workers representative]
-
-- canonical: "Spc: Trade Union"
-  category: Spc
-  triggers: [trade union, trade unions, union]
-
-- canonical: "Spc: Assessor"
-  category: Spc
-  triggers: [assessor, assessors]
-
-- canonical: "Spc: Engineer"
-  category: Spc
-  triggers: [engineer, engineers]
-
-# ── Services ─────────────────────────────────────────────────────────
-
-- canonical: "Svc: Installer"
-  category: Svc
-  triggers: [installer, installers]
-
-# ── Public ───────────────────────────────────────────────────────────
-
-- canonical: "Public: Provider"
-  category: Public
-  triggers: [provider, providers, service provider]
-
-- canonical: "Public: Keeper"
-  category: Public
-  triggers: [keeper, keepers]
-
-- canonical: "Public: Dealer"
-  category: Public
-  triggers: [dealer, dealers]
-
-- canonical: Public
+- label: Operator
+  type: governed
   category: other
-  triggers: [public, the public, general public, members of the public]
-
-- canonical: Operator
-  category: other
+  regex_patterns:
+    - "(?:[Oo]perators?|(?:berth|mine|well|economic|meter)[\\s-]operator|operator of a production installation)"
   triggers: [operator, operators, the operator]
 
-# ── Offshore ─────────────────────────────────────────────────────────
+- label: "Ind: Employee"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "[Ee]mployees?"
+  triggers: [employee, employees, his employees, their employees]
 
-- canonical: "Offshore: Licensee"
+- label: "Ind: Worker"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "(?:[Ww]orkers?|[Ww]orkmen|(?:members of the )?[Ww]orkforce)"
+  triggers: [worker, workers]
+
+- label: "Ind: Self-employed Worker"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "[Ss]elf-employed (?:[Pp]ersons?|diver)"
+  triggers: [self-employed person, self-employed worker, self-employed, freelancer]
+
+- label: "Ind: Responsible Person"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "[Rr]esponsible [Pp]ersons?"
+  triggers: [responsible person, the responsible person]
+
+- label: "Ind: Competent Person"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "(?:[Cc]ompetent [Pp]ersons?|person who is competent)"
+  triggers: [competent person, competent persons]
+
+- label: "Ind: Duty Holder"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "(?:[Dd]uty [Hh]olders?|[Dd]utyholder)"
+  triggers: [duty holder, the duty holder]
+
+- label: "Ind: Manager"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "(?:managers?|mine manager|manager of a mine|installation manager)"
+  triggers: [manager, managers]
+
+- label: "Ind: Supervisor"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "(?:[Ss]upervisor|[Pp]erson in control|individual in charge)"
+  triggers: [supervisor, supervisors]
+
+- label: "Ind: Person"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "(?:[Pp]ersons?|[Ii]ndividual)"
+  triggers: [person, persons, individual, any person, every person, no person]
+
+- label: "SC: Downstream User"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "[Dd]ownstream [Uu]sers?"
+  triggers: [downstream user, downstream users]
+
+- label: "Ind: User"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "[Uu]sers?"
+  triggers: [user, users]
+
+- label: "Spc: Inspector"
+  type: governed
+  category: Spc
+  regex_patterns:
+    - "(?:[Uu]ser inspectorate|[Ii]nspectors?|[Vv]erifier|[Ww]ell examiner)"
+  triggers: [inspector, inspectors]
+
+- label: "Spc: Employees' Representative"
+  type: governed
+  category: Spc
+  regex_patterns:
+    - "(?:[Ee]mployees' representative|[Ss]afety representatives?|[Tt]rade [Uu]nions? representatives?)"
+  triggers: [employees' representative, employees representative, safety representative, workers representative]
+
+- label: "Spc: Trade Union"
+  type: governed
+  category: Spc
+  regex_patterns:
+    - "[Tt]rade [Uu]nions?"
+  triggers: [trade union, trade unions, union]
+
+- label: "Spc: Assessor"
+  type: governed
+  category: Spc
+  regex_patterns:
+    - "[Aa]ssessors?"
+  triggers: [assessor, assessors]
+
+- label: "Spc: Engineer"
+  type: governed
+  category: Spc
+  regex_patterns:
+    - "[Ee]ngineer"
+  triggers: [engineer, engineers]
+
+- label: "SC: Manufacturer"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "[Mm]anufacturer"
+  triggers: [manufacturer, manufacturers]
+
+- label: "SC: C: Principal Designer"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "[Pp]rincipal [Dd]esigner"
+  triggers: [principal designer]
+
+- label: "SC: C: Designer"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "(?:[Dd]esigner|designs for another)"
+  triggers: [designer, designers]
+
+- label: "SC: C: Principal Contractor"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "[Pp]rincipal [Cc]ontractor"
+  triggers: [principal contractor]
+
+- label: "SC: C: Contractor"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "(?:[Cc]ontractors?|[Dd]iving contractor|[Cc]ompressed air contractor)"
+  triggers: [contractor, contractors]
+
+- label: "SC: Supplier"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "(?:[Ss]upplier|[Pp]erson who supplies)"
+  triggers: [supplier, suppliers]
+
+- label: "SC: Importer"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "(?:[Ii]mporter|person who.*?imports*?)"
+  triggers: [importer, importers]
+
+- label: "SC: Distributor"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "[Dd]istributors?"
+  triggers: [distributor, distributors]
+
+- label: "SC: Registrant"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "[Rr]egistrants?"
+  triggers: [registrant, registrants]
+
+- label: "SC: Applicant"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "[Aa]pplicants?"
+  triggers: [applicant, applicants]
+
+- label: "SC: Authorised Representative"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "[Aa]uthoris?ed [Rr]epresentatives?"
+  triggers: [authorised representative, authorized representative]
+
+- label: "SC: Notified Body"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "[Nn]otified [Bb]od(?:y|ies)"
+  triggers: [notified body, notified bodies]
+
+- label: "SC: Client"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "[Cc]lients?"
+  triggers: [client, clients, the client]
+
+- label: "SC: T&L: Carrier"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "(?:[Tt]ransporter|[Cc]arriers?)"
+  triggers: [carrier, carriers]
+
+- label: "SC: T&L: Driver"
+  type: governed
+  category: SC
+  regex_patterns:
+    - "[Dd]river"
+  triggers: [driver, drivers]
+
+- label: "Svc: Installer"
+  type: governed
+  category: Svc
+  regex_patterns:
+    - "[Ii]nstaller"
+  triggers: [installer, installers]
+
+- label: "Org: Landlord"
+  type: governed
+  category: Org
+  regex_patterns:
+    - "[Ll]andlord"
+  triggers: [landlord, landlords]
+
+- label: Public
+  type: governed
+  category: other
+  regex_patterns:
+    - "(?:[Pp]ublic|[Ee]veryone|[Cc]itizens?)"
+  triggers: [public, the public, general public, members of the public]
+
+# ── Specialist: Offshore (family-gated) ─────────────────────────────
+
+- label: "Offshore: Licensee"
+  type: governed
   category: Offshore
+  regex_patterns:
+    - "[Ll]icen[cs]ees?"
   triggers: [licensee, offshore licensee]
+  families: ["OH&S: Offshore"]
 
-# ── Insolvency / Corporate ──────────────────────────────────────
+# ── Specialist: Public (family-gated) ───────────────────────────────
 
-- canonical: "Spc: Liquidator"
+- label: "Public: Provider"
+  type: governed
+  category: Public
+  regex_patterns:
+    - "[Pp]roviders?"
+  triggers: [provider, providers, service provider]
+  families: ["PUBLIC"]
+
+- label: "Public: Keeper"
+  type: governed
+  category: Public
+  regex_patterns:
+    - "[Kk]eepers?"
+  triggers: [keeper, keepers]
+  families: ["PUBLIC"]
+
+- label: "Public: Dealer"
+  type: governed
+  category: Public
+  regex_patterns:
+    - "(?:[Dd]ealers?|registered (?:firearms )?dealer)"
+  triggers: [dealer, dealers]
+  families: ["PUBLIC"]
+
+# ── Trigger-only entries (no regex patterns — used for LLM matching only) ──
+
+- label: "Spc: Liquidator"
+  type: governed
   category: Spc
   triggers: [liquidator, liquidators]
 
-- canonical: "Spc: Administrator"
+- label: "Spc: Administrator"
+  type: governed
   category: Spc
   triggers: [administrator, administrators]
 
-- canonical: "Spc: Receiver"
+- label: "Spc: Receiver"
+  type: governed
   category: Spc
   triggers: [receiver, receivers]
 
-- canonical: "Spc: Trustee in Bankruptcy"
+- label: "Spc: Trustee in Bankruptcy"
+  type: governed
   category: Spc
   triggers: [trustee in bankruptcy]
 
-# ── EU / International ──────────────────────────────────────────
-
-- canonical: "EU: Certification Body"
+- label: "EU: Certification Body"
+  type: government
   category: EU
   triggers: [certification body, certification bodies]
 
-- canonical: "EU: Central Management"
+- label: "EU: Central Management"
+  type: government
   category: EU
   triggers: [central management]
 
-- canonical: "EU: Special Negotiating Body"
+- label: "EU: Special Negotiating Body"
+  type: government
   category: EU
   triggers: [special negotiating body]
 
-- canonical: "Ind: Young Person"
+- label: "Ind: Young Person"
+  type: governed
   category: Ind
   triggers: [young person, young persons, young people, young worker, young workers]
 
-- canonical: "Org: Trade Association"
+- label: "Org: Trade Association"
+  type: governed
   category: Org
   triggers: [trade association, trade associations]
 
-- canonical: "Svc: Water Undertaker"
+- label: "Svc: Water Undertaker"
+  type: governed
   category: Svc
   triggers: [water undertaker, water undertakers, sewerage undertaker]
 
-# ── Procedural / Generic Roles ──────────────────────────────────
-
-- canonical: "Spc: Appellant"
+- label: "Spc: Appellant"
+  type: governed
   category: Spc
   triggers: [appellant, appellants]
 
-- canonical: "Spc: Licence Holder"
+- label: "Spc: Licence Holder"
+  type: governed
   category: Spc
   triggers: [licence holder, license holder, the licence holder, the license holder]
 
-- canonical: "Gvt: Consultation Body"
+- label: "Gvt: Consultation Body"
+  type: government
   category: Gvt
   triggers: [consultation body, consultation bodies, consultee, consultees]

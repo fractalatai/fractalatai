@@ -137,41 +137,17 @@ static ENABLING: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\bmay\b|\bpower to\b|\bauthori[sz]e|\benable").unwrap());
 
 // ── Actor fragment lists (downcased) ─────────────────────────────────
+// Loaded from actor-dictionary.yaml via the actors module.
 
-const GOVERNMENT_ACTORS: &[&str] = &[
-    "secretary of state",
-    "minister",
-    "executive",
-    "authority",
-    "commission",
-    "commissioner",
-    "inspector",
-    "hse",
-    "health and safety executive",
-    "local authority",
-    "enforcing authority",
-    "appropriate authority",
-    "national authority",
-    "member state",
-    "crown",
-    "tribunal",
-    "court",
-    "parliament",
-    "regulations made",
-    "ofcom",
-    "chief officer",
-    "constable",
-    "police",
-    "sheriff",
-    "procurator fiscal",
-    "department",
-];
+static GOVERNMENT_ACTORS: LazyLock<Vec<String>> = LazyLock::new(|| {
+    super::actors::government_keywords()
+});
 
 // ── Shared helper functions ──────────────────────────────────────────
 
 /// True when downcased text mentions a government-side actor.
 pub fn has_government_actor(text: &str) -> bool {
-    GOVERNMENT_ACTORS.iter().any(|frag| text.contains(frag))
+    GOVERNMENT_ACTORS.iter().any(|frag| text.contains(frag.as_str()))
 }
 
 /// True if text contains a strong obligation modal.
@@ -198,7 +174,7 @@ fn find_government_span(text: &str) -> Option<MatchSpan> {
     // Find the first government actor keyword
     let (actor_start, _actor_len) = GOVERNMENT_ACTORS
         .iter()
-        .filter_map(|frag| text.find(frag).map(|pos| (pos, frag.len())))
+        .filter_map(|frag| text.find(frag.as_str()).map(|pos| (pos, frag.len())))
         .min_by_key(|&(pos, _)| pos)?;
 
     // Find the modal verb (obligation or enabling)
