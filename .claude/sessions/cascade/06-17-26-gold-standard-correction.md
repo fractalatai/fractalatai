@@ -148,13 +148,42 @@ The pipeline is a cascade: regex → classifier → LLM. Each tier ADDS signal �
 - Findings tackled systematically, not rushed past
 - Actor dictionary gaps surfaced via actor-drift skill
 
-## Expected outcome
+## Phase 2 Results (2026-06-17)
 
-After gold correction + 3-class migration:
-- Benchmark accuracy: **~85%+** (the 95 decomposition errors disappear, offence/rule removed)
-- The pipeline stores what it knows (Obligation/Liberty) not what it infers (Duty/Responsibility)
-- No more governed/government classification debates at pipeline level
-- Cleaner benchmark signal for measuring real improvements
+### Shipped
+- 3-class DutyType enum (`404e534`): Obligation/Liberty/Rule
+- `decompose_drrp()` removed
+- Classifier confidence thresholding: 0.7 for gaps, 0.9 for overrides
+- Cascade transition rules codified (5 rules)
+- Arrow IPC backup for compact (Parquet can't handle null list components)
+
+### Benchmark: 78.5% overall, Obligation recall 84.2%
+
+| Class | Precision | Recall | F1 | Support |
+|-------|-----------|--------|-----|---------|
+| Obligation | 77.0% | **84.2%** | 80.4% | 791 |
+| Liberty | 71.1% | 64.6% | 67.7% | 381 |
+| none | 84.8% | 79.2% | 81.9% | 1078 |
+
+### Outstanding provision-level findings (to work through)
+
+1. **139 classifier false positives on none** — gold=none but classifier predicts Obligation at ≥0.7 confidence. Classifier v7 `none` boundary still too loose. Need: either raise threshold or retrain with more none examples.
+
+2. **31 stale agentic provisions** with old 5-class labels (Duty/Power/Responsibility/Rule). These have `extraction_method = 'agentic'` (tier 6) so `--force` regex can't overwrite them. Need: script to migrate agentic provisions to 3-class labels.
+
+3. **81 Obligation→none** — regex returns none, classifier below threshold or predicts none. These are the regex/classifier gap: 47 are new actors needing re-parse, 27 are inverted patterns, 9 are long preambles.
+
+4. **72 Liberty→none** — similar gap for Liberty provisions.
+
+5. **60 Liberty→Obligation** — classifier or regex misclassifies Liberty (may/entitled) as Obligation (shall/must). Likely the provision has both modal types.
+
+### What's next (systematic, not rushing)
+
+1. Work through finding #2 — migrate agentic provisions to 3-class (small script)
+2. Work through finding #1 — analyse the 139 false positives, decide threshold vs retrain
+3. Work through finding #3 — the 47 new-actor provisions need the Rust pipeline to re-parse
+4. Codify the cascade transition rules IN CODE, not just in docs
+5. Then re-benchmark and log the next round of findings
 
 ## Key files
 
