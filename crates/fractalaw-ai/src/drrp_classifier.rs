@@ -204,22 +204,6 @@ pub fn build_features(embedding: &[f32], text: &str) -> Vec<f32> {
     features
 }
 
-/// Decompose a DrrpClass into specific DRRP types based on the active actor's category.
-///
-/// - Obligation + government actor → Responsibility
-/// - Obligation + governed actor → Duty
-/// - Liberty + government actor → Power
-/// - Liberty + governed actor → Right
-pub fn decompose_drrp(class: DrrpClass, is_government_actor: bool) -> Option<&'static str> {
-    match (class, is_government_actor) {
-        (DrrpClass::Obligation, true) => Some("Responsibility"),
-        (DrrpClass::Obligation, false) => Some("Duty"),
-        (DrrpClass::Liberty, true) => Some("Power"),
-        (DrrpClass::Liberty, false) => Some("Right"),
-        (DrrpClass::None, _) => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,28 +228,5 @@ mod tests {
         let embedding = vec![0.1f32; 384];
         let features = build_features(&embedding, "shall ensure");
         assert_eq!(features.len(), 397);
-    }
-
-    #[test]
-    fn decompose_drrp_obligation_govt() {
-        assert_eq!(
-            decompose_drrp(DrrpClass::Obligation, true),
-            Some("Responsibility")
-        );
-    }
-
-    #[test]
-    fn decompose_drrp_obligation_org() {
-        assert_eq!(decompose_drrp(DrrpClass::Obligation, false), Some("Duty"));
-    }
-
-    #[test]
-    fn decompose_drrp_liberty_govt() {
-        assert_eq!(decompose_drrp(DrrpClass::Liberty, true), Some("Power"));
-    }
-
-    #[test]
-    fn decompose_drrp_none() {
-        assert_eq!(decompose_drrp(DrrpClass::None, false), None);
     }
 }

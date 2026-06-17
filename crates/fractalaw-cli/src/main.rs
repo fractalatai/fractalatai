@@ -3498,18 +3498,15 @@ async fn enrich_single_law(
 
             for dt in &record.duty_types {
                 taxa.duty_types.insert(format!("{dt:?}"));
+                // Map 3-class types to DuckDB columns (backward compatible):
+                // Obligation → duty_holder, Liberty → rights_holder, Rule → duty_holder
+                // responsibility_holder and power_holder left empty (Phase 3)
                 let (holders_set, entries) = match dt {
-                    fractalaw_core::taxa::duty_type::DutyType::Duty => {
+                    fractalaw_core::taxa::duty_type::DutyType::Obligation => {
                         (&mut taxa.duty_holders, &mut taxa.duties)
                     }
-                    fractalaw_core::taxa::duty_type::DutyType::Right => {
+                    fractalaw_core::taxa::duty_type::DutyType::Liberty => {
                         (&mut taxa.rights_holders, &mut taxa.rights)
-                    }
-                    fractalaw_core::taxa::duty_type::DutyType::Responsibility => {
-                        (&mut taxa.responsibility_holders, &mut taxa.responsibilities)
-                    }
-                    fractalaw_core::taxa::duty_type::DutyType::Power => {
-                        (&mut taxa.power_holders, &mut taxa.powers)
                     }
                     fractalaw_core::taxa::duty_type::DutyType::Rule => {
                         (&mut taxa.duty_holders, &mut taxa.duties)
@@ -3926,10 +3923,8 @@ Respond in JSON only:
                             {
                                 let drrp_lower = drrp_val.to_lowercase();
                                 let mapped = match drrp_lower.as_str() {
-                                    "duty" => Some("Duty"),
-                                    "right" => Some("Right"),
-                                    "responsibility" => Some("Responsibility"),
-                                    "power" => Some("Power"),
+                                    "duty" | "responsibility" | "obligation" => Some("Obligation"),
+                                    "right" | "power" | "liberty" => Some("Liberty"),
                                     _ => None,
                                 };
                                 if let Some(dt) = mapped {
@@ -4985,7 +4980,7 @@ async fn cmd_taxa_enrich(
                         let text: &str = &prov.1;
                         let tier: u8 = prov.3;
                         let section_type: &str = &prov.4;
-                        let is_govt: bool = prov.5;
+                        let _is_govt: bool = prov.5;
 
                         if tier >= source_tier("classifier")
                             || !REGULATION_TYPES.contains(&section_type)
@@ -5011,17 +5006,14 @@ async fn cmd_taxa_enrich(
                             continue;
                         }
 
-                        if let Some(drrp_type) =
-                            fractalaw_ai::drrp_classifier::decompose_drrp(prediction.class, is_govt)
-                        {
-                            cls_sid_b.append_value(sid);
-                            let drrp_vals = cls_drrp_b.values();
-                            drrp_vals.append_value(drrp_type);
-                            cls_drrp_b.append(true);
-                            cls_method_b.append_value("classifier");
-                            cls_conf_b.append_value(0.85);
-                            total_classified += 1;
-                        }
+                        let drrp_type = prediction.class.as_str();
+                        cls_sid_b.append_value(sid);
+                        let drrp_vals = cls_drrp_b.values();
+                        drrp_vals.append_value(drrp_type);
+                        cls_drrp_b.append(true);
+                        cls_method_b.append_value("classifier");
+                        cls_conf_b.append_value(0.85);
+                        total_classified += 1;
                     }
 
                     let cls_count = cls_sid_b.len();

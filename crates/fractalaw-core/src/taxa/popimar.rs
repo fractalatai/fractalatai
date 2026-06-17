@@ -34,9 +34,9 @@ pub const CATEGORIES: &[&str] = &[
 
 /// Duty types that trigger POPIMAR classification.
 const RELEVANT_DUTY_TYPES: &[&str] = &[
-    "Duty",
-    "Right",
-    "Responsibility",
+    "Obligation",
+    "Liberty",
+    "Rule",
     "Discretionary",
     "Process, Rule, Constraint, Condition",
 ];
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn default_risk_control_with_duty_types() {
-        let result = classify_with_duty_types("some generic text without keywords", &["Duty"]);
+        let result = classify_with_duty_types("some generic text without keywords", &["Obligation"]);
         assert_eq!(result, vec!["Risk Control"]);
     }
 

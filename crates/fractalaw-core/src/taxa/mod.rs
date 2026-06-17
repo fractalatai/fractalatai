@@ -54,7 +54,7 @@ pub struct TaxaRecord {
     /// Government actors found (ministers, authorities, etc.).
     pub government_actors: Vec<String>,
 
-    /// DRRP duty types (Duty, Right, Responsibility, Power).
+    /// DRRP duty types (Obligation, Liberty, Rule).
     pub duty_types: Vec<DutyType>,
 
     /// POPIMAR management categories.
@@ -600,7 +600,7 @@ mod tests {
     #[test]
     fn parse_employer_duty() {
         let record = parse("The employer shall ensure the health and safety of employees.");
-        assert!(record.duty_types.contains(&DutyType::Duty));
+        assert!(record.duty_types.contains(&DutyType::Obligation));
         assert!(
             record
                 .governed_actors
@@ -613,7 +613,7 @@ mod tests {
     #[test]
     fn parse_government_responsibility() {
         let record = parse("The Secretary of State shall have power to make regulations.");
-        assert!(record.duty_types.contains(&DutyType::Responsibility));
+        assert!(record.duty_types.contains(&DutyType::Obligation));
         assert!(
             record
                 .government_actors
@@ -626,7 +626,7 @@ mod tests {
     fn parse_html_cleaned() {
         let record = parse("<p>The employer <b>shall</b> ensure safety.</p>");
         assert!(!record.cleaned_text.contains('<'));
-        assert!(record.duty_types.contains(&DutyType::Duty));
+        assert!(record.duty_types.contains(&DutyType::Obligation));
     }
 
     #[test]
@@ -648,7 +648,7 @@ mod tests {
                     is reasonably practicable, the health, safety and welfare at \
                     work of all his employees.";
         let record = parse(text);
-        assert!(record.duty_types.contains(&DutyType::Duty));
+        assert!(record.duty_types.contains(&DutyType::Obligation));
         assert!(!record.popimar.is_empty());
         assert!(!record.purposes.is_empty());
     }
@@ -903,7 +903,7 @@ mod tests {
             "The employer shall ensure the health and safety of employees.",
             None,
         );
-        assert!(record.duty_types.contains(&DutyType::Duty));
+        assert!(record.duty_types.contains(&DutyType::Obligation));
         assert!(
             record
                 .governed_actors
@@ -1043,7 +1043,7 @@ mod tests {
                     practicable, it is carried out without risks to health and safety.";
         let record = parse(text);
         assert!(
-            record.duty_types.contains(&DutyType::Duty),
+            record.duty_types.contains(&DutyType::Obligation),
             "contractor obligation should classify as Duty, got: {:?}",
             record.duty_types
         );
@@ -1058,7 +1058,7 @@ mod tests {
                     construction phase plan to be drawn up.";
         let record = parse(text);
         assert!(
-            record.duty_types.contains(&DutyType::Duty),
+            record.duty_types.contains(&DutyType::Obligation),
             "principal contractor obligation should classify as Duty, got: {:?}",
             record.duty_types
         );
@@ -1072,7 +1072,7 @@ mod tests {
                     duties owed by the client under these regulations.";
         let record = parse(text);
         assert!(
-            record.duty_types.contains(&DutyType::Duty),
+            record.duty_types.contains(&DutyType::Obligation),
             "contractor prohibition should classify as Duty, got: {:?}",
             record.duty_types
         );
@@ -1100,7 +1100,7 @@ mod tests {
                     work unless that vehicle is suitable for carrying that person.";
         let record = parse(text);
         assert!(
-            record.duty_types.contains(&DutyType::Duty),
+            record.duty_types.contains(&DutyType::Obligation),
             "person prohibition should classify as Duty, got: {:?}",
             record.duty_types
         );
@@ -1115,7 +1115,7 @@ mod tests {
                     and maintained for that person.";
         let record = parse(text);
         assert!(
-            record.duty_types.contains(&DutyType::Duty),
+            record.duty_types.contains(&DutyType::Obligation),
             "person prohibition should classify as Duty, got: {:?}",
             record.duty_types
         );
@@ -1129,7 +1129,7 @@ mod tests {
                     instructed.";
         let record = parse(text);
         assert!(
-            record.duty_types.contains(&DutyType::Duty),
+            record.duty_types.contains(&DutyType::Obligation),
             "person fire prohibition should classify as Duty, got: {:?}",
             record.duty_types
         );
@@ -1145,7 +1145,7 @@ mod tests {
                     other resources.";
         let record = parse(text);
         assert!(
-            record.duty_types.contains(&DutyType::Duty),
+            record.duty_types.contains(&DutyType::Obligation),
             "client obligation should classify as Duty, got: {:?}",
             record.duty_types
         );
@@ -1158,7 +1158,7 @@ mod tests {
                     and reviewed throughout the project.";
         let record = parse(text);
         assert!(
-            record.duty_types.contains(&DutyType::Duty),
+            record.duty_types.contains(&DutyType::Obligation),
             "client obligation should classify as Duty, got: {:?}",
             record.duty_types
         );
@@ -1574,7 +1574,7 @@ mod tests {
                     into account the adoption of those other measures.";
         let record = parse(text);
         assert!(
-            record.duty_types.contains(&DutyType::Duty),
+            record.duty_types.contains(&DutyType::Obligation),
             "repeated actor in Where+main clause should produce Duty, got: {:?}",
             record.duty_types
         );
@@ -1654,7 +1654,7 @@ mod tests {
         let text = "Member States shall ensure that the medical surveillance of exposed workers is based on the principles that govern occupational medicine generally.";
         let record = parse(text);
         assert!(
-            record.duty_types.contains(&DutyType::Responsibility),
+            record.duty_types.contains(&DutyType::Obligation),
             "EU Directive 'shall ensure' should be Responsibility, got: {:?}",
             record.duty_types
         );
@@ -1692,7 +1692,7 @@ mod tests {
         let text = "Member States shall require that the manufacturer, the supplier, and each undertaking ensures that high-activity sealed sources comply with the requirements.";
         let record = parse(text);
         assert!(
-            record.duty_types.contains(&DutyType::Responsibility),
+            record.duty_types.contains(&DutyType::Obligation),
             "'shall require' should be Responsibility, got: {:?}",
             record.duty_types
         );
