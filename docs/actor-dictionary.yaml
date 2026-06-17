@@ -22,7 +22,8 @@
   category: other
   regex_patterns:
     - "Crown"
-  triggers: [crown, the crown]
+    - "(?:Her|His) Majesty"
+  triggers: [crown, the crown, her majesty, his majesty]
   drrp_keywords: [crown]
 
 - label: "Gvt: Minister: Secretary of State for Defence"
@@ -498,32 +499,44 @@
   triggers: [authorised person, authorized person, an authorised person, the authorised person]
 
 - label: "Spc: Administrator"
-  type: governed
+  type: government
   category: Spc
   regex_patterns:
     - "(?:[Tt]he [Aa]dministrator|[Ss]cheme [Aa]dministrators?)"
   triggers: [administrator, the administrator, scheme administrator]
+  drrp_keywords: [administrator]
 
 - label: "Spc: Compliance Body"
-  type: governed
+  type: government
   category: Spc
   regex_patterns:
     - "[Cc]ompliance [Bb]od(?:y|ies)"
   triggers: [compliance body, compliance bodies]
+  drrp_keywords: [compliance bod]
 
 - label: "Spc: Certification Body"
-  type: governed
+  type: government
   category: Spc
   regex_patterns:
     - "[Cc]ertification [Bb]od(?:y|ies)"
   triggers: [certification body, certification bodies]
+  drrp_keywords: [certification bod]
 
 - label: "Spc: Approval Body"
-  type: governed
+  type: government
   category: Spc
   regex_patterns:
     - "[Aa]pproval [Bb]od(?:y|ies)"
   triggers: [approval body, approval bodies]
+  drrp_keywords: [approval bod]
+
+- label: "Spc: Appeal Body"
+  type: government
+  category: Spc
+  regex_patterns:
+    - "[Aa]ppeal [Bb]od(?:y|ies)"
+  triggers: [appeal body, appeal bodies]
+  drrp_keywords: [appeal bod]
 
 - label: "Org: Responsible Undertaking"
   type: governed
