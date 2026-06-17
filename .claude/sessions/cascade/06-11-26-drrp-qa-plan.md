@@ -1,8 +1,13 @@
-# Session: DRRP QA Plan — Polishing Results, Models, Code, Testing
+# Session: DRRP QA Plan — Polishing Results, Models, Code, Testing (CLOSED)
 
-## Resume Point (2026-06-17)
+## Closed: 2026-06-17
 
-**To resume**: read this session doc + the prior sessions in `.claude/sessions/cascade/`.
+**Outcome**: POC Duty detection 82.7% (up from 67.1% baseline). Regex ceiling at ~71%, classifier adds +1.8pp, stale gold correction accounts for +11pp. Remaining ~13% gap is LLM-only (offence provisions, implied actors).
+
+**Continuation sessions**:
+- `.claude/sessions/cascade/06-17-26-gold-standard-correction.md` — fix ~160 stale gold labels (PENDING)
+- `.claude/sessions/cascade/06-17-26-actor-drift-surfacing.md` — systematise actor dictionary expansion (LIVE)
+- `.claude/sessions/cascade/06-17-26-offence-provision-gating.md` — gate offence provisions from DRRP (PENDING)
 
 ### What's done
 - P1-P4 code fixes shipped and QQ corpus re-enriched (274 laws, 161K provisions)
