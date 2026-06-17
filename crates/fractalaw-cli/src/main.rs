@@ -4754,12 +4754,13 @@ async fn cmd_taxa_enrich(
         eprintln!();
     }
 
-    // ── Embed + Classify pass (--pending only) ──
+    // ── Embed + Classify pass ──
     //
-    // After regex enrichment, compute embeddings for provisions with null
-    // embeddings and run the DRRP classifier. This is the production
-    // pipeline for new laws arriving via sync watch.
-    if pending && enriched > 0 {
+    // After regex enrichment, run the DRRP classifier on provisions where
+    // regex returned empty drrp_types but an embedding exists.
+    // --pending: also computes embeddings for provisions with null embeddings
+    // --force: skips embedding, uses existing embeddings only
+    if (pending || force) && enriched > 0 {
         let model_dir = data_dir.join("../models/all-MiniLM-L6-v2");
         let weights_path = std::path::Path::new("docs/drrp_classifier_v6.json");
 
@@ -4767,9 +4768,16 @@ async fn cmd_taxa_enrich(
             // Ensure position classifier columns exist before writing
             lance.ensure_gap_c_columns().await?;
             let batch_start = std::time::Instant::now();
-            eprintln!("  Embed + classify pass for {enriched} laws...");
-            let mut embedder =
-                fractalaw_ai::Embedder::load(&model_dir).context("loading embedding model")?;
+            eprintln!(
+                "  {} pass for {enriched} laws...",
+                if pending { "Embed + classify" } else { "Classify" }
+            );
+            // Only load embedder for --pending (new laws needing embeddings)
+            let mut embedder = if pending {
+                Some(fractalaw_ai::Embedder::load(&model_dir).context("loading embedding model")?)
+            } else {
+                None
+            };
             let classifier = fractalaw_ai::DrrpClassifier::load(weights_path)
                 .context("loading DRRP classifier")?;
             let actor_matcher = ActorMatcher::load("docs/actor-dictionary.yaml")
@@ -4865,18 +4873,21 @@ async fn cmd_taxa_enrich(
                     continue;
                 }
 
-                // Phase 1: Embed provisions.
-                // Always re-embed for --pending laws (text may have changed
-                // since last embed if sertantai re-parsed the law).
-                let needs_embedding: Vec<usize> = (0..provisions.len())
-                    .filter(|&i| {
-                        let text = &provisions[i].1;
-                        // Skip empty/tiny provisions — no useful embedding
-                        text.len() > 20 && (pending || provisions[i].2.is_none())
-                    })
-                    .collect();
+                // Phase 1: Embed provisions (--pending only).
+                // --force skips embedding — uses existing embeddings.
+                let needs_embedding: Vec<usize> = if pending {
+                    (0..provisions.len())
+                        .filter(|&i| {
+                            let text = &provisions[i].1;
+                            text.len() > 20 && (pending || provisions[i].2.is_none())
+                        })
+                        .collect()
+                } else {
+                    Vec::new()
+                };
 
                 if !needs_embedding.is_empty() {
+                    let embedder = embedder.as_mut().expect("embedder loaded for --pending");
                     // Collect texts to embed (clone to avoid borrow conflict)
                     let texts: Vec<String> = needs_embedding
                         .iter()
