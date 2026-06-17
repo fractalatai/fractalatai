@@ -693,19 +693,19 @@ mod tests {
     #[test]
     fn extract_scheme_administrator() {
         let actors = extract_actors(" The scheme administrator must publish. ");
-        assert!(has_label(&actors.government, "Spc: Administrator"));
+        assert!(has_label(&actors.governed, "Spc: Administrator"));
     }
 
     #[test]
     fn extract_compliance_body() {
         let actors = extract_actors(" A compliance body must verify. ");
-        assert!(has_label(&actors.government, "Spc: Compliance Body"));
+        assert!(has_label(&actors.governed, "Spc: Compliance Body"));
     }
 
     #[test]
     fn extract_certification_body() {
         let actors = extract_actors(" A certification body must provide details. ");
-        assert!(has_label(&actors.government, "Spc: Certification Body"));
+        assert!(has_label(&actors.governed, "Spc: Certification Body"));
     }
 
     #[test]

@@ -507,60 +507,53 @@
   triggers: [authorised person, authorized person, an authorised person, the authorised person]
 
 - label: "Spc: Administrator"
-  type: government
+  type: governed
   category: Spc
   regex_patterns:
     - "(?:[Tt]he [Aa]dministrator|[Ss]cheme [Aa]dministrators?)"
   triggers: [administrator, the administrator, scheme administrator]
-  drrp_keywords: [administrator]
 
 - label: "Spc: Compliance Body"
-  type: government
+  type: governed
   category: Spc
   regex_patterns:
     - "[Cc]ompliance [Bb]od(?:y|ies)"
   triggers: [compliance body, compliance bodies]
-  drrp_keywords: [compliance bod]
 
 - label: "Spc: Certification Body"
-  type: government
+  type: governed
   category: Spc
   regex_patterns:
     - "[Cc]ertification [Bb]od(?:y|ies)"
   triggers: [certification body, certification bodies]
-  drrp_keywords: [certification bod]
 
 - label: "Spc: Approval Body"
-  type: government
+  type: governed
   category: Spc
   regex_patterns:
     - "[Aa]pproval [Bb]od(?:y|ies)"
   triggers: [approval body, approval bodies]
-  drrp_keywords: [approval bod]
 
 - label: "Spc: Appeal Body"
-  type: government
+  type: governed
   category: Spc
   regex_patterns:
     - "[Aa]ppeal [Bb]od(?:y|ies)"
   triggers: [appeal body, appeal bodies]
-  drrp_keywords: [appeal bod]
 
 - label: "Spc: Conformity Assessment Body"
-  type: government
+  type: governed
   category: Spc
   regex_patterns:
     - "[Cc]onformity [Aa]ssessment [Bb]od(?:y|ies)"
   triggers: [conformity assessment body, conformity assessment bodies]
-  drrp_keywords: [conformity assessment bod]
 
 - label: "Spc: Approved Body"
-  type: government
+  type: governed
   category: Spc
   regex_patterns:
     - "[Aa]pproved [Bb]od(?:y|ies)"
   triggers: [approved body, approved bodies]
-  drrp_keywords: [approved bod]
 
 - label: "Spc: Notifying Authority"
   type: government

@@ -66,14 +66,25 @@ Create `.claude/skills/actor-drift/` with:
 
 ### Governed vs government decision rules
 
-| Signal | Classification |
-|--------|---------------|
-| Exercises penalty/enforcement powers | government |
-| Grants approvals/licences/certificates | government |
-| Named government agency/body/authority | government |
-| Private company/individual/worker | governed |
-| Bears statutory duties as a regulated entity | governed |
-| Delegated regulatory function (compliance body) | government |
+**The test: who IS the entity, not what function it performs.**
+
+A private company designated to perform a public function is still governed. Government means the state itself.
+
+| Signal | Classification | Example |
+|--------|---------------|---------|
+| Established by Act of Parliament as a state body | government | HSE, NDA, ONR, Environment Agency |
+| Crown, ministers, departments | government | Secretary of State, Treasury |
+| Courts, tribunals, police | government | Sheriff, Constable, Tribunal |
+| EU institutions | government | Commission, Member State |
+| Government-appointed authority (notifying, licensing) | government | Notifying Authority, Licensing Authority |
+| Private company/individual/worker | governed | Employer, Employee, Contractor |
+| Private body designated to perform public function | **governed** | Certification Body, Compliance Body, Approved Body |
+| Delegated scheme administrator | **governed** | Scheme Administrator, Administrator |
+| Appeal/assessment body (private) | **governed** | Appeal Body, Conformity Assessment Body |
+
+**Key principle**: "exercises regulatory functions" ≠ government. A certification body issuing certificates is performing a delegated function — it bears DUTIES (obligations as a governed entity), not RESPONSIBILITIES (obligations as the state).
+
+**Reclassified (2026-06-17)**: Spc: Administrator, Compliance Body, Certification Body, Approval Body, Appeal Body, Conformity Assessment Body, Approved Body — all moved from government back to governed. Notifying Authority stays government (it IS the state authority that notifies).
 
 ### Family gating
 
