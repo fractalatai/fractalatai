@@ -1,6 +1,6 @@
-# Session: DRRP QA Plan — Polishing Results, Models, Code, Testing (SUSPENDED)
+# Session: DRRP QA Plan — Polishing Results, Models, Code, Testing
 
-## Resume Point (2026-06-11)
+## Resume Point (2026-06-17)
 
 **To resume**: read this session doc + the prior sessions in `.claude/sessions/cascade/`.
 
@@ -12,14 +12,21 @@
 - Actor dictionary: 105 entries, Zenoh dictionary stream working
 - Position classifier: wired in with `reason` field disagreement signal (39% of HSWA)
 - Source-tier protection: `source_tier()` replaces numeric confidence hierarchy
+- Classifier disagreement analysis: 1,684 actor-position pairs, classifier 56.1% vs regex 46.8%
+- Embedding backfill: 7,843 benchmark provision embeddings computed, 0% gap (was 39%)
+- Benchmark QA skill created (`.claude/skills/benchmark-qa/`)
+- Three mismatch patterns identified from text drill-down (see below)
 
 ### What's next (in order)
-1. **Classifier disagreements** — run position classifier across full QQ, aggregate by category/family
-2. **Retry 6 failed benchmark laws** — Gemini rate-limited: Environmental Protection (×2), HR Employment, Nuclear, Planning, Pollution
-3. **Ad-hoc human drill-through** — Baserow validation, 5-10 provisions per family
-4. **Full regression test suite** — codify learnings from benchmarks into unit tests
-5. **Publish QQ corpus to sertantai** — held pending sertantai code review completion
-6. **P5 fix** — classifier features (text offset unreliable, missing negative modals) — retrain
+1. **Pattern fix: EU Directive subordinate clauses** — "Member States shall ensure that [actor]..." — regex wrongly marks the subordinate actor as active instead of the Member State
+2. **Pattern fix: inverted duty phrasing** — "It shall be the duty of X to..." — classifier hasn't learned this, predicts "other" at 0.98+ confidence
+3. **Pattern fix: counterparty detection** — both regex and classifier struggle; "both wrong" cases are almost all gold=counterparty
+4. **Retry 6 failed benchmark laws** — Gemini rate-limited: Environmental Protection (×2), HR Employment, Nuclear, Planning, Pollution
+5. **Re-run benchmarks** — after pattern fixes, measure improvement
+6. **Ad-hoc human drill-through** — Baserow validation, 5-10 provisions per family
+7. **Full regression test suite** — codify learnings from benchmarks into unit tests
+8. **Publish QQ corpus to sertantai** — held pending sertantai code review completion
+9. **P5 fix** — classifier features (text offset unreliable, missing negative modals) — retrain
 
 ### Key files
 - Session doc: `.claude/sessions/cascade/06-11-26-drrp-qa-plan.md` (this file)
@@ -196,7 +203,7 @@ The position classifier's text offset feature fails for passive voice and comple
 5. **P5 fix**: Classifier feature improvements — retrain with better features (deferred, MEDIUM)
 6. ~~**Re-enrich QQ corpus**~~ — DONE. 274 laws re-enriched with P1-P4 fixes. NAS backup 20260611.
 7. ~~**Golden benchmarks**~~ — DONE (`8fc62b0`). **2,250 provisions across 16 families** with Gemini gold standard on NAS. Baseline: **67.1% DRRP accuracy, 37.1% position accuracy**. 6 laws need retry (Gemini rate limits). Key gaps: Duty recall 47%, Right recall 37%. Scripts: `generate_benchmarks.py`, `generate_benchmarks_batch.py`, `benchmark_report.py`.
-8. **Classifier disagreements** — quantify position classifier gap across QQ
+8. ~~**Classifier disagreements**~~ — DONE (2026-06-17). Position classifier vs regex vs Gemini gold on 2,250 benchmark provisions. See analysis below.
 9. **Gemini spot-check** — 50-100 provisions verified (partially covered by benchmarks — 2,250 already verified)
 10. **Ad-hoc human drill-through** — Baserow validation
 11. **Full regression test suite** — codify all learnings
@@ -305,3 +312,101 @@ New QA mode that:
 - Does not cover every provision — sampling, not exhaustive
 - Does not test the sync watch pipeline — only the regex+classifier path
 - Does not test sertantai's consumption — only fractalaw's output
+
+## Classifier Disagreement Analysis (2026-06-17)
+
+Ran the position classifier against 2,250 golden benchmark provisions. Script: `scripts/benchmark_classifier_disagreements.py`. Skill: `.claude/skills/benchmark-qa/`.
+
+### Coverage
+
+- 2,250 benchmark provisions → 1,211 analysable (with embedding + non-agentic)
+- 879 skipped (no embedding — 39% of benchmarks lack embeddings)
+- 160 skipped (agentic — already gold standard)
+- 558 skipped (no actor label matches between gold and pipeline)
+- 1,040 actor-position pairs evaluated
+
+### Overall: Classifier beats regex 57.1% vs 43.9%
+
+| Outcome | Count | % |
+|---------|-------|---|
+| Both correct | 254 | 24.4% |
+| Classifier only correct | 340 | 32.7% |
+| Regex only correct | 203 | 19.5% |
+| Both wrong | 243 | 23.4% |
+| **Total disagreements** | **681** | **65.5%** |
+
+### Key finding: classifier advantage is entirely from non-DRRP provisions
+
+| DRRP | Regex% | Classifier% | Winner |
+|------|--------|------------|--------|
+| Duty | 65.7% | 53.9% | **Regex** |
+| Responsibility | 67.4% | 53.3% | **Regex** |
+| Power | 52.9% | 47.1% | **Regex** |
+| Right | 47.5% | 22.0% | **Regex** |
+| none | 6.2% | 74.2% | **Classifier** |
+
+**Interpretation**: Regex correctly identifies duty-bearers when there IS a duty, but wrongly assigns "active" to every actor in non-DRRP provisions (definitions, interpretations, penalties). The classifier correctly demotes those to "other" but over-corrects on real duty provisions, demoting actual duty-bearers.
+
+### By actor category
+
+| Category | Pairs | Regex% | Cls% | Disagreement% |
+|----------|-------|--------|------|----------------|
+| Org | 90 | 51.1% | 81.1% | 55.6% |
+| Spc | 49 | 44.9% | 77.6% | 40.8% |
+| EU | 35 | 8.6% | 42.9% | 62.9% |
+| other | 67 | 40.3% | 64.2% | 61.2% |
+| SC | 76 | 64.5% | 71.1% | 46.1% |
+| Gvt | 354 | 45.8% | 52.8% | 65.8% |
+| Ind | 369 | 40.1% | 49.9% | 75.9% |
+
+Classifier is strongest on Org (81%) and Spc (78%) — categories with clear role semantics in legislation.
+
+### Actionable insights
+
+1. **Ensemble approach**: trust regex positions for DRRP provisions (Duty/Right/Responsibility/Power), trust classifier for non-DRRP provisions (none). This would combine the best of both: ~66% regex accuracy on DRRP + ~74% classifier accuracy on none.
+
+2. **Embedding gap**: 39% of benchmark provisions lack embeddings — these are invisible to the classifier. Backfilling embeddings would increase coverage.
+
+3. **Ind category is hardest**: 75.9% disagreement rate on Individual actors (Person, Employee). These are the most ambiguous — "any person" appears in both duty provisions (active) and penalty clauses (mentioned).
+
+4. **High-confidence classifier errors**: The classifier predicts "other" with >0.90 confidence for many actual duty-bearers (s.5(1), s.6(8A) HSWA). This is the P5 issue — the text offset feature is unreliable for passive voice.
+
+5. **Right recall is critical**: 22% classifier accuracy on Rights — the classifier almost never predicts active for right-holders. Rights use different modal language ("entitled to", "right to") that the classifier hasn't learned.
+
+### Embedding backfill (2026-06-17)
+
+Backfilled 7,843 embeddings for the 13 benchmark laws with gaps. Coverage: 0% missing (was 39%). Analysable pairs increased from 1,040 → 1,684 (+62%). Updated metrics in the table above reflect post-backfill state.
+
+### Text pattern drill-down (2026-06-17)
+
+Added `--text` flag to `benchmark_classifier_disagreements.py` and examined provision text for all three mismatch categories. Three clear linguistic patterns emerge:
+
+#### Pattern 1: EU Directive subordinate clauses (affects Nuclear, Climate Change, Energy)
+
+**Text**: "Member States shall ensure that [workers/persons] are given adequate training..."
+
+**Problem**: The duty-bearer is "Member State" but the regex finds "Worker" in the text, sees "shall", and marks Worker as active. The Worker is actually the *object* of protection — a counterparty or beneficiary.
+
+**Scale**: 215 Nuclear pairs at 90.2% disagreement; 196 EU-category actors at 81.6% disagreement. This single pattern drives the majority of Nuclear/EU mismatches.
+
+**Fix approach**: Detect "Member States shall ensure that..." pattern in regex. When the main clause actor is a Member State and the subordinate clause contains another actor, the subordinate actor should NOT be marked active.
+
+#### Pattern 2: Inverted duty phrasing (affects OH&S, Energy, Fire)
+
+**Text**: "It shall be the duty of the person having control..." / "Nothing in ... shall relieve any person from any duty"
+
+**Problem**: Classifier predicts "other" at 0.98+ confidence for these actors. The training data is dominated by "X shall [verb]" patterns; the inverted "It shall be the duty of X" pattern is underrepresented.
+
+**Scale**: Visible in top regex-wins — s.5(1), s.6(8A), s.18(2) HSWA/Energy. High confidence errors (>0.95) that affect core OH&S provisions.
+
+**Fix approach**: Add inverted duty phrases as training examples for the position classifier. Also consider adding regex patterns for "It shall be the duty of [actor]" → mark actor as active.
+
+#### Pattern 3: Counterparty detection (the "both wrong" problem)
+
+**Text**: "shall ensure that workers are given..." / "shall not be disclosed without the consent of the person" / "may serve on the responsible person a notice"
+
+**Problem**: Gold says counterparty, regex says active, classifier says other. Neither system has a signal for "this actor is the target/object of the obligation, not the bearer." Counterparty detection requires understanding clause structure — who does the verb apply *to*?
+
+**Scale**: Almost all "both wrong" cases (197) are gold=counterparty. This is the hardest category because it requires parsing the relationship between two actors within a clause.
+
+**Fix approach**: Heuristic patterns for common counterparty signals: "serve on [actor] a notice", "consent of [actor]", "ensure that [actor] is/are [given/provided]". Longer-term: clause structure parsing to identify subject vs object actors.
