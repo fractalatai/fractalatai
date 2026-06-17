@@ -675,4 +675,59 @@ mod tests {
             labels.len()
         );
     }
+
+    // ── New entity extraction tests ─────────────────────────────────
+
+    #[test]
+    fn extract_nda() {
+        let actors = extract_actors(" The NDA must prepare a plan. ");
+        assert!(has_label(&actors.government, "Gvt: Agency: NDA"));
+    }
+
+    #[test]
+    fn extract_authorised_person() {
+        let actors = extract_actors(" An authorised person must consult. ");
+        assert!(has_label(&actors.governed, "Spc: Authorised Person"));
+    }
+
+    #[test]
+    fn extract_scheme_administrator() {
+        let actors = extract_actors(" The scheme administrator must publish. ");
+        assert!(has_label(&actors.governed, "Spc: Administrator"));
+    }
+
+    #[test]
+    fn extract_compliance_body() {
+        let actors = extract_actors(" A compliance body must verify. ");
+        assert!(has_label(&actors.governed, "Spc: Compliance Body"));
+    }
+
+    #[test]
+    fn extract_certification_body() {
+        let actors = extract_actors(" A certification body must provide details. ");
+        assert!(has_label(&actors.governed, "Spc: Certification Body"));
+    }
+
+    #[test]
+    fn extract_responsible_undertaking() {
+        let actors = extract_actors(" The responsible undertaking must comply. ");
+        assert!(has_label(&actors.governed, "Org: Responsible Undertaking"));
+    }
+
+    #[test]
+    fn extract_manufacturers_plural() {
+        let actors = extract_actors(" Manufacturers must ensure compliance. ");
+        assert!(has_label(&actors.governed, "SC: Manufacturer"));
+    }
+
+    #[test]
+    fn authorised_person_before_generic_person() {
+        // Spc: Authorised Person should match before generic Ind: Person
+        let actors = extract_actors(" The authorised person must inspect the premises. ");
+        assert!(
+            has_label(&actors.governed, "Spc: Authorised Person"),
+            "should extract Spc: Authorised Person, got: {:?}",
+            actors.governed.iter().map(|a| &a.label).collect::<Vec<_>>()
+        );
+    }
 }
