@@ -60,6 +60,46 @@ The classifier has never run on benchmark provisions (all are `extraction_method
 3. Write classifier result with `extraction_method = 'classifier'`
 4. Re-benchmark to confirm ~78% accuracy
 
+### Actor reason provenance format (2026-06-17)
+
+The `reason` field on each actor in the actors struct records the full parse history across tiers. Each tier that processes an actor appends its determination. Format:
+
+```
+tier:position@confidence
+```
+
+Multiple tiers are pipe-separated, chronological left-to-right:
+
+```
+regex:active@0.80
+regex:active@0.80 | classifier:active@0.85
+regex:counterparty@0.80 | classifier:active@0.72
+regex:active@0.80 | classifier:active@0.85 | llm:counterparty@0.95
+```
+
+**Rules:**
+- The `position` field on the actor struct always holds the winning (highest-tier) determination
+- The `reason` field records what EACH tier said, even when they agree
+- Tiers: `regex` (1) → `classifier` (4) → `llm` (6)
+- When a new tier runs, it appends ` | tier:position@confidence` to the existing reason
+- `null` reason means no classification has run (provision skipped by all tiers)
+
+**Queries:**
+- `reason LIKE '%classifier:%'` — classifier ran on this actor
+- `reason LIKE '%llm:%'` — LLM ran on this actor
+- Split on ` | ` and compare segments to find disagreements
+- Sertantai backward-compatible: `reason.startsWith("classifier:")` still works for old-format position disagreements
+
+**No schema change needed** — the `reason` field is already `Utf8 nullable` in the actors struct. The change is purely in what the enrichment pipeline writes to it.
+
+**DRRP type is not recorded in reason** — it's derivable from actor label (governed/government) + position + the provision's `drrp_types` column. Recording it would be redundant.
+
+**Integration with --force:**
+- `--force` re-runs regex, writing `regex:position@confidence` to reason
+- A new classify-only pass runs on provisions where `drrp_types = []` + embedding exists
+- The classify pass appends `| classifier:position@confidence` to existing reason
+- No re-embedding needed for existing provisions
+
 ### Regex ceiling analysis
 
 Of 1185 gold DRRP provisions, the pipeline misses 265. Root causes:
