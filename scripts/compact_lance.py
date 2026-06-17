@@ -4,13 +4,20 @@
 LanceDB compaction requires pylance which isn't installed.
 This script reads the table into memory, drops it, and recreates
 it — effectively a full compaction.
+
+Backup is Arrow IPC (not Parquet) because Parquet doesn't support
+null components inside list fields (actors struct has nullable reason).
 """
+import os
 import lancedb
-import pyarrow.parquet as pq
+import pyarrow as pa
 import subprocess
 
 DB_PATH = "data/lancedb"
 TABLE_NAME = "legislation_text"
+BACKUP_PATH = "backups/legislation_text_backup.arrow"
+
+os.makedirs("backups", exist_ok=True)
 
 db = lancedb.connect(DB_PATH)
 table = db.open_table(TABLE_NAME)
@@ -18,8 +25,11 @@ rows = table.count_rows()
 print(f"Exporting {rows} rows to memory...")
 arrow = table.to_arrow()
 
-pq.write_table(arrow, "backups/legislation_text_mid_enrich.parquet")
-print("Safety backup written to backups/legislation_text_mid_enrich.parquet")
+# Arrow IPC backup — handles nulls in nested structs (Parquet doesn't)
+with pa.ipc.new_file(pa.OSFile(BACKUP_PATH, "wb"), arrow.schema) as writer:
+    writer.write_table(arrow)
+backup_size = os.path.getsize(BACKUP_PATH)
+print(f"Backup: {BACKUP_PATH} ({backup_size / 1024 / 1024:.0f} MB)")
 
 db.drop_table(TABLE_NAME)
 print("Dropped old table")
