@@ -51,7 +51,22 @@ const EXTENDED_WINDOW: usize = 200;
 
 static PERSON_QUALIFIERS: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
-        r"(?i)(?:a person (?:who|with a duty|must|shall)|every person|no person|(?:each|any) person[—–\-]?\s*(?:\([a-z]\)\s*)?(?:who|at work|with|[a-z]+ing )|the duty of (?:every|any|each) person)",
+        r"(?ix)
+        # Existing patterns
+          a\s+person\s+(?:who|with\s+a\s+duty|must|shall)
+        | every\s+person
+        | no\s+person
+        | (?:each|any)\s+person[—–\-]?\s*(?:\([a-z]\)\s*)?(?:who|at\s+work|with|[a-z]+ing\s)
+        | the\s+duty\s+of\s+(?:every|any|each)\s+person
+        # New: 'the person [who/with/must/shall]' — definite article person as subject
+        | the\s+person\s+(?:who|with|must|shall|having|responsible)
+        # New: 'the [adjective] person must/shall' — qualified definite person
+        | the\s+(?:responsible|authorised|authorized|appropriate|relevant|qualifying|competent)\s+person\s+(?:must|shall|is\s+required)
+        # New: 'an [adjective] person must/shall' — indefinite qualified person
+        | an?\s+(?:responsible|authorised|authorized|appropriate|relevant|qualifying|competent)\s+person\s+(?:must|shall|is\s+required)
+        # New: 'that person' — anaphoric reference, typically object of a duty
+        | that\s+person\s+(?:must|shall|to)
+        ",
     )
     .unwrap()
 });
@@ -1252,5 +1267,53 @@ mod tests {
         let actors = vec![actor("Ind: Employee", "employee")];
         let dc = match_governed_v2(text, &actors).unwrap();
         assert_eq!(dc.sub_type, DutySubType::Enabling);
+    }
+
+    // ── Expanded PERSON_QUALIFIERS tests ─────────────────────────────
+
+    #[test]
+    fn the_person_who_must() {
+        let text = "the person who has control of the premises must ensure safety";
+        let actors = vec![actor("Ind: Person", "person")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+    }
+
+    #[test]
+    fn the_responsible_person_must() {
+        let text =
+            "the responsible person must ensure that the premises are equipped with fire detectors";
+        let actors = vec![actor("Ind: Person", "person")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+    }
+
+    #[test]
+    fn an_authorised_person_must() {
+        let text = "an authorised person must consult such persons as appear appropriate";
+        let actors = vec![actor("Ind: Person", "person")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+    }
+
+    #[test]
+    fn the_person_with_control_must() {
+        let text = "the person with control of the installation must prepare a safety case";
+        let actors = vec![actor("Ind: Person", "person")];
+        let dc = match_governed_v2(text, &actors).unwrap();
+        assert_eq!(dc.family, DutyFamily::Governed);
+    }
+
+    #[test]
+    fn bare_the_person_still_no_match() {
+        // "the person" without a qualifying phrase should NOT match
+        let text = "information may be disclosed to the person under subsection (3)";
+        let actors = vec![actor("Ind: Person", "person")];
+        let result = match_governed_v2(text, &actors);
+        assert!(
+            result.is_none(),
+            "bare 'the person' as object should not match, got: {:?}",
+            result
+        );
     }
 }
