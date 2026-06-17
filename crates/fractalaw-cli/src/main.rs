@@ -6841,9 +6841,19 @@ fn parse_gemini_response(response_body: &str) -> Option<serde_json::Value> {
 /// Actor dictionary entry, deserialized from YAML.
 #[derive(serde::Deserialize)]
 struct DictEntry {
-    canonical: String,
+    label: String,
+    #[serde(rename = "type")]
+    actor_type: Option<String>,
     category: Option<String>,
+    #[serde(default)]
     triggers: Vec<String>,
+}
+
+impl DictEntry {
+    /// Backward-compatible accessor for canonical label.
+    fn canonical(&self) -> String {
+        self.label.clone()
+    }
 }
 
 /// Matches LLM natural-language actor names to canonical dictionary labels.
@@ -6866,7 +6876,7 @@ impl ActorMatcher {
         let mut all_triggers: Vec<(String, String)> = Vec::new();
         for entry in &entries {
             for trigger in &entry.triggers {
-                all_triggers.push((trigger.clone(), entry.canonical.clone()));
+                all_triggers.push((trigger.clone(), entry.canonical().clone()));
             }
         }
         all_triggers.sort_by(|a, b| b.0.len().cmp(&a.0.len()));
@@ -6890,7 +6900,7 @@ impl ActorMatcher {
         for entry in &self.entries {
             for trigger in &entry.triggers {
                 if n == *trigger {
-                    return Some((entry.canonical.clone(), 1.0));
+                    return Some((entry.canonical().clone(), 1.0));
                 }
             }
         }
@@ -6909,7 +6919,12 @@ impl ActorMatcher {
     /// Check if a canonical label is a government/EU actor.
     fn is_government(&self, canonical_label: &str) -> bool {
         for entry in &self.entries {
-            if entry.canonical == canonical_label {
+            if entry.canonical() == canonical_label {
+                // Prefer the explicit type field from unified YAML
+                if let Some(ref t) = entry.actor_type {
+                    return t == "government";
+                }
+                // Fallback to category for backward compatibility
                 let cat = entry.category.as_deref().unwrap_or("other");
                 return cat == "Gvt" || cat == "EU";
             }
