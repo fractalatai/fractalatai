@@ -131,16 +131,19 @@ def main():
         print(f"No benchmark files found in {BENCHMARK_DIR}")
         sys.exit(1)
 
-    if args.output_dir:
-        os.makedirs(args.output_dir, exist_ok=True)
+    # NEVER write directly to NAS — block-padding corrupts Parquet files.
+    # Always write locally first, then copy to NAS.
+    output_dir = args.output_dir or "data/benchmarks"
+    os.makedirs(output_dir, exist_ok=True)
 
-    print(f"{'DRY RUN — ' if args.dry_run else ''}Correcting {len(files)} benchmark files\n")
+    print(f"{'DRY RUN — ' if args.dry_run else ''}Correcting {len(files)} benchmark files")
+    print(f"Output: {output_dir}\n")
 
     total_changes = Counter()
     total_rows = 0
 
     for f in files:
-        changes = process_file(f, args.output_dir, args.dry_run)
+        changes = process_file(f, output_dir, args.dry_run)
         for k, v in changes.items():
             total_changes[k] += v
         total_rows += sum(changes.values())
