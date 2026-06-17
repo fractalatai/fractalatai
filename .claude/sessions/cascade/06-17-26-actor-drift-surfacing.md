@@ -1,4 +1,4 @@
-# Session: Actor Drift Surfacing
+# Session: Actor Drift Surfacing (CLOSED)
 
 ## Context
 
