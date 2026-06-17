@@ -5172,55 +5172,67 @@ async fn cmd_taxa_enrich(
 
                                 let modals = fractalaw_ai::drrp_classifier::modal_features(&text);
                                 let text_lower = text.to_lowercase();
-                                let mut has_disagreement = false;
                                 let mut updated_actors: Vec<ActorTuple> = Vec::new();
 
                                 for (label, regex_pos, relates_to, label_source, existing_reason) in
                                     &actors
                                 {
-                                    let has_llm_reason = existing_reason.is_some()
-                                        && !existing_reason
-                                            .as_ref()
-                                            .unwrap()
-                                            .starts_with("classifier:");
+                                    // Check if existing reason is from LLM (tier 6) — don't touch
+                                    let has_llm_reason = existing_reason.as_ref().is_some_and(|r| {
+                                        r.contains("llm:") || r.contains("agentic:")
+                                    });
 
-                                    let new_reason = if has_llm_reason {
-                                        // Preserve LLM reason — don't overwrite
-                                        existing_reason.clone()
-                                    } else {
-                                        let label_lower = label
-                                            .to_lowercase()
-                                            .split(':')
-                                            .next_back()
-                                            .unwrap_or("")
-                                            .trim()
-                                            .to_string();
-                                        let offset = text_lower.find(&label_lower);
-                                        let rel_offset = offset
-                                            .map(|o| o as f32 / text.len().max(1) as f32)
-                                            .unwrap_or(0.5);
+                                    if has_llm_reason {
+                                        // LLM is highest tier — preserve as-is
+                                        updated_actors.push((
+                                            label.clone(),
+                                            regex_pos.clone(),
+                                            relates_to.clone(),
+                                            label_source.clone(),
+                                            existing_reason.clone(),
+                                        ));
+                                        continue;
+                                    }
 
-                                        let features = fractalaw_ai::position_classifier::build_position_features(
+                                    let label_lower = label
+                                        .to_lowercase()
+                                        .split(':')
+                                        .next_back()
+                                        .unwrap_or("")
+                                        .trim()
+                                        .to_string();
+                                    let offset = text_lower.find(&label_lower);
+                                    let rel_offset = offset
+                                        .map(|o| o as f32 / text.len().max(1) as f32)
+                                        .unwrap_or(0.5);
+
+                                    let features =
+                                        fractalaw_ai::position_classifier::build_position_features(
                                             embedding, &modals, &drrp_types, label, rel_offset,
                                         );
-                                        let pred = pos_classifier.predict(&features);
-                                        let cls_pos = pred.class.as_str();
-                                        pos_classified += 1;
+                                    let pred = pos_classifier.predict(&features);
+                                    let cls_pos = pred.class.as_str();
+                                    pos_classified += 1;
 
-                                        let agrees = regex_pos == cls_pos
-                                            || (regex_pos == "mentioned" && cls_pos == "other")
-                                            || (regex_pos == "beneficiary" && cls_pos == "other");
+                                    let agrees = regex_pos == cls_pos
+                                        || (regex_pos == "mentioned" && cls_pos == "other")
+                                        || (regex_pos == "beneficiary" && cls_pos == "other");
 
-                                        if agrees {
-                                            None
-                                        } else {
-                                            has_disagreement = true;
-                                            Some(format!(
-                                                "classifier:{}@{:.2}",
-                                                cls_pos, pred.confidence
-                                            ))
+                                    // Build provenance chain: append classifier to existing reason
+                                    let cls_segment =
+                                        format!("classifier:{}@{:.2}", cls_pos, pred.confidence);
+                                    let new_reason = match existing_reason {
+                                        Some(prev) if !prev.is_empty() => {
+                                            Some(format!("{prev} | {cls_segment}"))
                                         }
+                                        _ => Some(cls_segment),
                                     };
+
+                                    if !agrees {
+                                        // Position disagreement — classifier sees
+                                        // a different role. The provenance chain in
+                                        // `reason` records both views.
+                                    }
 
                                     updated_actors.push((
                                         label.clone(),
@@ -5231,7 +5243,9 @@ async fn cmd_taxa_enrich(
                                     ));
                                 }
 
-                                if has_disagreement {
+                                // Always write back when classifier ran — provenance
+                                // chain records agreement too, not just disagreements
+                                if !updated_actors.is_empty() {
                                     pos_updates.push((sid, updated_actors));
                                 }
                             }
