@@ -15,7 +15,7 @@
 The benchmark Parquet files on NAS contain:
 - **~95 provisions gold=Duty where pipeline says Responsibility** — not a pipeline error. The LLM was prompted without the governed/government distinction. These are actually Obligation.
 - **~38 offence provisions gold=Duty** — "is guilty of an offence", no modal verb. These are not DRRP. Gold should be `none`.
-- **~28 Rule provisions gold=Duty** — thing-subject ("A notice must be given"). Implied actor, context-dependent. Gold should be `none` or flagged as LLM-territory.
+- **~28 Rule provisions gold=Duty** — thing-subject ("A notice must be given"). The LLM correctly identifies the implied duty-bearer from context (parent sections). Gold is correct — these ARE Obligation. The pipeline's Rule classification is the gap, not the gold. The actor is a person, not the thing — the Rule tier fires incorrectly because the person-actor isn't extracted.
 
 ### Problem 2: 5-class creates decomposition errors
 
@@ -69,8 +69,8 @@ Liberty    + government active actor → "Power"
 
 ### Phase 1: Gold standard (no pipeline change)
 1. Script to rewrite benchmark Parquet: map 5-class → 3-class labels
-2. Remove offence provisions (no modal = not DRRP)
-3. Remove Rule provisions (thing-subject = context-dependent)
+2. Fix offence provisions: gold → none (no modal = not DRRP)
+3. Keep Rule provisions as Obligation in gold (LLM is correct — implied actor from context, pipeline must catch up via classifier/LLM)
 4. Write to NAS, re-run benchmark with current pipeline for new baseline
 
 ### Phase 2: Pipeline migration
