@@ -111,6 +111,43 @@ Of the 171 misses identified in Phase 1:
 2. Derive Duty/Responsibility from actor struct `label` prefix
 3. Coordinated deploy
 
+## Cascade Transition Rules (codified 2026-06-17)
+
+The pipeline is a cascade: regex → classifier → LLM. Each tier ADDS signal — it never silently replaces the previous tier. The `reason` field on each actor records what EVERY tier said, not just disagreements.
+
+### Rule 1: Regex always runs first
+- Fast, free, deterministic
+- Extracts actors from text using YAML dictionary
+- Classifies DRRP type (Obligation/Liberty/none) using pattern matching
+- Assigns actor positions (active/counterparty) using span heuristic
+- Writes `reason = "regex:{position}@{confidence}"` on each actor
+
+### Rule 2: Classifier always runs second (when embedding exists)
+- Runs on EVERY provision with an embedding, not just regex gaps
+- Predicts Obligation/Liberty/none from embedding + modal features
+- Predicts actor position (active/counterparty/other) per actor
+- APPENDS to reason: `"regex:active@0.80 | classifier:active@0.85"`
+- Adds signal even when agreeing (confirms the classification)
+- When disagreeing: record both views, the disagreement IS the signal
+
+### Rule 3: Disagreements are LLM escalation candidates
+- Where regex and classifier disagree on DRRP type → LLM candidate
+- Where regex and classifier disagree on actor position → LLM candidate
+- Where no actor extracted but modal present → LLM candidate (implied actor)
+- LLM appends: `"regex:active@0.80 | classifier:counterparty@0.72 | llm:counterparty@0.95"`
+
+### Rule 4: drrp_types reflects highest-tier non-none result
+- Regex says Obligation, classifier agrees → Obligation (method=regex)
+- Regex says none, classifier says Obligation → Obligation (method=classifier)
+- Regex and classifier disagree → hold for LLM, keep regex until resolved
+- Never silently override — disagreements wait for LLM
+
+### Rule 5: QA findings tracked at provision level
+- Each benchmark run produces provision-level findings
+- Findings logged in session with section_id, what went wrong, which tier failed
+- Findings tackled systematically, not rushed past
+- Actor dictionary gaps surfaced via actor-drift skill
+
 ## Expected outcome
 
 After gold correction + 3-class migration:
