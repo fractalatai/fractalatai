@@ -3442,33 +3442,36 @@ async fn enrich_single_law(
                     actors: if is_structural {
                         Vec::new()
                     } else {
+                        let conf = taxa_confidence.unwrap_or(0.0);
                         record
                             .governed_actors
                             .iter()
-                            .map(|a| ActorEntry {
-                                label: a.clone(),
-                                position: record
+                            .map(|a| {
+                                let pos: &str = record
                                     .actor_positions
                                     .get(a)
                                     .copied()
-                                    .unwrap_or("active")
-                                    .into(),
-                                relates_to: None,
-                                label_source: "canonical".into(),
-                                reason: None,
-                            })
-                            .chain(record.government_actors.iter().map(|a| {
+                                    .unwrap_or("active");
                                 ActorEntry {
                                     label: a.clone(),
-                                    position: record
-                                        .actor_positions
-                                        .get(a)
-                                        .copied()
-                                        .unwrap_or("active")
-                                        .into(),
+                                    position: pos.into(),
                                     relates_to: None,
                                     label_source: "canonical".into(),
-                                    reason: None,
+                                    reason: Some(format!("regex:{pos}@{conf:.2}")),
+                                }
+                            })
+                            .chain(record.government_actors.iter().map(|a| {
+                                let pos: &str = record
+                                    .actor_positions
+                                    .get(a)
+                                    .copied()
+                                    .unwrap_or("active");
+                                ActorEntry {
+                                    label: a.clone(),
+                                    position: pos.into(),
+                                    relates_to: None,
+                                    label_source: "canonical".into(),
+                                    reason: Some(format!("regex:{pos}@{conf:.2}")),
                                 }
                             }))
                             .collect()
@@ -3659,14 +3662,14 @@ async fn enrich_single_law(
                     position: "active".into(),
                     relates_to: None,
                     label_source: "canonical".into(),
-                    reason: None,
+                    reason: Some("inherited:active@0.70".into()),
                 })
                 .chain(p.government_actors.iter().map(|a| ActorEntry {
                     label: a.clone(),
                     position: "active".into(),
                     relates_to: None,
                     label_source: "canonical".into(),
-                    reason: None,
+                    reason: Some("inherited:active@0.70".into()),
                 }))
                 .collect();
             inherited_count += 1;
