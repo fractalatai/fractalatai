@@ -4997,10 +4997,7 @@ async fn cmd_taxa_enrich(
                         let _is_govt: bool = prov.5;
                         let has_drrp: bool = prov.6;
 
-                        // Only classify provisions where regex returned empty drrp_types.
-                        // Don't override correct regex results with classifier predictions.
-                        if has_drrp
-                            || tier >= source_tier("classifier")
+                        if tier >= source_tier("classifier")
                             || !REGULATION_TYPES.contains(&section_type)
                         {
                             continue;
@@ -5024,13 +5021,21 @@ async fn cmd_taxa_enrich(
                             continue;
                         }
 
+                        // Confidence threshold: when regex already found DRRP, require
+                        // high confidence (0.9) to override. When regex found nothing,
+                        // accept lower confidence (0.7) to fill gaps.
+                        let threshold = if has_drrp { 0.9 } else { 0.7 };
+                        if prediction.confidence < threshold {
+                            continue;
+                        }
+
                         let drrp_type = prediction.class.as_str();
                         cls_sid_b.append_value(sid);
                         let drrp_vals = cls_drrp_b.values();
                         drrp_vals.append_value(drrp_type);
                         cls_drrp_b.append(true);
                         cls_method_b.append_value("classifier");
-                        cls_conf_b.append_value(0.85);
+                        cls_conf_b.append_value(prediction.confidence);
                         total_classified += 1;
                     }
 
