@@ -16,13 +16,17 @@
 - Embedding backfill: 7,843 benchmark provision embeddings computed, 0% gap (was 39%)
 - Benchmark QA skill created (`.claude/skills/benchmark-qa/`)
 - Three mismatch patterns identified from text drill-down (see below)
+- EU Directive fix (`a099135`): "member state" in GOVERNMENT_ACTORS + GOV_EU_ENSURE pattern
+- Purpose gate softening (`a099135`): actor presence overrides Enactment/Interpretation/ALL-skip gates
+- `--force` now bypasses source-tier protection for LanceDB re-enrichment
+- **DRRP accuracy: 67.1% → 70.5% (+3.4pp)** — Responsibility recall 49% → 76.6%
 
 ### What's next (in order)
-1. **Pattern fix: EU Directive subordinate clauses** — "Member States shall ensure that [actor]..." — regex wrongly marks the subordinate actor as active instead of the Member State
-2. **Pattern fix: inverted duty phrasing** — "It shall be the duty of X to..." — classifier hasn't learned this, predicts "other" at 0.98+ confidence
-3. **Pattern fix: counterparty detection** — both regex and classifier struggle; "both wrong" cases are almost all gold=counterparty
-4. **Retry 6 failed benchmark laws** — Gemini rate-limited: Environmental Protection (×2), HR Employment, Nuclear, Planning, Pollution
-5. **Re-run benchmarks** — after pattern fixes, measure improvement
+1. ~~**Pattern fix: EU Directive subordinate clauses**~~ — DONE (`a099135`). "member state" added to GOVERNMENT_ACTORS, GOV_EU_ENSURE pattern. Responsibility recall +27.6pp.
+2. **Pattern fix: inverted duty phrasing** — classifier training issue (P5), not a regex fix. Regex already handles "It shall be the duty of X". Classifier needs more training data.
+3. **Pattern fix: counterparty detection** — 106 provisions with DRRP but wrong actor position. 68 provisions blocked by purpose gate (mostly now fixed). Remaining: structural clause parsing to distinguish subject vs object actors.
+4. **Purpose gate: 329 Process+Rule provisions with gold DRRP but no regex match** — actors present but regex patterns don't match the specific language. Biggest remaining gap.
+5. **Retry 6 failed benchmark laws** — Gemini rate-limited: Environmental Protection (×2), HR Employment, Nuclear, Planning, Pollution
 6. **Ad-hoc human drill-through** — Baserow validation, 5-10 provisions per family
 7. **Full regression test suite** — codify learnings from benchmarks into unit tests
 8. **Publish QQ corpus to sertantai** — held pending sertantai code review completion

@@ -3073,6 +3073,7 @@ async fn enrich_single_law(
     store: &DuckStore,
     law_name: &str,
     gap_c: bool,
+    force: bool,
 ) -> anyhow::Result<EnrichResult> {
     use std::collections::BTreeSet;
 
@@ -4199,13 +4200,16 @@ Respond in JSON only, no markdown:
         let mut skipped_high_tier = 0u32;
         for pt in &provision_taxa {
             // Source-tier protection: never overwrite a higher-tier classification
-            let new_tier = source_tier(&pt.extraction_method);
-            if let Some(&existing_tier) = existing_tiers.get(&pt.section_id)
-                && existing_tier >= new_tier
-                && new_tier > 0
-            {
-                skipped_high_tier += 1;
-                continue;
+            // (unless --force, which re-runs the full regex pipeline)
+            if !force {
+                let new_tier = source_tier(&pt.extraction_method);
+                if let Some(&existing_tier) = existing_tiers.get(&pt.section_id)
+                    && existing_tier >= new_tier
+                    && new_tier > 0
+                {
+                    skipped_high_tier += 1;
+                    continue;
+                }
             }
             section_ids.append_value(&pt.section_id);
 
@@ -4691,7 +4695,7 @@ async fn cmd_taxa_enrich(
 
     let mut failed = 0usize;
     for law_name in &law_names {
-        let result = match enrich_single_law(&lance, store, law_name, gap_c).await {
+        let result = match enrich_single_law(&lance, store, law_name, gap_c, force).await {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("  {law_name}: enrich error: {e}");
