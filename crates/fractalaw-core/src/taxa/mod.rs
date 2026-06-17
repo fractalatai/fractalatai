@@ -1544,19 +1544,20 @@ mod tests {
     }
 
     #[test]
-    fn licensee_duty_no_family_no_specialist_actor() {
-        // Same provision text but without family context — licensee should
-        // NOT be extracted (it's a specialist actor, not core).
+    fn licensee_duty_no_family_extracts_general_licensee() {
+        // Licensee is now in the core dictionary (Ind: Licensee) as well as
+        // the Offshore specialist (Offshore: Licensee). Without family context,
+        // the general label should be extracted.
         let text = "The licensee shall ensure that any operator appointed \
                     by him is capable of satisfactorily carrying out his \
                     functions under these Regulations.";
         let record = parse_v2(text, None);
         assert!(
-            !record
+            record
                 .governed_actors
                 .iter()
                 .any(|a| a.contains("Licensee")),
-            "licensee should NOT be extracted without family context, got: {:?}",
+            "licensee should be extracted as Ind: Licensee, got: {:?}",
             record.governed_actors
         );
     }

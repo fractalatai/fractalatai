@@ -90,8 +90,44 @@ Some entities only appear in specific legislation families. Adding them to the c
 
 Entities that appear in 3+ families should be in the core (ungated) dictionary.
 
+## Progress
+
+### Skill created (2026-06-17)
+
+- `.claude/skills/actor-drift/SKILL.md` — workflow documentation
+- `.claude/skills/actor-drift/scripts/surface_missing_actors.py` — automated gap surfacing
+- Script scans benchmarks or LanceDB for provisions with modals but no DRRP, extracts subjects
+- 88 entities surfaced from benchmarks, most are noise (thing-subjects). Manual review required.
+
+### Actors added (2026-06-17)
+
+From surfacing output + Duty miss analysis:
+
+| Label | Type | Category | Notes |
+|-------|------|----------|-------|
+| Gvt: Agency: GEMA | government | Gvt | Gas and Electricity Markets Authority |
+| Spc: Conformity Assessment Body | government | Spc | EU product safety |
+| Spc: Approved Body | government | Spc | Grants type examination certificates |
+| Spc: Notifying Authority | government | Spc | EU product safety notifications |
+| Spc: Responsible Officer | governed | Spc | ESOS scheme officer role |
+| Spc: Participant | governed | Spc | ESOS scheme — family-gated to ENERGY |
+| Ind: Licensee | governed | Ind | General (non-offshore) licensee |
+| Ind: Appellant | governed | Ind | Appeal provisions |
+| Ind: Hirer | governed | Ind | Agency worker regulations |
+
+### Still missing (deferred)
+
+| Entity | Family | Blocker |
+|--------|--------|---------|
+| relevant body | Climate Change | too generic — need compound predicate or family gate |
+| hazardous substances authority | Planning | "authority" already matches as Gvt: Authority |
+| holder of a licence | Energy | phrase, not a single keyword — needs compound pattern |
+| Civil Nuclear Police Federation | Energy | very specific — single law |
+| chief constable | Energy | already matches as Gvt: Emergency Services: Police |
+
 ## Key files
 
 - `docs/actor-dictionary.yaml` — unified actor dictionary
 - `crates/fractalaw-core/src/taxa/actors.rs` — YAML loader, pattern compiler
+- `.claude/skills/actor-drift/scripts/surface_missing_actors.py` — gap surfacing script
 - `scripts/benchmark_classifier_disagreements.py` — surfaces gaps during benchmark analysis

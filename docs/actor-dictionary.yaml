@@ -167,6 +167,14 @@
   triggers: [nuclear decommissioning authority, nda, the nda]
   drrp_keywords: [nda]
 
+- label: "Gvt: Agency: GEMA"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:Gas and Electricity Markets Authority|GEMA)"
+  triggers: [gas and electricity markets authority, gema]
+  drrp_keywords: [gema]
+
 - label: "Gvt: Agency"
   type: government
   category: Gvt
@@ -538,12 +546,72 @@
   triggers: [appeal body, appeal bodies]
   drrp_keywords: [appeal bod]
 
+- label: "Spc: Conformity Assessment Body"
+  type: government
+  category: Spc
+  regex_patterns:
+    - "[Cc]onformity [Aa]ssessment [Bb]od(?:y|ies)"
+  triggers: [conformity assessment body, conformity assessment bodies]
+  drrp_keywords: [conformity assessment bod]
+
+- label: "Spc: Approved Body"
+  type: government
+  category: Spc
+  regex_patterns:
+    - "[Aa]pproved [Bb]od(?:y|ies)"
+  triggers: [approved body, approved bodies]
+  drrp_keywords: [approved bod]
+
+- label: "Spc: Notifying Authority"
+  type: government
+  category: Spc
+  regex_patterns:
+    - "[Nn]otifying [Aa]uthority?i?e?s?"
+  triggers: [notifying authority, notifying authorities]
+  drrp_keywords: [notifying authorit]
+
 - label: "Org: Responsible Undertaking"
   type: governed
   category: Org
   regex_patterns:
     - "[Rr]esponsible [Uu]ndertakings?"
   triggers: [responsible undertaking, the responsible undertaking]
+
+- label: "Spc: Responsible Officer"
+  type: governed
+  category: Spc
+  regex_patterns:
+    - "[Rr]esponsible [Oo]fficers?"
+  triggers: [responsible officer, responsible officers]
+
+- label: "Spc: Participant"
+  type: governed
+  category: Spc
+  regex_patterns:
+    - "[Pp]articipants?"
+  triggers: [participant, participants, the participant]
+  families: ["ENERGY"]
+
+- label: "Ind: Licensee"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "[Ll]icen[cs]ees?"
+  triggers: [licensee, licensees, the licensee]
+
+- label: "Ind: Appellant"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "[Aa]ppellants?"
+  triggers: [appellant, appellants, the appellant]
+
+- label: "Ind: Hirer"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "[Hh]irers?"
+  triggers: [hirer, hirers, the hirer]
 
 - label: "Ind: Person"
   type: governed
