@@ -19,18 +19,47 @@
 - EU Directive fix (`a099135`): "member state" in GOVERNMENT_ACTORS + GOV_EU_ENSURE pattern
 - Purpose gate softening (`a099135`): actor presence overrides Enactment/Interpretation/ALL-skip gates
 - `--force` now bypasses source-tier protection for LanceDB re-enrichment
-- **DRRP accuracy: 67.1% → 70.5% (+3.4pp)** — Responsibility recall 49% → 76.6%
+- **DRRP accuracy: 67.1% → 70.7%** — Responsibility recall 49% → 76.6%, Duty recall 43→45%
+- PERSON_QUALIFIERS expanded (`2ce6ca2`): "the responsible person must", "an authorised person must", etc.
+- Regex ceiling identified: ~200 provisions unreachable by regex (no actors, no modal, or structural mismatch)
 
-### What's next (in order)
-1. ~~**Pattern fix: EU Directive subordinate clauses**~~ — DONE (`a099135`). "member state" added to GOVERNMENT_ACTORS, GOV_EU_ENSURE pattern. Responsibility recall +27.6pp.
-2. **Pattern fix: inverted duty phrasing** — classifier training issue (P5), not a regex fix. Regex already handles "It shall be the duty of X". Classifier needs more training data.
-3. **Pattern fix: counterparty detection** — 106 provisions with DRRP but wrong actor position. 68 provisions blocked by purpose gate (mostly now fixed). Remaining: structural clause parsing to distinguish subject vs object actors.
-4. **Purpose gate: 329 Process+Rule provisions with gold DRRP but no regex match** — actors present but regex patterns don't match the specific language. Biggest remaining gap.
-5. **Retry 6 failed benchmark laws** — Gemini rate-limited: Environmental Protection (×2), HR Employment, Nuclear, Planning, Pollution
-6. **Ad-hoc human drill-through** — Baserow validation, 5-10 provisions per family
-7. **Full regression test suite** — codify learnings from benchmarks into unit tests
-8. **Publish QQ corpus to sertantai** — held pending sertantai code review completion
-9. **P5 fix** — classifier features (text offset unreliable, missing negative modals) — retrain
+### Benchmark progress (2026-06-17)
+
+| DRRP Type | Recall | Target | Gap | Notes |
+|-----------|--------|--------|-----|-------|
+| Duty | 44.6% | 90% | -45.4pp | 155 classified as `none`, need classifier |
+| Right | 30.2% | 90% | -59.8pp | 44 classified as `none`, weakest |
+| Responsibility | 76.6% | 90% | -13.4pp | EU fix landed, close |
+| Power | 52.4% | 90% | -37.6pp | 70 classified as `none` |
+| none | 90.5% | 90% | at target | ✓ |
+| **Overall** | **70.7%** | **90%** | **-19.3pp** | |
+
+### Regex ceiling analysis
+
+Of 1185 gold DRRP provisions, the pipeline misses 265. Root causes:
+
+| Category | Count | Fix layer |
+|----------|-------|-----------|
+| No actor + no modal | ~24 | LLM only |
+| No actor + modal | ~120 | Classifier (entity gap: NDA, Administrator, scheme administrator, compliance body, responsible undertaking, manufacturers) |
+| Actor + no modal | ~42 | Classifier |
+| Actor + modal but pattern miss | ~66 (partially fixed) | Some regex-fixable, rest classifier |
+| Remaining gated | ~13 | Purpose gate or amendment |
+
+**Key entity gaps**: NDA, Administrator, scheme administrator, compliance body, responsible undertaking, manufacturers, member of the Constabulary, Her Majesty — these are real duty-bearers not in the actor dictionary. Adding them would move ~20-30 provisions from "no actor" to "actor + modal" → regex-catchable.
+
+### What's next: Regex → Classifier → LLM transition
+
+**Strategy**: Regex handles the structural patterns it can (70.7% and ceiling ~75% with dictionary expansion). The DRRP classifier (Tier 2) handles provisions with embeddings but no regex match. LLM (Tier 3) handles the rest.
+
+1. **Actor dictionary expansion** — add ~10 entity patterns (NDA, Administrator, etc.) to recover ~20-30 provisions for regex. Quick win.
+2. **DRRP classifier retraining** — retrain with the 2,250 benchmark provisions as additional training data. The classifier currently only covers Obligation/Liberty/none — expand to 5-class (Duty/Right/Responsibility/Power/none).
+3. **Classifier transition trigger** — when regex returns `drrp_types = []` AND the provision has an embedding AND has a modal verb → escalate to Tier 2 classifier.
+4. **LLM escalation trigger** — when classifier confidence < 0.7 OR classifier disagrees with regex → escalate to Tier 3 LLM.
+5. **Retry 6 failed benchmark laws** — Gemini rate-limited
+6. **Position classifier P5 fix** — retrain with better features
+7. **Full regression test suite** — codify learnings
+8. **Publish QQ corpus to sertantai**
 
 ### Key files
 - Session doc: `.claude/sessions/cascade/06-11-26-drrp-qa-plan.md` (this file)
