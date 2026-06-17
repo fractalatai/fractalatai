@@ -117,8 +117,10 @@ pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
     // presence as an override signal for mixed-content provisions.
     let extracted = actors::extract_actors_for_family(&cleaned, family);
     let has_governed = !extracted.governed.is_empty();
+    let has_government = !extracted.government.is_empty();
 
-    if should_skip_drrp(&purposes, has_governed) || is_descriptive_summary(&cleaned) {
+    if should_skip_drrp(&purposes, has_governed, has_government) || is_descriptive_summary(&cleaned)
+    {
         // Extract fitness rules whenever APPLICATION_SCOPE is present,
         // even if another purpose (INTERPRETATION, ENACTMENT) ranked first.
         let fitness_rules = if purposes.contains(&purpose::APPLICATION_SCOPE) {
@@ -472,11 +474,15 @@ pub fn analyse_miss(raw_text: &str) -> MissRecord {
 /// ALL gives 104 clean skips (9.9%) with no false negatives, vs ANY's
 /// 189 skips (18.1%) with 58 false negatives (30.7% error rate).
 ///
-/// When `has_governed_actor` is true, the Interpretation-primary gate is
-/// softened — mixed-content provisions (definitions + duties) in product
-/// safety SIs often have Interpretation as primary purpose but contain
-/// real actor-anchored duties that should still be extracted.
-pub fn should_skip_drrp(purposes: &[&str], has_governed_actor: bool) -> bool {
+/// Actor presence overrides structural gates — provisions classified as
+/// Interpretation/Enactment/Application+Scope often contain real DRRP
+/// when actors are present (e.g., "Member States shall ensure that..."
+/// in definitions, commencement provisions with "Secretary of State may").
+pub fn should_skip_drrp(
+    purposes: &[&str],
+    has_governed_actor: bool,
+    has_government_actor: bool,
+) -> bool {
     const SKIP_PURPOSES: &[&str] = &[
         purpose::ENACTMENT,
         purpose::INTERPRETATION,
@@ -488,30 +494,49 @@ pub fn should_skip_drrp(purposes: &[&str], has_governed_actor: bool) -> bool {
         return false;
     }
 
-    // ALL strategy: skip when every detected purpose is a skip-purpose.
-    // Even with a governed actor, pure-structural provisions have no DRRP.
+    let has_any_actor = has_governed_actor || has_government_actor;
+
+    // Amendment/Repeal provisions never bear their own DRRP — obligations
+    // in quoted text belong to the target section, not this provision.
+    // Skip unconditionally regardless of actors present.
+    if purposes
+        .iter()
+        .any(|p| *p == purpose::AMENDMENT || *p == purpose::REPEAL_REVOCATION)
+    {
+        return true;
+    }
+
+    // ALL strategy: skip when every detected purpose is a skip-purpose
+    // AND no actors are present. Actor presence indicates real DRRP may
+    // be embedded (e.g., Interpretation-only provisions with "No person
+    // may transfer..." or "A notice may include directions...").
     if purposes.iter().all(|p| SKIP_PURPOSES.contains(p)) {
-        return true;
+        return !has_any_actor;
     }
 
-    // Interpretation-primary: skip DRRP for pure definitions UNLESS
-    // a governed actor is present (indicating a real obligation may be
-    // embedded in the definition — 3 provisions in 161K corpus).
-    // If mixed-content (Interpretation + other purposes), same rule:
-    // skip unless governed actor overrides.
+    // Interpretation-primary: skip unless actors present.
     if purposes.first() == Some(&purpose::INTERPRETATION) {
-        return !has_governed_actor;
+        return !has_any_actor;
     }
 
-    // Enactment-primary: title blocks and signed blocks always skip.
+    // Enactment-primary: commencement/citation blocks usually skip, but
+    // transitional provisions with actors contain real Powers/Duties
+    // (e.g., "Secretary of State may by order appoint...").
     if purposes.first() == Some(&purpose::ENACTMENT) {
-        return true;
+        return !has_any_actor;
     }
 
-    // Application+Scope-primary: "These Regulations shall apply to..." describes
-    // how/when/to whom the law applies, not what actors must do. GH #20.
+    // Application+Scope-primary: "These Regulations shall apply to..."
+    // usually describes scope, but provisions with actors may contain
+    // real obligations (e.g., "does not apply where the importer has...",
+    // "the Executive shall submit...", "the Secretary of State must consult").
+    // Skip only when no actors are present OR when governed actors are
+    // present but no government actors (scope extensions typically mention
+    // governed actors like employer/employee to define who the scope covers).
+    // Government actors (Secretary of State, Executive) in Application+Scope
+    // provisions usually indicate a real obligation.
     if purposes.first() == Some(&purpose::APPLICATION_SCOPE) {
-        return true;
+        return !has_government_actor;
     }
 
     false
@@ -1618,6 +1643,128 @@ mod tests {
             Some("active"),
             "Secretary of State should be active, got: {:?}",
             record.actor_positions
+        );
+    }
+
+    // ── EU Directive patterns ────────────────────────────────────────
+
+    #[test]
+    fn eu_directive_member_state_shall_ensure() {
+        let text = "Member States shall ensure that the medical surveillance of exposed workers is based on the principles that govern occupational medicine generally.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.contains(&DutyType::Responsibility),
+            "EU Directive 'shall ensure' should be Responsibility, got: {:?}",
+            record.duty_types
+        );
+        assert!(
+            record
+                .government_actors
+                .iter()
+                .any(|a| a.contains("Member State")),
+            "should extract Member State, got: {:?}",
+            record.government_actors
+        );
+    }
+
+    #[test]
+    fn eu_directive_member_state_active_worker_counterparty() {
+        let text = "Member States shall ensure that the undertaking is responsible for assessing and implementing arrangements for the radiation protection of exposed workers.";
+        let record = parse(text);
+        assert_eq!(
+            record.actor_positions.get("EU: Member State").copied(),
+            Some("active"),
+            "Member State should be active, got: {:?}",
+            record.actor_positions
+        );
+        // Worker is mentioned in subordinate clause — should NOT be active
+        if let Some(&pos) = record.actor_positions.get("Ind: Worker") {
+            assert_ne!(
+                pos, "active",
+                "Worker in subordinate clause should not be active"
+            );
+        }
+    }
+
+    #[test]
+    fn eu_directive_member_state_shall_require() {
+        let text = "Member States shall require that the manufacturer, the supplier, and each undertaking ensures that high-activity sealed sources comply with the requirements.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.contains(&DutyType::Responsibility),
+            "'shall require' should be Responsibility, got: {:?}",
+            record.duty_types
+        );
+    }
+
+    // ── Purpose gate: actor override tests ───────────────────────────
+
+    #[test]
+    fn enactment_with_government_actor_gets_drrp() {
+        // Commencement provision with Secretary of State power
+        let text = "This Act shall come into operation on such day as the Secretary of State may by order appoint.";
+        let record = parse(text);
+        assert!(
+            !record.duty_types.is_empty(),
+            "Enactment with government actor should get DRRP, got empty"
+        );
+    }
+
+    #[test]
+    fn interpretation_with_government_actor_gets_drrp() {
+        // Definition provision that also contains a government obligation
+        let text = "Member States shall ensure the establishment, regular review and use of diagnostic reference levels for radiodiagnostic examinations.";
+        let record = parse(text);
+        assert!(
+            !record.duty_types.is_empty(),
+            "Interpretation with government actor should get DRRP, got empty"
+        );
+    }
+
+    #[test]
+    fn all_skip_with_government_actor_gets_drrp() {
+        // Interpretation-only provision with government obligation
+        let text = "For the purpose of obtaining information, the Executive may serve on any person a notice requiring that person to furnish information.";
+        let record = parse(text);
+        // Executive is a government actor — gate should let this through
+        assert!(
+            !record.government_actors.is_empty(),
+            "should extract government actor, got: {:?}",
+            record.government_actors
+        );
+    }
+
+    #[test]
+    fn amendment_with_government_actor_still_skipped() {
+        // Amendment provisions should always skip — obligations belong to target
+        let text = r#"In section 3, for subsection (2) substitute— "The Secretary of State shall ensure compliance.""#;
+        let record = parse(text);
+        assert!(
+            record.duty_types.is_empty(),
+            "amendment should skip DRRP even with government actor"
+        );
+    }
+
+    #[test]
+    fn app_scope_with_governed_only_still_skipped() {
+        // Scope extension with governed actors but no government actors
+        let text = "These Regulations shall apply to a self-employed person as they apply to an employer and an employee.";
+        let record = parse(text);
+        assert!(
+            record.duty_types.is_empty(),
+            "scope extension with governed-only actors should skip"
+        );
+    }
+
+    #[test]
+    fn app_scope_with_government_actor_gets_drrp() {
+        // Application+Scope provision with government obligation
+        let text = "The Executive shall submit under subsection (4)(b)(i) a report on the application of these provisions.";
+        let record = parse(text);
+        // Executive is a government actor — should not be blocked
+        assert!(
+            !record.government_actors.is_empty(),
+            "should extract government actor"
         );
     }
 }

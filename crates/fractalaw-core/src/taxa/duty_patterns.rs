@@ -103,6 +103,11 @@ static GOV_ENFORCEMENT_1: LazyLock<Regex> = LazyLock::new(|| {
 static GOV_ENFORCEMENT_2: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\bimprovement notice\b|\bprohibition notice\b").unwrap());
 
+// EU Directive — "Member States shall ensure/require"
+static GOV_EU_ENSURE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\bmember states?\b.*\bshall\b.*\b(?:ensure|require|establish|provide|take)\b")
+        .unwrap()
+});
 // Government v2
 static GOV_DIRECTION: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\b(?:secretary of state|minister|authority)\b.*\bgive\b.*\bdirection").unwrap()
@@ -147,6 +152,7 @@ const GOVERNMENT_ACTORS: &[&str] = &[
     "enforcing authority",
     "appropriate authority",
     "national authority",
+    "member state",
     "crown",
     "tribunal",
     "court",
@@ -214,6 +220,15 @@ pub fn clamp01(v: f32) -> f32 {
 
 /// Try government duty patterns (v1) against downcased text.
 pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
+    // EU Directive: "Member States shall ensure/require that..."
+    if GOV_EU_ENSURE.is_match(text) {
+        return Some(DutyClassification {
+            family: DutyFamily::Government,
+            sub_type: DutySubType::Prescriptive,
+            confidence: 0.85,
+            span: find_government_span(text),
+        });
+    }
     if GOV_REG_MAKING_1.is_match(text) {
         return Some(DutyClassification {
             family: DutyFamily::Government,

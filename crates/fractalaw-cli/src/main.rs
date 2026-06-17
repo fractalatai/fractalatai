@@ -2340,6 +2340,7 @@ async fn cmd_taxa_qa(
                 } else if fractalaw_core::taxa::should_skip_drrp(
                     &record.purposes,
                     !record.governed_actors.is_empty(),
+                    !record.government_actors.is_empty(),
                 ) {
                     stats.gate_skip_drrp += 1;
                     // Sub-classify the skip reason.
