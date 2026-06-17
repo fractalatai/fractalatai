@@ -25,14 +25,18 @@
 
 ### Benchmark progress (2026-06-17)
 
-| DRRP Type | Recall | Target | Gap | Notes |
-|-----------|--------|--------|-----|-------|
-| Duty | 44.6% | 90% | -45.4pp | 155 classified as `none`, need classifier |
-| Right | 30.2% | 90% | -59.8pp | 44 classified as `none`, weakest |
-| Responsibility | 76.6% | 90% | -13.4pp | EU fix landed, close |
-| Power | 52.4% | 90% | -37.6pp | 70 classified as `none` |
-| none | 90.5% | 90% | at target | ✓ |
-| **Overall** | **70.7%** | **90%** | **-19.3pp** | |
+| DRRP Type | Baseline | After fixes | Target | Gap |
+|-----------|----------|-------------|--------|-----|
+| Duty recall | 46.9% | **46.7%** | 90% | -43.3pp |
+| Right recall | 36.8% | **33.0%** | 90% | -57.0pp |
+| Responsibility recall | 49.0% | **76.9%** | 90% | -13.1pp |
+| Power recall | 52.7% | **50.5%** | 90% | -39.5pp |
+| none recall | 88.5% | **90.2%** | 90% | at target |
+| **Overall accuracy** | **67.1%** | **71.0%** | **90%** | **-19.0pp** |
+
+Fixes applied: EU directive patterns, purpose gate softening, PERSON_QUALIFIERS expansion, YAML unification, entity expansion (NDA, Administrator, etc.), authorised person promotion.
+
+**Regex ceiling reached at ~71%.** Remaining gap to 90% requires Tier 2 classifier + Tier 3 LLM.
 
 ### Regex ceiling analysis
 
