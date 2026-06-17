@@ -73,13 +73,38 @@ Liberty    + government active actor → "Power"
 3. Keep Rule provisions as Obligation in gold (LLM is correct — implied actor from context, pipeline must catch up via classifier/LLM)
 4. Write to NAS, re-run benchmark with current pipeline for new baseline
 
-### Phase 2: Pipeline migration
-1. Change `DutyType` enum to 3-class
-2. Update `map_to_duty_type()` — Government and Governed both → Obligation (with obligation modal) or Liberty (with enabling modal)
-3. Update LanceDB write paths
-4. Update DuckDB schema + write paths
-5. Remove `decompose_drrp()`
+### Phase 2: Pipeline migration + parse pipe consolidation
+
+Consolidate all parse pipeline changes into one pass. Includes fractalaw/fractalaw#37 (run_patterns refactor).
+
+#### 2a. 3-class DutyType
+1. Change `DutyType` enum: Obligation, Liberty, Rule (drop Duty/Right/Responsibility/Power)
+2. Update `map_to_duty_type()` — Government and Governed both → Obligation or Liberty
+3. Remove `decompose_drrp()` from `drrp_classifier.rs`
+4. Update LanceDB write paths (`drrp_types` column)
+5. Update DuckDB schema: `obligation_holder`/`liberty_holder` replace 4 holder columns
 6. Update enrichment pipeline, QA commands, benchmark reports
+
+#### 2b. run_patterns() refactor (#37)
+Non-mutating overlap resolution — collect all matches, resolve by span length + pattern priority. Fix the 56 provisions where actor IS extracted and modal IS present but governed v2 doesn't anchor.
+
+#### 2c. Re-parse with updated dictionary (NO re-embedding)
+Run `parse_v2()` on benchmark laws with:
+- Updated YAML actor dictionary (30 new actors take effect)
+- Reason provenance written to actor struct (`regex:active@0.80`)
+- 3-class drrp_types written to LanceDB
+- Existing embeddings untouched
+
+### Obligation→none gap after Phase 2
+
+Of the 171 misses identified in Phase 1:
+
+| Category | Count | Status after Phase 2 |
+|----------|-------|---------------------|
+| New actors recover | 30 | Fixed — parse_v2 extracts them |
+| Actor + modal but regex miss | 56 | Target of 2b — run_patterns + v2 improvements |
+| Thing-subject (implied actor) | 50 | LLM territory — assume correct, exclude from QA |
+| Offence/passive (no modal) | 35 | Gate or LLM — see offence session |
 
 ### Phase 3: Sertantai
 1. Update sertantai to read `obligation_holder`/`liberty_holder`
