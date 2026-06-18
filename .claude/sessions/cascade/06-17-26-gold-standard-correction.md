@@ -106,6 +106,20 @@ Of the 171 misses identified in Phase 1:
 | Thing-subject (implied actor) | 50 | LLM territory — assume correct, exclude from QA |
 | Offence/passive (no modal) | 35 | Gate or LLM — see offence session |
 
+### Liberty→none findings (50 remaining, was 72)
+
+**Cat 1: No enabling modal, has actor (23)** — LLM territory but on review many are not new legal relations. 23 provisions reclassified to none in gold. Rights expressed as "No answer is admissible", "right of appeal is to a magistrates' court" are subordinate detail — they reference/condition rights created elsewhere. Only provisions creating a new legal relation count as Liberty.
+
+**Cat 2: Has enabling modal, no actor (13)** — thing-subject + "may" where the actor is implied from surrounding sections. The LLM had full law context when building gold; the production Tier 3 prompt doesn't. Raised as fractalaw/fractalaw#38.
+
+**Cat 3: Has enabling modal, has actor (9)** — RESOLVED per provision:
+- 3 fixed: BROAD_LABELS compound predicate — added `person may/entitled`, `persons entitled`, `person making` to PERSON_QUALIFIERS
+- 2 fixed: drrp_keywords gap — Crown missing "majesty", Local Authority missing "council"
+- 2 fixed: actor after modal — Office of Rail and Road, added "office of rail" to drrp_keywords (s.43A(5), s.43A(6) now Liberty)
+- 1 gold fixed: s.6(8) "as the case may be" is stock phrasing, not enabling → gold corrected to none
+- 1 remaining: s.43(4) governed actor after modal — same as Cat 2 (fractalaw/fractalaw#38)
+- 1 known issue: s.84(3) "Her Majesty may... shall" — obligation pattern fires before enabling. Both modals present, pipeline picks wrong one
+
 ### Phase 3: Sertantai
 1. Update sertantai to read `obligation_holder`/`liberty_holder`
 2. Derive Duty/Responsibility from actor struct `label` prefix
@@ -188,7 +202,13 @@ Benchmark after migration: **79.0% accuracy, Obligation recall 85.6%**. The 31 s
 1. ~~Work through finding #2~~ — DONE (label migration)
 2. Work through finding #1 — analyse the 139 classifier FPs on none
 3. ~~Work through finding #3~~ — DONE (2026-06-18). Re-parsed UK_uksi_2014_1643 (ESOS). 25→50 provisions now Obligation. **Obligation recall: 90.5% — target hit.**
-4. Work through finding #4 — Liberty→none: `entitled` broadened, Rule enabling→Liberty. Recall 64.8%→71.4%. Remaining 29% are passive constructions (LLM territory).
+4. Work through finding #4 — Liberty→none (50 remaining, was 72):
+
+   **Cat 1: No enabling modal, has actor (23)** — LLM territory. Rights expressed without modal verbs: "No answer is admissible in evidence", "The right of appeal is to a magistrates' court", "is to be in such manner as the Secretary of State considers appropriate". Structural/passive language. No regex fix possible. → Accept as LLM-only, exclude from regex/classifier QA.
+
+   **Cat 2: Has enabling modal, no actor (13)** — PARTIALLY FIXED. Rule enabling→Liberty fix applied but these 13 provisions still miss. Thing-subject + "may" ("the guidance may be revised", "An order may contain..."). The Rule tier should now catch these but they're not matching — need to check if the thing-subject keywords list covers "guidance", "representations", "order", "scheme", "marking". → TODO: expand THING_KEYWORDS in duty_patterns_rule.rs.
+
+   **Cat 3: Has enabling modal, has actor (9)** — PARTIALLY FIXED. `entitled` broadened from `entitled to` to bare `entitled`. 3 provisions fixed but 9 remain. Patterns: "Nothing in this regulation is taken to compel" (negative construction), "Regulations under subsection (1) may enable" (may + enable in same sentence), "Her Majesty may by Order in Council" (Crown as actor). → TODO: investigate why governed v2 doesn't anchor these — distance? subordinate clause rejection? compound predicate?
 5. Work through finding #5 — 60 Liberty→Obligation misclassifications
 6. Codify the cascade transition rules IN CODE, not just in docs
 7. Then re-benchmark and log the next round of findings

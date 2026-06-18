@@ -3801,13 +3801,19 @@ async fn enrich_single_law(
                             r#"Classify this UK/EU legal provision.
 
 Text: {text}
-Regex DRRP hint: {drrp}
+Regex hint: {drrp}
 
-1. What is the DRRP type? One of: Duty, Right, Responsibility, Power, or none.
-2. Name each actor mentioned in the provision using natural language (e.g. "employer", "HSE", "inspector", "local authority"). For each, classify their POSITION: ACTIVE (bears the duty/exercises the power), COUNTERPARTY (other side of the legal relation), BENEFICIARY, or MENTIONED.
+1. What is the DRRP type? One of: Obligation, Liberty, or none.
+   - Obligation: a legal obligation imposed on someone (shall, must, is required to)
+   - Liberty: a permission, entitlement, or discretionary power (may, entitled to, power to)
+   - none: definitions, commencement, repeals, structural, offence/penalty, OR provisions that only reference/detail/exempt an obligation or right created elsewhere
+
+   IMPORTANT: classify as 'none' if the provision only references, conditions, details, or exempts a legal relation created in another section. Only provisions that CREATE a new obligation or liberty count.
+
+2. Name each actor using natural language. For each, classify POSITION: ACTIVE (bears the obligation/exercises the liberty), COUNTERPARTY (other side), BENEFICIARY, or MENTIONED.
 
 Respond in JSON only:
-{{"drrp_type": "Duty|Right|Responsibility|Power|none", "actors": [{{"label": "employer", "position": "ACTIVE", "reason": "..."}}]}}"#
+{{"drrp_type": "Obligation|Liberty|none", "actors": [{{"label": "employer", "position": "ACTIVE", "reason": "..."}}]}}"#
                         );
 
                         let resp = if use_gemini {

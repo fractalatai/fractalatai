@@ -24,7 +24,7 @@
     - "Crown"
     - "(?:Her|His) Majesty"
   triggers: [crown, the crown, her majesty, his majesty]
-  drrp_keywords: [crown]
+  drrp_keywords: [crown, majesty]
 
 - label: "Gvt: Minister: Secretary of State for Defence"
   type: government
@@ -107,6 +107,7 @@
   regex_patterns:
     - "Office of Rail and Road?"
   triggers: [office of rail and road]
+  drrp_keywords: [office of rail]
 
 - label: "Gvt: Agency: OFCOM"
   type: government
@@ -196,7 +197,7 @@
   regex_patterns:
     - "(?:[Ll]ocal [Aa]uthority?i?e?s?|council of a county|(?:county|district)(?: borough | )council|London Borough Council|council constituted)"
   triggers: [local authority, local authorities, county council, district council, london borough council]
-  drrp_keywords: [local authority, authority]
+  drrp_keywords: [local authority, authority, council]
 
 - label: "Gvt: Authority: Planning"
   type: government

@@ -51,21 +51,27 @@ BENCHMARK_SCHEMA = pa.schema([
 SYSTEM_PROMPT = """You are an expert legal analyst specialising in UK/EU ESH (Environment, Safety, Health) legislation and Hohfeldian legal relations.
 
 For each provision, classify:
-1. DRRP type: Duty / Right / Responsibility / Power / none
-   - Duty: obligation on a governed entity (employer, person, manufacturer)
-   - Right: permission or entitlement for a governed entity
-   - Responsibility: obligation on a government body (minister, authority, agency)
-   - Power: authority exercised by a government body
-   - none: definitions, commencement, repeals, cross-references, structural
+1. DRRP type: Obligation / Liberty / none
+   - Obligation: a legal obligation imposed on someone (shall, must, is required to, has a duty)
+   - Liberty: a permission, entitlement, or discretionary power granted to someone (may, is entitled to, has a right to, power to)
+   - none: definitions, commencement, repeals, cross-references, structural, offence/penalty provisions
+
+   IMPORTANT — classify as 'none' if the provision:
+   - References, conditions, or details an obligation/right created ELSEWHERE (e.g., "An employee's right to return under regulation 13 is a right to return—" just details the right from reg 13)
+   - Creates an exemption or exception to an obligation (e.g., "A client is not required to comply with this Part where..." is a detail of the obligation, not a new Liberty)
+   - Describes a procedural protection (e.g., "No answer... is admissible in evidence" — this is a procedural rule, not a new right)
+   - States a consequence without a modal verb (e.g., "is guilty of an offence", "is liable to forfeiture")
+   - Only a provision that CREATES a new legal relation counts as Obligation or Liberty
+
 2. For each actor, their Hohfeldian position:
-   - active: bears the duty / exercises the power / holds the right (the doer)
+   - active: bears the obligation / exercises the liberty (the doer)
    - counterparty: on the receiving end of the legal relation
    - beneficiary: benefits without a direct legal relation
    - mentioned: referenced but no active legal role
 3. Brief reasoning (1-2 sentences)
 
 Respond in JSON only, no markdown:
-{"drrp_type": "Duty|Right|Responsibility|Power|none", "actors": [{"label": "...", "position": "active|counterparty|beneficiary|mentioned"}], "reasoning": "..."}"""
+{"drrp_type": "Obligation|Liberty|none", "actors": [{"label": "...", "position": "active|counterparty|beneficiary|mentioned"}], "reasoning": "..."}"""
 
 
 # ── Helpers ─────────────────────────────────────────────────────────

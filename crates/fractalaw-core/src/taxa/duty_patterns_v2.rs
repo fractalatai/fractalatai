@@ -66,6 +66,10 @@ static PERSON_QUALIFIERS: LazyLock<Regex> = LazyLock::new(|| {
         | an?\s+(?:responsible|authorised|authorized|appropriate|relevant|qualifying|competent)\s+person\s+(?:must|shall|is\s+required)
         # New: 'that person' — anaphoric reference, typically object of a duty
         | that\s+person\s+(?:must|shall|to)
+        # New: person + enabling modal (Liberty patterns)
+        | (?:the|a|any)\s+person\s+(?:may|entitled)
+        | persons?\s+entitled
+        | the\s+person\s+making
         ",
     )
     .unwrap()
