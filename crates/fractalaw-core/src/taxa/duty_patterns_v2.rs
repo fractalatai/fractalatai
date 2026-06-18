@@ -185,7 +185,7 @@ const SUB_TYPE_PATTERNS: &[SubTypePattern] = &[
         idx: 7,
         sub_type: DutySubType::Enabling,
         confidence: 0.50,
-        obligation: r"\b(?:may|power to|entitled to|has a right to|have the right to|shall be entitled|authorise|authorize)\b",
+        obligation: r"\b(?:may|power to|entitled|has a right|have the right|shall be entitled|authorise|authorize)\b",
     },
 ];
 

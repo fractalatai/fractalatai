@@ -71,7 +71,10 @@ const THING_KEYWORDS: &[&str] = &[
 /// Modal verbs indicating obligation (must/shall/is required to).
 /// Does NOT include "may" — thing-subject + "may" is not a Rule.
 static MODAL_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\b(?:shall|must|is required to)\b").unwrap());
+    LazyLock::new(|| Regex::new(r"(?i)\b(?:shall|must|is required to|may|entitled)\b").unwrap());
+
+static ENABLING_MODAL_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(?:may|entitled)\b").unwrap());
 
 /// Window (in bytes) to look backwards from the modal for a thing keyword.
 const THING_WINDOW: usize = 80;
@@ -156,9 +159,16 @@ pub fn match_rule(text: &str) -> Option<DutyClassification> {
             continue;
         }
 
+        // Check if the matched modal is enabling (may/entitled) → Liberty
+        let sub_type = if ENABLING_MODAL_RE.is_match(modal_match.as_str()) {
+            DutySubType::Enabling
+        } else {
+            DutySubType::ThingObligation
+        };
+
         return Some(DutyClassification {
             family: DutyFamily::Rule,
-            sub_type: DutySubType::ThingObligation,
+            sub_type,
             confidence: 0.55,
             span: None,
         });

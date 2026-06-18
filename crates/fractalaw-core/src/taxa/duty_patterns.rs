@@ -134,7 +134,7 @@ static PROHIBITION: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\bshall not\b|\bmust not\b|\bno person shall\b|\bprohibit").unwrap()
 });
 static ENABLING: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?i)\bmay\b|\bpower to\b|\bauthori[sz]e|\benable").unwrap());
+    LazyLock::new(|| Regex::new(r"(?i)\bmay\b|\bpower to\b|\bauthori[sz]e|\benable|\bentitled\b").unwrap());
 
 // ── Actor fragment lists (downcased) ─────────────────────────────────
 // Loaded from actor-dictionary.yaml via the actors module.

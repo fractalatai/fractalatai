@@ -132,7 +132,10 @@ fn map_to_duty_type(dc: &DutyClassification) -> Vec<DutyType> {
                 }
             }
         }
-        DutyFamily::Rule => vec![DutyType::Rule],
+        DutyFamily::Rule => match dc.sub_type {
+            DutySubType::Enabling => vec![DutyType::Liberty],
+            _ => vec![DutyType::Rule],
+        },
         DutyFamily::Unknown => Vec::new(),
     }
 }
