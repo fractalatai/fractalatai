@@ -3777,9 +3777,11 @@ async fn enrich_single_law(
                         const REGULATION_TYPES: &[&str] =
                             &["article", "sub_article", "section", "sub_section"];
                         let is_regulation = REGULATION_TYPES.contains(&p.section_type.as_str());
-                        // Only Tier 2 if not already classified by a higher source
+                        let pending_llm = p.extraction_method == "pending_llm";
+                        // Tier 2 candidates: multi-actor, DRRP=none with actors,
+                        // or flagged by classifier as pending LLM review
                         is_regulation
-                            && (multi_actor || drrp_none_with_actors)
+                            && (multi_actor || drrp_none_with_actors || pending_llm)
                             && existing_tier < source_tier("local")
                     })
                     .collect()
@@ -5140,13 +5142,24 @@ async fn cmd_taxa_classify(
                 let threshold = if has_drrp { 0.9 } else { 0.7 };
 
                 if !has_drrp && prediction.confidence >= threshold {
-                    // Gap fill: regex found nothing, classifier found DRRP
+                    // Gap fill: regex found nothing, classifier found DRRP with confidence
                     cls_sid_b.append_value(sid);
                     let drrp_vals = cls_drrp_b.values();
                     drrp_vals.append_value(cls_drrp);
                     cls_drrp_b.append(true);
                     cls_method_b.append_value("classifier");
                     cls_conf_b.append_value(prediction.confidence);
+                    total_classified += 1;
+                } else if !has_drrp && prediction.confidence < threshold {
+                    // Weak signal: regex=none, classifier found DRRP but low confidence
+                    // Flag for LLM verification
+                    cls_sid_b.append_value(sid);
+                    let drrp_vals = cls_drrp_b.values();
+                    drrp_vals.append_value(cls_drrp);
+                    cls_drrp_b.append(true);
+                    cls_method_b.append_value("pending_llm");
+                    cls_conf_b.append_value(prediction.confidence);
+                    disagreements += 1;
                     total_classified += 1;
                 } else if has_drrp && prediction.confidence >= threshold {
                     // Disagreement: regex has DRRP, classifier has different DRRP

@@ -1,12 +1,64 @@
-# Session: Cascade Transition Rules — Codify in Code (SUSPENDED)
+# Session: Cascade Transition Rules — Codify in Code
 
 ## Resume Point (2026-06-18)
 
-**Stage 1**: DONE — `drrp_history` field added to LanceDB, migration complete.
-**Stage 2**: IN PROGRESS — extracting `cmd_taxa_parse`, `cmd_taxa_classify`, `cmd_taxa_escalate`, `cmd_taxa_embed` from `enrich_single_law` + `cmd_taxa_enrich` in main.rs. Plan approved. No code changes yet — agent failed on disk, doing manually.
+**Stage 1**: DONE (`7de07d8`)
+**Stage 2**: DONE (`010cc69`)
 **Stage 3-5**: NOT STARTED.
 
 **To resume**: read this session doc + the plan at `.claude/plans/staged-booping-candy.md`
+
+### Stage 1 completion checklist
+
+| Requirement | Status | Commit |
+|-------------|--------|--------|
+| `drrp_history` List<Struct> schema in schema.rs | ✅ | `7de07d8` |
+| Field count test updated (58→59) | ✅ | `7de07d8` |
+| Migration script (scripts/migrate_drrp_history.py) | ✅ | `7de07d8` |
+| 134,293 provisions populated from existing data | ✅ | data migration |
+| Warning in ensure_gap_c_columns() if column missing | ✅ | `7de07d8` |
+| Write path in enrich_single_law (regex tier writes to drrp_history) | ✅ | `7de07d8` |
+| Arrow IPC backup before rebuild | ✅ | backups/ |
+| Workspace compiles, 476 tests pass | ✅ | `7de07d8` |
+
+### Stage 2 completion checklist
+
+| Requirement | Status | Commit |
+|-------------|--------|--------|
+| `cmd_taxa_parse` — regex parse + inheritance + write | ✅ | `010cc69` |
+| `cmd_taxa_embed` — compute embeddings for missing provisions | ✅ | `010cc69` |
+| `cmd_taxa_classify` — DRRP + position classifiers | ✅ | `010cc69` |
+| `cmd_taxa_escalate` — LLM classification (Ollama/Gemini) | ✅ | `010cc69` |
+| `cmd_taxa_enrich` rewired as orchestrator (parse→embed→classify→escalate) | ✅ | `010cc69` |
+| CLI subcommands (taxa parse, taxa embed, taxa classify, taxa escalate) | ✅ | `010cc69` |
+| Each function can run independently via CLI | ✅ | `010cc69` |
+| `--force`, `--pending`, `--gap-c` backward compatible | ✅ | `010cc69` |
+| LLM code extracted from enrich_single_law into cmd_taxa_escalate | ✅ | `010cc69` |
+| Workspace compiles, 476 tests pass | ✅ | `010cc69` |
+
+### Stage 3 completion checklist
+
+| Requirement | Status | Commit |
+|-------------|--------|--------|
+| Classifier always records prediction in drrp_history | ✅ | `fcd0fc4` |
+| drrp_history written via merge_insert (List<Struct> with tier/drrp/confidence/timestamp) | ✅ | `fcd0fc4` |
+| Both-modals detection (obligation + enabling in same provision) | ✅ | `fcd0fc4` |
+| Disagreements flagged as `extraction_method = "pending_llm"` | ✅ | `fcd0fc4` |
+| Gap fills (regex=none, classifier confident) still work | ✅ | `fcd0fc4` |
+| Disagreement count logged to stderr | ✅ | `fcd0fc4` |
+| No silent overrides — disagreements held for LLM | ✅ | `fcd0fc4` |
+| Workspace compiles, 476 tests pass | ✅ | `fcd0fc4` |
+
+### Stage 3 remaining gaps
+
+| # | Gap | Status |
+|---|-----|--------|
+| 1 | `taxa escalate` doesn't consume `pending_llm` flags | ✅ FIXED — `enrich_single_law` Tier 2 candidate filter now includes `pending_llm` provisions |
+| 2 | `taxa escalate` doesn't write to drrp_history | KNOWN LIMITATION — `enrich_single_law` builds a single history entry per provision reflecting whoever won last. True multi-entry requires accumulating entries in ProvisionTaxa or read-modify-write from LanceDB. |
+| 3 | Low-confidence classifier on regex=none provisions not flagged for LLM | ✅ FIXED — below-threshold classifier predictions on regex=none now flagged as `pending_llm` |
+| 4 | No actor + modal provisions not detected as LLM candidates | DEFERRED — requires reading actors from LanceDB in the classifier pass, which it doesn't currently do. Better as a post-parse filter. |
+| 5 | Resolution rules not codified — highest-tier wins via drrp_history | DEFERRED — consumer-side concern. Write path records each tier's decision. Read path (benchmarks, publish) should resolve by taking highest-tier entry. |
+| 6 | drrp_history doesn't clear own tier on re-run | KNOWN LIMITATION — appends duplicate entries. Consumers should take latest-timestamped entry per tier. Fix requires read-modify-write which is expensive with merge_insert. |
 
 ## Context
 
@@ -104,12 +156,12 @@ Gemini review: `data/code-review/gemini-cascade-architecture-review.md`
 
 ### Design principles
 
-1. **Correct cascade order**: regex → classifier → LLM. Each tier sees the output of the previous tier.
-2. **Loose coupling**: each tier (regex, classifier, LLM) must be able to run independently for testing and improvement. `taxa parse`, `taxa classify`, `taxa llm` as separate subcommands that can run standalone or in sequence.
-3. **Clear naming**: `gap-c`, `--pending`, Phase 3/4 etc. are cryptic. Use names that describe what they do: `taxa parse` (regex), `taxa classify` (embedding classifier), `taxa escalate` (LLM on disagreements).
-4. **DRRP provenance at provision level**: a `drrp_history` field (per Gemini recommendation) that records what each tier said, not just who won.
-5. **Disagreement detection**: when regex and classifier disagree, the provision is flagged for LLM escalation. When both obligation and enabling modals are present (#41), flag for LLM.
-6. **No silent overrides**: every tier ADDS signal. The final `drrp_types` is determined by explicit resolution rules, not by whoever runs last.
+1. **Correct cascade order**: regex → classifier → LLM. Each tier sees the output of the previous tier. — ✅ Stage 2 restructured the code into this order
+2. **Loose coupling**: each tier (regex, classifier, LLM) must be able to run independently for testing and improvement. `taxa parse`, `taxa classify`, `taxa escalate` as separate subcommands that can run standalone or in sequence. — ✅ Stage 2 extracted separate functions + CLI subcommands
+3. **Clear naming**: `gap-c`, `--pending`, Phase 3/4 etc. are cryptic. Use names that describe what they do. — **Stage 4** (not started). Old flags still exist alongside new subcommands.
+4. **DRRP provenance at provision level**: a `drrp_history` field that records what each tier said, not just who won. — ✅ Stage 1 (schema + migration) + Stage 3 (classifier writes to it). **GAP**: `taxa parse` writes regex entry; `taxa classify` writes classifier entry; `taxa escalate` does NOT yet write LLM entry.
+5. **Disagreement detection**: when regex and classifier disagree, the provision is flagged for LLM escalation. When both obligation and enabling modals are present (#41), flag for LLM. — ✅ Stage 3. **GAP**: `taxa escalate` doesn't consume the flags yet.
+6. **No silent overrides**: every tier ADDS signal. The final `drrp_types` is determined by explicit resolution rules, not by whoever runs last. — **PARTIAL**: classifier gap-fills are written directly. Disagreements are flagged as `pending_llm`. But the resolution rules (highest-tier wins, higher-tier none overrides) are not codified — they're implicit in the threshold logic.
 
 ### Target architecture
 
@@ -156,23 +208,26 @@ Add a provision-level `drrp_history` field that records what each tier said:
 ```
 
 **Resolution rules for `drrp_types`:**
-- The final `drrp_types` is determined by the highest-tier entry
-- A higher-tier `none` DOES override a lower-tier DRRP — it means "I looked and there's nothing here"
-- When a tier re-runs, it clears and re-adds its OWN entry (latest timestamp per tier wins). Other tiers' entries are untouched.
-- `extraction_method` simplified to just "who won" — `drrp_history` has the full detail
+- The final `drrp_types` is determined by the highest-tier entry — **NOT IMPLEMENTED**: current logic uses confidence thresholds, not drrp_history resolution
+- A higher-tier `none` DOES override a lower-tier DRRP — **NOT IMPLEMENTED**: classifier skips when it predicts none
+- When a tier re-runs, it clears and re-adds its OWN entry (latest timestamp per tier wins) — **NOT IMPLEMENTED**: drrp_history currently appends, doesn't clear previous entries for the same tier
+- `extraction_method` simplified to just "who won" — ✅ this is how it works (extraction_method reflects the tier that set drrp_types)
 
 ### Transition rules
 
 When stages run independently (`taxa classify --laws X`), they process what's specified. When run together via `taxa enrich`, the transition rules determine what gets passed forward between stages. Without these rules, LLM would run on the full stack — expensive and pointless.
 
 **Regex → Classifier**: all provisions with embeddings. The classifier adds signal to everything it can — it's cheap (microseconds per provision). No filtering needed.
+- ✅ Implemented: `cmd_taxa_classify` processes all provisions with embeddings where `tier < source_tier("classifier")` (`fcd0fc4`)
 
 **Classifier → LLM**: only flagged provisions. This is the critical filter — it determines what costs money and time. A provision is flagged for LLM when:
-- Regex and classifier disagree on DRRP type (regex=Obligation, classifier=Liberty)
-- Both obligation and enabling modals are present in the text (#41)
-- Classifier confidence is below a threshold on a provision where regex found DRRP
-- Regex=none AND classifier predicts DRRP at low confidence (weak signal worth verifying)
-- No actor extracted but modal present (implied actor — LLM needs sibling context #38)
+- Regex and classifier disagree on DRRP type (regex=Obligation, classifier=Liberty) — ✅ flagged as `pending_llm` (`fcd0fc4`)
+- Both obligation and enabling modals are present in the text (#41) — ✅ detected, flagged (`fcd0fc4`)
+- Classifier confidence is below a threshold on a provision where regex found DRRP — ✅ below-threshold provisions are skipped (not flagged, regex stands). **GAP**: these aren't explicitly flagged for LLM — they silently keep the regex result.
+- Regex=none AND classifier predicts DRRP at low confidence (weak signal worth verifying) — **NOT IMPLEMENTED**: low-confidence classifier predictions on regex=none provisions are silently dropped. No flag.
+- No actor extracted but modal present (implied actor — LLM needs sibling context #38) — **NOT IMPLEMENTED**: this detection isn't in the classifier. It's a separate signal that would need to be checked during `cmd_taxa_parse` or as a post-parse filter.
+
+**`taxa escalate` reads flagged provisions**: `cmd_taxa_escalate` currently runs on its own candidate selection logic (multi-actor, DRRP=none with actors). It does NOT yet consume the `pending_llm` flag set by the classifier. **GAP**: the escalate function needs to query for `extraction_method = 'pending_llm'` provisions.
 
 Everything else stays at its current classification. The LLM only sees provisions that need resolving.
 
@@ -199,10 +254,10 @@ Everything else stays at its current classification. The LLM only sees provision
 
 This is a significant refactor of `main.rs` (the largest file in the codebase). It should be done in stages:
 
-1. **Stage 1**: Add `drrp_history` field to LanceDB schema. Migration script for existing data. This must land first — Stages 2-3 write to it.
-2. **Stage 2**: Extract `taxa parse`, `taxa classify`, `taxa escalate` as separate functions within main.rs. Keep them callable from `taxa enrich` for backward compatibility.
-3. **Stage 3**: Wire the cascade — `taxa classify` reads regex output and appends to `drrp_history`, flags disagreements. `taxa escalate` reads flagged provisions and appends its resolution.
-4. **Stage 4**: Rename cryptic flags (`--gap-c` → `--escalate`, `TIER2_PROVIDER` → `LLM_PROVIDER`). Add CLI subcommands so each tier can run independently.
+1. ~~**Stage 1**~~: DONE (`7de07d8`). `drrp_history` field added to LanceDB schema. Migration script for existing data. 134K provisions populated.
+2. ~~**Stage 2**~~: DONE (`010cc69`). `cmd_taxa_parse`, `cmd_taxa_classify`, `cmd_taxa_escalate`, `cmd_taxa_embed` extracted as separate functions + CLI subcommands. Orchestrator rewired.
+3. ~~**Stage 3**~~: DONE (`fcd0fc4`). Wire the cascade — `taxa classify` reads regex output and appends to `drrp_history`, flags disagreements.
+4. **Stage 4**: Rename cryptic flags (`--gap-c` → `--escalate`, `TIER2_PROVIDER` → `LLM_PROVIDER`).
 5. **Stage 5**: Error handling — if LLM rate-limits or classifier errors, log and continue (don't fail the whole `taxa enrich` run). Retry logic for external services.
 
 ### `taxa enrich` orchestration
@@ -222,7 +277,14 @@ If any stage fails (e.g., LLM API error), the pipeline logs the error and contin
 
 ## Key files
 
-- `crates/fractalaw-cli/src/main.rs` — pipeline orchestration (~7K lines, needs decomposition)
+- `crates/fractalaw-cli/src/main.rs` — pipeline orchestration, now decomposed:
+  - `cmd_taxa_parse()` — regex parse + inheritance + write (~line 4698)
+  - `cmd_taxa_embed()` — compute embeddings (~line 4752)
+  - `cmd_taxa_classify()` — DRRP + position classifiers (~line 4914)
+  - `cmd_taxa_escalate()` — LLM classification (~line 5412)
+  - `cmd_taxa_enrich()` — orchestrator (~line 5470)
 - `crates/fractalaw-core/src/taxa/mod.rs` — `parse_v2()`, purpose gates
-- `crates/fractalaw-store/src/lance.rs` — LanceDB read/write
+- `crates/fractalaw-store/src/lance.rs` — LanceDB read/write, `drrp_history` column check
+- `crates/fractalaw-core/src/schema.rs` — `drrp_history` List<Struct> schema definition
 - `docs/drrp_classifier_v8.json` — classifier weights
+- `scripts/migrate_drrp_history.py` — schema migration script
