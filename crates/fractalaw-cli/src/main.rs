@@ -5031,18 +5031,44 @@ async fn cmd_taxa_classify(
             continue;
         }
 
-        // Phase 3: DRRP classification
+        // Phase 3: DRRP classification + drrp_history + disagreement detection
         const REGULATION_TYPES: &[&str] =
             &["article", "sub_article", "section", "sub_section"];
+        // Simple string checks for both-modals detection (LLM escalation signal)
+        let has_obligation_modal = |t: &str| {
+            let l = t.to_lowercase();
+            l.contains("shall") || l.contains("must") || l.contains("is required to")
+        };
+        let has_enabling_modal = |t: &str| {
+            let l = t.to_lowercase();
+            l.contains(" may ") || l.contains("entitled") || l.contains("power to")
+        };
+        let now_iso = chrono::Utc::now().to_rfc3339();
         {
             use arrow::array::{
                 ArrayBuilder, Float32Builder, ListBuilder, StringBuilder as SB3,
             };
+            use arrow::datatypes::{DataType, Field};
 
             let mut cls_sid_b = SB3::new();
             let mut cls_drrp_b = ListBuilder::new(SB3::new());
             let mut cls_method_b = SB3::new();
             let mut cls_conf_b = Float32Builder::new();
+
+            // drrp_history builder — appends classifier entry
+            let hist_fields: Vec<Field> = vec![
+                Field::new("tier", DataType::Utf8, false),
+                Field::new("drrp", DataType::Utf8, false),
+                Field::new("confidence", DataType::Float32, true),
+                Field::new("timestamp", DataType::Utf8, true),
+            ];
+            let mut hist_sid_b = SB3::new();
+            let mut hist_b = ListBuilder::new(arrow::array::StructBuilder::from_fields(
+                hist_fields.clone(),
+                0,
+            ));
+
+            let mut disagreements = 0usize;
 
             for prov in &provisions {
                 let sid: &str = &prov.0;
@@ -5071,55 +5097,94 @@ async fn cmd_taxa_classify(
                 let features =
                     fractalaw_ai::drrp_classifier::build_features(embedding, text);
                 let prediction = classifier.predict(&features);
+                let cls_drrp = prediction.class.as_str();
+
+                // Always record classifier prediction in drrp_history
+                hist_sid_b.append_value(sid);
+                let hist_struct = hist_b.values();
+                hist_struct
+                    .field_builder::<SB3>(0)
+                    .unwrap()
+                    .append_value("classifier");
+                hist_struct
+                    .field_builder::<SB3>(1)
+                    .unwrap()
+                    .append_value(cls_drrp);
+                hist_struct
+                    .field_builder::<Float32Builder>(2)
+                    .unwrap()
+                    .append_value(prediction.confidence);
+                hist_struct
+                    .field_builder::<SB3>(3)
+                    .unwrap()
+                    .append_value(&now_iso);
+                hist_struct.append(true);
+                hist_b.append(true);
+
+                // Detect both-modals provisions (LLM escalation signal)
+                let both_modals =
+                    has_obligation_modal(text) && has_enabling_modal(text);
 
                 if prediction.class == fractalaw_ai::DrrpClass::None {
+                    // Classifier says none — flag for LLM if both modals present
+                    if both_modals && has_drrp {
+                        disagreements += 1;
+                    }
                     continue;
                 }
 
+                // Transition rules:
+                // - Gap fill (regex=none, classifier=DRRP): classifier wins if confident
+                // - Disagreement (regex=X, classifier=Y): flag for LLM, don't override
+                // - Both modals present: flag for LLM
                 let threshold = if has_drrp { 0.9 } else { 0.7 };
-                if prediction.confidence < threshold {
-                    continue;
-                }
 
-                let drrp_type = prediction.class.as_str();
-                cls_sid_b.append_value(sid);
-                let drrp_vals = cls_drrp_b.values();
-                drrp_vals.append_value(drrp_type);
-                cls_drrp_b.append(true);
-                cls_method_b.append_value("classifier");
-                cls_conf_b.append_value(prediction.confidence);
-                total_classified += 1;
+                if !has_drrp && prediction.confidence >= threshold {
+                    // Gap fill: regex found nothing, classifier found DRRP
+                    cls_sid_b.append_value(sid);
+                    let drrp_vals = cls_drrp_b.values();
+                    drrp_vals.append_value(cls_drrp);
+                    cls_drrp_b.append(true);
+                    cls_method_b.append_value("classifier");
+                    cls_conf_b.append_value(prediction.confidence);
+                    total_classified += 1;
+                } else if has_drrp && prediction.confidence >= threshold {
+                    // Disagreement: regex has DRRP, classifier has different DRRP
+                    // Flag for LLM review — don't silently override
+                    cls_sid_b.append_value(sid);
+                    let drrp_vals = cls_drrp_b.values();
+                    drrp_vals.append_value(cls_drrp);
+                    cls_drrp_b.append(true);
+                    cls_method_b.append_value("pending_llm");
+                    cls_conf_b.append_value(prediction.confidence);
+                    disagreements += 1;
+                    total_classified += 1;
+                } else if both_modals && has_drrp {
+                    // Both obligation + enabling modals — ambiguous, flag for LLM
+                    disagreements += 1;
+                }
             }
 
+            if disagreements > 0 {
+                eprintln!("    {disagreements} provisions flagged for LLM review");
+            }
+
+            // Write DRRP updates
             let cls_count = cls_sid_b.len();
             if cls_count > 0 {
                 let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
-                    arrow::datatypes::Field::new(
-                        "section_id",
-                        arrow::datatypes::DataType::Utf8,
-                        false,
-                    ),
-                    arrow::datatypes::Field::new(
+                    Field::new("section_id", DataType::Utf8, false),
+                    Field::new(
                         "drrp_types",
-                        arrow::datatypes::DataType::List(std::sync::Arc::new(
-                            arrow::datatypes::Field::new(
-                                "item",
-                                arrow::datatypes::DataType::Utf8,
-                                true,
-                            ),
-                        )),
+                        DataType::List(std::sync::Arc::new(Field::new(
+                            "item",
+                            DataType::Utf8,
+                            true,
+                        ))),
                         true,
                     ),
-                    arrow::datatypes::Field::new(
-                        "extraction_method",
-                        arrow::datatypes::DataType::Utf8,
-                        true,
-                    ),
-                    arrow::datatypes::Field::new(
-                        "taxa_confidence",
-                        arrow::datatypes::DataType::Float32,
-                        true,
-                    ),
+                    Field::new("extraction_method", DataType::Utf8, true),
+                    Field::new("taxa_confidence", DataType::Float32, true),
                 ]));
                 let batch = arrow::record_batch::RecordBatch::try_new(
                     schema,
@@ -5128,6 +5193,39 @@ async fn cmd_taxa_classify(
                         std::sync::Arc::new(cls_drrp_b.finish()),
                         std::sync::Arc::new(cls_method_b.finish()),
                         std::sync::Arc::new(cls_conf_b.finish()),
+                    ],
+                )?;
+                lance.upsert_embeddings(&batch).await?;
+            }
+
+            // Write drrp_history updates (classifier entries)
+            let hist_count = hist_sid_b.len();
+            if hist_count > 0 {
+                let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
+                    Field::new("section_id", DataType::Utf8, false),
+                    Field::new(
+                        "drrp_history",
+                        DataType::List(std::sync::Arc::new(Field::new(
+                            "item",
+                            DataType::Struct(
+                                vec![
+                                    Field::new("tier", DataType::Utf8, false),
+                                    Field::new("drrp", DataType::Utf8, false),
+                                    Field::new("confidence", DataType::Float32, true),
+                                    Field::new("timestamp", DataType::Utf8, true),
+                                ]
+                                .into(),
+                            ),
+                            true,
+                        ))),
+                        true,
+                    ),
+                ]));
+                let batch = arrow::record_batch::RecordBatch::try_new(
+                    schema,
+                    vec![
+                        std::sync::Arc::new(hist_sid_b.finish()),
+                        std::sync::Arc::new(hist_b.finish()),
                     ],
                 )?;
                 lance.upsert_embeddings(&batch).await?;
