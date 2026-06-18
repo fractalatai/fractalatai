@@ -5,6 +5,69 @@
 **Prior sessions**: gold-standard-correction (CLOSED), offence-provision-gating (CLOSED)
 **Trigger**: The cascade transition rules (regex → classifier → LLM) were documented in the gold correction session but never implemented in code. The pipeline makes ad-hoc decisions about when each tier runs.
 
+## Definitions
+
+### Enrichment pipeline stages
+
+The pipeline runs in two passes within `cmd_taxa_enrich`:
+
+**Pass 1: Per-law enrichment** (`enrich_single_law`, runs once per law)
+- Step 1: **Regex parse** — `parse_v2()` on every provision. Extracts actors from YAML dictionary. Classifies DRRP via regex pattern matching (governed v2 → government v1/v2 → offence → rule). Assigns actor positions via span heuristic. Writes `extraction_method="regex"`.
+- Step 2: **Tier 1 inheritance** — child provisions inherit DRRP from parent when they have no direct classification. Writes `extraction_method="inherited"`.
+- Step 3: **LLM classification** (optional, requires `--gap-c` + `TIER2_PROVIDER` env var) — routes multi-actor and DRRP=none provisions to an LLM (Ollama or Gemini) for position + DRRP classification. Writes `extraction_method="local"` or `"agentic"`.
+- Step 4: **Write to LanceDB + DuckDB** — per-provision taxa written to LanceDB, per-law aggregates to DuckDB.
+
+**Pass 2: Embed + classify** (runs once after all laws in Pass 1, triggered by `--pending` or `--force`)
+- Phase 1: **Embed** — compute embeddings for provisions without them (`--pending` only, skipped by `--force`).
+- Phase 2: **Write embeddings** — merge_insert to LanceDB.
+- Phase 3: **DRRP classifier** — logistic regression (v8) on provisions with embeddings. Predicts Obligation/Liberty/none. Writes `drrp_types` + `extraction_method="classifier"` for provisions where it overrides regex.
+- Phase 4: **Position classifier** — per (provision, actor) pair. Predicts active/counterparty/other. Appends `| classifier:{position}@{confidence}` to each actor's reason field.
+
+### Tiers (source hierarchy)
+
+| Tier | extraction_method | source_tier() | What sets it |
+|------|-------------------|---------------|-------------|
+| 1 | regex | 1 | Pass 1 regex enrichment |
+| 2 | inherited | 2 | Pass 1 Tier 1 parent inheritance |
+| 3 | local | 3 | Local LLM (Ollama) |
+| 4 | classifier | 4 | Pass 2 Phase 3 DRRP classifier |
+| 5 | agentic_unvalidated | 5 | Gemini without QA validation |
+| 6 | agentic | 6 | Gemini with QA validation (gold standard) |
+
+Higher tier = higher quality. Source-tier protection prevents lower tiers from overwriting higher tiers.
+
+### Cascade — desired vs actual
+
+**Desired cascade** (what we keep saying):
+```
+regex → classifier → LLM
+```
+Each tier adds signal. Disagreements between tiers escalate to the next.
+
+**Actual code order**:
+```
+Pass 1: regex → inheritance → LLM (optional)
+Pass 2: classifier (optional)
+```
+The LLM runs BEFORE the classifier. They never see each other's results. The classifier can't flag disagreements for LLM review because the LLM already ran (or didn't). The desired cascade doesn't exist in the architecture.
+
+### The architecture problem
+
+The logical cascade (regex → classifier → LLM) requires:
+1. Regex runs first (done)
+2. Classifier sees regex output and adds signal (partially done — Phase 3/4)
+3. Disagreements between regex and classifier escalate to LLM (NOT POSSIBLE — LLM runs before classifier)
+
+**Options**:
+- **A) Move classifier into Pass 1** — run the classifier per-law, after regex, before LLM. Requires the embedding to exist already (won't work for new laws without embeddings).
+- **B) Multi-pass enrichment** — Pass 1 does regex + classifier. A separate pass sends disagreements to LLM. Two enrichment runs required.
+- **C) Accept reverse order** — LLM runs on regex gaps first (`--gap-c`), classifier runs afterwards (`--force`/`--pending`). The classifier doesn't override LLM (source-tier protection: agentic=6 > classifier=4). Disagreements between regex and classifier are logged but not auto-escalated — they become candidates for a FUTURE LLM run.
+
+Option C matches the current architecture. The "cascade" becomes:
+```
+regex → classifier → [log disagreements] → LLM (separate run, human-triggered)
+```
+
 ## Current state (what the code does)
 
 ### Regex (always runs)
@@ -25,52 +88,107 @@
 - Receives provision text + optional parent context
 - Context gap: no sibling provisions (#38)
 
-## What's wanted (the 5 rules)
+## Decision: Option B — Multi-pass pipeline restructure
 
-### Rule 1: Regex always runs first ✓
-Implemented. `parse_v2()` runs on every provision.
+Gemini review: `data/code-review/gemini-cascade-architecture-review.md`
 
-### Rule 2: Classifier always runs second (when embedding exists)
-**GAP**: Classifier only runs in `--force`/`--pending`, not in normal enrichment.
-**GAP**: Classifier doesn't append to reason when it AGREES with regex — only Phase 4 (position) does.
-**GAP**: Phase 3 (DRRP) doesn't write to reason at all — only overwrites `drrp_types`.
+**We go Option B.** The code doesn't match the mental model of `regex → classifier → LLM`. That mismatch is a blocker to improving the pipeline — every conversation about transition rules describes a cascade that doesn't exist. Fix the architecture so the code matches how we think about it.
 
-### Rule 3: Disagreements are LLM escalation candidates
-**GAP**: No mechanism to flag disagreements for LLM review.
-**GAP**: No detection of "both obligation and enabling modals present" (#41) as an LLM candidate.
-**WANTED**: A `needs_llm_review` flag or queue that the Tier 3 pass can consume.
+### Design principles
 
-### Rule 4: drrp_types reflects highest-tier non-none result
-**PARTIAL**: Confidence thresholding (0.7/0.9) partially implements this.
-**GAP**: When regex and classifier disagree, the classifier silently overrides if above threshold. Should hold for LLM instead.
+1. **Correct cascade order**: regex → classifier → LLM. Each tier sees the output of the previous tier.
+2. **Loose coupling**: each tier (regex, classifier, LLM) must be able to run independently for testing and improvement. `taxa parse`, `taxa classify`, `taxa llm` as separate subcommands that can run standalone or in sequence.
+3. **Clear naming**: `gap-c`, `--pending`, Phase 3/4 etc. are cryptic. Use names that describe what they do: `taxa parse` (regex), `taxa classify` (embedding classifier), `taxa escalate` (LLM on disagreements).
+4. **DRRP provenance at provision level**: a `drrp_history` field (per Gemini recommendation) that records what each tier said, not just who won.
+5. **Disagreement detection**: when regex and classifier disagree, the provision is flagged for LLM escalation. When both obligation and enabling modals are present (#41), flag for LLM.
+6. **No silent overrides**: every tier ADDS signal. The final `drrp_types` is determined by explicit resolution rules, not by whoever runs last.
 
-### Rule 5: QA findings tracked at provision level
-**GAP**: No systematic tracking. Findings discovered in CLI output and lost.
-**WANTED**: A skill that captures QA findings per provision.
+### Target architecture
 
-## The gap (to close)
+```
+taxa parse [--laws ...]        # Step 1: regex parse, actor extraction, DRRP classification
+                                # Writes: drrp_types, actors with reason, extraction_method="regex"
+                                # Can run independently for testing regex changes
 
-1. **Phase 3 should write DRRP provenance to reason** — currently only Phase 4 (position) writes to reason. Phase 3 should record what the DRRP classifier predicted, even when agreeing with regex.
+taxa classify [--laws ...]     # Step 2: embedding classifier (requires embeddings to exist)
+                                # Reads: provisions with embeddings
+                                # Predicts: DRRP type + actor positions
+                                # Writes: appends to drrp_history, updates reason provenance
+                                # Flags disagreements with regex for escalation
+                                # Can run independently for testing classifier changes
 
-2. **Disagreement detection** — when regex says X and classifier says Y:
-   - Record both in reason: `regex:Obligation@0.80 | classifier:Liberty@0.72`
-   - Flag for LLM review (don't override silently)
-   - When both modals present (obligation + enabling), flag for LLM
+taxa escalate [--laws ...]     # Step 3: LLM on flagged provisions (requires GEMINI_API_KEY)
+                                # Reads: provisions flagged by classifier (disagreements, ambiguous)
+                                # Sends to LLM with full context (provision + siblings)
+                                # Writes: final drrp_types, actors, extraction_method="agentic"
+                                # Can run independently for testing LLM prompts
 
-3. **LLM candidate queue** — a column or flag in LanceDB that marks provisions needing LLM review. The Tier 3 pass consumes this queue.
+taxa enrich [--laws ...]       # Convenience: runs parse → classify → escalate in sequence
+taxa enrich --pending          # For new laws via sync watch (includes embedding)
+```
 
-4. **Run classifier in normal enrichment** — not just `--force`/`--pending`. Every enrichment should run Phase 3/4 on provisions with embeddings.
+### Embedding generation
 
-## Approach
+Embeddings are computed from provision TEXT, not from DRRP classifications. They should be computed once when text arrives (via sync or import) and never recomputed during classification. This decouples embedding from the classification cascade.
 
-1. Add DRRP provenance to Phase 3 (parallel to Phase 4's position provenance)
-2. Add disagreement detection between regex and classifier DRRP predictions
-3. Add "both modals present" detection as an LLM escalation signal
-4. Create an `llm_candidate` column or use extraction_method = "pending_llm"
-5. Wire classifier into normal enrichment (not just --force/--pending)
+```
+taxa embed [--laws ...]        # Standalone: compute embeddings for provisions without them
+```
+
+### DRRP provenance (Gemini recommendation)
+
+Add a provision-level `drrp_history` field that records what each tier said:
+
+```json
+[
+  {"tier": "regex", "drrp": "Obligation", "confidence": 0.80, "timestamp": "..."},
+  {"tier": "classifier", "drrp": "Liberty", "confidence": 0.72, "timestamp": "..."},
+  {"tier": "llm", "drrp": "Obligation", "confidence": 0.95, "timestamp": "..."}
+]
+```
+
+The final `drrp_types` is determined by the highest-tier non-none entry. Disagreements are visible in the history.
+
+### Disagreement rules
+
+A provision is flagged for LLM escalation when:
+- Regex and classifier disagree on DRRP type (regex=Obligation, classifier=Liberty)
+- Both obligation and enabling modals are present in the text (#41)
+- Classifier confidence is below a threshold on a provision where regex found DRRP
+- No actor extracted but modal present (implied actor — LLM needs context)
+
+### Naming cleanup
+
+| Current | Proposed | Why |
+|---------|----------|-----|
+| `--gap-c` | `--escalate` or separate `taxa escalate` | "gap-c" is meaningless |
+| `TIER2_PROVIDER` | `LLM_PROVIDER` | Tier 2 is the classifier, not the LLM |
+| Phase 3 / Phase 4 | `taxa classify` (DRRP + position in one step) | Phase numbers are internal |
+| `enrich_single_law` | `parse_law` | It does more than enrichment but the core is parsing |
+| `--pending` | `--new-laws` or just detect automatically | "pending" is vague |
+| `source_tier()` | keep | This is clear |
+| `extraction_method` | keep | This is clear |
+
+### Gemini's other observations (to address)
+
+1. **Formalize disagreement resolution rules** — define what counts as a disagreement and what the resolution policy is (LLM override, confidence-weighted, etc.)
+2. **Layered pipeline control** — consider a state machine or pipeline definition rather than implicit checks in main.rs
+3. **Enhanced LLM context** (#38) — sibling provisions, section/chapter context for LLM escalation
+4. **Benchmark cascade value** — A/B test whether LLM escalation actually improves accuracy over just regex + classifier
+
+### Scope of refactor
+
+This is a significant refactor of `main.rs` (the largest file in the codebase). It should be done in stages:
+
+1. **Stage 1**: Extract `taxa parse`, `taxa classify`, `taxa escalate` as separate functions. Keep them callable from `taxa enrich` for backward compatibility.
+2. **Stage 2**: Wire the cascade — `taxa classify` reads regex output, flags disagreements. `taxa escalate` reads flagged provisions.
+3. **Stage 3**: Add `drrp_history` field to LanceDB schema. Each tier appends to it.
+4. **Stage 4**: Rename cryptic flags (`--gap-c` → `--escalate`, `TIER2_PROVIDER` → `LLM_PROVIDER`).
+5. **Stage 5**: Add CLI subcommands so each tier can run independently.
 
 ## Key files
 
-- `crates/fractalaw-cli/src/main.rs` — Phase 3 (DRRP classify), Phase 4 (position classify), enrichment flow
+- `crates/fractalaw-cli/src/main.rs` — pipeline orchestration (~7K lines, needs decomposition)
 - `crates/fractalaw-core/src/taxa/mod.rs` — `parse_v2()`, purpose gates
-- `docs/drrp_classifier_v8.json` — current classifier weights
+- `crates/fractalaw-store/src/lance.rs` — LanceDB read/write
+- `docs/drrp_classifier_v8.json` — classifier weights
