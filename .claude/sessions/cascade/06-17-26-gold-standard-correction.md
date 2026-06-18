@@ -188,9 +188,19 @@ Benchmark after migration: **79.0% accuracy, Obligation recall 85.6%**. The 31 s
 1. ~~Work through finding #2~~ — DONE (label migration)
 2. Work through finding #1 — analyse the 139 classifier FPs on none
 3. ~~Work through finding #3~~ — DONE (2026-06-18). Re-parsed UK_uksi_2014_1643 (ESOS). 25→50 provisions now Obligation. **Obligation recall: 90.5% — target hit.**
-4. Work through finding #5 — 60 Liberty→Obligation misclassifications
-5. Codify the cascade transition rules IN CODE, not just in docs
-6. Then re-benchmark and log the next round of findings
+4. Work through finding #4 — Liberty→none: `entitled` broadened, Rule enabling→Liberty. Recall 64.8%→71.4%. Remaining 29% are passive constructions (LLM territory).
+5. Work through finding #5 — 60 Liberty→Obligation misclassifications
+6. Codify the cascade transition rules IN CODE, not just in docs
+7. Then re-benchmark and log the next round of findings
+
+### Current benchmark (2026-06-18)
+
+| Class | Precision | Recall | F1 | Support |
+|-------|-----------|--------|-----|---------|
+| Obligation | 78.0% | **90.4%** | 83.7% | 791 |
+| Liberty | 71.2% | **71.4%** | 71.3% | 381 |
+| none | 90.6% | 78.7% | 84.2% | 1078 |
+| **Overall** | | | | **81.6%** |
 
 ## Key files
 
