@@ -177,13 +177,20 @@ The pipeline is a cascade: regex → classifier → LLM. Each tier ADDS signal �
 
 5. **60 Liberty→Obligation** — classifier or regex misclassifies Liberty (may/entitled) as Obligation (shall/must). Likely the provision has both modal types.
 
+### Finding #2 resolved: 3-class label migration (2026-06-18)
+
+Migrated 30,970 provisions from 5-class to 3-class via merge_insert. Includes 1,636 agentic (tier 6) provisions. Zero old labels remaining.
+
+Benchmark after migration: **79.0% accuracy, Obligation recall 85.6%**. The 31 stale benchmark provisions now show clean 3-class labels. 18 Rule provisions remain (pipeline correctly classifies thing-subjects as Rule but gold says Obligation).
+
 ### What's next (systematic, not rushing)
 
-1. Work through finding #2 — migrate agentic provisions to 3-class (small script)
-2. Work through finding #1 — analyse the 139 false positives, decide threshold vs retrain
-3. Work through finding #3 — the 47 new-actor provisions need the Rust pipeline to re-parse
-4. Codify the cascade transition rules IN CODE, not just in docs
-5. Then re-benchmark and log the next round of findings
+1. ~~Work through finding #2~~ — DONE (label migration)
+2. Work through finding #1 — analyse the 139 classifier FPs on none
+3. Work through finding #3 — the 47 new-actor provisions need Rust re-parse
+4. Work through finding #5 — 60 Liberty→Obligation misclassifications
+5. Codify the cascade transition rules IN CODE, not just in docs
+6. Then re-benchmark and log the next round of findings
 
 ## Key files
 
