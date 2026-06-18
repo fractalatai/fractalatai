@@ -41,6 +41,8 @@ pub mod popimar;
 pub mod purpose;
 pub mod text_cleaner;
 
+use regex::Regex;
+
 use duty_type::DutyType;
 
 /// A fully classified Taxa record — the output of the pipeline.
@@ -138,7 +140,15 @@ pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
         };
     }
     let lower = cleaned.to_lowercase();
-    let cr = duty_type::classify(&lower, &extracted.governed, &extracted.government);
+    let mut cr = duty_type::classify(&lower, &extracted.governed, &extracted.government);
+
+    // Post-classification rejection: legal fiction language uses "shall" in the
+    // interpretive sense ("shall be treated as", "Nothing in this section shall"),
+    // not the obligation sense. Suppress DRRP to avoid false positives.
+    if !cr.duty_types.is_empty() && is_legal_fiction(&lower) {
+        cr.duty_types.clear();
+        cr.classification = None;
+    }
 
     let dt_labels: Vec<&str> = cr.duty_types.iter().map(|d| d.as_str()).collect();
     let popimar = popimar::classify_with_duty_types(&cleaned, &dt_labels);
@@ -498,11 +508,12 @@ pub fn should_skip_drrp(
 
     // Amendment/Repeal provisions never bear their own DRRP — obligations
     // in quoted text belong to the target section, not this provision.
+    // Offence provisions describe consequences (penalties, liability), not
+    // new obligations — the duty is in the section that creates the requirement.
     // Skip unconditionally regardless of actors present.
-    if purposes
-        .iter()
-        .any(|p| *p == purpose::AMENDMENT || *p == purpose::REPEAL_REVOCATION)
-    {
+    if purposes.iter().any(|p| {
+        *p == purpose::AMENDMENT || *p == purpose::REPEAL_REVOCATION || *p == purpose::OFFENCE
+    }) {
         return true;
     }
 
@@ -540,6 +551,22 @@ pub fn should_skip_drrp(
     }
 
     false
+}
+
+/// Check whether text uses "shall" in the legal fiction / interpretive sense
+/// rather than the obligation sense. UK legislative drafting uses "shall" for both:
+/// - "The employer shall ensure safety" — obligation
+/// - "The Authority shall be treated as a local authority" — legal fiction
+///
+/// When detected, the provision should not produce DRRP even though it has a modal.
+static LEGAL_FICTION_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+    Regex::new(
+        r"(?i)\bshall\b\s+(?:be\s+(?:treated|deemed|construed|read|applied)|have\s+(?:the\s+)?effect|not\s+(?:affect|authorise|prejudice|apply\b|prevent|be\s+taken))|(?:^|[.;]\s*)Nothing\s+in\b"
+    ).unwrap()
+});
+
+pub fn is_legal_fiction(text: &str) -> bool {
+    LEGAL_FICTION_RE.is_match(text)
 }
 
 /// Check whether a provision's purposes indicate it could bear a duty.

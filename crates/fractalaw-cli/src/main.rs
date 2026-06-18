@@ -4763,7 +4763,7 @@ async fn cmd_taxa_enrich(
     // --force: skips embedding, uses existing embeddings only
     if (pending || force) && enriched > 0 {
         let model_dir = data_dir.join("../models/all-MiniLM-L6-v2");
-        let weights_path = std::path::Path::new("docs/drrp_classifier_v6.json");
+        let weights_path = std::path::Path::new("docs/drrp_classifier_v8.json");
 
         if model_dir.exists() && weights_path.exists() {
             // Ensure position classifier columns exist before writing

@@ -1,4 +1,4 @@
-# Session: Offence Provision Gating (PENDING)
+# Session: Offence Provision Gating
 
 ## Context
 
