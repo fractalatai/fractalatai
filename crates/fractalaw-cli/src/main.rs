@@ -4198,8 +4198,19 @@ Respond in JSON only, no markdown:
             actors_struct_fields.clone(),
             0,
         ));
+        let drrp_history_fields: Vec<Field> = vec![
+            Field::new("tier", DataType::Utf8, false),
+            Field::new("drrp", DataType::Utf8, false),
+            Field::new("confidence", DataType::Float32, true),
+            Field::new("timestamp", DataType::Utf8, true),
+        ];
+        let mut drrp_history_b = ListBuilder::new(arrow::array::StructBuilder::from_fields(
+            drrp_history_fields.clone(),
+            0,
+        ));
 
         let now_ns = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
+        let now_iso = chrono::Utc::now().to_rfc3339();
 
         let mut skipped_high_tier = 0u32;
         for pt in &provision_taxa {
@@ -4338,6 +4349,50 @@ Respond in JSON only, no markdown:
                 }
                 actors_b.append(true);
             }
+
+            // drrp_history: record what this tier (regex) said
+            if pt.drrp_types.is_empty() {
+                // No DRRP — record "none" entry
+                let hist_b = drrp_history_b.values();
+                hist_b
+                    .field_builder::<StringBuilder>(0)
+                    .unwrap()
+                    .append_value(&pt.extraction_method);
+                hist_b
+                    .field_builder::<StringBuilder>(1)
+                    .unwrap()
+                    .append_value("none");
+                hist_b
+                    .field_builder::<Float32Builder>(2)
+                    .unwrap()
+                    .append_value(pt.taxa_confidence.unwrap_or(0.0));
+                hist_b
+                    .field_builder::<StringBuilder>(3)
+                    .unwrap()
+                    .append_value(&now_iso);
+                hist_b.append(true);
+                drrp_history_b.append(true);
+            } else {
+                let hist_b = drrp_history_b.values();
+                hist_b
+                    .field_builder::<StringBuilder>(0)
+                    .unwrap()
+                    .append_value(&pt.extraction_method);
+                hist_b
+                    .field_builder::<StringBuilder>(1)
+                    .unwrap()
+                    .append_value(&pt.drrp_types[0]);
+                hist_b
+                    .field_builder::<Float32Builder>(2)
+                    .unwrap()
+                    .append_value(pt.taxa_confidence.unwrap_or(0.0));
+                hist_b
+                    .field_builder::<StringBuilder>(3)
+                    .unwrap()
+                    .append_value(&now_iso);
+                hist_b.append(true);
+                drrp_history_b.append(true);
+            }
         }
 
         let item_field = std::sync::Arc::new(Field::new("item", DataType::Utf8, true));
@@ -4389,6 +4444,23 @@ Respond in JSON only, no markdown:
                 ))),
                 true,
             ),
+            Field::new(
+                "drrp_history",
+                DataType::List(std::sync::Arc::new(Field::new(
+                    "item",
+                    DataType::Struct(
+                        vec![
+                            Field::new("tier", DataType::Utf8, false),
+                            Field::new("drrp", DataType::Utf8, false),
+                            Field::new("confidence", DataType::Float32, true),
+                            Field::new("timestamp", DataType::Utf8, true),
+                        ]
+                        .into(),
+                    ),
+                    true,
+                ))),
+                true,
+            ),
         ]));
 
         let taxa_batch = RecordBatch::try_new(
@@ -4416,6 +4488,7 @@ Respond in JSON only, no markdown:
                 std::sync::Arc::new(inferred_from_b.finish()),
                 std::sync::Arc::new(ancestor_distance_b.finish()),
                 std::sync::Arc::new(actors_b.finish()),
+                std::sync::Arc::new(drrp_history_b.finish()),
             ],
         )
         .context("building taxa RecordBatch")?;

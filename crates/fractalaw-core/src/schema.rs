@@ -354,6 +354,24 @@ pub mod esh {
                 ))),
                 true,
             ),
+            // 3.10d DRRP provenance history — what each tier said (1)
+            Field::new(
+                "drrp_history",
+                DataType::List(Arc::new(Field::new(
+                    "item",
+                    DataType::Struct(
+                        vec![
+                            Field::new("tier", DataType::Utf8, false),
+                            Field::new("drrp", DataType::Utf8, false),
+                            Field::new("confidence", DataType::Float32, true),
+                            Field::new("timestamp", DataType::Utf8, true),
+                        ]
+                        .into(),
+                    ),
+                    true,
+                ))),
+                true,
+            ),
             // 3.11 AI-Refined DRRP — polisher output stored back in LanceDB (7)
             Field::new("ai_holder", DataType::Utf8, true),
             Field::new("ai_clause", DataType::Utf8, true),
@@ -467,7 +485,7 @@ mod tests {
 
     #[test]
     fn legislation_text_schema_field_count() {
-        assert_eq!(esh::legislation_text_schema().fields().len(), 58);
+        assert_eq!(esh::legislation_text_schema().fields().len(), 59);
     }
 
     #[test]
