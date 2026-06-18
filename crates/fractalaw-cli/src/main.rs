@@ -448,6 +448,33 @@ enum TaxaAction {
         #[arg(long, default_value_t = 10)]
         limit: usize,
     },
+    /// Regex parse + Tier 1 inheritance only (no LLM, no classifier)
+    Parse {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: String,
+        /// Re-parse all (clear existing DuckDB taxa columns for these laws)
+        #[arg(long)]
+        force: bool,
+    },
+    /// Compute embeddings for provisions missing them
+    Embed {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: String,
+    },
+    /// Run DRRP + position classifiers on provisions with embeddings
+    Classify {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: String,
+    },
+    /// LLM escalation: Tier 2 DRRP + Tier 3 position classification
+    Escalate {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: String,
+    },
 }
 
 #[tokio::main]
@@ -630,6 +657,41 @@ async fn main() -> anyhow::Result<()> {
                 family,
                 limit,
             } => cmd_taxa_audit_fitness(&data_dir, laws, family, limit).await,
+            TaxaAction::Parse { laws, force } => {
+                let store = open_duck(&data_dir)?;
+                let lance = LanceStore::open(&data_dir.join("lancedb"))
+                    .await
+                    .context("opening LanceDB")?;
+                let law_names: Vec<String> =
+                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                cmd_taxa_parse(&lance, &store, &law_names, force).await?;
+                Ok(())
+            }
+            TaxaAction::Embed { laws } => {
+                let lance = LanceStore::open(&data_dir.join("lancedb"))
+                    .await
+                    .context("opening LanceDB")?;
+                let law_names: Vec<String> =
+                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                cmd_taxa_embed(&lance, &law_names).await
+            }
+            TaxaAction::Classify { laws } => {
+                let lance = LanceStore::open(&data_dir.join("lancedb"))
+                    .await
+                    .context("opening LanceDB")?;
+                let law_names: Vec<String> =
+                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                cmd_taxa_classify(&lance, &law_names).await
+            }
+            TaxaAction::Escalate { laws } => {
+                let store = open_duck(&data_dir)?;
+                let lance = LanceStore::open(&data_dir.join("lancedb"))
+                    .await
+                    .context("opening LanceDB")?;
+                let law_names: Vec<String> =
+                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                cmd_taxa_escalate(&lance, &store, &law_names).await
+            }
         },
 
         // Training data export.
@@ -3068,6 +3130,90 @@ fn source_tier(method: &str) -> u8 {
     }
 }
 
+struct LawTaxa {
+    duty_holders: std::collections::BTreeSet<String>,
+    rights_holders: std::collections::BTreeSet<String>,
+    responsibility_holders: std::collections::BTreeSet<String>,
+    power_holders: std::collections::BTreeSet<String>,
+    duty_types: std::collections::BTreeSet<String>,
+    roles: std::collections::BTreeSet<String>,
+    roles_gvt: std::collections::BTreeSet<String>,
+    duties: Vec<(String, String, String, String)>,
+    rights: Vec<(String, String, String, String)>,
+    responsibilities: Vec<(String, String, String, String)>,
+    powers: Vec<(String, String, String, String)>,
+    // Fitness / applicability
+    fitness_persons: std::collections::BTreeSet<String>,
+    fitness_processes: std::collections::BTreeSet<String>,
+    fitness_places: std::collections::BTreeSet<String>,
+    fitness_plants: std::collections::BTreeSet<String>,
+    fitness_properties: std::collections::BTreeSet<String>,
+    fitness_sectors: std::collections::BTreeSet<String>,
+    fitness_entries: Vec<FitnessEntry>,
+}
+
+impl LawTaxa {
+    fn new() -> Self {
+        Self {
+            duty_holders: std::collections::BTreeSet::new(),
+            rights_holders: std::collections::BTreeSet::new(),
+            responsibility_holders: std::collections::BTreeSet::new(),
+            power_holders: std::collections::BTreeSet::new(),
+            duty_types: std::collections::BTreeSet::new(),
+            roles: std::collections::BTreeSet::new(),
+            roles_gvt: std::collections::BTreeSet::new(),
+            duties: Vec::new(),
+            rights: Vec::new(),
+            responsibilities: Vec::new(),
+            powers: Vec::new(),
+            fitness_persons: std::collections::BTreeSet::new(),
+            fitness_processes: std::collections::BTreeSet::new(),
+            fitness_places: std::collections::BTreeSet::new(),
+            fitness_plants: std::collections::BTreeSet::new(),
+            fitness_properties: std::collections::BTreeSet::new(),
+            fitness_sectors: std::collections::BTreeSet::new(),
+            fitness_entries: Vec::new(),
+        }
+    }
+}
+
+struct ActorEntry {
+    label: String,
+    position: String, // "active" | "counterparty" | "beneficiary" | "mentioned"
+    relates_to: Option<String>, // linked actor label for pairwise relations
+    label_source: String, // "canonical" or "invented"
+    reason: Option<String>, // LLM reasoning (Tier 3 only)
+}
+
+struct ProvisionTaxa {
+    section_id: String,
+    drrp_types: Vec<String>,
+    governed_actors: Vec<String>,
+    government_actors: Vec<String>,
+    duty_family: Option<String>,
+    duty_sub_type: Option<String>,
+    popimar: Vec<String>,
+    purposes: Vec<String>,
+    clause_refined: String,
+    taxa_confidence: Option<f32>,
+    // Fitness per-provision
+    fitness_polarity: Vec<String>,
+    fitness_person: Vec<String>,
+    fitness_process: Vec<String>,
+    fitness_place: Vec<String>,
+    fitness_plant: Vec<String>,
+    fitness_property: Vec<String>,
+    fitness_sector: Vec<String>,
+    // Gap C provenance
+    section_type: String,
+    hierarchy_path: String,
+    depth: i32,
+    extraction_method: String,
+    holder_inferred_from: Vec<String>,
+    ancestor_distance: Option<i32>,
+    actors: Vec<ActorEntry>,
+}
+
 async fn enrich_single_law(
     lance: &LanceStore,
     store: &DuckStore,
@@ -3075,8 +3221,6 @@ async fn enrich_single_law(
     gap_c: bool,
     force: bool,
 ) -> anyhow::Result<EnrichResult> {
-    use std::collections::BTreeSet;
-
     // Look up family for specialist dictionary selection
     let family: Option<String> = {
         let batches = store.query_arrow(&format!(
@@ -3122,85 +3266,8 @@ async fn enrich_single_law(
         map
     };
 
-    struct LawTaxa {
-        duty_holders: BTreeSet<String>,
-        rights_holders: BTreeSet<String>,
-        responsibility_holders: BTreeSet<String>,
-        power_holders: BTreeSet<String>,
-        duty_types: BTreeSet<String>,
-        roles: BTreeSet<String>,
-        roles_gvt: BTreeSet<String>,
-        duties: Vec<(String, String, String, String)>,
-        rights: Vec<(String, String, String, String)>,
-        responsibilities: Vec<(String, String, String, String)>,
-        powers: Vec<(String, String, String, String)>,
-        // Fitness / applicability
-        fitness_persons: BTreeSet<String>,
-        fitness_processes: BTreeSet<String>,
-        fitness_places: BTreeSet<String>,
-        fitness_plants: BTreeSet<String>,
-        fitness_properties: BTreeSet<String>,
-        fitness_sectors: BTreeSet<String>,
-        fitness_entries: Vec<FitnessEntry>,
-    }
+    let mut taxa = LawTaxa::new();
 
-    let mut taxa = LawTaxa {
-        duty_holders: BTreeSet::new(),
-        rights_holders: BTreeSet::new(),
-        responsibility_holders: BTreeSet::new(),
-        power_holders: BTreeSet::new(),
-        duty_types: BTreeSet::new(),
-        roles: BTreeSet::new(),
-        roles_gvt: BTreeSet::new(),
-        duties: Vec::new(),
-        rights: Vec::new(),
-        responsibilities: Vec::new(),
-        powers: Vec::new(),
-        fitness_persons: BTreeSet::new(),
-        fitness_processes: BTreeSet::new(),
-        fitness_places: BTreeSet::new(),
-        fitness_plants: BTreeSet::new(),
-        fitness_properties: BTreeSet::new(),
-        fitness_sectors: BTreeSet::new(),
-        fitness_entries: Vec::new(),
-    };
-
-    struct ActorEntry {
-        label: String,
-        position: String, // "active" | "counterparty" | "beneficiary" | "mentioned"
-        relates_to: Option<String>, // linked actor label for pairwise relations
-        label_source: String, // "canonical" or "invented"
-        reason: Option<String>, // LLM reasoning (Tier 3 only)
-    }
-
-    struct ProvisionTaxa {
-        section_id: String,
-        drrp_types: Vec<String>,
-        governed_actors: Vec<String>,
-        government_actors: Vec<String>,
-        duty_family: Option<String>,
-        duty_sub_type: Option<String>,
-        popimar: Vec<String>,
-        purposes: Vec<String>,
-        clause_refined: String,
-        taxa_confidence: Option<f32>,
-        // Fitness per-provision
-        fitness_polarity: Vec<String>,
-        fitness_person: Vec<String>,
-        fitness_process: Vec<String>,
-        fitness_place: Vec<String>,
-        fitness_plant: Vec<String>,
-        fitness_property: Vec<String>,
-        fitness_sector: Vec<String>,
-        // Gap C provenance
-        section_type: String,
-        hierarchy_path: String,
-        depth: i32,
-        extraction_method: String,
-        holder_inferred_from: Vec<String>,
-        ancestor_distance: Option<i32>,
-        actors: Vec<ActorEntry>,
-    }
     let mut provision_taxa: Vec<ProvisionTaxa> = Vec::new();
 
     for batch in &batches {
@@ -4626,6 +4693,780 @@ Respond in JSON only, no markdown:
     })
 }
 
+/// Regex parsing + Tier 1 inheritance for a list of laws.
+/// Runs `enrich_single_law` with `gap_c=false` — no LLM calls.
+async fn cmd_taxa_parse(
+    lance: &LanceStore,
+    store: &DuckStore,
+    law_names: &[String],
+    force: bool,
+) -> anyhow::Result<usize> {
+    store.ensure_taxa_hash_columns()?;
+    store.ensure_fitness_columns()?;
+
+    let mut enriched = 0usize;
+    let mut failed = 0usize;
+    let total = law_names.len();
+
+    for law_name in law_names {
+        match enrich_single_law(lance, store, law_name, false, force).await {
+            Ok(_) => {
+                enriched += 1;
+                if enriched.is_multiple_of(100) {
+                    eprint!("\r  Parsed {enriched}/{total}...");
+                }
+            }
+            Err(e) => {
+                eprintln!("  {law_name}: parse error: {e}");
+                let escaped = law_name.replace('\'', "''");
+                let _ = store.execute(&format!(
+                    "UPDATE legislation \
+                     SET enrichment_retry_count = COALESCE(enrichment_retry_count, 0) + 1 \
+                     WHERE name = '{escaped}'"
+                ));
+                failed += 1;
+            }
+        }
+
+        // Compact LanceDB periodically to prevent fragment bloat.
+        if enriched.is_multiple_of(20) && total > 20 {
+            eprint!("\r  Compacting LanceDB after {enriched} laws...");
+            if let Err(e) = lance.compact().await {
+                eprintln!(" compact error: {e}");
+            } else {
+                eprintln!(" done");
+            }
+        }
+    }
+
+    if enriched >= 100 {
+        eprintln!();
+    }
+
+    println!("Parsed {enriched}/{total} laws ({failed} failed).");
+    Ok(enriched)
+}
+
+/// Compute embeddings for provisions that lack them.
+/// Loads the ONNX embedding model and writes embeddings to LanceDB.
+async fn cmd_taxa_embed(
+    lance: &LanceStore,
+    law_names: &[String],
+) -> anyhow::Result<()> {
+    let model_dir = std::path::Path::new("models/all-MiniLM-L6-v2");
+    if !model_dir.exists() {
+        anyhow::bail!(
+            "Embedding model not found at {}",
+            model_dir.display()
+        );
+    }
+
+    let mut embedder = fractalaw_ai::Embedder::load(model_dir)
+        .context("loading embedding model")?;
+
+    let batch_start = std::time::Instant::now();
+    let mut total_embedded = 0usize;
+    let mut total_provisions = 0usize;
+
+    for law_name in law_names {
+        let escaped = law_name.replace('\'', "''");
+        let filter = format!("law_name = '{escaped}'");
+        let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+
+        let mut provisions: Vec<(String, String, Option<Vec<f32>>)> = Vec::new();
+        for batch in &batches {
+            let sid_col = batch.column_by_name("section_id");
+            let text_col = batch.column_by_name("text");
+            let emb_col = batch.column_by_name("embedding");
+
+            for row in 0..batch.num_rows() {
+                let sid = sid_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let text = text_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+
+                let emb = emb_col
+                    .and_then(|c| {
+                        c.as_any()
+                            .downcast_ref::<arrow::array::FixedSizeListArray>()
+                    })
+                    .filter(|a| !a.is_null(row))
+                    .and_then(|a| {
+                        let values = a
+                            .values()
+                            .as_any()
+                            .downcast_ref::<arrow::array::Float32Array>()?;
+                        let dim = a.value_length() as usize;
+                        let offset = row * dim;
+                        Some(values.values()[offset..offset + dim].to_vec())
+                    });
+
+                provisions.push((sid, text, emb));
+            }
+        }
+
+        if provisions.is_empty() {
+            continue;
+        }
+
+        let needs_embedding: Vec<usize> = (0..provisions.len())
+            .filter(|&i| provisions[i].1.len() > 20 && provisions[i].2.is_none())
+            .collect();
+
+        if !needs_embedding.is_empty() {
+            let texts: Vec<String> = needs_embedding
+                .iter()
+                .map(|&i| provisions[i].1.clone())
+                .collect();
+
+            for chunk_start in (0..texts.len()).step_by(64) {
+                let chunk_end = (chunk_start + 64).min(texts.len());
+                let chunk: Vec<&str> = texts[chunk_start..chunk_end]
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect();
+                let embeddings = embedder.embed_batch(&chunk)?;
+                for (j, emb) in embeddings.into_iter().enumerate() {
+                    let idx = needs_embedding[chunk_start + j];
+                    provisions[idx].2 = Some(emb);
+                }
+            }
+            total_embedded += needs_embedding.len();
+        }
+
+        // Write embeddings via merge_insert
+        {
+            use arrow::array::{
+                FixedSizeListBuilder, Float32Builder, StringBuilder as SB2,
+            };
+
+            let mut sid_b = SB2::new();
+            let mut emb_b = FixedSizeListBuilder::new(Float32Builder::new(), 384);
+            let mut count = 0usize;
+
+            for prov in &provisions {
+                if let Some(ref e) = prov.2 {
+                    let e: &Vec<f32> = e;
+                    if e.len() == 384 {
+                        sid_b.append_value(&prov.0);
+                        let vals = emb_b.values();
+                        for &v in e {
+                            vals.append_value(v);
+                        }
+                        emb_b.append(true);
+                        count += 1;
+                    }
+                }
+            }
+
+            if count > 0 {
+                let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
+                    arrow::datatypes::Field::new(
+                        "section_id",
+                        arrow::datatypes::DataType::Utf8,
+                        false,
+                    ),
+                    arrow::datatypes::Field::new(
+                        "embedding",
+                        arrow::datatypes::DataType::FixedSizeList(
+                            std::sync::Arc::new(arrow::datatypes::Field::new(
+                                "item",
+                                arrow::datatypes::DataType::Float32,
+                                true,
+                            )),
+                            384,
+                        ),
+                        true,
+                    ),
+                ]));
+                let batch = arrow::record_batch::RecordBatch::try_new(
+                    schema,
+                    vec![
+                        std::sync::Arc::new(sid_b.finish()),
+                        std::sync::Arc::new(emb_b.finish()),
+                    ],
+                )?;
+                lance.upsert_embeddings(&batch).await?;
+            }
+        }
+
+        total_provisions += provisions.len();
+        eprintln!(
+            "  {law_name}: {}/{} embedded",
+            needs_embedding.len(),
+            provisions.len(),
+        );
+    }
+
+    let elapsed = batch_start.elapsed();
+    eprintln!(
+        "  Embed: {total_embedded}/{total_provisions} embedded ({:.1}s)",
+        elapsed.as_secs_f64(),
+    );
+
+    Ok(())
+}
+
+/// Run DRRP + position classifiers on provisions with embeddings.
+/// Loads v8 DRRP classifier, position classifier, and actor dictionary.
+async fn cmd_taxa_classify(
+    lance: &LanceStore,
+    law_names: &[String],
+) -> anyhow::Result<()> {
+    let weights_path = std::path::Path::new("docs/drrp_classifier_v8.json");
+    if !weights_path.exists() {
+        anyhow::bail!(
+            "DRRP classifier weights not found at {}",
+            weights_path.display()
+        );
+    }
+
+    // Ensure position classifier columns exist before writing
+    lance.ensure_gap_c_columns().await?;
+
+    let classifier = fractalaw_ai::DrrpClassifier::load(weights_path)
+        .context("loading DRRP classifier")?;
+    let actor_matcher = ActorMatcher::load("docs/actor-dictionary.yaml")
+        .context("loading actor dictionary for classifier")?;
+
+    let batch_start = std::time::Instant::now();
+    let mut total_classified = 0usize;
+    let mut total_provisions = 0usize;
+
+    for law_name in law_names {
+        let escaped = law_name.replace('\'', "''");
+        let law_start = std::time::Instant::now();
+        let filter = format!("law_name = '{escaped}'");
+        let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+
+        // (section_id, text, embedding, source_tier, section_type, has_govt_active, has_drrp)
+        type Prov = (String, String, Option<Vec<f32>>, u8, String, bool, bool);
+        let mut provisions: Vec<Prov> = Vec::new();
+        for batch in &batches {
+            let sid_col = batch.column_by_name("section_id");
+            let text_col = batch.column_by_name("text");
+            let emb_col = batch.column_by_name("embedding");
+            let method_col = batch.column_by_name("extraction_method");
+            let st_col = batch.column_by_name("section_type");
+            let actors_col = batch.column_by_name("actors");
+            let drrp_col = batch.column_by_name("drrp_types");
+
+            for row in 0..batch.num_rows() {
+                let sid = sid_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let text = text_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let section_type = st_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+
+                let tier = method_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .map(|m| source_tier(&m))
+                    .unwrap_or(0);
+
+                let emb = emb_col
+                    .and_then(|c| {
+                        c.as_any()
+                            .downcast_ref::<arrow::array::FixedSizeListArray>()
+                    })
+                    .filter(|a| !a.is_null(row))
+                    .and_then(|a| {
+                        let values = a
+                            .values()
+                            .as_any()
+                            .downcast_ref::<arrow::array::Float32Array>()?;
+                        let dim = a.value_length() as usize;
+                        let offset = row * dim;
+                        Some(values.values()[offset..offset + dim].to_vec())
+                    });
+
+                let has_govt_active = actors_col
+                    .and_then(|c| {
+                        use arrow::array::AsArray;
+                        let list = c.as_list_opt::<i32>()?;
+                        if list.is_null(row) {
+                            return None;
+                        }
+                        let struct_arr = list.value(row);
+                        let struct_arr = struct_arr.as_struct_opt()?;
+                        let label_col = struct_arr.column_by_name("label")?;
+                        let pos_col = struct_arr.column_by_name("position")?;
+                        for i in 0..struct_arr.len() {
+                            let pos =
+                                get_string_value(pos_col.as_ref(), i).unwrap_or_default();
+                            if pos == "active" {
+                                let label = get_string_value(label_col.as_ref(), i)
+                                    .unwrap_or_default();
+                                if actor_matcher.is_government(&label) {
+                                    return Some(true);
+                                }
+                            }
+                        }
+                        Some(false)
+                    })
+                    .unwrap_or(false);
+
+                let has_drrp = drrp_col
+                    .and_then(|c| {
+                        use arrow::array::AsArray;
+                        let list = c.as_list_opt::<i32>()?;
+                        if list.is_null(row) {
+                            return Some(false);
+                        }
+                        let vals = list.value(row);
+                        Some(vals.len() > 0)
+                    })
+                    .unwrap_or(false);
+
+                provisions.push((sid, text, emb, tier, section_type, has_govt_active, has_drrp));
+            }
+        }
+
+        if provisions.is_empty() {
+            continue;
+        }
+
+        // Phase 3: DRRP classification
+        const REGULATION_TYPES: &[&str] =
+            &["article", "sub_article", "section", "sub_section"];
+        {
+            use arrow::array::{
+                ArrayBuilder, Float32Builder, ListBuilder, StringBuilder as SB3,
+            };
+
+            let mut cls_sid_b = SB3::new();
+            let mut cls_drrp_b = ListBuilder::new(SB3::new());
+            let mut cls_method_b = SB3::new();
+            let mut cls_conf_b = Float32Builder::new();
+
+            for prov in &provisions {
+                let sid: &str = &prov.0;
+                let text: &str = &prov.1;
+                let tier: u8 = prov.3;
+                let section_type: &str = &prov.4;
+                let _is_govt: bool = prov.5;
+                let has_drrp: bool = prov.6;
+
+                if tier >= source_tier("classifier")
+                    || !REGULATION_TYPES.contains(&section_type)
+                {
+                    continue;
+                }
+                let embedding: &[f32] = match prov.2 {
+                    Some(ref e) => {
+                        let e: &Vec<f32> = e;
+                        if e.len() != 384 {
+                            continue;
+                        }
+                        e.as_slice()
+                    }
+                    None => continue,
+                };
+
+                let features =
+                    fractalaw_ai::drrp_classifier::build_features(embedding, text);
+                let prediction = classifier.predict(&features);
+
+                if prediction.class == fractalaw_ai::DrrpClass::None {
+                    continue;
+                }
+
+                let threshold = if has_drrp { 0.9 } else { 0.7 };
+                if prediction.confidence < threshold {
+                    continue;
+                }
+
+                let drrp_type = prediction.class.as_str();
+                cls_sid_b.append_value(sid);
+                let drrp_vals = cls_drrp_b.values();
+                drrp_vals.append_value(drrp_type);
+                cls_drrp_b.append(true);
+                cls_method_b.append_value("classifier");
+                cls_conf_b.append_value(prediction.confidence);
+                total_classified += 1;
+            }
+
+            let cls_count = cls_sid_b.len();
+            if cls_count > 0 {
+                let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
+                    arrow::datatypes::Field::new(
+                        "section_id",
+                        arrow::datatypes::DataType::Utf8,
+                        false,
+                    ),
+                    arrow::datatypes::Field::new(
+                        "drrp_types",
+                        arrow::datatypes::DataType::List(std::sync::Arc::new(
+                            arrow::datatypes::Field::new(
+                                "item",
+                                arrow::datatypes::DataType::Utf8,
+                                true,
+                            ),
+                        )),
+                        true,
+                    ),
+                    arrow::datatypes::Field::new(
+                        "extraction_method",
+                        arrow::datatypes::DataType::Utf8,
+                        true,
+                    ),
+                    arrow::datatypes::Field::new(
+                        "taxa_confidence",
+                        arrow::datatypes::DataType::Float32,
+                        true,
+                    ),
+                ]));
+                let batch = arrow::record_batch::RecordBatch::try_new(
+                    schema,
+                    vec![
+                        std::sync::Arc::new(cls_sid_b.finish()),
+                        std::sync::Arc::new(cls_drrp_b.finish()),
+                        std::sync::Arc::new(cls_method_b.finish()),
+                        std::sync::Arc::new(cls_conf_b.finish()),
+                    ],
+                )?;
+                lance.upsert_embeddings(&batch).await?;
+            }
+        }
+
+        // Phase 4: Position classification
+        {
+            let pos_weights = std::path::Path::new("docs/position_classifier_v1.json");
+            if pos_weights.exists() {
+                let pos_classifier = fractalaw_ai::PositionClassifier::load(pos_weights)
+                    .context("loading position classifier")?;
+
+                let mut pos_classified = 0usize;
+                type ActorTuple = (String, String, Option<String>, String, Option<String>);
+                let mut pos_updates: Vec<(String, Vec<ActorTuple>)> = Vec::new();
+
+                for batch in &batches {
+                    let sid_col = batch.column_by_name("section_id");
+                    let text_col = batch.column_by_name("text");
+                    let emb_col = batch.column_by_name("embedding");
+                    let method_col = batch.column_by_name("extraction_method");
+                    let actors_col = batch.column_by_name("actors");
+                    let drrp_col = batch.column_by_name("drrp_types");
+
+                    for row in 0..batch.num_rows() {
+                        let method = method_col
+                            .and_then(|c| get_string_value(c.as_ref(), row))
+                            .unwrap_or_default();
+                        if method == "agentic" || method == "agentic_unvalidated" {
+                            continue;
+                        }
+
+                        let sid = sid_col
+                            .and_then(|c| get_string_value(c.as_ref(), row))
+                            .unwrap_or_default();
+                        let text = text_col
+                            .and_then(|c| get_string_value(c.as_ref(), row))
+                            .unwrap_or_default();
+
+                        let embedding = emb_col
+                            .and_then(|c| {
+                                c.as_any()
+                                    .downcast_ref::<arrow::array::FixedSizeListArray>()
+                            })
+                            .filter(|a| !a.is_null(row))
+                            .and_then(|a| {
+                                let vals = a
+                                    .values()
+                                    .as_any()
+                                    .downcast_ref::<arrow::array::Float32Array>()?;
+                                let dim = a.value_length() as usize;
+                                let off = row * dim;
+                                Some(vals.values()[off..off + dim].to_vec())
+                            });
+                        let embedding = match embedding {
+                            Some(ref e) if e.len() == 384 => e.as_slice(),
+                            _ => continue,
+                        };
+
+                        let drrp_types: Vec<String> = drrp_col
+                            .and_then(|c| {
+                                use arrow::array::AsArray;
+                                let list = c.as_list_opt::<i32>()?;
+                                if list.is_null(row) {
+                                    return None;
+                                }
+                                let vals = list.value(row);
+                                let mut types = Vec::new();
+                                for i in 0..vals.len() {
+                                    if let Some(s) = get_string_value(vals.as_ref(), i) {
+                                        types.push(s);
+                                    }
+                                }
+                                Some(types)
+                            })
+                            .unwrap_or_default();
+
+                        let actors: Vec<ActorTuple> = actors_col
+                            .and_then(|c| {
+                                use arrow::array::AsArray;
+                                let list = c.as_list_opt::<i32>()?;
+                                if list.is_null(row) {
+                                    return None;
+                                }
+                                let sa = list.value(row);
+                                let sa = sa.as_struct_opt()?;
+                                let lc = sa.column_by_name("label")?;
+                                let pc = sa.column_by_name("position")?;
+                                let rtc = sa.column_by_name("relates_to");
+                                let lsc = sa.column_by_name("label_source");
+                                let rc = sa.column_by_name("reason");
+                                let mut result = Vec::new();
+                                for i in 0..sa.len() {
+                                    result.push((
+                                        get_string_value(lc.as_ref(), i)
+                                            .unwrap_or_default(),
+                                        get_string_value(pc.as_ref(), i)
+                                            .unwrap_or_default(),
+                                        rtc.and_then(|c| get_string_value(c.as_ref(), i)),
+                                        lsc.and_then(|c| get_string_value(c.as_ref(), i))
+                                            .unwrap_or_else(|| "canonical".into()),
+                                        rc.and_then(|c| get_string_value(c.as_ref(), i)),
+                                    ));
+                                }
+                                Some(result)
+                            })
+                            .unwrap_or_default();
+
+                        if actors.is_empty() {
+                            continue;
+                        }
+
+                        let modals = fractalaw_ai::drrp_classifier::modal_features(&text);
+                        let text_lower = text.to_lowercase();
+                        let mut updated_actors: Vec<ActorTuple> = Vec::new();
+
+                        for (label, regex_pos, relates_to, label_source, existing_reason) in
+                            &actors
+                        {
+                            let has_llm_reason = existing_reason.as_ref().is_some_and(|r| {
+                                r.contains("llm:") || r.contains("agentic:")
+                            });
+
+                            if has_llm_reason {
+                                updated_actors.push((
+                                    label.clone(),
+                                    regex_pos.clone(),
+                                    relates_to.clone(),
+                                    label_source.clone(),
+                                    existing_reason.clone(),
+                                ));
+                                continue;
+                            }
+
+                            let label_lower = label
+                                .to_lowercase()
+                                .split(':')
+                                .next_back()
+                                .unwrap_or("")
+                                .trim()
+                                .to_string();
+                            let offset = text_lower.find(&label_lower);
+                            let rel_offset = offset
+                                .map(|o| o as f32 / text.len().max(1) as f32)
+                                .unwrap_or(0.5);
+
+                            let features =
+                                fractalaw_ai::position_classifier::build_position_features(
+                                    embedding, &modals, &drrp_types, label, rel_offset,
+                                );
+                            let pred = pos_classifier.predict(&features);
+                            let cls_pos = pred.class.as_str();
+                            pos_classified += 1;
+
+                            let agrees = regex_pos == cls_pos
+                                || (regex_pos == "mentioned" && cls_pos == "other")
+                                || (regex_pos == "beneficiary" && cls_pos == "other");
+
+                            let cls_segment =
+                                format!("classifier:{}@{:.2}", cls_pos, pred.confidence);
+                            let new_reason = match existing_reason {
+                                Some(prev) if !prev.is_empty() => {
+                                    Some(format!("{prev} | {cls_segment}"))
+                                }
+                                _ => Some(cls_segment),
+                            };
+
+                            if !agrees {
+                                // Position disagreement — provenance chain records both
+                            }
+
+                            updated_actors.push((
+                                label.clone(),
+                                regex_pos.clone(),
+                                relates_to.clone(),
+                                label_source.clone(),
+                                new_reason,
+                            ));
+                        }
+
+                        if !updated_actors.is_empty() {
+                            pos_updates.push((sid, updated_actors));
+                        }
+                    }
+                }
+
+                // Write back actors with updated reason fields
+                if !pos_updates.is_empty() {
+                    use arrow::array::StringBuilder as SB4;
+                    use arrow::datatypes::{DataType, Field};
+
+                    let actors_fields = vec![
+                        Field::new("label", DataType::Utf8, false),
+                        Field::new("position", DataType::Utf8, false),
+                        Field::new("relates_to", DataType::Utf8, true),
+                        Field::new("label_source", DataType::Utf8, false),
+                        Field::new("reason", DataType::Utf8, true),
+                    ];
+                    let mut sid_b = SB4::new();
+                    let mut actors_b = arrow::array::ListBuilder::new(
+                        arrow::array::StructBuilder::from_fields(actors_fields.clone(), 0),
+                    );
+
+                    for (sid, actors) in &pos_updates {
+                        sid_b.append_value(sid);
+                        let sb = actors_b.values();
+                        for (label, position, relates_to, label_source, reason) in actors {
+                            sb.field_builder::<SB4>(0).unwrap().append_value(label);
+                            sb.field_builder::<SB4>(1).unwrap().append_value(position);
+                            match relates_to {
+                                Some(rt) => {
+                                    sb.field_builder::<SB4>(2).unwrap().append_value(rt)
+                                }
+                                None => sb.field_builder::<SB4>(2).unwrap().append_null(),
+                            }
+                            sb.field_builder::<SB4>(3)
+                                .unwrap()
+                                .append_value(label_source);
+                            match reason {
+                                Some(r) => {
+                                    sb.field_builder::<SB4>(4).unwrap().append_value(r)
+                                }
+                                None => sb.field_builder::<SB4>(4).unwrap().append_null(),
+                            }
+                            sb.append(true);
+                        }
+                        actors_b.append(true);
+                    }
+
+                    let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
+                        Field::new("section_id", DataType::Utf8, false),
+                        Field::new(
+                            "actors",
+                            DataType::List(std::sync::Arc::new(Field::new(
+                                "item",
+                                DataType::Struct(actors_fields.into()),
+                                true,
+                            ))),
+                            true,
+                        ),
+                    ]));
+                    let batch = arrow::record_batch::RecordBatch::try_new(
+                        schema,
+                        vec![
+                            std::sync::Arc::new(sid_b.finish()),
+                            std::sync::Arc::new(actors_b.finish()),
+                        ],
+                    )?;
+                    lance.upsert_embeddings(&batch).await?;
+                }
+
+                if pos_classified > 0 {
+                    eprintln!(
+                        "    position: {pos_classified} actors, {} disagreements written",
+                        pos_updates.len()
+                    );
+                }
+            }
+        }
+
+        total_provisions += provisions.len();
+        let law_elapsed = law_start.elapsed();
+        eprintln!(
+            "  {law_name}: {total_classified} classified ({:.1}s)",
+            law_elapsed.as_secs_f64()
+        );
+    }
+
+    let batch_elapsed = batch_start.elapsed();
+    eprintln!(
+        "  Classify: {total_classified} classified across {total_provisions} provisions ({:.1}s)",
+        batch_elapsed.as_secs_f64(),
+    );
+
+    Ok(())
+}
+
+/// LLM escalation for a list of laws: runs Tier 2 (DRRP) + Tier 3 (position).
+/// Re-runs the full pipeline with gap_c=true, which enables LLM calls when
+/// TIER2_PROVIDER and/or GEMINI_API_KEY are set in the environment.
+async fn cmd_taxa_escalate(
+    lance: &LanceStore,
+    store: &DuckStore,
+    law_names: &[String],
+) -> anyhow::Result<()> {
+    store.ensure_taxa_hash_columns()?;
+    store.ensure_fitness_columns()?;
+    lance.ensure_gap_c_columns().await?;
+
+    let tier2_provider = std::env::var("TIER2_PROVIDER").ok();
+    let gemini_key = std::env::var("GEMINI_API_KEY").ok();
+
+    if tier2_provider.is_none() && gemini_key.is_none() {
+        anyhow::bail!(
+            "No LLM provider configured. Set TIER2_PROVIDER=gemini (or 'local') \
+             and/or GEMINI_API_KEY to enable LLM escalation."
+        );
+    }
+
+    let total = law_names.len();
+    let mut enriched = 0usize;
+    let mut failed = 0usize;
+
+    eprintln!("=== Taxa Escalation: {total} laws (gap_c=true) ===");
+
+    for law_name in law_names {
+        match enrich_single_law(lance, store, law_name, true, false).await {
+            Ok(_) => {
+                enriched += 1;
+                if enriched.is_multiple_of(10) {
+                    eprint!("\r  Escalated {enriched}/{total}...");
+                }
+            }
+            Err(e) => {
+                eprintln!("  {law_name}: escalation error: {e}");
+                failed += 1;
+            }
+        }
+
+        // Compact periodically
+        if enriched.is_multiple_of(20) && total > 20 {
+            eprint!("\r  Compacting LanceDB after {enriched} laws...");
+            if let Err(e) = lance.compact().await {
+                eprintln!(" compact error: {e}");
+            } else {
+                eprintln!(" done");
+            }
+        }
+    }
+
+    if enriched >= 10 {
+        eprintln!();
+    }
+
+    println!("Escalated {enriched}/{total} laws ({failed} failed).");
+    Ok(())
+}
+
 async fn cmd_taxa_enrich(
     data_dir: &std::path::Path,
     store: &DuckStore,
@@ -4839,618 +5680,18 @@ async fn cmd_taxa_enrich(
         let weights_path = std::path::Path::new("docs/drrp_classifier_v8.json");
 
         if model_dir.exists() && weights_path.exists() {
-            // Ensure position classifier columns exist before writing
-            lance.ensure_gap_c_columns().await?;
-            let batch_start = std::time::Instant::now();
             eprintln!(
                 "  {} pass for {enriched} laws...",
                 if pending { "Embed + classify" } else { "Classify" }
             );
-            // Only load embedder for --pending (new laws needing embeddings)
-            let mut embedder = if pending {
-                Some(fractalaw_ai::Embedder::load(&model_dir).context("loading embedding model")?)
-            } else {
-                None
-            };
-            let classifier = fractalaw_ai::DrrpClassifier::load(weights_path)
-                .context("loading DRRP classifier")?;
-            let actor_matcher = ActorMatcher::load("docs/actor-dictionary.yaml")
-                .context("loading actor dictionary for classifier")?;
 
-            let mut total_embedded = 0usize;
-            let mut total_classified = 0usize;
-            let mut total_provisions = 0usize;
-
-            for law_name in &law_names {
-                let escaped = law_name.replace('\'', "''");
-                let law_start = std::time::Instant::now();
-                // Query provisions needing embeddings or classification
-                let filter = format!("law_name = '{escaped}'");
-                let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
-
-                // (section_id, text, embedding, source_tier, section_type, has_govt_active, has_drrp)
-                type Prov = (String, String, Option<Vec<f32>>, u8, String, bool, bool);
-                let mut provisions: Vec<Prov> = Vec::new();
-                for batch in &batches {
-                    let sid_col = batch.column_by_name("section_id");
-                    let text_col = batch.column_by_name("text");
-                    let emb_col = batch.column_by_name("embedding");
-                    let method_col = batch.column_by_name("extraction_method");
-                    let st_col = batch.column_by_name("section_type");
-                    let actors_col = batch.column_by_name("actors");
-                    let drrp_col = batch.column_by_name("drrp_types");
-
-                    for row in 0..batch.num_rows() {
-                        let sid = sid_col
-                            .and_then(|c| get_string_value(c.as_ref(), row))
-                            .unwrap_or_default();
-                        let text = text_col
-                            .and_then(|c| get_string_value(c.as_ref(), row))
-                            .unwrap_or_default();
-                        let section_type = st_col
-                            .and_then(|c| get_string_value(c.as_ref(), row))
-                            .unwrap_or_default();
-
-                        let tier = method_col
-                            .and_then(|c| get_string_value(c.as_ref(), row))
-                            .map(|m| source_tier(&m))
-                            .unwrap_or(0);
-
-                        // Extract existing embedding if present
-                        let emb = emb_col
-                            .and_then(|c| {
-                                c.as_any()
-                                    .downcast_ref::<arrow::array::FixedSizeListArray>()
-                            })
-                            .filter(|a| !a.is_null(row))
-                            .and_then(|a| {
-                                let values = a
-                                    .values()
-                                    .as_any()
-                                    .downcast_ref::<arrow::array::Float32Array>()?;
-                                let dim = a.value_length() as usize;
-                                let offset = row * dim;
-                                Some(values.values()[offset..offset + dim].to_vec())
-                            });
-
-                        // Check if any active actor is government (for DRRP decomposition)
-                        let has_govt_active = actors_col
-                            .and_then(|c| {
-                                use arrow::array::AsArray;
-                                let list = c.as_list_opt::<i32>()?;
-                                if list.is_null(row) {
-                                    return None;
-                                }
-                                let struct_arr = list.value(row);
-                                let struct_arr = struct_arr.as_struct_opt()?;
-                                let label_col = struct_arr.column_by_name("label")?;
-                                let pos_col = struct_arr.column_by_name("position")?;
-                                for i in 0..struct_arr.len() {
-                                    let pos =
-                                        get_string_value(pos_col.as_ref(), i).unwrap_or_default();
-                                    if pos == "active" {
-                                        let label = get_string_value(label_col.as_ref(), i)
-                                            .unwrap_or_default();
-                                        if actor_matcher.is_government(&label) {
-                                            return Some(true);
-                                        }
-                                    }
-                                }
-                                Some(false)
-                            })
-                            .unwrap_or(false);
-
-                        // Check if provision already has DRRP from regex
-                        let has_drrp = drrp_col
-                            .and_then(|c| {
-                                use arrow::array::AsArray;
-                                let list = c.as_list_opt::<i32>()?;
-                                if list.is_null(row) {
-                                    return Some(false);
-                                }
-                                let vals = list.value(row);
-                                Some(vals.len() > 0)
-                            })
-                            .unwrap_or(false);
-
-                        provisions.push((sid, text, emb, tier, section_type, has_govt_active, has_drrp));
-                    }
-                }
-
-                if provisions.is_empty() {
-                    continue;
-                }
-
-                // Phase 1: Embed provisions (--pending only).
-                // --force skips embedding — uses existing embeddings.
-                let needs_embedding: Vec<usize> = if pending {
-                    (0..provisions.len())
-                        .filter(|&i| {
-                            let text = &provisions[i].1;
-                            text.len() > 20 && (pending || provisions[i].2.is_none())
-                        })
-                        .collect()
-                } else {
-                    Vec::new()
-                };
-
-                if !needs_embedding.is_empty() {
-                    let embedder = embedder.as_mut().expect("embedder loaded for --pending");
-                    // Collect texts to embed (clone to avoid borrow conflict)
-                    let texts: Vec<String> = needs_embedding
-                        .iter()
-                        .map(|&i| provisions[i].1.clone())
-                        .collect();
-
-                    // Embed in batches of 64
-                    for chunk_start in (0..texts.len()).step_by(64) {
-                        let chunk_end = (chunk_start + 64).min(texts.len());
-                        let chunk: Vec<&str> = texts[chunk_start..chunk_end]
-                            .iter()
-                            .map(|s| s.as_str())
-                            .collect();
-                        let embeddings = embedder.embed_batch(&chunk)?;
-                        for (j, emb) in embeddings.into_iter().enumerate() {
-                            let idx = needs_embedding[chunk_start + j];
-                            provisions[idx].2 = Some(emb);
-                        }
-                    }
-                    total_embedded += needs_embedding.len();
-                }
-
-                // Phase 2: Write embeddings via merge_insert
-                {
-                    use arrow::array::{
-                        FixedSizeListBuilder, Float32Builder, StringBuilder as SB2,
-                    };
-
-                    let mut sid_b = SB2::new();
-                    let mut emb_b = FixedSizeListBuilder::new(Float32Builder::new(), 384);
-                    let mut count = 0usize;
-
-                    for prov in &provisions {
-                        if let Some(ref e) = prov.2 {
-                            let e: &Vec<f32> = e;
-                            if e.len() == 384 {
-                                sid_b.append_value(&prov.0);
-                                let vals = emb_b.values();
-                                for &v in e {
-                                    vals.append_value(v);
-                                }
-                                emb_b.append(true);
-                                count += 1;
-                            }
-                        }
-                    }
-
-                    if count > 0 {
-                        let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
-                            arrow::datatypes::Field::new(
-                                "section_id",
-                                arrow::datatypes::DataType::Utf8,
-                                false,
-                            ),
-                            arrow::datatypes::Field::new(
-                                "embedding",
-                                arrow::datatypes::DataType::FixedSizeList(
-                                    std::sync::Arc::new(arrow::datatypes::Field::new(
-                                        "item",
-                                        arrow::datatypes::DataType::Float32,
-                                        true,
-                                    )),
-                                    384,
-                                ),
-                                true,
-                            ),
-                        ]));
-                        let batch = arrow::record_batch::RecordBatch::try_new(
-                            schema,
-                            vec![
-                                std::sync::Arc::new(sid_b.finish()),
-                                std::sync::Arc::new(emb_b.finish()),
-                            ],
-                        )?;
-                        lance.upsert_embeddings(&batch).await?;
-                    }
-                }
-
-                // Phase 3: Classify regulation-level provisions with confidence < 0.85
-                // and write back DRRP results
-                const REGULATION_TYPES: &[&str] =
-                    &["article", "sub_article", "section", "sub_section"];
-                {
-                    use arrow::array::{
-                        ArrayBuilder, Float32Builder, ListBuilder, StringBuilder as SB3,
-                    };
-
-                    let mut cls_sid_b = SB3::new();
-                    let mut cls_drrp_b = ListBuilder::new(SB3::new());
-                    let mut cls_method_b = SB3::new();
-                    let mut cls_conf_b = Float32Builder::new();
-
-                    for prov in &provisions {
-                        let sid: &str = &prov.0;
-                        let text: &str = &prov.1;
-                        let tier: u8 = prov.3;
-                        let section_type: &str = &prov.4;
-                        let _is_govt: bool = prov.5;
-                        let has_drrp: bool = prov.6;
-
-                        if tier >= source_tier("classifier")
-                            || !REGULATION_TYPES.contains(&section_type)
-                        {
-                            continue;
-                        }
-                        let embedding: &[f32] = match prov.2 {
-                            Some(ref e) => {
-                                let e: &Vec<f32> = e;
-                                if e.len() != 384 {
-                                    continue;
-                                }
-                                e.as_slice()
-                            }
-                            None => continue,
-                        };
-
-                        let features =
-                            fractalaw_ai::drrp_classifier::build_features(embedding, text);
-                        let prediction = classifier.predict(&features);
-
-                        if prediction.class == fractalaw_ai::DrrpClass::None {
-                            continue;
-                        }
-
-                        // Confidence threshold: when regex already found DRRP, require
-                        // high confidence (0.9) to override. When regex found nothing,
-                        // accept lower confidence (0.7) to fill gaps.
-                        let threshold = if has_drrp { 0.9 } else { 0.7 };
-                        if prediction.confidence < threshold {
-                            continue;
-                        }
-
-                        let drrp_type = prediction.class.as_str();
-                        cls_sid_b.append_value(sid);
-                        let drrp_vals = cls_drrp_b.values();
-                        drrp_vals.append_value(drrp_type);
-                        cls_drrp_b.append(true);
-                        cls_method_b.append_value("classifier");
-                        cls_conf_b.append_value(prediction.confidence);
-                        total_classified += 1;
-                    }
-
-                    let cls_count = cls_sid_b.len();
-                    if cls_count > 0 {
-                        let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
-                            arrow::datatypes::Field::new(
-                                "section_id",
-                                arrow::datatypes::DataType::Utf8,
-                                false,
-                            ),
-                            arrow::datatypes::Field::new(
-                                "drrp_types",
-                                arrow::datatypes::DataType::List(std::sync::Arc::new(
-                                    arrow::datatypes::Field::new(
-                                        "item",
-                                        arrow::datatypes::DataType::Utf8,
-                                        true,
-                                    ),
-                                )),
-                                true,
-                            ),
-                            arrow::datatypes::Field::new(
-                                "extraction_method",
-                                arrow::datatypes::DataType::Utf8,
-                                true,
-                            ),
-                            arrow::datatypes::Field::new(
-                                "taxa_confidence",
-                                arrow::datatypes::DataType::Float32,
-                                true,
-                            ),
-                        ]));
-                        let batch = arrow::record_batch::RecordBatch::try_new(
-                            schema,
-                            vec![
-                                std::sync::Arc::new(cls_sid_b.finish()),
-                                std::sync::Arc::new(cls_drrp_b.finish()),
-                                std::sync::Arc::new(cls_method_b.finish()),
-                                std::sync::Arc::new(cls_conf_b.finish()),
-                            ],
-                        )?;
-                        lance.upsert_embeddings(&batch).await?;
-                    }
-                }
-
-                // Phase 4: Position classification — predict active/counterparty/other
-                // per (provision, actor) pair. On disagreement, write the classifier
-                // prediction into the actor's `reason` field. Skip agentic provisions
-                // (already gold-standard). Don't overwrite existing LLM reasons.
-                {
-                    let pos_weights = std::path::Path::new("docs/position_classifier_v1.json");
-                    if pos_weights.exists() {
-                        let pos_classifier = fractalaw_ai::PositionClassifier::load(pos_weights)
-                            .context("loading position classifier")?;
-
-                        let mut pos_classified = 0usize;
-                        type ActorTuple = (String, String, Option<String>, String, Option<String>);
-                        let mut pos_updates: Vec<(String, Vec<ActorTuple>)> = Vec::new();
-
-                        for batch in &batches {
-                            let sid_col = batch.column_by_name("section_id");
-                            let text_col = batch.column_by_name("text");
-                            let emb_col = batch.column_by_name("embedding");
-                            let method_col = batch.column_by_name("extraction_method");
-                            let actors_col = batch.column_by_name("actors");
-                            let drrp_col = batch.column_by_name("drrp_types");
-
-                            for row in 0..batch.num_rows() {
-                                // Skip agentic — already has gold-standard positions
-                                let method = method_col
-                                    .and_then(|c| get_string_value(c.as_ref(), row))
-                                    .unwrap_or_default();
-                                if method == "agentic" || method == "agentic_unvalidated" {
-                                    continue;
-                                }
-
-                                let sid = sid_col
-                                    .and_then(|c| get_string_value(c.as_ref(), row))
-                                    .unwrap_or_default();
-                                let text = text_col
-                                    .and_then(|c| get_string_value(c.as_ref(), row))
-                                    .unwrap_or_default();
-
-                                // Get embedding
-                                let embedding = emb_col
-                                    .and_then(|c| {
-                                        c.as_any()
-                                            .downcast_ref::<arrow::array::FixedSizeListArray>()
-                                    })
-                                    .filter(|a| !a.is_null(row))
-                                    .and_then(|a| {
-                                        let vals = a
-                                            .values()
-                                            .as_any()
-                                            .downcast_ref::<arrow::array::Float32Array>()?;
-                                        let dim = a.value_length() as usize;
-                                        let off = row * dim;
-                                        Some(vals.values()[off..off + dim].to_vec())
-                                    });
-                                let embedding = match embedding {
-                                    Some(ref e) if e.len() == 384 => e.as_slice(),
-                                    _ => continue,
-                                };
-
-                                // Get DRRP types
-                                let drrp_types: Vec<String> = drrp_col
-                                    .and_then(|c| {
-                                        use arrow::array::AsArray;
-                                        let list = c.as_list_opt::<i32>()?;
-                                        if list.is_null(row) {
-                                            return None;
-                                        }
-                                        let vals = list.value(row);
-                                        let mut types = Vec::new();
-                                        for i in 0..vals.len() {
-                                            if let Some(s) = get_string_value(vals.as_ref(), i) {
-                                                types.push(s);
-                                            }
-                                        }
-                                        Some(types)
-                                    })
-                                    .unwrap_or_default();
-
-                                // Get actors (all 5 fields)
-                                let actors: Vec<ActorTuple> = actors_col
-                                    .and_then(|c| {
-                                        use arrow::array::AsArray;
-                                        let list = c.as_list_opt::<i32>()?;
-                                        if list.is_null(row) {
-                                            return None;
-                                        }
-                                        let sa = list.value(row);
-                                        let sa = sa.as_struct_opt()?;
-                                        let lc = sa.column_by_name("label")?;
-                                        let pc = sa.column_by_name("position")?;
-                                        let rtc = sa.column_by_name("relates_to");
-                                        let lsc = sa.column_by_name("label_source");
-                                        let rc = sa.column_by_name("reason");
-                                        let mut result = Vec::new();
-                                        for i in 0..sa.len() {
-                                            result.push((
-                                                get_string_value(lc.as_ref(), i)
-                                                    .unwrap_or_default(),
-                                                get_string_value(pc.as_ref(), i)
-                                                    .unwrap_or_default(),
-                                                rtc.and_then(|c| get_string_value(c.as_ref(), i)),
-                                                lsc.and_then(|c| get_string_value(c.as_ref(), i))
-                                                    .unwrap_or_else(|| "canonical".into()),
-                                                rc.and_then(|c| get_string_value(c.as_ref(), i)),
-                                            ));
-                                        }
-                                        Some(result)
-                                    })
-                                    .unwrap_or_default();
-
-                                if actors.is_empty() {
-                                    continue;
-                                }
-
-                                let modals = fractalaw_ai::drrp_classifier::modal_features(&text);
-                                let text_lower = text.to_lowercase();
-                                let mut updated_actors: Vec<ActorTuple> = Vec::new();
-
-                                for (label, regex_pos, relates_to, label_source, existing_reason) in
-                                    &actors
-                                {
-                                    // Check if existing reason is from LLM (tier 6) — don't touch
-                                    let has_llm_reason = existing_reason.as_ref().is_some_and(|r| {
-                                        r.contains("llm:") || r.contains("agentic:")
-                                    });
-
-                                    if has_llm_reason {
-                                        // LLM is highest tier — preserve as-is
-                                        updated_actors.push((
-                                            label.clone(),
-                                            regex_pos.clone(),
-                                            relates_to.clone(),
-                                            label_source.clone(),
-                                            existing_reason.clone(),
-                                        ));
-                                        continue;
-                                    }
-
-                                    let label_lower = label
-                                        .to_lowercase()
-                                        .split(':')
-                                        .next_back()
-                                        .unwrap_or("")
-                                        .trim()
-                                        .to_string();
-                                    let offset = text_lower.find(&label_lower);
-                                    let rel_offset = offset
-                                        .map(|o| o as f32 / text.len().max(1) as f32)
-                                        .unwrap_or(0.5);
-
-                                    let features =
-                                        fractalaw_ai::position_classifier::build_position_features(
-                                            embedding, &modals, &drrp_types, label, rel_offset,
-                                        );
-                                    let pred = pos_classifier.predict(&features);
-                                    let cls_pos = pred.class.as_str();
-                                    pos_classified += 1;
-
-                                    let agrees = regex_pos == cls_pos
-                                        || (regex_pos == "mentioned" && cls_pos == "other")
-                                        || (regex_pos == "beneficiary" && cls_pos == "other");
-
-                                    // Build provenance chain: append classifier to existing reason
-                                    let cls_segment =
-                                        format!("classifier:{}@{:.2}", cls_pos, pred.confidence);
-                                    let new_reason = match existing_reason {
-                                        Some(prev) if !prev.is_empty() => {
-                                            Some(format!("{prev} | {cls_segment}"))
-                                        }
-                                        _ => Some(cls_segment),
-                                    };
-
-                                    if !agrees {
-                                        // Position disagreement — classifier sees
-                                        // a different role. The provenance chain in
-                                        // `reason` records both views.
-                                    }
-
-                                    updated_actors.push((
-                                        label.clone(),
-                                        regex_pos.clone(),
-                                        relates_to.clone(),
-                                        label_source.clone(),
-                                        new_reason,
-                                    ));
-                                }
-
-                                // Always write back when classifier ran — provenance
-                                // chain records agreement too, not just disagreements
-                                if !updated_actors.is_empty() {
-                                    pos_updates.push((sid, updated_actors));
-                                }
-                            }
-                        }
-
-                        // Write back actors with updated reason fields
-                        if !pos_updates.is_empty() {
-                            use arrow::array::StringBuilder as SB4;
-                            use arrow::datatypes::{DataType, Field};
-
-                            let actors_fields = vec![
-                                Field::new("label", DataType::Utf8, false),
-                                Field::new("position", DataType::Utf8, false),
-                                Field::new("relates_to", DataType::Utf8, true),
-                                Field::new("label_source", DataType::Utf8, false),
-                                Field::new("reason", DataType::Utf8, true),
-                            ];
-                            let mut sid_b = SB4::new();
-                            let mut actors_b = arrow::array::ListBuilder::new(
-                                arrow::array::StructBuilder::from_fields(actors_fields.clone(), 0),
-                            );
-
-                            for (sid, actors) in &pos_updates {
-                                sid_b.append_value(sid);
-                                let sb = actors_b.values();
-                                for (label, position, relates_to, label_source, reason) in actors {
-                                    sb.field_builder::<SB4>(0).unwrap().append_value(label);
-                                    sb.field_builder::<SB4>(1).unwrap().append_value(position);
-                                    match relates_to {
-                                        Some(rt) => {
-                                            sb.field_builder::<SB4>(2).unwrap().append_value(rt)
-                                        }
-                                        None => sb.field_builder::<SB4>(2).unwrap().append_null(),
-                                    }
-                                    sb.field_builder::<SB4>(3)
-                                        .unwrap()
-                                        .append_value(label_source);
-                                    match reason {
-                                        Some(r) => {
-                                            sb.field_builder::<SB4>(4).unwrap().append_value(r)
-                                        }
-                                        None => sb.field_builder::<SB4>(4).unwrap().append_null(),
-                                    }
-                                    sb.append(true);
-                                }
-                                actors_b.append(true);
-                            }
-
-                            let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
-                                Field::new("section_id", DataType::Utf8, false),
-                                Field::new(
-                                    "actors",
-                                    DataType::List(std::sync::Arc::new(Field::new(
-                                        "item",
-                                        DataType::Struct(actors_fields.into()),
-                                        true,
-                                    ))),
-                                    true,
-                                ),
-                            ]));
-                            let batch = arrow::record_batch::RecordBatch::try_new(
-                                schema,
-                                vec![
-                                    std::sync::Arc::new(sid_b.finish()),
-                                    std::sync::Arc::new(actors_b.finish()),
-                                ],
-                            )?;
-                            lance.upsert_embeddings(&batch).await?;
-                        }
-
-                        if pos_classified > 0 {
-                            eprintln!(
-                                "    position: {pos_classified} actors, {} disagreements written",
-                                pos_updates.len()
-                            );
-                        }
-                    }
-                }
-
-                total_provisions += provisions.len();
-                let law_elapsed = law_start.elapsed();
-                eprintln!(
-                    "  {law_name}: {}/{} embedded, {total_classified} classified ({:.1}s)",
-                    needs_embedding.len(),
-                    provisions.len(),
-                    law_elapsed.as_secs_f64()
-                );
+            // --pending: compute embeddings for provisions missing them
+            if pending {
+                cmd_taxa_embed(&lance, &law_names).await?;
             }
 
-            let batch_elapsed = batch_start.elapsed();
-            eprintln!(
-                "  Embed+classify: {total_embedded}/{total_provisions} embedded, \
-                 {total_classified} classified ({:.1}s, {:.0} provisions/s)",
-                batch_elapsed.as_secs_f64(),
-                if batch_elapsed.as_secs_f64() > 0.0 {
-                    total_provisions as f64 / batch_elapsed.as_secs_f64()
-                } else {
-                    0.0
-                }
-            );
+            // Classify with DRRP + position classifiers
+            cmd_taxa_classify(&lance, &law_names).await?;
         } else {
             if !model_dir.exists() {
                 eprintln!(
