@@ -4513,23 +4513,9 @@ Respond in JSON only, no markdown:
                 ))),
                 true,
             ),
-            Field::new(
-                "drrp_history",
-                DataType::List(std::sync::Arc::new(Field::new(
-                    "item",
-                    DataType::Struct(
-                        vec![
-                            Field::new("tier", DataType::Utf8, false),
-                            Field::new("drrp", DataType::Utf8, false),
-                            Field::new("confidence", DataType::Float32, true),
-                            Field::new("timestamp", DataType::Utf8, true),
-                        ]
-                        .into(),
-                    ),
-                    true,
-                ))),
-                true,
-            ),
+            // drrp_history: written by cmd_taxa_classify, not here.
+            // Writing List<Struct> via merge_insert across multiple laws causes
+            // Lance offset panics — defer to classify pass which handles it per-law.
         ]));
 
         let taxa_batch = RecordBatch::try_new(
@@ -4557,7 +4543,6 @@ Respond in JSON only, no markdown:
                 std::sync::Arc::new(inferred_from_b.finish()),
                 std::sync::Arc::new(ancestor_distance_b.finish()),
                 std::sync::Arc::new(actors_b.finish()),
-                std::sync::Arc::new(drrp_history_b.finish()),
             ],
         )
         .context("building taxa RecordBatch")?;
