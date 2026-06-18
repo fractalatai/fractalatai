@@ -1,4 +1,9 @@
-# Session: Offence Provision Gating
+# Session: Offence Provision Gating (CLOSED)
+
+## Outcome
+
+86.3% accuracy (was 83.4%). Offence gate + legal fiction rejection + v8 classifier.
+FPs halved from 211 to 128. Remaining issues raised as #39 (classifier retraining), #40 (purpose classifier), #41 (Liberty→Obligation).
 
 ## Context
 
