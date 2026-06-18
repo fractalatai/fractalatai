@@ -404,9 +404,9 @@ enum TaxaAction {
         /// Re-enrich all laws (clear existing DuckDB taxa columns, re-process all LanceDB text)
         #[arg(long)]
         force: bool,
-        /// Enable Gap C Tier 1: deterministic parent-clause inheritance for implicit duty holders
+        /// Enable LLM escalation: inheritance + LLM classification for ambiguous provisions
         #[arg(long)]
-        gap_c: bool,
+        escalate: bool,
         /// Skip laws where all provisions were enriched within the last 24 hours
         #[arg(long)]
         skip_recent: bool,
@@ -584,7 +584,7 @@ async fn main() -> anyhow::Result<()> {
                 laws,
                 family,
                 force,
-                gap_c,
+                escalate,
                 skip_recent,
                 pending,
             } => {
@@ -637,7 +637,7 @@ async fn main() -> anyhow::Result<()> {
                     &store,
                     law_filter,
                     force,
-                    gap_c,
+                    escalate,
                     skip_recent,
                     pending,
                 )
@@ -2750,7 +2750,7 @@ async fn cmd_taxa_audit_fitness(
         total_app_scope: usize,
         polarity_matched: usize,
         with_tags: usize,
-        gap_count: usize,
+        escalateount: usize,
         cross_ref_count: usize,
         no_polarity_count: usize,
         gap_provisions: Vec<GapProvision>,
@@ -2778,7 +2778,7 @@ async fn cmd_taxa_audit_fitness(
                 total_app_scope: 0,
                 polarity_matched: 0,
                 with_tags: 0,
-                gap_count: 0,
+                escalateount: 0,
                 cross_ref_count: 0,
                 no_polarity_count: 0,
                 gap_provisions: Vec::new(),
@@ -2834,7 +2834,7 @@ async fn cmd_taxa_audit_fitness(
 
                     if rule.tags.is_empty() {
                         if rule.cross_refs.is_empty() {
-                            stats.gap_count += 1;
+                            stats.escalateount += 1;
                             stats.gap_provisions.push(GapProvision {
                                 law_name: law_name.clone(),
                                 raw_text: rule.raw_text.clone(),
@@ -2883,7 +2883,7 @@ async fn cmd_taxa_audit_fitness(
         corpus_app += s.total_app_scope;
         corpus_pol += s.polarity_matched;
         corpus_tag += s.with_tags;
-        corpus_gap += s.gap_count;
+        corpus_gap += s.escalateount;
         corpus_xref += s.cross_ref_count;
 
         if s.total_app_scope == 0 {
@@ -2903,7 +2903,7 @@ async fn cmd_taxa_audit_fitness(
             } else {
                 0.0
             },
-            s.gap_count,
+            s.escalateount,
             s.cross_ref_count,
         );
     }
@@ -3204,7 +3204,7 @@ struct ProvisionTaxa {
     fitness_plant: Vec<String>,
     fitness_property: Vec<String>,
     fitness_sector: Vec<String>,
-    // Gap C provenance
+    // Escalation provenance
     section_type: String,
     hierarchy_path: String,
     depth: i32,
@@ -3218,7 +3218,7 @@ async fn enrich_single_law(
     lance: &LanceStore,
     store: &DuckStore,
     law_name: &str,
-    gap_c: bool,
+    escalate: bool,
     force: bool,
 ) -> anyhow::Result<EnrichResult> {
     // Look up family for specialist dictionary selection
@@ -3237,8 +3237,8 @@ async fn enrich_single_law(
             .next()
     };
 
-    // Ensure Gap C provenance columns exist if Tier 1 is enabled.
-    if gap_c {
+    // Ensure Escalation provenance columns exist if Tier 1 is enabled.
+    if escalate {
         lance.ensure_gap_c_columns().await?;
     }
 
@@ -3631,17 +3631,17 @@ async fn enrich_single_law(
         }
     }
 
-    // ── Gap C Tier 1: Deterministic parent inheritance ──
+    // ── Escalation Tier 1: Deterministic parent inheritance ──
     //
     // For provisions with no DRRP but a duty-bearing purpose, walk up the
     // hierarchy to find the nearest ancestor with actors. Deepest-first:
     // stop at the closest parent that has governed_actors, not the root.
     let mut inherited_count = 0u32;
-    if gap_c {
+    if escalate {
         // Build a snapshot of section_id → index for parent lookups.
         // We iterate by index so we can read from immutable slices while
         // collecting mutations, then apply them in a second pass.
-        let gap_c_candidates: Vec<usize> = (0..provision_taxa.len())
+        let escalate_candidates: Vec<usize> = (0..provision_taxa.len())
             .filter(|&i| {
                 let p = &provision_taxa[i];
                 p.drrp_types.is_empty()
@@ -3664,7 +3664,7 @@ async fn enrich_single_law(
         }
         let mut mutations: Vec<InheritedTaxa> = Vec::new();
 
-        for &idx in &gap_c_candidates {
+        for &idx in &escalate_candidates {
             let target_path = &provision_taxa[idx].hierarchy_path;
             let target_depth = provision_taxa[idx].depth;
 
@@ -3750,19 +3750,19 @@ async fn enrich_single_law(
 
         if inherited_count > 0 {
             eprintln!(
-                "  Gap C Tier 1: {inherited_count} provisions inherited actors from parent clauses"
+                "  Escalation Tier 1: {inherited_count} provisions inherited actors from parent clauses"
             );
         }
 
         // ── Tier 2: LLM classification (local or Gemini) ──
         //
         // Routes multi-actor and DRRP=none provisions to an LLM for
-        // position + DRRP classification. Provider selected by TIER2_PROVIDER:
+        // position + DRRP classification. Provider selected by LLM_PROVIDER:
         //   "local"  → Ollama (CPU/GPU, zero API cost)
         //   "gemini" → Gemini API (requires GEMINI_API_KEY)
         //   unset    → skip Tier 2
         {
-            let tier2_provider = std::env::var("TIER2_PROVIDER").ok();
+            let tier2_provider = std::env::var("LLM_PROVIDER").ok();
             let tier2_candidates: Vec<usize> = if tier2_provider.is_some() {
                 (0..provision_taxa.len())
                     .filter(|&i| {
@@ -4036,7 +4036,7 @@ Respond in JSON only:
             }
         }
 
-        // ── Gap C Tier 3: LLM position classification (Gemini) ──
+        // ── Escalation Tier 3: LLM position classification (Gemini) ──
         //
         // For inherited provisions with multiple actors, call Gemini 2.5 Flash
         // to classify Hohfeldian positions. Only fires if GEMINI_API_KEY is set.
@@ -4220,7 +4220,7 @@ Respond in JSON only, no markdown:
                 if tier3_count > 0 {
                     let validated = tier3_count - tier3_unvalidated;
                     eprintln!(
-                        "  Gap C Tier 3: {tier3_count}/{} multi-actor provisions classified by LLM ({validated} validated, {tier3_unvalidated} with unknown labels)",
+                        "  Escalation Tier 3: {tier3_count}/{} multi-actor provisions classified by LLM ({validated} validated, {tier3_unvalidated} with unknown labels)",
                         tier3_candidates.len()
                     );
                 }
@@ -4696,7 +4696,7 @@ Respond in JSON only, no markdown:
 }
 
 /// Regex parsing + Tier 1 inheritance for a list of laws.
-/// Runs `enrich_single_law` with `gap_c=false` — no LLM calls.
+/// Runs `enrich_single_law` with `escalate=false` — no LLM calls.
 async fn cmd_taxa_parse(
     lance: &LanceStore,
     store: &DuckStore,
@@ -5518,8 +5518,8 @@ async fn cmd_taxa_classify(
 }
 
 /// LLM escalation for a list of laws: runs Tier 2 (DRRP) + Tier 3 (position).
-/// Re-runs the full pipeline with gap_c=true, which enables LLM calls when
-/// TIER2_PROVIDER and/or GEMINI_API_KEY are set in the environment.
+/// Re-runs the full pipeline with escalate=true, which enables LLM calls when
+/// LLM_PROVIDER and/or GEMINI_API_KEY are set in the environment.
 async fn cmd_taxa_escalate(
     lance: &LanceStore,
     store: &DuckStore,
@@ -5529,12 +5529,12 @@ async fn cmd_taxa_escalate(
     store.ensure_fitness_columns()?;
     lance.ensure_gap_c_columns().await?;
 
-    let tier2_provider = std::env::var("TIER2_PROVIDER").ok();
+    let tier2_provider = std::env::var("LLM_PROVIDER").ok();
     let gemini_key = std::env::var("GEMINI_API_KEY").ok();
 
     if tier2_provider.is_none() && gemini_key.is_none() {
         anyhow::bail!(
-            "No LLM provider configured. Set TIER2_PROVIDER=gemini (or 'local') \
+            "No LLM provider configured. Set LLM_PROVIDER=gemini (or 'local') \
              and/or GEMINI_API_KEY to enable LLM escalation."
         );
     }
@@ -5543,7 +5543,7 @@ async fn cmd_taxa_escalate(
     let mut enriched = 0usize;
     let mut failed = 0usize;
 
-    eprintln!("=== Taxa Escalation: {total} laws (gap_c=true) ===");
+    eprintln!("=== Taxa Escalation: {total} laws (escalate=true) ===");
 
     for law_name in law_names {
         match enrich_single_law(lance, store, law_name, true, false).await {
@@ -5583,7 +5583,7 @@ async fn cmd_taxa_enrich(
     store: &DuckStore,
     law_filter: Option<Vec<String>>,
     force: bool,
-    gap_c: bool,
+    escalate: bool,
     skip_recent: bool,
     pending: bool,
 ) -> anyhow::Result<()> {
@@ -5724,7 +5724,7 @@ async fn cmd_taxa_enrich(
 
     let mut failed = 0usize;
     for law_name in &law_names {
-        let result = match enrich_single_law(&lance, store, law_name, gap_c, force).await {
+        let result = match enrich_single_law(&lance, store, law_name, escalate, force).await {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("  {law_name}: enrich error: {e}");
