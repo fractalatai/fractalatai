@@ -31,15 +31,39 @@ The purpose classifier already has an `Offence` purpose. The `duty_patterns_offe
 
 Option A is cleanest. Offence provisions are structurally similar to Enactment — they describe consequences, not obligations. The duty is in the parent/sibling section.
 
-## Scope
+## Broader problem: purpose classifier mislabelling (from gold correction session)
 
-1. Add `Offence` to the purpose gate skip list in `should_skip_drrp()`
-2. Verify no false negatives — check if any genuine duties have Offence as primary purpose
-3. Update gold standard to mark offence provisions as `none`
-4. Re-benchmark
+The FP analysis in the gold correction session revealed 86 regex false positives where gold=none but the pipeline says Obligation/Liberty. Root cause: the purpose classifier labels these as `Process+Rule` when they are actually:
+
+- **Legal fictions** (52): "shall be treated/deemed/construed as", "Nothing in this section shall", "shall apply as if". These use "shall" in the interpretive sense, not the obligation sense. Purpose should be Interpretation, not Process+Rule.
+- **Service method** (10): "notice may be served/sent/given by electronic means". Subordinate procedural detail.
+- **Notice detail** (10): "notice must contain/specify/be in writing". Form requirements.
+- **Offence** (9): "It is an offence for any person to". Already in scope of this session.
+- **Scope extension** (5): "This article applies to...". Purpose should be Application+Scope, not Process+Rule.
+
+### Fix approach: tighten the gate, not just add offence
+
+The purpose gate currently allows `Process+Rule` provisions through unconditionally. But `Process+Rule` is too broad — it covers both substantive obligations AND procedural/interpretive provisions. 
+
+**Principle**: Interpretation, offence, and similar structural sections are very unlikely to have DRRP. They should require a HIGH BAR before being allowed through — like a regex match on a canonical obligation pattern (actor + "shall/must" in subject position).
+
+**Implementation**:
+1. Gate `Offence`-primary provisions — skip DRRP unless a strong canonical actor+modal pattern is present
+2. Tighten the `Process+Rule` gate for provisions that contain legal fiction language ("shall be treated/deemed/construed as")
+3. The actor+modal anchor check from governed v2 is the right "high bar" — if governed v2 wouldn't match, the provision is likely structural
+
+## Scope (revised)
+
+1. Add `Offence` to the purpose gate skip list (with actor override, same as other gates)
+2. Add legal fiction rejection: "shall be treated/deemed/construed/read as" provisions classified as Process+Rule should require a stronger signal (governed v2 anchor match) before producing DRRP
+3. Verify no false negatives — check genuine duties aren't blocked
+4. Update gold standard for offence provisions → none
+5. Re-benchmark
+6. Classifier retraining with none examples — fractalaw/fractalaw#39
 
 ## Key files
 
 - `crates/fractalaw-core/src/taxa/mod.rs` — `should_skip_drrp()` gate
 - `crates/fractalaw-core/src/taxa/purpose.rs` — Offence purpose classifier
 - `crates/fractalaw-core/src/taxa/duty_patterns_offence.rs` — offence-as-duty patterns
+- `crates/fractalaw-core/src/taxa/duty_type.rs` — `classify()` pattern cascade

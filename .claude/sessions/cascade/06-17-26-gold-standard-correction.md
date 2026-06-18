@@ -1,4 +1,4 @@
-# Session: Gold Standard Correction + 3-Class Model Migration (PENDING)
+# Session: Gold Standard Correction + 3-Class Model Migration (CLOSED)
 
 ## Context
 
@@ -118,7 +118,7 @@ Of the 171 misses identified in Phase 1:
 - 2 fixed: actor after modal — Office of Rail and Road, added "office of rail" to drrp_keywords (s.43A(5), s.43A(6) now Liberty)
 - 1 gold fixed: s.6(8) "as the case may be" is stock phrasing, not enabling → gold corrected to none
 - 1 remaining: s.43(4) governed actor after modal — same as Cat 2 (fractalaw/fractalaw#38)
-- 1 known issue: s.84(3) "Her Majesty may... shall" — obligation pattern fires before enabling. Both modals present, pipeline picks wrong one
+- 1 known issue: s.84(3) "Her Majesty may... shall" — obligation pattern fires before enabling. Both modals present, pipeline picks wrong one. **LLM transition candidate**: when a provision has BOTH obligation and enabling modals, regex can't determine which is the primary legal relation → escalate to LLM
 
 ### Phase 3: Sertantai
 1. Update sertantai to read `obligation_holder`/`liberty_holder`
@@ -209,9 +209,17 @@ Benchmark after migration: **79.0% accuracy, Obligation recall 85.6%**. The 31 s
    **Cat 2: Has enabling modal, no actor (13)** — PARTIALLY FIXED. Rule enabling→Liberty fix applied but these 13 provisions still miss. Thing-subject + "may" ("the guidance may be revised", "An order may contain..."). The Rule tier should now catch these but they're not matching — need to check if the thing-subject keywords list covers "guidance", "representations", "order", "scheme", "marking". → TODO: expand THING_KEYWORDS in duty_patterns_rule.rs.
 
    **Cat 3: Has enabling modal, has actor (9)** — PARTIALLY FIXED. `entitled` broadened from `entitled to` to bare `entitled`. 3 provisions fixed but 9 remain. Patterns: "Nothing in this regulation is taken to compel" (negative construction), "Regulations under subsection (1) may enable" (may + enable in same sentence), "Her Majesty may by Order in Council" (Crown as actor). → TODO: investigate why governed v2 doesn't anchor these — distance? subordinate clause rejection? compound predicate?
-5. Work through finding #5 — 60 Liberty→Obligation misclassifications
-6. Codify the cascade transition rules IN CODE, not just in docs
-7. Then re-benchmark and log the next round of findings
+5. Work through finding #1 — 231 FPs on none (gold=none but pipeline≠none):
+   - **Classifier FPs (145)**: classifier predicts Obligation/Liberty on procedural provisions. v7 none boundary too loose. Fix: retrain with more none examples from these 145 provisions.
+   - **Regex FPs (86)**, broken down:
+     - **Legal fictions (52)**: "shall be treated/deemed/construed as", "Nothing in this section shall", "shall apply as if", establishment provisions ("There shall be a body corporate"). These use "shall" in the interpretive sense, not the obligation sense. Fix options: (a) regex rejection patterns for "shall be treated/deemed/construed/read as" and "Nothing in... shall"; (b) purpose classifier improvement to catch these as Interpretation not Process+Rule.
+     - **Service method (10)**: "notice may be served/sent/given by electronic means". Subordinate detail about HOW to serve, not a new Liberty. Fix: rejection pattern.
+     - **Notice detail (10)**: "notice must contain/specify/be in writing". Form requirements. Fix: rejection pattern.
+     - **Offence (9)**: "It is an offence for any person to". Fix: offence gate (pending session).
+     - **Scope extension (5)**: "This article applies to..." Fix: purpose gate should catch — investigate why it doesn't.
+6. Work through finding #5 — 60 Liberty→Obligation misclassifications
+7. Codify the cascade transition rules IN CODE, not just in docs
+8. Then re-benchmark and log the next round of findings
 
 ### Current benchmark (2026-06-18)
 
