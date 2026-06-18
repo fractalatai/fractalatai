@@ -147,15 +147,26 @@ Add a provision-level `drrp_history` field that records what each tier said:
 ]
 ```
 
-The final `drrp_types` is determined by the highest-tier non-none entry. Disagreements are visible in the history.
+**Resolution rules for `drrp_types`:**
+- The final `drrp_types` is determined by the highest-tier entry
+- A higher-tier `none` DOES override a lower-tier DRRP — it means "I looked and there's nothing here"
+- When a tier re-runs, it clears and re-adds its OWN entry (latest timestamp per tier wins). Other tiers' entries are untouched.
+- `extraction_method` simplified to just "who won" — `drrp_history` has the full detail
 
-### Disagreement rules
+### Transition rules
 
-A provision is flagged for LLM escalation when:
+When stages run independently (`taxa classify --laws X`), they process what's specified. When run together via `taxa enrich`, the transition rules determine what gets passed forward between stages. Without these rules, LLM would run on the full stack — expensive and pointless.
+
+**Regex → Classifier**: all provisions with embeddings. The classifier adds signal to everything it can — it's cheap (microseconds per provision). No filtering needed.
+
+**Classifier → LLM**: only flagged provisions. This is the critical filter — it determines what costs money and time. A provision is flagged for LLM when:
 - Regex and classifier disagree on DRRP type (regex=Obligation, classifier=Liberty)
 - Both obligation and enabling modals are present in the text (#41)
 - Classifier confidence is below a threshold on a provision where regex found DRRP
-- No actor extracted but modal present (implied actor — LLM needs context)
+- Regex=none AND classifier predicts DRRP at low confidence (weak signal worth verifying)
+- No actor extracted but modal present (implied actor — LLM needs sibling context #38)
+
+Everything else stays at its current classification. The LLM only sees provisions that need resolving.
 
 ### Naming cleanup
 
@@ -180,11 +191,26 @@ A provision is flagged for LLM escalation when:
 
 This is a significant refactor of `main.rs` (the largest file in the codebase). It should be done in stages:
 
-1. **Stage 1**: Extract `taxa parse`, `taxa classify`, `taxa escalate` as separate functions. Keep them callable from `taxa enrich` for backward compatibility.
-2. **Stage 2**: Wire the cascade — `taxa classify` reads regex output, flags disagreements. `taxa escalate` reads flagged provisions.
-3. **Stage 3**: Add `drrp_history` field to LanceDB schema. Each tier appends to it.
-4. **Stage 4**: Rename cryptic flags (`--gap-c` → `--escalate`, `TIER2_PROVIDER` → `LLM_PROVIDER`).
-5. **Stage 5**: Add CLI subcommands so each tier can run independently.
+1. **Stage 1**: Add `drrp_history` field to LanceDB schema. Migration script for existing data. This must land first — Stages 2-3 write to it.
+2. **Stage 2**: Extract `taxa parse`, `taxa classify`, `taxa escalate` as separate functions within main.rs. Keep them callable from `taxa enrich` for backward compatibility.
+3. **Stage 3**: Wire the cascade — `taxa classify` reads regex output and appends to `drrp_history`, flags disagreements. `taxa escalate` reads flagged provisions and appends its resolution.
+4. **Stage 4**: Rename cryptic flags (`--gap-c` → `--escalate`, `TIER2_PROVIDER` → `LLM_PROVIDER`). Add CLI subcommands so each tier can run independently.
+5. **Stage 5**: Error handling — if LLM rate-limits or classifier errors, log and continue (don't fail the whole `taxa enrich` run). Retry logic for external services.
+
+### `taxa enrich` orchestration
+
+When `taxa enrich` chains the stages:
+```
+taxa enrich --laws X
+  → taxa parse --laws X
+  → taxa embed --laws X (only provisions without embeddings)
+  → taxa classify --laws X (all provisions with embeddings)
+  → taxa escalate --laws X (only flagged provisions, if LLM_PROVIDER set)
+```
+
+For `--pending` (new laws via sync watch), `taxa embed` runs because new provisions lack embeddings. For `--force` (re-enrichment), `taxa embed` is skipped — embeddings already exist.
+
+If any stage fails (e.g., LLM API error), the pipeline logs the error and continues — the provision keeps its current best classification. Failed provisions can be retried later by running the failing stage independently.
 
 ## Key files
 
