@@ -1,4 +1,12 @@
-# Session: Cascade Transition Rules — Codify in Code
+# Session: Cascade Transition Rules — Codify in Code (SUSPENDED)
+
+## Resume Point (2026-06-18)
+
+**Stage 1**: DONE — `drrp_history` field added to LanceDB, migration complete.
+**Stage 2**: IN PROGRESS — extracting `cmd_taxa_parse`, `cmd_taxa_classify`, `cmd_taxa_escalate`, `cmd_taxa_embed` from `enrich_single_law` + `cmd_taxa_enrich` in main.rs. Plan approved. No code changes yet — agent failed on disk, doing manually.
+**Stage 3-5**: NOT STARTED.
+
+**To resume**: read this session doc + the plan at `.claude/plans/staged-booping-candy.md`
 
 ## Context
 
