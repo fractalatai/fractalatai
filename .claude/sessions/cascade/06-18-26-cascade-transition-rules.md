@@ -1,12 +1,14 @@
-# Session: Cascade Transition Rules — Codify in Code
+# Session: Cascade Transition Rules — Codify in Code (CLOSED)
 
-## Resume Point (2026-06-18)
+## Outcome
 
-**Stage 1**: DONE (`7de07d8`)
-**Stage 2**: DONE (`010cc69`)
-**Stage 3-5**: NOT STARTED.
+Pipeline restructured from tangled two-pass architecture to loosely coupled cascade: `taxa parse → taxa classify → taxa escalate`. Each tier runs independently via CLI subcommands. drrp_history records provenance. Disagreements flagged for LLM. Cryptic flags renamed.
 
-**To resume**: read this session doc + the plan at `.claude/plans/staged-booping-candy.md`
+**Stage 1**: DONE (`7de07d8`) — drrp_history schema + migration
+**Stage 2**: DONE (`010cc69`) — extract 4 functions + CLI subcommands
+**Stage 3**: DONE (`fcd0fc4`, `c8c49a6`) — cascade wiring + disagreement detection. Deferred: #42, #43, #44
+**Stage 4**: DONE (`3d52f29`) — `--gap-c` → `--escalate`, `TIER2_PROVIDER` → `LLM_PROVIDER`
+**Stage 5**: DONE (`53f4a5b`) — error handling (embed/classify failures don't stop enrichment)
 
 ### Stage 1 completion checklist
 
@@ -51,14 +53,35 @@
 
 ### Stage 3 remaining gaps
 
-| # | Gap | Status |
-|---|-----|--------|
-| 1 | `taxa escalate` doesn't consume `pending_llm` flags | ✅ FIXED — `enrich_single_law` Tier 2 candidate filter now includes `pending_llm` provisions |
-| 2 | `taxa escalate` doesn't write to drrp_history | KNOWN LIMITATION — `enrich_single_law` builds a single history entry per provision reflecting whoever won last. True multi-entry requires accumulating entries in ProvisionTaxa or read-modify-write from LanceDB. |
-| 3 | Low-confidence classifier on regex=none provisions not flagged for LLM | ✅ FIXED — below-threshold classifier predictions on regex=none now flagged as `pending_llm` |
-| 4 | No actor + modal provisions not detected as LLM candidates | DEFERRED — requires reading actors from LanceDB in the classifier pass, which it doesn't currently do. Better as a post-parse filter. |
-| 5 | Resolution rules not codified — highest-tier wins via drrp_history | DEFERRED — consumer-side concern. Write path records each tier's decision. Read path (benchmarks, publish) should resolve by taking highest-tier entry. |
-| 6 | drrp_history doesn't clear own tier on re-run | KNOWN LIMITATION — appends duplicate entries. Consumers should take latest-timestamped entry per tier. Fix requires read-modify-write which is expensive with merge_insert. |
+| # | Gap | Status | Ref |
+|---|-----|--------|-----|
+| 1 | `taxa escalate` doesn't consume `pending_llm` flags | ✅ FIXED | `c8c49a6` |
+| 2 | `taxa escalate` doesn't write to drrp_history | KNOWN LIMITATION — single entry per write pass, last writer wins | #42 |
+| 3 | Low-confidence classifier on regex=none not flagged for LLM | ✅ FIXED — flagged as `pending_llm` | `c8c49a6` |
+| 4 | No actor + modal provisions not detected as LLM candidates | DEFERRED — needs actor access in classifier pass | #43 |
+| 5 | Resolution rules not codified via drrp_history | DEFERRED — consumer-side concern | #44 |
+| 6 | drrp_history doesn't clear own tier on re-run | KNOWN LIMITATION — latest timestamp per tier is authoritative | #42 |
+
+### Stage 4 completion checklist
+
+| Requirement | Status | Commit |
+|-------------|--------|--------|
+| `--gap-c` renamed to `--escalate` | ✅ | `3d52f29` |
+| CLI help text updated for `--escalate` | ✅ | `3d52f29` |
+| `TIER2_PROVIDER` renamed to `LLM_PROVIDER` | ✅ | `3d52f29` |
+| "Gap C" comments updated to "Escalation" in main.rs | ✅ | `3d52f29` |
+| `ensure_gap_c_columns()` function name kept (cross-crate, rename later) | noted | — |
+| Workspace compiles, 476 tests pass | ✅ | `3d52f29` |
+
+### Stage 5 completion checklist
+
+| Requirement | Status | Commit |
+|-------------|--------|--------|
+| `cmd_taxa_embed` failure in orchestrator: log and continue | ✅ | `53f4a5b` |
+| `cmd_taxa_classify` failure in orchestrator: log and continue | ✅ | `53f4a5b` |
+| Per-law errors in parse: already handled (retry count) | ✅ | pre-existing |
+| Per-law errors in escalate: already handled (retry count) | ✅ | pre-existing |
+| Failed stages retryable independently via CLI subcommands | ✅ | Stage 2 |
 
 ## Context
 
@@ -257,8 +280,8 @@ This is a significant refactor of `main.rs` (the largest file in the codebase). 
 1. ~~**Stage 1**~~: DONE (`7de07d8`). `drrp_history` field added to LanceDB schema. Migration script for existing data. 134K provisions populated.
 2. ~~**Stage 2**~~: DONE (`010cc69`). `cmd_taxa_parse`, `cmd_taxa_classify`, `cmd_taxa_escalate`, `cmd_taxa_embed` extracted as separate functions + CLI subcommands. Orchestrator rewired.
 3. ~~**Stage 3**~~: DONE (`fcd0fc4`). Wire the cascade — `taxa classify` reads regex output and appends to `drrp_history`, flags disagreements.
-4. **Stage 4**: Rename cryptic flags (`--gap-c` → `--escalate`, `TIER2_PROVIDER` → `LLM_PROVIDER`).
-5. **Stage 5**: Error handling — if LLM rate-limits or classifier errors, log and continue (don't fail the whole `taxa enrich` run). Retry logic for external services.
+4. ~~**Stage 4**~~: DONE (`3d52f29`). Renamed `--gap-c` → `--escalate`, `TIER2_PROVIDER` → `LLM_PROVIDER`.
+5. ~~**Stage 5**~~: DONE (`53f4a5b`). Error handling — embed/classify failures logged, pipeline continues.
 
 ### `taxa enrich` orchestration
 
