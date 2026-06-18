@@ -5798,11 +5798,15 @@ async fn cmd_taxa_enrich(
 
             // --pending: compute embeddings for provisions missing them
             if pending {
-                cmd_taxa_embed(&lance, &law_names).await?;
+                if let Err(e) = cmd_taxa_embed(&lance, &law_names).await {
+                    eprintln!("  Embed failed (continuing): {e}");
+                }
             }
 
             // Classify with DRRP + position classifiers
-            cmd_taxa_classify(&lance, &law_names).await?;
+            if let Err(e) = cmd_taxa_classify(&lance, &law_names).await {
+                eprintln!("  Classify failed (continuing): {e}");
+            }
         } else {
             if !model_dir.exists() {
                 eprintln!(
