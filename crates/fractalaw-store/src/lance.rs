@@ -243,12 +243,12 @@ impl LanceStore {
         // Position classifier output is stored in the actors struct `reason` field
         // (only when classifier disagrees with regex position).
 
-        // drrp_history: native List<Struct> — created during table rebuild, not via add_columns.
+        // drrp_history: JSON string (was List<Struct>, changed to avoid Lance offset panics).
         // Records what each tier (regex, classifier, llm) predicted for this provision.
         if schema.field_with_name("drrp_history").is_err() {
             tracing::warn!(
                 "drrp_history column missing from legislation_text — \
-                 run scripts/migrate_drrp_history.py to add it (requires table rebuild)"
+                 run scripts/migrate_drrp_history.py to add it"
             );
         }
 

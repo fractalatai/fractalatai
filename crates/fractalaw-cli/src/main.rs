@@ -4267,16 +4267,7 @@ Respond in JSON only, no markdown:
             actors_struct_fields.clone(),
             0,
         ));
-        let drrp_history_fields: Vec<Field> = vec![
-            Field::new("tier", DataType::Utf8, false),
-            Field::new("drrp", DataType::Utf8, false),
-            Field::new("confidence", DataType::Float32, true),
-            Field::new("timestamp", DataType::Utf8, true),
-        ];
-        let mut drrp_history_b = ListBuilder::new(arrow::array::StructBuilder::from_fields(
-            drrp_history_fields.clone(),
-            0,
-        ));
+        let mut drrp_history_b = StringBuilder::new();
 
         let now_ns = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
         let now_iso = chrono::Utc::now().to_rfc3339();
@@ -4419,48 +4410,20 @@ Respond in JSON only, no markdown:
                 actors_b.append(true);
             }
 
-            // drrp_history: record what this tier (regex) said
-            if pt.drrp_types.is_empty() {
-                // No DRRP — record "none" entry
-                let hist_b = drrp_history_b.values();
-                hist_b
-                    .field_builder::<StringBuilder>(0)
-                    .unwrap()
-                    .append_value(&pt.extraction_method);
-                hist_b
-                    .field_builder::<StringBuilder>(1)
-                    .unwrap()
-                    .append_value("none");
-                hist_b
-                    .field_builder::<Float32Builder>(2)
-                    .unwrap()
-                    .append_value(pt.taxa_confidence.unwrap_or(0.0));
-                hist_b
-                    .field_builder::<StringBuilder>(3)
-                    .unwrap()
-                    .append_value(&now_iso);
-                hist_b.append(true);
-                drrp_history_b.append(true);
-            } else {
-                let hist_b = drrp_history_b.values();
-                hist_b
-                    .field_builder::<StringBuilder>(0)
-                    .unwrap()
-                    .append_value(&pt.extraction_method);
-                hist_b
-                    .field_builder::<StringBuilder>(1)
-                    .unwrap()
-                    .append_value(&pt.drrp_types[0]);
-                hist_b
-                    .field_builder::<Float32Builder>(2)
-                    .unwrap()
-                    .append_value(pt.taxa_confidence.unwrap_or(0.0));
-                hist_b
-                    .field_builder::<StringBuilder>(3)
-                    .unwrap()
-                    .append_value(&now_iso);
-                hist_b.append(true);
-                drrp_history_b.append(true);
+            // drrp_history: record what this tier (regex) said — JSON array
+            {
+                let drrp_val = if pt.drrp_types.is_empty() {
+                    "none"
+                } else {
+                    &pt.drrp_types[0]
+                };
+                let entry = serde_json::json!([{
+                    "tier": &pt.extraction_method,
+                    "drrp": drrp_val,
+                    "confidence": pt.taxa_confidence.unwrap_or(0.0),
+                    "timestamp": &now_iso,
+                }]);
+                drrp_history_b.append_value(entry.to_string());
             }
         }
 
@@ -4513,9 +4476,7 @@ Respond in JSON only, no markdown:
                 ))),
                 true,
             ),
-            // drrp_history: written by cmd_taxa_classify, not here.
-            // Writing List<Struct> via merge_insert across multiple laws causes
-            // Lance offset panics — defer to classify pass which handles it per-law.
+            Field::new("drrp_history", DataType::Utf8, true),
         ]));
 
         let taxa_batch = RecordBatch::try_new(
@@ -4543,6 +4504,7 @@ Respond in JSON only, no markdown:
                 std::sync::Arc::new(inferred_from_b.finish()),
                 std::sync::Arc::new(ancestor_distance_b.finish()),
                 std::sync::Arc::new(actors_b.finish()),
+                std::sync::Arc::new(drrp_history_b.finish()),
             ],
         )
         .context("building taxa RecordBatch")?;
@@ -4928,8 +4890,8 @@ async fn cmd_taxa_classify(
         let filter = format!("law_name = '{escaped}'");
         let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
 
-        // (section_id, text, embedding, source_tier, section_type, has_govt_active, has_drrp)
-        type Prov = (String, String, Option<Vec<f32>>, u8, String, bool, bool);
+        // (section_id, text, embedding, source_tier, section_type, has_govt_active, has_drrp, drrp_history)
+        type Prov = (String, String, Option<Vec<f32>>, u8, String, bool, bool, Option<String>);
         let mut provisions: Vec<Prov> = Vec::new();
         for batch in &batches {
             let sid_col = batch.column_by_name("section_id");
@@ -4939,6 +4901,7 @@ async fn cmd_taxa_classify(
             let st_col = batch.column_by_name("section_type");
             let actors_col = batch.column_by_name("actors");
             let drrp_col = batch.column_by_name("drrp_types");
+            let hist_col = batch.column_by_name("drrp_history");
 
             for row in 0..batch.num_rows() {
                 let sid = sid_col
@@ -5010,7 +4973,10 @@ async fn cmd_taxa_classify(
                     })
                     .unwrap_or(false);
 
-                provisions.push((sid, text, emb, tier, section_type, has_govt_active, has_drrp));
+                let existing_hist = hist_col
+                    .and_then(|c| get_string_value(c.as_ref(), row));
+
+                provisions.push((sid, text, emb, tier, section_type, has_govt_active, has_drrp, existing_hist));
             }
         }
 
@@ -5042,18 +5008,9 @@ async fn cmd_taxa_classify(
             let mut cls_method_b = SB3::new();
             let mut cls_conf_b = Float32Builder::new();
 
-            // drrp_history builder — appends classifier entry
-            let hist_fields: Vec<Field> = vec![
-                Field::new("tier", DataType::Utf8, false),
-                Field::new("drrp", DataType::Utf8, false),
-                Field::new("confidence", DataType::Float32, true),
-                Field::new("timestamp", DataType::Utf8, true),
-            ];
+            // drrp_history builder — appends classifier entry as JSON
             let mut hist_sid_b = SB3::new();
-            let mut hist_b = ListBuilder::new(arrow::array::StructBuilder::from_fields(
-                hist_fields.clone(),
-                0,
-            ));
+            let mut hist_b = SB3::new();
 
             let mut disagreements = 0usize;
 
@@ -5064,6 +5021,7 @@ async fn cmd_taxa_classify(
                 let section_type: &str = &prov.4;
                 let _is_govt: bool = prov.5;
                 let has_drrp: bool = prov.6;
+                let existing_hist: Option<&str> = prov.7.as_deref();
 
                 if tier >= source_tier("classifier")
                     || !REGULATION_TYPES.contains(&section_type)
@@ -5086,27 +5044,20 @@ async fn cmd_taxa_classify(
                 let prediction = classifier.predict(&features);
                 let cls_drrp = prediction.class.as_str();
 
-                // Always record classifier prediction in drrp_history
+                // Always record classifier prediction in drrp_history (JSON)
                 hist_sid_b.append_value(sid);
-                let hist_struct = hist_b.values();
-                hist_struct
-                    .field_builder::<SB3>(0)
-                    .unwrap()
-                    .append_value("classifier");
-                hist_struct
-                    .field_builder::<SB3>(1)
-                    .unwrap()
-                    .append_value(cls_drrp);
-                hist_struct
-                    .field_builder::<Float32Builder>(2)
-                    .unwrap()
-                    .append_value(prediction.confidence);
-                hist_struct
-                    .field_builder::<SB3>(3)
-                    .unwrap()
-                    .append_value(&now_iso);
-                hist_struct.append(true);
-                hist_b.append(true);
+                let new_entry = serde_json::json!({
+                    "tier": "classifier",
+                    "drrp": cls_drrp,
+                    "confidence": prediction.confidence,
+                    "timestamp": &now_iso,
+                });
+                // Append to existing history if present
+                let mut history: Vec<serde_json::Value> = existing_hist
+                    .and_then(|h| serde_json::from_str(h).ok())
+                    .unwrap_or_default();
+                history.push(new_entry);
+                hist_b.append_value(serde_json::to_string(&history).unwrap());
 
                 // Detect both-modals provisions (LLM escalation signal)
                 let both_modals =
@@ -5196,28 +5147,12 @@ async fn cmd_taxa_classify(
                 lance.upsert_embeddings(&batch).await?;
             }
 
-            // Write drrp_history updates (classifier entries)
+            // Write drrp_history updates (classifier entries — JSON strings)
             let hist_count = hist_sid_b.len();
             if hist_count > 0 {
                 let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
                     Field::new("section_id", DataType::Utf8, false),
-                    Field::new(
-                        "drrp_history",
-                        DataType::List(std::sync::Arc::new(Field::new(
-                            "item",
-                            DataType::Struct(
-                                vec![
-                                    Field::new("tier", DataType::Utf8, false),
-                                    Field::new("drrp", DataType::Utf8, false),
-                                    Field::new("confidence", DataType::Float32, true),
-                                    Field::new("timestamp", DataType::Utf8, true),
-                                ]
-                                .into(),
-                            ),
-                            true,
-                        ))),
-                        true,
-                    ),
+                    Field::new("drrp_history", DataType::Utf8, true),
                 ]));
                 let batch = arrow::record_batch::RecordBatch::try_new(
                     schema,
