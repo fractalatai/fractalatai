@@ -534,14 +534,19 @@ pub fn should_skip_drrp(
 
     let has_any_actor = has_governed_actor || has_government_actor;
 
-    // Amendment/Repeal provisions never bear their own DRRP — obligations
-    // in quoted text belong to the target section, not this provision.
-    // Skip unconditionally regardless of actors present.
-    if purposes
-        .iter()
-        .any(|p| *p == purpose::AMENDMENT || *p == purpose::REPEAL_REVOCATION)
-    {
+    // Amendment provisions never bear their own DRRP — obligations in quoted
+    // text belong to the target section, not this provision.
+    if purposes.iter().any(|p| *p == purpose::AMENDMENT) {
         return true;
+    }
+
+    // Repeal/Revocation provisions usually describe what is repealed, not new
+    // obligations. However, government actors in revocation provisions often
+    // exercise powers — "a direction may be revoked or modified", "the
+    // Secretary of State may by order revoke". Allow DRRP when government
+    // actors are present.
+    if purposes.iter().any(|p| *p == purpose::REPEAL_REVOCATION) {
+        return !has_government_actor;
     }
 
     // Offence provisions usually describe consequences (penalties, liability),
