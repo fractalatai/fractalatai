@@ -134,7 +134,7 @@ fn map_to_duty_type(dc: &DutyClassification) -> Vec<DutyType> {
         }
         DutyFamily::Rule => match dc.sub_type {
             DutySubType::Enabling => vec![DutyType::Liberty],
-            _ => vec![DutyType::Rule],
+            _ => vec![DutyType::Obligation], // thing-subject obligations — implied duty-holder resolved by classifier/LLM
         },
         DutyFamily::Unknown => Vec::new(),
     }
@@ -323,10 +323,12 @@ mod tests {
     }
 
     #[test]
-    fn classify_thing_subject_as_rule() {
+    fn classify_thing_subject_as_obligation() {
+        // Thing-subject obligations (no person-actor) now map to Obligation
+        // — implied duty-holder resolved by classifier/LLM tiers
         let text = "every traffic routes must be suitable for the persons using them";
         let result = classify(text, &[], &[]);
-        assert_eq!(result.duty_types, vec![DutyType::Rule]);
+        assert_eq!(result.duty_types, vec![DutyType::Obligation]);
     }
 
     #[test]

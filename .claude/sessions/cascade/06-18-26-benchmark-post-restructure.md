@@ -1,32 +1,52 @@
-# Session: Benchmark Post-Restructure (SUSPENDED)
+# Session: Benchmark Post-Restructure (CLOSED)
 
-## Resume Point (2026-06-18)
+## Progress
 
-**Blocker**: Lance panic on multi-law `taxa parse --force` — List<Struct> offset corruption in `drrp_history` column (#45). Single-law runs work. Multi-law panics. Need to either drop and re-add the column as empty, or downgrade to a simpler type (JSON string).
+### ✅ Blocker resolved: #45 Lance panic fixed (2026-06-21)
 
-**To resume**: fix #45 first, then re-run the benchmark.
+- Changed `drrp_history` column from `List<Struct>` to `Utf8` (JSON string) — commit `1d0f0e5`
+- Migrated 134K existing history entries to JSON via `scripts/migrate_drrp_history_json.py`
+- Multi-law parse confirmed working: `taxa parse --laws UK_eudr_2013_59,UK_ukpga_1974_37 --force` — 2/2 laws, no panic
+- NAS backup taken (20260621)
+- `drrp_history` now written inline during enrich pass (no longer deferred to classify)
+- Classify pass properly appends to existing history instead of overwriting
+- GH issue #45 closed
 
-### Progress before suspension
+### Pre-suspension progress (2026-06-18)
 
 - ✅ `taxa parse --laws UK_ukpga_1974_37 --force` — works (single law)
 - ✅ `taxa classify --laws UK_ukpga_1974_37` — works (118 classified, 116 flagged for LLM)
-- ❌ `taxa parse --laws <all 16 benchmark laws> --force` — panics on second/third law
-- Workaround applied: removed drrp_history from regex parse write path
-- Still panics — the corrupted drrp_history data from migration causes Lance read failures during merge_insert
 
-### Fix needed before resuming
+### Benchmark pipeline run (2026-06-22)
 
-Drop `drrp_history` column from LanceDB and rebuild table. Then re-add as empty column. The migrated data (134K pre-populated entries) is causing the corruption. The column will be populated correctly by the classifier pass going forward.
+- ✅ `taxa parse --laws <all 16> --force` — 16/16, 0 failed
+- ✅ `taxa classify --laws <all 16>` — 1,748 classified across 19,471 provisions (50.5s)
+- ✅ Compacted LanceDB (2.5GB → 472MB)
+- ✅ `benchmark_report.py` — pointed to local `data/benchmarks/` (NAS benchmarks were corrupted)
 
-```bash
-# When resuming:
-# 1. Drop drrp_history, rebuild table
-# 2. Re-run migration with empty history (no bootstrapping)
-# 3. taxa parse --laws <benchmark_laws> --force
-# 4. taxa classify --laws <benchmark_laws>
-# 5. Compact
-# 6. Run benchmark
-```
+### Benchmark results
+
+**DRRP accuracy: 84.4%** (1,898/2,250) — down from 86.3% pre-restructure
+
+| Class | Precision | Recall | F1 | Support |
+|-------|-----------|--------|-----|---------|
+| Liberty | 66.7% | 81.8% | 73.5% | 357 |
+| Obligation | 84.0% | 90.6% | 87.2% | 791 |
+| none | 95.1% | 80.7% | 87.3% | 1102 |
+
+**Actor position accuracy: 34.3%** (70/204) — `beneficiary` and `mentioned` never predicted
+
+**Top error patterns:**
+- 123 gold=`none` predicted as `Liberty` (biggest single error — Liberty false positives)
+- 81 gold=`none` predicted as `Obligation`
+- 56 gold=`Liberty` predicted as `Obligation`
+- `Rule` class: 0 support in gold, 23 pipeline predictions
+
+### Follow-on sessions
+
+- `06-22-26-liberty-false-positives.md` (PENDING) — investigate none→Liberty leakage
+- `06-22-26-actor-position-coverage.md` (PENDING) — beneficiary/mentioned never predicted
+- `06-22-26-rule-class-cleanup.md` (ACTIVE) — Rule class has 0 gold support but 23 pipeline predictions
 
 ## Context
 

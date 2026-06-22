@@ -20,7 +20,7 @@ from collections import Counter
 import lancedb
 import pyarrow.parquet as pq
 
-BENCHMARK_DIR = "/mnt/nas/sertantai-data/data/fractalaw-benchmarks"
+BENCHMARK_DIR = "data/benchmarks"
 
 
 def load_benchmarks(family_filter=None):
