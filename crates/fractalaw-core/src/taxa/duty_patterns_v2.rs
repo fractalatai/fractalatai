@@ -784,9 +784,9 @@ fn classify_after_modal(
         });
     }
 
-    // Right/entitlement: "shall be entitled to", "has a right to"
+    // Right/entitlement/power: "shall be entitled to", "has a right to", "have the right/authority/power"
     static RIGHT_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?i)\b(?:entitled to|has a right to|have the right to)\b").unwrap()
+        Regex::new(r"(?i)\b(?:entitled to|has a right|have the right|have the authority|have the power|have (?:a )?power to)\b").unwrap()
     });
     if RIGHT_RE.is_match(text_after_modal) {
         return Some(DutyClassification {

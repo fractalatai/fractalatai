@@ -406,22 +406,42 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
             span: find_government_span(text),
         }, text));
     }
-    // Blunt gate — already modal-aware (obligation vs enabling checked separately)
-    if has_government_actor(text) && has_obligation(text) {
-        return Some(DutyClassification {
-            family: DutyFamily::Government,
-            sub_type: DutySubType::Prescriptive,
-            confidence: 0.60,
-            span: find_government_span(text),
-        });
-    }
-    if has_government_actor(text) && has_enabling(text) {
-        return Some(DutyClassification {
-            family: DutyFamily::Government,
-            sub_type: DutySubType::Enabling,
-            confidence: 0.55,
-            span: find_government_span(text),
-        });
+    // Blunt gate — check which modal type dominates
+    if has_government_actor(text) {
+        let has_obl = has_obligation(text);
+        let has_ena = has_enabling(text);
+        if has_obl && has_ena {
+            // Both modals present — enabling wins if it appears first
+            if first_modal_is_enabling(text) {
+                return Some(DutyClassification {
+                    family: DutyFamily::Government,
+                    sub_type: DutySubType::Enabling,
+                    confidence: 0.55,
+                    span: find_government_span(text),
+                });
+            } else {
+                return Some(DutyClassification {
+                    family: DutyFamily::Government,
+                    sub_type: DutySubType::Prescriptive,
+                    confidence: 0.60,
+                    span: find_government_span(text),
+                });
+            }
+        } else if has_obl {
+            return Some(DutyClassification {
+                family: DutyFamily::Government,
+                sub_type: DutySubType::Prescriptive,
+                confidence: 0.60,
+                span: find_government_span(text),
+            });
+        } else if has_ena {
+            return Some(DutyClassification {
+                family: DutyFamily::Government,
+                sub_type: DutySubType::Enabling,
+                confidence: 0.55,
+                span: find_government_span(text),
+            });
+        }
     }
     None
 }
