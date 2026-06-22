@@ -1743,7 +1743,8 @@ async fn cmd_taxa_show(
 
             section_num += 1;
 
-            let record = fractalaw_core::taxa::parse_v2(&text, family.as_deref());
+            let (record, trail) =
+                fractalaw_core::taxa::parse_v2_with_trail(&text, family.as_deref());
 
             // Skip sections with no classification signal.
             if record.duty_types.is_empty()
@@ -1767,6 +1768,21 @@ async fn cmd_taxa_show(
                     class.family,
                     class.sub_type,
                     class.confidence * 100.0,
+                );
+            }
+
+            // Decision trail
+            println!(
+                "  Trail:   {} ({} candidates, {} rejected)",
+                trail.reason, trail.candidates_count, trail.rejections_count,
+            );
+            if let Some(ref winner) = trail.winner {
+                println!(
+                    "  Winner:  {:?} / {:?} ({:.0}%) via {:?}",
+                    winner.family,
+                    winner.sub_type,
+                    winner.confidence * 100.0,
+                    winner.tier,
                 );
             }
 

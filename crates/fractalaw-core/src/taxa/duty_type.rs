@@ -56,19 +56,12 @@ pub struct ClassificationResult {
 
 /// Classify a **downcased** legal text into DRRP duty types.
 ///
-/// Tries pattern tiers in order:
-/// 1. Governed v2: actor-anchored patterns (actor keyword before modal within window)
-/// 2. Government v1 (strong patterns — embedded actor keywords)
-/// 3. Government v2 (extended patterns — embedded actor keywords)
-/// 4. Offence-as-duty (offence-creating language as implicit prohibition)
-/// 5. Rule (thing-subject + modal — no person-actor)
-/// 6. Falls back to `Unknown` / empty
+/// **Deprecated**: Use `signals::extract_all()` + `decision::decide()` instead.
+/// This function remains for backward compatibility with tests.
 ///
-/// The family determines DRRP mapping:
-/// - `Government` + obligation → Obligation
-/// - `Government` + enabling   → Liberty
-/// - `Governed`   + obligation → Obligation
-/// - `Governed`   + enabling   → Liberty
+/// Tries pattern tiers in order (first-match-wins):
+/// 1. Governed v2 → 2. Government v1 → 3. Government v2 → 4. Offence → 5. Rule
+#[deprecated(note = "use signals::extract_all() + decision::decide() instead")]
 pub fn classify(
     text: &str,
     governed_actors: &[ActorMatch],
@@ -177,6 +170,7 @@ pub fn sort_duty_types(types: &mut Vec<DutyType>) {
 // ── Tests ────────────────────────────────────────────────────────────
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
     use crate::taxa::actors::ActorMatch;
