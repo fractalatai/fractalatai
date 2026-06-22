@@ -187,6 +187,28 @@ fn find_government_span(text: &str) -> Option<MatchSpan> {
     })
 }
 
+/// Check whether the first modal verb in the text is enabling (may/power to/entitled)
+/// rather than obligatory (shall/must). Used to override government pattern sub-types
+/// when the keyword pattern matches but the modal context is enabling.
+fn first_modal_is_enabling(text: &str) -> bool {
+    let enabling_pos = ENABLING.find(text).map(|m| m.start());
+    let obligation_pos = OBLIGATION.find(text).map(|m| m.start());
+    match (enabling_pos, obligation_pos) {
+        (Some(_), None) => true,
+        (Some(e), Some(o)) => e < o,
+        _ => false,
+    }
+}
+
+/// Apply modal context to a government classification: if the text's first modal
+/// is enabling, override the sub-type to Enabling (→ Liberty).
+fn apply_modal_context(mut dc: DutyClassification, text: &str) -> DutyClassification {
+    if dc.sub_type != DutySubType::Enabling && first_modal_is_enabling(text) {
+        dc.sub_type = DutySubType::Enabling;
+    }
+    dc
+}
+
 /// Clamp a float to the 0.0..=1.0 range, rounded to 3 decimal places.
 pub fn clamp01(v: f32) -> f32 {
     ((v.clamp(0.0, 1.0)) * 1000.0).round() / 1000.0
@@ -195,56 +217,62 @@ pub fn clamp01(v: f32) -> f32 {
 // ── Pattern matchers ─────────────────────────────────────────────────
 
 /// Try government duty patterns (v1) against downcased text.
+///
+/// Specific keyword patterns are checked first (enforcement, regulation-making,
+/// etc.), then the blunt government-actor + modal gate. All specific patterns
+/// pass through `apply_modal_context` so "authority may serve a notice" returns
+/// Enabling (→ Liberty), not Enforcement (→ Obligation).
 pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
     // EU Directive: "Member States shall ensure/require that..."
     if GOV_EU_ENSURE.is_match(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::Prescriptive,
             confidence: 0.85,
             span: find_government_span(text),
-        });
+        }, text));
     }
     if GOV_REG_MAKING_1.is_match(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::RegulationMaking,
             confidence: 0.90,
             span: find_government_span(text),
-        });
+        }, text));
     }
     if GOV_REG_MAKING_2.is_match(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::RegulationMaking,
             confidence: 0.85,
             span: find_government_span(text),
-        });
+        }, text));
     }
     if GOV_CODE_APPROVAL.is_match(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::CodeApproval,
             confidence: 0.85,
             span: find_government_span(text),
-        });
+        }, text));
     }
     if GOV_ENFORCEMENT_1.is_match(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::Enforcement,
             confidence: 0.85,
             span: find_government_span(text),
-        });
+        }, text));
     }
     if GOV_ENFORCEMENT_2.is_match(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::Enforcement,
             confidence: 0.80,
             span: find_government_span(text),
-        });
+        }, text));
     }
+    // Blunt gate — already modal-aware (obligation vs enabling checked separately)
     if has_government_actor(text) && has_obligation(text) {
         return Some(DutyClassification {
             family: DutyFamily::Government,
@@ -265,62 +293,64 @@ pub fn match_government_v1(text: &str) -> Option<DutyClassification> {
 }
 
 /// Try extended government duty patterns (v2) against downcased text.
+///
+/// All patterns pass through `apply_modal_context` for enabling/obligation awareness.
 pub fn match_government_v2(text: &str) -> Option<DutyClassification> {
     if GOV_DIRECTION.is_match(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::Direction,
             confidence: 0.80,
             span: find_government_span(text),
-        });
+        }, text));
     }
     if GOV_GUIDANCE.is_match(text) && has_government_actor(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::Guidance,
             confidence: 0.75,
             span: find_government_span(text),
-        });
+        }, text));
     }
     if GOV_CONSULTATION.is_match(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::ConsultationObligation,
             confidence: 0.75,
             span: find_government_span(text),
-        });
+        }, text));
     }
     if GOV_APPOINTMENT.is_match(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::Appointment,
             confidence: 0.80,
             span: find_government_span(text),
-        });
+        }, text));
     }
     if GOV_DELEGATION.is_match(text) && has_government_actor(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::Delegation,
             confidence: 0.70,
             span: find_government_span(text),
-        });
+        }, text));
     }
     if GOV_FEES.is_match(text) && has_government_actor(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::Fees,
             confidence: 0.65,
             span: find_government_span(text),
-        });
+        }, text));
     }
     if GOV_PARL_REPORTING.is_match(text) {
-        return Some(DutyClassification {
+        return Some(apply_modal_context(DutyClassification {
             family: DutyFamily::Government,
             sub_type: DutySubType::ParliamentaryReporting,
             confidence: 0.80,
             span: find_government_span(text),
-        });
+        }, text));
     }
     None
 }
@@ -363,29 +393,42 @@ mod tests {
 
     #[test]
     fn gov_v1_regulation_making_power_to() {
+        // "power to" is enabling → overrides to Enabling
         let text = "there is a power to make regulations under this section";
         assert_gov_match(
             match_government_v1(text),
             DutyFamily::Government,
-            DutySubType::RegulationMaking,
+            DutySubType::Enabling,
             0.85,
         );
     }
 
     #[test]
     fn gov_v1_code_approval() {
+        // "may approve" → enabling context
         let text = "the commission may approve a code of practice";
         assert_gov_match(
             match_government_v1(text),
             DutyFamily::Government,
-            DutySubType::CodeApproval,
+            DutySubType::Enabling,
             0.85,
         );
     }
 
     #[test]
-    fn gov_v1_enforcement_notice() {
+    fn gov_v1_enforcement_notice_enabling() {
+        // "may serve" → enabling context overrides enforcement
         let text = "an inspector may serve an improvement notice or prohibition notice";
+        assert_eq!(
+            match_government_v1(text).map(|c| c.sub_type),
+            Some(DutySubType::Enabling)
+        );
+    }
+
+    #[test]
+    fn gov_v1_enforcement_notice_obligation() {
+        // "shall serve" → obligation context preserves enforcement
+        let text = "an inspector shall serve an improvement notice or prohibition notice";
         assert_eq!(
             match_government_v1(text).map(|c| c.sub_type),
             Some(DutySubType::Enforcement)
@@ -444,8 +487,21 @@ mod tests {
     // ── Government v2 ────────────────────────────────────────────────
 
     #[test]
-    fn gov_v2_direction() {
+    fn gov_v2_direction_enabling() {
+        // "may give" → enabling context
         let text = "the secretary of state may give directions to the executive";
+        assert_gov_match(
+            match_government_v2(text),
+            DutyFamily::Government,
+            DutySubType::Enabling,
+            0.80,
+        );
+    }
+
+    #[test]
+    fn gov_v2_direction_obligation() {
+        // "shall give" → obligation context preserves Direction
+        let text = "the secretary of state shall give directions to the executive";
         assert_gov_match(
             match_government_v2(text),
             DutyFamily::Government,
@@ -456,11 +512,12 @@ mod tests {
 
     #[test]
     fn gov_v2_guidance() {
+        // "may issue" → enabling context
         let text = "the executive may issue guidance on the application of these regulations";
         assert_gov_match(
             match_government_v2(text),
             DutyFamily::Government,
-            DutySubType::Guidance,
+            DutySubType::Enabling,
             0.75,
         );
     }
@@ -478,33 +535,36 @@ mod tests {
 
     #[test]
     fn gov_v2_appointment() {
+        // "may appoint" → enabling context
         let text = "the executive may appoint any suitably qualified person as an inspector";
         assert_gov_match(
             match_government_v2(text),
             DutyFamily::Government,
-            DutySubType::Appointment,
+            DutySubType::Enabling,
             0.80,
         );
     }
 
     #[test]
     fn gov_v2_delegation() {
+        // "may delegate" → enabling context
         let text = "the authority may delegate any of its functions to a committee";
         assert_gov_match(
             match_government_v2(text),
             DutyFamily::Government,
-            DutySubType::Delegation,
+            DutySubType::Enabling,
             0.70,
         );
     }
 
     #[test]
     fn gov_v2_fees() {
+        // "may charge" → enabling context
         let text = "the authority may charge fees for the performance of functions";
         assert_gov_match(
             match_government_v2(text),
             DutyFamily::Government,
-            DutySubType::Fees,
+            DutySubType::Enabling,
             0.65,
         );
     }

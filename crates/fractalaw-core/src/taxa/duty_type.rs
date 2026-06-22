@@ -339,4 +339,48 @@ mod tests {
         let result = classify(text, &actors, &[]);
         assert_eq!(result.duty_types, vec![DutyType::Obligation]);
     }
+
+    #[test]
+    fn enforcing_authority_may_is_liberty() {
+        // "enforcing authority may serve" = enabling/Liberty, not Obligation
+        let text = "the enforcing authority may serve on the responsible person a notice \
+                     if the authority is of the opinion that the premises constitute a serious risk";
+        let actors = vec![
+            actor("Gvt: Authority: Enforcement", "enforcing authority"),
+            actor("Ind: Responsible Person", "responsible person"),
+        ];
+        let result = classify(text, &actors, &[]);
+        assert_eq!(
+            result.duty_types,
+            vec![DutyType::Liberty],
+            "got {:?} from {:?}",
+            result.duty_types,
+            result.classification,
+        );
+    }
+
+    #[test]
+    fn enforcing_authority_may_via_parse_v2() {
+        // Integration: parse_v2 extracts its own actors — verify Liberty
+        let text = "29.—(1) The enforcing authority may serve on the responsible person \
+                     a notice (in this Order referred to as \"an alterations notice\") \
+                     if the authority is of the opinion that the premises—\n\
+                     (a) constitute a serious risk to relevant persons (whether due to \
+                     the features of the premises, their use, any hazard present, or any \
+                     other circumstances); or\n\
+                     (b) may constitute such a risk if a change is made to them or the \
+                     use to which they are put.";
+        let record = crate::taxa::parse_v2(text, None);
+        eprintln!("duty_types: {:?}", record.duty_types);
+        eprintln!("governed: {:?}", record.governed_actors);
+        eprintln!("government: {:?}", record.government_actors);
+        eprintln!("classification: {:?}", record.classification);
+        eprintln!("purposes: {:?}", record.purposes);
+        assert!(
+            record.duty_types.contains(&DutyType::Liberty),
+            "expected Liberty, got {:?} from {:?}",
+            record.duty_types,
+            record.classification,
+        );
+    }
 }
