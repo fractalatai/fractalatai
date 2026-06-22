@@ -214,6 +214,140 @@ pub fn clamp01(v: f32) -> f32 {
     ((v.clamp(0.0, 1.0)) * 1000.0).round() / 1000.0
 }
 
+// ── Signal extraction ────────────────────────────────────────────────
+
+/// Extract ALL government v1 signals (not just first match).
+pub fn extract_government_v1_signals(text: &str) -> Vec<super::signals::PatternSignal> {
+    use super::signals::{PatternSignal, SignalTier};
+
+    let mut signals = Vec::new();
+
+    let try_pattern = |re: &Regex, sub_type: DutySubType, confidence: f32| -> Option<PatternSignal> {
+        if re.is_match(text) {
+            let dc = apply_modal_context(
+                DutyClassification {
+                    family: DutyFamily::Government,
+                    sub_type,
+                    confidence,
+                    span: find_government_span(text),
+                },
+                text,
+            );
+            Some(PatternSignal {
+                tier: SignalTier::GovernmentV1,
+                family: dc.family,
+                sub_type: dc.sub_type,
+                confidence: dc.confidence,
+                span: dc.span,
+                actor_keyword: None,
+                actor_label: None,
+            })
+        } else {
+            None
+        }
+    };
+
+    if let Some(s) = try_pattern(&GOV_EU_ENSURE, DutySubType::Prescriptive, 0.85) {
+        signals.push(s);
+    }
+    if let Some(s) = try_pattern(&GOV_REG_MAKING_1, DutySubType::RegulationMaking, 0.90) {
+        signals.push(s);
+    }
+    if let Some(s) = try_pattern(&GOV_REG_MAKING_2, DutySubType::RegulationMaking, 0.85) {
+        signals.push(s);
+    }
+    if let Some(s) = try_pattern(&GOV_CODE_APPROVAL, DutySubType::CodeApproval, 0.85) {
+        signals.push(s);
+    }
+    if let Some(s) = try_pattern(&GOV_ENFORCEMENT_1, DutySubType::Enforcement, 0.85) {
+        signals.push(s);
+    }
+    if let Some(s) = try_pattern(&GOV_ENFORCEMENT_2, DutySubType::Enforcement, 0.80) {
+        signals.push(s);
+    }
+    // Blunt gate
+    if has_government_actor(text) && has_obligation(text) {
+        signals.push(PatternSignal {
+            tier: SignalTier::GovernmentV1,
+            family: DutyFamily::Government,
+            sub_type: DutySubType::Prescriptive,
+            confidence: 0.60,
+            span: find_government_span(text),
+            actor_keyword: None,
+            actor_label: None,
+        });
+    }
+    if has_government_actor(text) && has_enabling(text) {
+        signals.push(PatternSignal {
+            tier: SignalTier::GovernmentV1,
+            family: DutyFamily::Government,
+            sub_type: DutySubType::Enabling,
+            confidence: 0.55,
+            span: find_government_span(text),
+            actor_keyword: None,
+            actor_label: None,
+        });
+    }
+
+    signals
+}
+
+/// Extract ALL government v2 signals (not just first match).
+pub fn extract_government_v2_signals(text: &str) -> Vec<super::signals::PatternSignal> {
+    use super::signals::{PatternSignal, SignalTier};
+
+    let mut signals = Vec::new();
+
+    let try_pattern = |re: &Regex, sub_type: DutySubType, confidence: f32, need_gov: bool| -> Option<PatternSignal> {
+        if re.is_match(text) && (!need_gov || has_government_actor(text)) {
+            let dc = apply_modal_context(
+                DutyClassification {
+                    family: DutyFamily::Government,
+                    sub_type,
+                    confidence,
+                    span: find_government_span(text),
+                },
+                text,
+            );
+            Some(PatternSignal {
+                tier: SignalTier::GovernmentV2,
+                family: dc.family,
+                sub_type: dc.sub_type,
+                confidence: dc.confidence,
+                span: dc.span,
+                actor_keyword: None,
+                actor_label: None,
+            })
+        } else {
+            None
+        }
+    };
+
+    if let Some(s) = try_pattern(&GOV_DIRECTION, DutySubType::Direction, 0.80, false) {
+        signals.push(s);
+    }
+    if let Some(s) = try_pattern(&GOV_GUIDANCE, DutySubType::Guidance, 0.75, true) {
+        signals.push(s);
+    }
+    if let Some(s) = try_pattern(&GOV_CONSULTATION, DutySubType::ConsultationObligation, 0.75, false) {
+        signals.push(s);
+    }
+    if let Some(s) = try_pattern(&GOV_APPOINTMENT, DutySubType::Appointment, 0.80, false) {
+        signals.push(s);
+    }
+    if let Some(s) = try_pattern(&GOV_DELEGATION, DutySubType::Delegation, 0.70, true) {
+        signals.push(s);
+    }
+    if let Some(s) = try_pattern(&GOV_FEES, DutySubType::Fees, 0.65, true) {
+        signals.push(s);
+    }
+    if let Some(s) = try_pattern(&GOV_PARL_REPORTING, DutySubType::ParliamentaryReporting, 0.80, false) {
+        signals.push(s);
+    }
+
+    signals
+}
+
 // ── Pattern matchers ─────────────────────────────────────────────────
 
 /// Try government duty patterns (v1) against downcased text.

@@ -222,6 +222,102 @@ pub fn match_governed_v2(text: &str, governed_actors: &[ActorMatch]) -> Option<D
     best
 }
 
+/// Extract ALL governed v2 signals — matches and rejections — from all actors.
+///
+/// Unlike `match_governed_v2` which returns the single best match,
+/// this function collects every signal across all actors and sub-type patterns.
+pub fn extract_governed_v2_signals(
+    text: &str,
+    governed_actors: &[ActorMatch],
+) -> (Vec<super::signals::PatternSignal>, Vec<super::signals::RejectedSignal>) {
+    use super::signals::{PatternSignal, SignalTier};
+
+    let mut matches = Vec::new();
+    let mut rejections = Vec::new();
+
+    for actor in governed_actors {
+        let results = if BROAD_LABELS.contains(&actor.label.as_str()) {
+            extract_person_compound_signals(text)
+        } else {
+            extract_actor_anchored_signals(text, &actor.keyword)
+        };
+
+        for dc in results.0 {
+            matches.push(PatternSignal {
+                tier: SignalTier::GovernedV2,
+                family: dc.family,
+                sub_type: dc.sub_type,
+                confidence: dc.confidence,
+                span: dc.span,
+                actor_keyword: Some(actor.keyword.clone()),
+                actor_label: Some(actor.label.clone()),
+            });
+        }
+        rejections.extend(results.1);
+    }
+
+    (matches, rejections)
+}
+
+/// Extract all signals for a specific actor keyword (non-broad labels).
+fn extract_actor_anchored_signals(
+    text: &str,
+    keyword: &str,
+) -> (Vec<DutyClassification>, Vec<super::signals::RejectedSignal>) {
+    let mut matches = Vec::new();
+    let mut rejections = Vec::new();
+
+    // Reverse pattern: "shall be the duty of {actor}"
+    if let Some(dc) = match_duty_of_pattern(text, keyword) {
+        matches.push(dc);
+    }
+
+    // Passive voice: "must be {done} by the {actor}"
+    if let Some(dc) = match_passive_by_pattern(text, keyword) {
+        matches.push(dc);
+    }
+
+    // Primary window sub-type patterns
+    for pat in SUB_TYPE_PATTERNS {
+        let re = cached_anchored(keyword, pat.obligation, pat.idx, PRIMARY_WINDOW);
+        if let Some(dc) =
+            find_valid_match_with_rejections(text, keyword, &re, pat.sub_type, pat.confidence, Some(&mut rejections))
+        {
+            matches.push(dc);
+        }
+    }
+
+    // Extended window at reduced confidence
+    for pat in SUB_TYPE_PATTERNS {
+        let re = cached_anchored(keyword, pat.obligation, pat.idx, EXTENDED_WINDOW);
+        let reduced = (pat.confidence - 0.15).max(0.30);
+        if let Some(dc) =
+            find_valid_match_with_rejections(text, keyword, &re, pat.sub_type, reduced, Some(&mut rejections))
+        {
+            matches.push(dc);
+        }
+    }
+
+    (matches, rejections)
+}
+
+/// Extract all signals from person compound patterns.
+fn extract_person_compound_signals(
+    text: &str,
+) -> (Vec<DutyClassification>, Vec<super::signals::RejectedSignal>) {
+    // Person compound is complex but single-match — delegate to existing function
+    // and wrap result. Rejections inside match_person_compound (definitional constructions)
+    // would need deeper refactoring to capture — for now, just wrap the result.
+    let mut matches = Vec::new();
+    let rejections = Vec::new();
+
+    if let Some(dc) = match_person_compound(text) {
+        matches.push(dc);
+    }
+
+    (matches, rejections)
+}
+
 /// Detect the UK legislative "it shall be the duty of every/any {actor}" formulation.
 ///
 /// In this construction the modal comes BEFORE the actor, so the standard
@@ -388,6 +484,20 @@ fn find_valid_match(
     sub_type: DutySubType,
     confidence: f32,
 ) -> Option<DutyClassification> {
+    find_valid_match_with_rejections(text, keyword, re, sub_type, confidence, None)
+}
+
+/// Like `find_valid_match` but optionally collects rejected candidates.
+fn find_valid_match_with_rejections(
+    text: &str,
+    keyword: &str,
+    re: &Regex,
+    sub_type: DutySubType,
+    confidence: f32,
+    mut rejections: Option<&mut Vec<super::signals::RejectedSignal>>,
+) -> Option<DutyClassification> {
+    use super::signals::{RejectedSignal, RejectionReason, SignalTier};
+
     let mut offset = 0;
     while offset < text.len() {
         let Some(m) = re.find(&text[offset..]) else {
@@ -398,10 +508,26 @@ fn find_valid_match(
         let span = extract_span_from_anchored(text, abs_start, abs_end);
 
         if sub_type == DutySubType::Enabling && is_epistemic_may(text, abs_end) {
+            if let Some(ref mut rej) = rejections {
+                rej.push(RejectedSignal {
+                    tier: SignalTier::GovernedV2,
+                    reason: RejectionReason::EpistemicMay,
+                    actor_keyword: Some(keyword.to_string()),
+                    span: Some(span),
+                });
+            }
             offset = abs_start + keyword.len();
             continue;
         }
         if is_actor_in_subordinate(text, span.actor_start, span.modal_start) {
+            if let Some(ref mut rej) = rejections {
+                rej.push(RejectedSignal {
+                    tier: SignalTier::GovernedV2,
+                    reason: RejectionReason::SubordinateClause,
+                    actor_keyword: Some(keyword.to_string()),
+                    span: Some(span),
+                });
+            }
             offset = abs_start + keyword.len();
             continue;
         }

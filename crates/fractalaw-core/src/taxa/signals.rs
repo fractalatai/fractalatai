@@ -6,7 +6,7 @@
 //! [`decision`](super::decision) module then evaluates.
 
 use super::actors::ActorMatch;
-use super::duty_patterns::{DutyClassification, DutyFamily, DutySubType, MatchSpan};
+use super::duty_patterns::{DutyFamily, DutySubType, MatchSpan};
 
 /// Which regex tier produced a signal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -101,69 +101,38 @@ pub fn extract_all(
         return signals;
     }
 
-    // Tier 1: Governed V2 (actor-anchored)
-    if let Some(dc) = super::duty_patterns_v2::match_governed_v2(lower, governed_actors) {
-        signals.matches.push(PatternSignal {
-            tier: SignalTier::GovernedV2,
-            family: dc.family,
-            sub_type: dc.sub_type,
-            confidence: dc.confidence,
-            span: dc.span,
-            actor_keyword: None,
-            actor_label: None,
-        });
+    // Tier 1: Governed V2 (actor-anchored) — all signals
+    {
+        let (matches, rejections) =
+            super::duty_patterns_v2::extract_governed_v2_signals(lower, governed_actors);
+        signals.matches.extend(matches);
+        signals.rejected.extend(rejections);
     }
 
-    // Tier 2: Government V1
-    if let Some(dc) = super::duty_patterns::match_government_v1(lower) {
-        signals.matches.push(PatternSignal {
-            tier: SignalTier::GovernmentV1,
-            family: dc.family,
-            sub_type: dc.sub_type,
-            confidence: dc.confidence,
-            span: dc.span,
-            actor_keyword: None,
-            actor_label: None,
-        });
+    // Tier 2: Government V1 — all signals
+    signals
+        .matches
+        .extend(super::duty_patterns::extract_government_v1_signals(lower));
+
+    // Tier 3: Government V2 — all signals
+    signals
+        .matches
+        .extend(super::duty_patterns::extract_government_v2_signals(lower));
+
+    // Tier 4: Offence-as-duty — all signals
+    {
+        let (matches, rejections) =
+            super::duty_patterns_offence::extract_offence_signals(lower);
+        signals.matches.extend(matches);
+        signals.rejected.extend(rejections);
     }
 
-    // Tier 3: Government V2
-    if let Some(dc) = super::duty_patterns::match_government_v2(lower) {
-        signals.matches.push(PatternSignal {
-            tier: SignalTier::GovernmentV2,
-            family: dc.family,
-            sub_type: dc.sub_type,
-            confidence: dc.confidence,
-            span: dc.span,
-            actor_keyword: None,
-            actor_label: None,
-        });
-    }
-
-    // Tier 4: Offence-as-duty
-    if let Some(dc) = super::duty_patterns_offence::match_offence_as_duty(lower) {
-        signals.matches.push(PatternSignal {
-            tier: SignalTier::OffenceAsDuty,
-            family: dc.family,
-            sub_type: dc.sub_type,
-            confidence: dc.confidence,
-            span: dc.span,
-            actor_keyword: None,
-            actor_label: None,
-        });
-    }
-
-    // Tier 5: Rule (thing-subject)
-    if let Some(dc) = super::duty_patterns_rule::match_rule(lower) {
-        signals.matches.push(PatternSignal {
-            tier: SignalTier::Rule,
-            family: dc.family,
-            sub_type: dc.sub_type,
-            confidence: dc.confidence,
-            span: dc.span,
-            actor_keyword: None,
-            actor_label: None,
-        });
+    // Tier 5: Rule (thing-subject) — all signals
+    {
+        let (matches, rejections) =
+            super::duty_patterns_rule::extract_rule_signals(lower);
+        signals.matches.extend(matches);
+        signals.rejected.extend(rejections);
     }
 
     // Legal fiction is a post-match rejection

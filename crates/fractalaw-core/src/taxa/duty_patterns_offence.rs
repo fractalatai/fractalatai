@@ -68,6 +68,80 @@ static PENALTY_PHRASES: LazyLock<Regex> = LazyLock::new(|| {
 
 // ── Public API ──────────────────────────────────────────────────────
 
+/// Extract ALL offence-as-duty signals with rejections.
+pub fn extract_offence_signals(
+    text: &str,
+) -> (Vec<super::signals::PatternSignal>, Vec<super::signals::RejectedSignal>) {
+    use super::signals::{PatternSignal, RejectedSignal, RejectionReason, SignalTier};
+
+    let mut matches = Vec::new();
+    let mut rejections = Vec::new();
+
+    // Primary penalty exclusion
+    if PENALTY_PRIMARY.is_match(text) {
+        rejections.push(RejectedSignal {
+            tier: SignalTier::OffenceAsDuty,
+            reason: RejectionReason::PenaltyProvision,
+            actor_keyword: None,
+            span: None,
+        });
+        return (matches, rejections);
+    }
+
+    let try_pattern = |re: &Regex, confidence: f32, actor_start_fn: fn(usize, usize) -> usize| {
+        if let Some(m) = re.find(text) {
+            if is_penalty_dominant(text, m.start()) {
+                return (None, Some(RejectedSignal {
+                    tier: SignalTier::OffenceAsDuty,
+                    reason: RejectionReason::PenaltyProvision,
+                    actor_keyword: None,
+                    span: Some(MatchSpan {
+                        actor_start: actor_start_fn(m.start(), m.end()),
+                        modal_start: m.start(),
+                        modal_end: m.end(),
+                    }),
+                }));
+            }
+            return (Some(PatternSignal {
+                tier: SignalTier::OffenceAsDuty,
+                family: DutyFamily::Governed,
+                sub_type: DutySubType::Prohibitive,
+                confidence,
+                span: Some(MatchSpan {
+                    actor_start: actor_start_fn(m.start(), m.end()),
+                    modal_start: m.start(),
+                    modal_end: m.end(),
+                }),
+                actor_keyword: None,
+                actor_label: None,
+            }), None);
+        }
+        (None, None)
+    };
+
+    // "it is an offence for" → actor after "for"
+    let (m, r) = try_pattern(&OFFENCE_FOR, 0.70, |_start, end| end);
+    if let Some(m) = m { matches.push(m); }
+    if let Some(r) = r { rejections.push(r); }
+
+    // "commits an offence if" → actor at start
+    let (m, r) = try_pattern(&COMMITS_OFFENCE, 0.70, |_start, _end| 0);
+    if let Some(m) = m { matches.push(m); }
+    if let Some(r) = r { rejections.push(r); }
+
+    // "guilty of an offence if" → actor at start
+    let (m, r) = try_pattern(&GUILTY_IF, 0.65, |_start, _end| 0);
+    if let Some(m) = m { matches.push(m); }
+    if let Some(r) = r { rejections.push(r); }
+
+    // "it is unlawful for" → actor after "for"
+    let (m, r) = try_pattern(&UNLAWFUL_FOR, 0.70, |_start, end| end);
+    if let Some(m) = m { matches.push(m); }
+    if let Some(r) = r { rejections.push(r); }
+
+    (matches, rejections)
+}
+
 /// Try to match an offence-creating provision as a duty.
 ///
 /// Returns `Governed / Prohibitive` if the provision creates a duty

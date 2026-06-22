@@ -123,6 +123,68 @@ const PERSON_KEYWORDS: &[&str] = &[
 /// Algorithm:
 /// 1. Find each modal verb (must/shall) in the text
 /// 2. Look backwards within `THING_WINDOW` chars for a thing keyword
+/// Extract ALL rule signals — matches and rejections.
+pub fn extract_rule_signals(
+    text: &str,
+) -> (Vec<super::signals::PatternSignal>, Vec<super::signals::RejectedSignal>) {
+    use super::signals::{PatternSignal, SignalTier};
+
+    let mut matches = Vec::new();
+    let rejections = Vec::new();
+
+    for modal_match in MODAL_RE.find_iter(text) {
+        let modal_start = modal_match.start();
+
+        let mut window_start = modal_start.saturating_sub(THING_WINDOW);
+        while window_start > 0 && !text.is_char_boundary(window_start) {
+            window_start -= 1;
+        }
+        let before_modal = &text[window_start..modal_start];
+
+        let mut best_thing: Option<(usize, &str)> = None;
+        for &kw in THING_KEYWORDS {
+            if let Some(pos) = before_modal.to_ascii_lowercase().rfind(kw)
+                && best_thing.is_none_or(|(best_pos, _)| pos > best_pos)
+            {
+                best_thing = Some((pos, kw));
+            }
+        }
+
+        let Some((thing_pos, _thing_kw)) = best_thing else {
+            continue;
+        };
+
+        let between = &before_modal[thing_pos..].to_ascii_lowercase();
+        let person_closer = PERSON_KEYWORDS.iter().any(|pk| between.contains(pk));
+
+        if person_closer {
+            // Could add rejection here for person-keyword-closer, but it's common
+            // and noisy — skip for now
+            continue;
+        }
+
+        let sub_type = if ENABLING_MODAL_RE.is_match(modal_match.as_str()) {
+            DutySubType::Enabling
+        } else {
+            DutySubType::ThingObligation
+        };
+
+        matches.push(PatternSignal {
+            tier: SignalTier::Rule,
+            family: DutyFamily::Rule,
+            sub_type,
+            confidence: 0.55,
+            span: None,
+            actor_keyword: None,
+            actor_label: None,
+        });
+        // Rule tier currently returns on first match — preserve that behaviour
+        break;
+    }
+
+    (matches, rejections)
+}
+
 /// 3. Verify no person keyword appears closer to the modal than the thing
 /// 4. Return `DutyClassification { family: Rule, sub_type: ThingObligation }`
 pub fn match_rule(text: &str) -> Option<DutyClassification> {

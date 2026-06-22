@@ -144,8 +144,8 @@ fn map_to_duty_types(dc: &DutyClassification) -> Vec<DutyType> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::taxa::duty_patterns::{DutyFamily, DutySubType, MatchSpan};
-    use crate::taxa::signals::{RejectedSignal, RejectionReason, SignalTier};
+    use crate::taxa::duty_patterns::{DutyFamily, DutySubType};
+    use crate::taxa::signals::SignalTier;
 
     fn make_signal(tier: SignalTier, family: DutyFamily, sub_type: DutySubType, confidence: f32) -> PatternSignal {
         PatternSignal {
