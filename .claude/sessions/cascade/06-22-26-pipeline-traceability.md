@@ -136,7 +136,7 @@ All 5 stages implemented in a single session:
 | trace | `9b96282` | `taxa parse --trace data/trace.json` persists trail to JSON |
 | gemini | `1755999` | Typed `DecisionReason` enum + 54 hard-provision shadow test |
 
-491 tests pass including shadow-mode verification. Zero warnings.
+492 tests pass including shadow-mode verification (17 representative + 54 hard provisions). Zero warnings.
 
 ### Status
 
