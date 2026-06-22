@@ -1,4 +1,4 @@
-# Session: Pipeline Traceability & Refactor — Meta Plan (PENDING)
+# Session: Pipeline Traceability & Refactor — Meta Plan (CLOSED)
 
 ## Motivation
 
@@ -118,10 +118,26 @@ Awareness for implementation:
 
 Full review: `data/code-review/signal-decision-separation.md`
 
+### Implementation (2026-06-22)
+
+All 5 stages implemented in a single session:
+
+| Stage | Commit | Description |
+|-------|--------|-------------|
+| 1 | `ebaaa2f` | Types (`SignalSet`, `PatternSignal`, `RejectedSignal`, `DecisionTrail`), `extract_all()` stub, `decide()`, `parse_v2_with_trail()` |
+| 2-3 | `ef5da88` | All 5 tiers have `extract_*_signals()` — collect ALL matches + rejections |
+| 4-5 | `5f31c65` | `parse_v2` delegates to `parse_v2_with_trail`, `classify()` deprecated, `taxa show` displays decision trail |
+
+491 tests pass including shadow-mode verification. Zero warnings.
+
 ### Status
 
-- Plan drafted and Gemini-reviewed — no plan changes needed
-- Ready for implementation — each stage becomes its own session when started
+Complete. The pipeline now has:
+- Signal/decision separation in fractalaw-core
+- Full `SignalSet` with all matches and rejections from every tier
+- `DecisionTrail` showing why each classification was chosen
+- `taxa show` CLI displays trail per provision
+- `parse_v2_with_trail()` public API for QA tooling
 
 ## Prior sessions
 
