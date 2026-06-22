@@ -536,13 +536,21 @@ pub fn should_skip_drrp(
 
     // Amendment/Repeal provisions never bear their own DRRP — obligations
     // in quoted text belong to the target section, not this provision.
-    // Offence provisions describe consequences (penalties, liability), not
-    // new obligations — the duty is in the section that creates the requirement.
     // Skip unconditionally regardless of actors present.
-    if purposes.iter().any(|p| {
-        *p == purpose::AMENDMENT || *p == purpose::REPEAL_REVOCATION || *p == purpose::OFFENCE
-    }) {
+    if purposes
+        .iter()
+        .any(|p| *p == purpose::AMENDMENT || *p == purpose::REPEAL_REVOCATION)
+    {
         return true;
+    }
+
+    // Offence provisions usually describe consequences (penalties, liability),
+    // not new obligations. However, government actors in offence provisions
+    // often exercise enforcement powers — "officer may enter and search",
+    // "authority may impose a civil penalty". Allow DRRP when government
+    // actors are present to capture these Liberty/Power classifications.
+    if purposes.iter().any(|p| *p == purpose::OFFENCE) {
+        return !has_government_actor;
     }
 
     // ALL strategy: skip when every detected purpose is a skip-purpose
