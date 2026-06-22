@@ -455,15 +455,46 @@ fn match_actor_anchored(text: &str, keyword: &str) -> Option<DutyClassification>
         return Some(dc);
     }
 
-    // Try primary window first (higher confidence)
+    // Try primary window — find the first obligation match AND the Enabling match,
+    // then prefer whichever modal is closer to the actor keyword.
+    let mut best_obligation: Option<DutyClassification> = None;
+    let mut best_enabling: Option<DutyClassification> = None;
+
     for pat in SUB_TYPE_PATTERNS {
         let re = cached_anchored(keyword, pat.obligation, pat.idx, PRIMARY_WINDOW);
         if let Some(dc) = find_valid_match(text, keyword, &re, pat.sub_type, pat.confidence) {
-            return Some(dc);
+            if pat.sub_type == DutySubType::Enabling {
+                if best_enabling.is_none() {
+                    best_enabling = Some(dc);
+                }
+            } else if best_obligation.is_none() {
+                best_obligation = Some(dc);
+            }
+            // Once we have both, no need to keep searching
+            if best_obligation.is_some() && best_enabling.is_some() {
+                break;
+            }
         }
     }
 
-    // Try extended window at reduced confidence
+    // If both obligation and enabling matched in the primary window,
+    // prefer whichever modal is closer to the actor (lower modal_start).
+    if let (Some(obl), Some(ena)) = (&best_obligation, &best_enabling) {
+        let obl_dist = obl.span.map(|s| s.modal_start).unwrap_or(usize::MAX);
+        let ena_dist = ena.span.map(|s| s.modal_start).unwrap_or(usize::MAX);
+        if ena_dist < obl_dist {
+            return best_enabling;
+        }
+        return best_obligation;
+    }
+    if best_obligation.is_some() {
+        return best_obligation;
+    }
+    if best_enabling.is_some() {
+        return best_enabling;
+    }
+
+    // Try extended window at reduced confidence (same logic)
     for pat in SUB_TYPE_PATTERNS {
         let re = cached_anchored(keyword, pat.obligation, pat.idx, EXTENDED_WINDOW);
         let reduced = (pat.confidence - 0.15).max(0.30);
