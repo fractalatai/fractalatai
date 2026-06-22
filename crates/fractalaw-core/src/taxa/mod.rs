@@ -127,7 +127,7 @@ pub fn parse_v2_with_trail(
             TaxaRecord::default(),
             decision::DecisionTrail {
                 winner: None,
-                reason: "empty_text",
+                reason: decision::DecisionReason::EmptyText,
                 candidates_count: 0,
                 rejections_count: 0,
             },
@@ -1889,6 +1889,68 @@ mod tests {
                 old.actor_positions, new.actor_positions,
                 "actor_positions mismatch for: {text:.80}"
             );
+        }
+    }
+
+    /// Shadow test against 54 hard provisions from the Liberty false-positives
+    /// investigation (Liberty→Obligation and Liberty→none mismatches).
+    /// Verifies parse_v2 and parse_v2_with_trail produce identical output
+    /// on the provisions most likely to expose tie-breaking edge cases.
+    #[test]
+    fn shadow_mode_hard_provisions() {
+        let json_str = include_str!("testdata_hard_provisions.json");
+        let texts: Vec<String> = serde_json::from_str(json_str).expect("valid JSON fixture");
+
+        assert!(
+            texts.len() >= 50,
+            "expected at least 50 hard provisions, got {}",
+            texts.len(),
+        );
+
+        for (i, text) in texts.iter().enumerate() {
+            let old = parse_v2(text, None);
+            let (new, trail) = parse_v2_with_trail(text, None);
+
+            assert_eq!(
+                old.duty_types, new.duty_types,
+                "duty_types mismatch at provision {i}: {text:.80}"
+            );
+            assert_eq!(
+                old.governed_actors, new.governed_actors,
+                "governed_actors mismatch at provision {i}"
+            );
+            assert_eq!(
+                old.government_actors, new.government_actors,
+                "government_actors mismatch at provision {i}"
+            );
+            assert_eq!(
+                old.purposes, new.purposes,
+                "purposes mismatch at provision {i}"
+            );
+            assert!(
+                (old.taxa_confidence - new.taxa_confidence).abs() < 1e-6,
+                "taxa_confidence mismatch at provision {i}: old={} new={}",
+                old.taxa_confidence,
+                new.taxa_confidence,
+            );
+            assert_eq!(
+                old.actor_positions, new.actor_positions,
+                "actor_positions mismatch at provision {i}"
+            );
+
+            // Verify trail has a valid reason
+            match trail.reason {
+                decision::DecisionReason::TierPriority(_) => {
+                    assert!(trail.winner.is_some(), "TierPriority must have a winner at provision {i}");
+                }
+                decision::DecisionReason::NoSignals
+                | decision::DecisionReason::PurposeGated
+                | decision::DecisionReason::LegalFiction
+                | decision::DecisionReason::DescriptiveSummary
+                | decision::DecisionReason::EmptyText => {
+                    assert!(trail.winner.is_none(), "non-match reason should have no winner at provision {i}");
+                }
+            }
         }
     }
 }

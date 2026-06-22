@@ -4786,7 +4786,7 @@ async fn cmd_taxa_trace(
                     "section_id": section_id,
                     "drrp_types": duty_types,
                     "decision": {
-                        "reason": trail.reason,
+                        "reason": trail.reason.to_string(),
                         "candidates": trail.candidates_count,
                         "rejections": trail.rejections_count,
                         "winner": winner,

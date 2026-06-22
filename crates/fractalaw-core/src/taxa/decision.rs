@@ -9,13 +9,43 @@ use super::duty_patterns::{DutyClassification, DutyFamily};
 use super::duty_type::{ClassificationResult, DutyType};
 use super::signals::{PatternSignal, SignalSet, SignalTier};
 
+/// Why the decision engine chose (or didn't choose) a classification.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DecisionReason {
+    /// Winning signal selected by tier priority, then highest confidence within tier.
+    TierPriority(SignalTier),
+    /// No positive signals found after extraction.
+    NoSignals,
+    /// Provision was gated out by purpose classification.
+    PurposeGated,
+    /// Provision text was empty.
+    EmptyText,
+    /// Provision matched descriptive summary pattern.
+    DescriptiveSummary,
+    /// All signals rejected as legal fiction.
+    LegalFiction,
+}
+
+impl std::fmt::Display for DecisionReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::TierPriority(tier) => write!(f, "tier_priority({tier:?})"),
+            Self::NoSignals => write!(f, "no_signals"),
+            Self::PurposeGated => write!(f, "purpose_gated"),
+            Self::EmptyText => write!(f, "empty_text"),
+            Self::DescriptiveSummary => write!(f, "descriptive_summary"),
+            Self::LegalFiction => write!(f, "legal_fiction"),
+        }
+    }
+}
+
 /// Trace of how the decision was made.
 #[derive(Debug, Clone)]
 pub struct DecisionTrail {
     /// The winning signal (if any).
     pub winner: Option<PatternSignal>,
-    /// Why this signal won.
-    pub reason: &'static str,
+    /// Why this signal won (or why no signal was chosen).
+    pub reason: DecisionReason,
     /// Total positive signals considered.
     pub candidates_count: usize,
     /// Total rejected signals.
@@ -36,49 +66,44 @@ const TIER_ORDER: &[SignalTier] = &[
 /// Default strategy: tier priority first, then highest confidence within
 /// the winning tier. This replicates the current first-match-wins cascade.
 pub fn decide(signals: &SignalSet) -> (ClassificationResult, DecisionTrail) {
-    let empty = (
-        ClassificationResult {
-            duty_types: Vec::new(),
-            classification: None,
-        },
-        DecisionTrail {
-            winner: None,
-            reason: "no_signals",
-            candidates_count: signals.matches.len(),
-            rejections_count: signals.rejected.len(),
-        },
-    );
+    let counts = (signals.matches.len(), signals.rejected.len());
+    let empty_result = ClassificationResult {
+        duty_types: Vec::new(),
+        classification: None,
+    };
 
     if signals.purpose_gated {
         return (
-            empty.0,
+            empty_result,
             DecisionTrail {
-                reason: "purpose_gated",
-                ..empty.1
+                winner: None,
+                reason: DecisionReason::PurposeGated,
+                candidates_count: counts.0,
+                rejections_count: counts.1,
             },
         );
     }
     if signals.is_descriptive_summary {
         return (
-            empty.0,
+            empty_result,
             DecisionTrail {
-                reason: "descriptive_summary",
-                ..empty.1
+                winner: None,
+                reason: DecisionReason::DescriptiveSummary,
+                candidates_count: counts.0,
+                rejections_count: counts.1,
             },
         );
     }
     if signals.is_legal_fiction {
         return (
-            empty.0,
+            empty_result,
             DecisionTrail {
-                reason: "legal_fiction",
-                ..empty.1
+                winner: None,
+                reason: DecisionReason::LegalFiction,
+                candidates_count: counts.0,
+                rejections_count: counts.1,
             },
         );
-    }
-
-    if signals.matches.is_empty() {
-        return empty;
     }
 
     // Find the best signal: tier priority first, then confidence within tier
@@ -104,15 +129,23 @@ pub fn decide(signals: &SignalSet) -> (ClassificationResult, DecisionTrail) {
                 },
                 DecisionTrail {
                     winner: Some(winner.clone()),
-                    reason: "tier_priority_then_confidence",
-                    candidates_count: signals.matches.len(),
-                    rejections_count: signals.rejected.len(),
+                    reason: DecisionReason::TierPriority(tier),
+                    candidates_count: counts.0,
+                    rejections_count: counts.1,
                 },
             );
         }
     }
 
-    empty
+    (
+        empty_result,
+        DecisionTrail {
+            winner: None,
+            reason: DecisionReason::NoSignals,
+            candidates_count: counts.0,
+            rejections_count: counts.1,
+        },
+    )
 }
 
 /// Map a DutyClassification to DRRP DutyTypes.
@@ -165,7 +198,7 @@ mod tests {
         let (result, trail) = decide(&signals);
         assert!(result.duty_types.is_empty());
         assert!(trail.winner.is_none());
-        assert_eq!(trail.reason, "no_signals");
+        assert_eq!(trail.reason, DecisionReason::NoSignals);
     }
 
     #[test]
@@ -182,7 +215,7 @@ mod tests {
         };
         let (result, trail) = decide(&signals);
         assert!(result.duty_types.is_empty());
-        assert_eq!(trail.reason, "purpose_gated");
+        assert_eq!(trail.reason, DecisionReason::PurposeGated);
     }
 
     #[test]
@@ -235,6 +268,6 @@ mod tests {
         };
         let (result, trail) = decide(&signals);
         assert!(result.duty_types.is_empty());
-        assert_eq!(trail.reason, "legal_fiction");
+        assert_eq!(trail.reason, DecisionReason::LegalFiction);
     }
 }
