@@ -1,4 +1,4 @@
-# Session: Pipeline Traceability & Refactor (PENDING)
+# Session: Pipeline Traceability & Refactor — Meta Plan (PENDING)
 
 ## Motivation
 
@@ -86,6 +86,42 @@ Hard cases that tracing would help diagnose:
 - `fractalaw-core/src/taxa/duty_patterns.rs` — government patterns + modal context
 - `fractalaw-core/src/taxa/duty_patterns_v2.rs` — governed actor-anchored patterns
 - `fractalaw-cli/src/main.rs:4863-5438` — classify pass, transition rules
+
+## Implementation plan
+
+Detailed plan: `.claude/plans/staged-mapping-cookie.md`
+Gemini review doc: `docs/reviews/gemini-signal-decision-separation-20260622.md` (AWAITING REVIEW)
+
+### 5 stages
+
+1. **Introduce types** — `SignalSet`, `PatternSignal`, `RejectedSignal`, `DecisionTrail` types + stub wiring. No behaviour change.
+2. **Extract Governed V2 signals** — Tier 1 returns all matches + rejections instead of first/best.
+3. **Extract Tiers 2-5 signals** — Government, Offence, Rule tiers return all matches + rejections.
+4. **Wire parse_v2 through signals/decision** — Replace `classify()` with `extract_all()` + `decide()`. Shadow-mode test.
+5. **Expose trail to CLI** — `taxa show`/`eyeball` display decision trail. Optional `--signals` JSON dump.
+
+### Gemini review (2026-06-22)
+
+**Verdict**: Approved. "Excellent and well-considered refactoring plan."
+
+Key feedback:
+- Type design validated — `SignalSet`/`PatternSignal`/`RejectedSignal` is the right abstraction
+- Staging order confirmed safe — shadow-mode test in Stage 4 is the critical regression gate
+- Running all 5 tiers: <5% overhead accepted, main risk is replicating implicit tie-breaking in `decide()`
+- `DecisionTrail` sufficient to start — enhance later with specific reason enums and top-N alternatives if needed
+- Architecture pattern is industry-standard NLP (annotation pipeline). Sets up future ML integration
+
+Awareness for implementation:
+- Stage 4 shadow test must cover full benchmark corpus (2,250+), not just unit tests
+- Watch for f32 precision drift — may need epsilon comparison, not byte-identical
+- Document any implicit tie-breaking rules discovered during Stage 2
+
+Full review: `data/code-review/signal-decision-separation.md`
+
+### Status
+
+- Plan drafted and Gemini-reviewed — no plan changes needed
+- Ready for implementation — each stage becomes its own session when started
 
 ## Prior sessions
 
