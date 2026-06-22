@@ -456,6 +456,9 @@ enum TaxaAction {
         /// Re-parse all (clear existing DuckDB taxa columns for these laws)
         #[arg(long)]
         force: bool,
+        /// Write decision trail JSON to this path (e.g. data/trace.json)
+        #[arg(long)]
+        trace: Option<String>,
     },
     /// Compute embeddings for provisions missing them
     Embed {
@@ -657,7 +660,7 @@ async fn main() -> anyhow::Result<()> {
                 family,
                 limit,
             } => cmd_taxa_audit_fitness(&data_dir, laws, family, limit).await,
-            TaxaAction::Parse { laws, force } => {
+            TaxaAction::Parse { laws, force, trace } => {
                 let store = open_duck(&data_dir)?;
                 let lance = LanceStore::open(&data_dir.join("lancedb"))
                     .await
@@ -665,6 +668,9 @@ async fn main() -> anyhow::Result<()> {
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
                 cmd_taxa_parse(&lance, &store, &law_names, force).await?;
+                if let Some(trace_path) = trace {
+                    cmd_taxa_trace(&lance, &store, &law_names, &trace_path).await?;
+                }
                 Ok(())
             }
             TaxaAction::Embed { laws } => {
@@ -4710,6 +4716,98 @@ async fn cmd_taxa_parse(
 
     println!("Parsed {enriched}/{total} laws ({failed} failed).");
     Ok(enriched)
+}
+
+/// Write decision trail JSON for the specified laws.
+///
+/// Re-runs `parse_v2_with_trail` on each provision from LanceDB and writes
+/// a JSON array of per-provision trace records to the given path.
+async fn cmd_taxa_trace(
+    lance: &LanceStore,
+    store: &DuckStore,
+    law_names: &[String],
+    trace_path: &str,
+) -> anyhow::Result<()> {
+    use std::io::Write;
+
+    let mut entries = Vec::new();
+
+    for law_name in law_names {
+        let family: Option<String> = {
+            let escaped = law_name.replace('\'', "''");
+            let batches = store.query_arrow(&format!(
+                "SELECT family FROM legislation WHERE name = '{escaped}'"
+            ))?;
+            batches.iter().find_map(|b| {
+                let col = b.column_by_name("family")?;
+                get_string_value(col.as_ref(), 0)
+            })
+        };
+
+        let escaped = law_name.replace('\'', "''");
+        let filter = format!("law_name = '{escaped}'");
+        let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+
+        for batch in &batches {
+            let sid_col = batch.column_by_name("section_id");
+            let text_col = batch.column_by_name("text");
+
+            for row in 0..batch.num_rows() {
+                let section_id = sid_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let text = text_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+
+                if text.trim().is_empty() {
+                    continue;
+                }
+
+                let (record, trail) =
+                    fractalaw_core::taxa::parse_v2_with_trail(&text, family.as_deref());
+
+                let duty_types: Vec<&str> =
+                    record.duty_types.iter().map(|d| d.as_str()).collect();
+
+                let winner = trail.winner.as_ref().map(|w| {
+                    serde_json::json!({
+                        "tier": format!("{:?}", w.tier),
+                        "family": format!("{:?}", w.family),
+                        "sub_type": format!("{:?}", w.sub_type),
+                        "confidence": w.confidence,
+                        "actor_keyword": w.actor_keyword,
+                        "actor_label": w.actor_label,
+                    })
+                });
+
+                entries.push(serde_json::json!({
+                    "law": law_name,
+                    "section_id": section_id,
+                    "drrp_types": duty_types,
+                    "decision": {
+                        "reason": trail.reason,
+                        "candidates": trail.candidates_count,
+                        "rejections": trail.rejections_count,
+                        "winner": winner,
+                    },
+                    "actors": {
+                        "governed": record.governed_actors,
+                        "government": record.government_actors,
+                    },
+                    "purposes": record.purposes,
+                    "confidence": record.taxa_confidence,
+                }));
+            }
+        }
+    }
+
+    let json = serde_json::to_string_pretty(&entries)?;
+    let mut file = std::fs::File::create(trace_path)?;
+    file.write_all(json.as_bytes())?;
+
+    eprintln!("Trace: {} provisions written to {trace_path}", entries.len());
+    Ok(())
 }
 
 /// Compute embeddings for provisions that lack them.
