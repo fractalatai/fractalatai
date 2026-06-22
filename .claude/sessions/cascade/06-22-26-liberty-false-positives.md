@@ -1,4 +1,4 @@
-# Session: Liberty False Positives (ACTIVE)
+# Session: Liberty False Positives (CLOSED)
 
 ## Problem
 
@@ -143,21 +143,41 @@ Impact: 84.8% → **84.9%** (regex-only benchmark, 2 provisions recovered).
 
 The dominant issue: **31/40 are Prescriptive** — the text has both obligation AND enabling language, but "shall/must" appears before "may" so the obligation pattern wins. The `apply_modal_context` fix helped Government patterns, but GovernedV2's sub-type ordering (Prescriptive at idx 6 before Enabling at idx 7) means obligation wins whenever both modals are present.
 
-## Remaining issues
+## Fixes applied (reopened session, 2026-06-22)
 
-- **37 no_signals**: No regex signal at all — need classifier (handled) or LLM
-- **18 purpose_gated**: Gold disagrees with the gate — enforcement/offence provisions that contain Liberty powers
-- **31 Prescriptive wins over Enabling**: Both modals present, obligation fires first. Needs either sub-type reordering or a "both-modals → enabling" heuristic for provisions where the primary verb is "may"
-- **Classifier threshold tuning**: 0.7 gap-fill is aggressive — causes 125 none→Liberty false positives
+| Fix | Commit | Impact |
+|-----|--------|--------|
+| Immunity exemption (`IMMUNITY_RE`) | `7b74179` | +2 provisions (legal fiction → Liberty) |
+| Blunt gate modal awareness + RIGHT_RE | `030f015` | +1 provision |
+| Offence gate: gov actor override | `00b997e` | +9 provisions (72.0% Liberty recall) |
+| GovernedV2: modal proximity preference | `4f307ea` | Benchmark-neutral (architecturally correct) |
+| Repeal gate: gov actor override | `7db37f5` | +5 provisions (73.4% Liberty recall) |
 
-## Key files
+### Final benchmark (regex only): **85.6%** (1,925/2,250)
 
-- `fractalaw-core/src/taxa/mod.rs` — `is_legal_fiction()`, `IMMUNITY_RE`
-- `fractalaw-core/src/taxa/duty_patterns.rs` — `apply_modal_context()`, `first_modal_is_enabling()`
-- `fractalaw-core/src/taxa/duty_patterns_v2.rs` — governed actor-anchored patterns, SUB_TYPE_PATTERNS order
-- `fractalaw-core/src/taxa/duty_type.rs` — integration tests
-- `data/benchmark_trace.json` — full trace for 18,382 provisions
-- `scripts/benchmark_report.py` — benchmark runner
+| Class | Precision | Recall | F1 | Support |
+|-------|-----------|--------|-----|---------|
+| Liberty | 81.9% | 73.4% | 77.4% | 357 |
+| Obligation | 88.4% | 81.5% | 84.8% | 791 |
+| none | 84.9% | 92.4% | 88.5% | 1102 |
+
+### Progression across session
+
+| Stage | Accuracy | Liberty R | Liberty F1 |
+|-------|----------|-----------|------------|
+| Pre-fix (Rule in output) | 84.4% | 81.8% | 73.5% |
+| Rule→Obligation remap | 84.0% | 64.1% | 71.9% |
+| Modal awareness (gov patterns) | 84.8% | 69.2% | 75.0% |
+| + Classifier pass | 85.5% | 85.2% | 75.1% |
+| Reopened: immunity + gates | **85.6%** | **73.4%** | **77.4%** |
+
+## Remaining at regex ceiling
+
+- **43 Liberty→Obligation**: Obligation modal genuinely closer to actor — need classifier/LLM
+- **52 Liberty→none**: 37 no_signals (no actor near modal), 15 purpose-gated/legal-fiction edge cases
+- **41 none→Liberty false positives**: Classifier threshold tuning needed (0.7 gap-fill too aggressive)
+
+These are beyond regex optimisation. Next steps would be classifier threshold tuning or LLM escalation.
 
 ## Key files
 
