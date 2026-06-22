@@ -593,8 +593,32 @@ static LEGAL_FICTION_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|
     ).unwrap()
 });
 
+/// Immunity/right-preservation patterns — provisions that use legal-fiction
+/// language but actually express a Liberty (right not to be compelled,
+/// preservation of entitlement, etc.).
+static IMMUNITY_RE: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
+    Regex::new(concat!(
+        r"(?i)",
+        // "Nothing in X shall compel/require" — immunity from compulsion
+        r"Nothing\s+in\b.{0,60}\bshall\b.{0,30}\b(?:compel|require|oblige)",
+        r"|",
+        // "shall not affect [any] entitlement/right" — preservation of rights
+        r"\bshall\s+not\s+affect\b.{0,40}\b(?:entitlement|right|privilege)",
+        r"|",
+        // "Nothing in X is taken to compel" — immunity variant
+        r"Nothing\s+in\b.{0,60}\b(?:taken|construed)\s+to\s+(?:compel|require)",
+    )).unwrap()
+});
+
 pub fn is_legal_fiction(text: &str) -> bool {
-    LEGAL_FICTION_RE.is_match(text)
+    if !LEGAL_FICTION_RE.is_match(text) {
+        return false;
+    }
+    // Immunity provisions use legal-fiction language but are actually Liberty
+    if IMMUNITY_RE.is_match(text) {
+        return false;
+    }
+    true
 }
 
 /// Check whether a provision's purposes indicate it could bear a duty.
