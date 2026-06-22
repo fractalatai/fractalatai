@@ -1,4 +1,4 @@
-# Session: Liberty False Positives (CLOSED)
+# Session: Liberty False Positives (ACTIVE)
 
 ## Problem
 
@@ -106,12 +106,58 @@ The complexity lives mainly in `parse_v2` (75 branches). The tier cascade in `du
 
 These 3 questions determine the DRRP type. The complexity comes from the many ways to detect each signal (v2 anchored, v1 keyword, extended window, special patterns). A refactor could separate **signal detection** (find all actor-modal pairs with positions) from **decision logic** (given signals, pick the best classification). Currently these are interleaved — each tier both detects and decides.
 
-## Next steps
+## Traceability investigation (2026-06-22, reopened)
 
-- The 17 no-modal Liberty→Obligation provisions need a new elevation signal (not modal-based)
-- The 125 none→Liberty false positives need classifier threshold tuning (0.7 → higher?)
-- Decision trail logging would make both problems easier to diagnose
-- Consider whether pipeline simplification (signal detection vs decision logic separation) is worth a dedicated session
+Generated full trace (`data/benchmark_trace.json`, 18,382 provisions) using the new `--trace` flag from the pipeline traceability refactor.
+
+### Liberty → none (68 regex-only) — trace reveals 3 root causes
+
+| Decision reason | Count | Root cause |
+|---|---|---|
+| no_signals | 37 | No regex tier matches — no recognised actor near a modal |
+| purpose_gated | 18 | Offence/Repeal/other gate fires, gold disagrees |
+| legal_fiction | 13 | "Nothing in X shall..." / "shall be treated as" rejected |
+
+### Legal fiction over-rejection — fix applied (`7b74179`)
+
+13 provisions rejected as legal fiction were gold=Liberty. Three groups:
+- **"Nothing in... taken to compel"** (2) — immunity from compulsion. Fixed with `IMMUNITY_RE` exemption.
+- **"shall not affect... entitlement"** (1) — preservation of rights. Fixed with `IMMUNITY_RE`.
+- **"shall be treated/deemed as"** (7) — beneficial deeming. Genuinely borderline: the language IS a legal fiction, but gold reads the benefit to the employee/person as Liberty. Not fixed — gold standard judgment call.
+- **"shall not apply" / "shall be construed as"** (3) — varied patterns. Not fixed.
+
+Impact: 84.8% → **84.9%** (regex-only benchmark, 2 provisions recovered).
+
+### Liberty → Obligation (40) — trace reveals dominant patterns
+
+| Winning tier | Count | Pattern |
+|---|---|---|
+| GovernmentV1 | 27 | Blunt gate: gov actor + obligation modal wins, but gold says Liberty |
+| GovernedV2 | 13 | Actor-anchored obligation pattern matched before enabling |
+
+| Sub-type | Count |
+|---|---|
+| Prescriptive | 31 | Generic "actor + shall/must" fallback — obligation modal fires first |
+| Prohibitive | 6 |
+| Enforcement/RegMaking/CodeApproval | 3 |
+
+The dominant issue: **31/40 are Prescriptive** — the text has both obligation AND enabling language, but "shall/must" appears before "may" so the obligation pattern wins. The `apply_modal_context` fix helped Government patterns, but GovernedV2's sub-type ordering (Prescriptive at idx 6 before Enabling at idx 7) means obligation wins whenever both modals are present.
+
+## Remaining issues
+
+- **37 no_signals**: No regex signal at all — need classifier (handled) or LLM
+- **18 purpose_gated**: Gold disagrees with the gate — enforcement/offence provisions that contain Liberty powers
+- **31 Prescriptive wins over Enabling**: Both modals present, obligation fires first. Needs either sub-type reordering or a "both-modals → enabling" heuristic for provisions where the primary verb is "may"
+- **Classifier threshold tuning**: 0.7 gap-fill is aggressive — causes 125 none→Liberty false positives
+
+## Key files
+
+- `fractalaw-core/src/taxa/mod.rs` — `is_legal_fiction()`, `IMMUNITY_RE`
+- `fractalaw-core/src/taxa/duty_patterns.rs` — `apply_modal_context()`, `first_modal_is_enabling()`
+- `fractalaw-core/src/taxa/duty_patterns_v2.rs` — governed actor-anchored patterns, SUB_TYPE_PATTERNS order
+- `fractalaw-core/src/taxa/duty_type.rs` — integration tests
+- `data/benchmark_trace.json` — full trace for 18,382 provisions
+- `scripts/benchmark_report.py` — benchmark runner
 
 ## Key files
 
