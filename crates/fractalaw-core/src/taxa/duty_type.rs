@@ -142,7 +142,7 @@ fn map_to_duty_type(dc: &DutyClassification) -> Vec<DutyType> {
 
 impl DutySubType {
     /// Lowercase label for keyword checks.
-    fn as_str_lower(self) -> &'static str {
+    pub(crate) fn as_str_lower(self) -> &'static str {
         match self {
             Self::RegulationMaking => "regulation making",
             Self::CodeApproval => "code approval",

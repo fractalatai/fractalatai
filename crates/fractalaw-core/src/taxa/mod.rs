@@ -30,6 +30,7 @@ pub mod actors;
 pub mod clause_refiner;
 pub mod clause_structure;
 pub mod confidence;
+pub mod decision;
 pub mod duty_patterns;
 pub mod duty_patterns_offence;
 pub mod duty_patterns_rule;
@@ -39,6 +40,7 @@ pub mod fitness;
 pub mod making;
 pub mod popimar;
 pub mod purpose;
+pub mod signals;
 pub mod text_cleaner;
 
 use regex::Regex;
@@ -239,6 +241,161 @@ pub fn parse_v2(raw_text: &str, family: Option<&str>) -> TaxaRecord {
         fitness_rules,
         actor_positions,
     }
+}
+
+/// Run the pipeline and return both the TaxaRecord and the decision trail.
+///
+/// Used by QA/diagnostic commands for tracing the "parsing journey".
+/// The TaxaRecord is identical to what `parse_v2()` returns.
+pub fn parse_v2_with_trail(
+    raw_text: &str,
+    family: Option<&str>,
+) -> (TaxaRecord, decision::DecisionTrail) {
+    if raw_text.trim().is_empty() {
+        return (
+            TaxaRecord::default(),
+            decision::DecisionTrail {
+                winner: None,
+                reason: "empty_text",
+                candidates_count: 0,
+                rejections_count: 0,
+            },
+        );
+    }
+
+    let cleaned = text_cleaner::clean(raw_text);
+    let purposes = purpose::classify(&cleaned);
+
+    let extracted = actors::extract_actors_for_family(&cleaned, family);
+    let has_governed = !extracted.governed.is_empty();
+    let has_government = !extracted.government.is_empty();
+
+    let purpose_gated =
+        should_skip_drrp(&purposes, has_governed, has_government);
+    let desc_summary = is_descriptive_summary(&cleaned);
+
+    if purpose_gated || desc_summary {
+        let fitness_rules = if purposes.contains(&purpose::APPLICATION_SCOPE) {
+            fitness::extract(&cleaned, family)
+        } else {
+            vec![]
+        };
+        let signal_set = signals::extract_all(
+            &cleaned.to_lowercase(),
+            &extracted.governed,
+            &extracted.government,
+            &purposes,
+            false,
+            desc_summary,
+            purpose_gated,
+        );
+        let (_, trail) = decision::decide(&signal_set);
+        return (
+            TaxaRecord {
+                cleaned_text: cleaned,
+                governed_actors: extracted.governed_labels(),
+                government_actors: extracted.government_labels(),
+                purposes,
+                fitness_rules,
+                ..Default::default()
+            },
+            trail,
+        );
+    }
+
+    let lower = cleaned.to_lowercase();
+    let is_lf = is_legal_fiction(&lower);
+
+    let signal_set = signals::extract_all(
+        &lower,
+        &extracted.governed,
+        &extracted.government,
+        &purposes,
+        is_lf,
+        false,
+        false,
+    );
+    let (cr, trail) = decision::decide(&signal_set);
+
+    let dt_labels: Vec<&str> = cr.duty_types.iter().map(|d| d.as_str()).collect();
+    let popimar = popimar::classify_with_duty_types(&cleaned, &dt_labels);
+    let clause_refined = extract_clause(&cleaned, cr.classification.as_ref());
+
+    let span = cr.classification.as_ref().and_then(|c| c.span);
+    let clause_structure = clause_refined
+        .as_deref()
+        .and_then(|c| clause_structure::decompose(c, span));
+
+    let has_span = span.is_some();
+    let taxa_confidence = clause_refined
+        .as_deref()
+        .map(|c| confidence::score(c, has_span))
+        .unwrap_or(0.0);
+
+    let fitness_rules = if purposes.contains(&purpose::APPLICATION_SCOPE) {
+        fitness::extract(&cleaned, family)
+    } else {
+        vec![]
+    };
+
+    let actor_positions = derive_actor_positions(&extracted, cr.classification.as_ref());
+
+    (
+        TaxaRecord {
+            cleaned_text: cleaned,
+            governed_actors: extracted.governed_labels(),
+            government_actors: extracted.government_labels(),
+            duty_types: cr.duty_types,
+            popimar,
+            purposes,
+            classification: cr.classification,
+            clause_refined,
+            taxa_confidence,
+            clause_structure,
+            fitness_rules,
+            actor_positions,
+        },
+        trail,
+    )
+}
+
+/// Derive Hohfeldian actor positions from the DRRP match span.
+fn derive_actor_positions(
+    extracted: &actors::ExtractedActors,
+    classification: Option<&duty_patterns::DutyClassification>,
+) -> std::collections::HashMap<String, &'static str> {
+    let mut positions = std::collections::HashMap::new();
+    if let Some(dc) = classification
+        && let Some(span) = dc.span
+    {
+        let all_actors: Vec<&actors::ActorMatch> = extracted
+            .governed
+            .iter()
+            .chain(extracted.government.iter())
+            .collect();
+
+        let mut found_active = false;
+        for actor in &all_actors {
+            let actor_end = actor.offset + actor.keyword.len();
+            let near_start =
+                actor.offset <= span.actor_start + 3 && actor_end + 3 >= span.actor_start;
+            if near_start {
+                positions.insert(actor.label.clone(), "active");
+                found_active = true;
+            }
+        }
+
+        for actor in &all_actors {
+            if !positions.contains_key(&actor.label) {
+                positions.insert(actor.label.clone(), "counterparty");
+            }
+        }
+
+        if !found_active && let Some(first) = all_actors.first() {
+            positions.insert(first.label.clone(), "active");
+        }
+    }
+    positions
 }
 
 // ── Clause extraction ────────────────────────────────────────────────
@@ -1794,5 +1951,73 @@ mod tests {
             !record.government_actors.is_empty(),
             "should extract government actor"
         );
+    }
+
+    // ── Shadow-mode: parse_v2 vs parse_v2_with_trail ────────────────
+
+    /// Verify that `parse_v2_with_trail` produces the same TaxaRecord as `parse_v2`
+    /// across a representative set of provision texts.
+    #[test]
+    fn shadow_mode_parse_v2_with_trail_matches() {
+        let texts = [
+            "The employer shall ensure the health and safety of employees.",
+            "The Secretary of State shall have power to make regulations.",
+            "<p>The employer <b>shall</b> ensure safety.</p>",
+            "",
+            "This Act may be cited as the Health and Safety at Work etc. Act 1974.",
+            "It shall be the duty of every employer to ensure, so far as is reasonably practicable, the health, safety and welfare at work of all his employees.",
+            r#"In these Regulations— "employer" means a person who employs one or more employees."#,
+            "In section 3, for subsection (2) substitute the following provisions.",
+            "Every employer shall ensure the health and safety of employees.",
+            "The enforcing authority may serve on the responsible person a notice.",
+            "An inspector may serve an improvement notice.",
+            "Every traffic route must be suitable for the persons using them.",
+            "It is an offence for a person to fail to comply with the requirement.",
+            "The authority may appoint any suitably qualified person as an inspector.",
+            "The secretary of state may give directions to the executive.",
+            "Nothing in this section shall be taken to compel production of a document.",
+            "The Regulations impose duties on employers.",
+        ];
+
+        for text in texts {
+            let old = parse_v2(text, None);
+            let (new, _trail) = parse_v2_with_trail(text, None);
+
+            assert_eq!(
+                old.duty_types, new.duty_types,
+                "duty_types mismatch for: {text:.80}"
+            );
+            assert_eq!(
+                old.governed_actors, new.governed_actors,
+                "governed_actors mismatch for: {text:.80}"
+            );
+            assert_eq!(
+                old.government_actors, new.government_actors,
+                "government_actors mismatch for: {text:.80}"
+            );
+            assert_eq!(
+                old.purposes, new.purposes,
+                "purposes mismatch for: {text:.80}"
+            );
+            assert_eq!(
+                old.popimar, new.popimar,
+                "popimar mismatch for: {text:.80}"
+            );
+            assert_eq!(
+                old.clause_refined, new.clause_refined,
+                "clause_refined mismatch for: {text:.80}"
+            );
+            // Confidence: epsilon comparison for f32
+            assert!(
+                (old.taxa_confidence - new.taxa_confidence).abs() < 1e-6,
+                "taxa_confidence mismatch for {text:.80}: old={} new={}",
+                old.taxa_confidence,
+                new.taxa_confidence,
+            );
+            assert_eq!(
+                old.actor_positions, new.actor_positions,
+                "actor_positions mismatch for: {text:.80}"
+            );
+        }
     }
 }
