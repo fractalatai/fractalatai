@@ -90,7 +90,7 @@ Hard cases that tracing would help diagnose:
 ## Implementation plan
 
 Detailed plan: `.claude/plans/staged-mapping-cookie.md`
-Gemini review doc: `docs/reviews/gemini-signal-decision-separation-20260622.md` (AWAITING REVIEW)
+Gemini review doc: `docs/reviews/gemini-signal-decision-separation-20260622.md` (REVIEWED)
 
 ### 5 stages
 
@@ -138,6 +138,7 @@ Complete. The pipeline now has:
 - `DecisionTrail` showing why each classification was chosen
 - `taxa show` CLI displays trail per provision
 - `parse_v2_with_trail()` public API for QA tooling
+- `taxa parse --trace data/trace.json` persists trail to JSON for offline analysis (`9b96282`)
 
 ## Prior sessions
 
