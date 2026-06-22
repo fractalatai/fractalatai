@@ -111,12 +111,18 @@ Key feedback:
 - `DecisionTrail` sufficient to start — enhance later with specific reason enums and top-N alternatives if needed
 - Architecture pattern is industry-standard NLP (annotation pipeline). Sets up future ML integration
 
-Awareness for implementation:
-- Stage 4 shadow test must cover full benchmark corpus (2,250+), not just unit tests
-- Watch for f32 precision drift — may need epsilon comparison, not byte-identical
-- Document any implicit tie-breaking rules discovered during Stage 2
-
 Full review: `data/code-review/signal-decision-separation.md`
+
+### Gemini feedback incorporated
+
+| Feedback | Status |
+|----------|--------|
+| Typed `DecisionReason` enum | Done (`1755999`) — `TierPriority(SignalTier)`, `NoSignals`, `PurposeGated`, etc. |
+| Shadow test on hard provisions | Done (`1755999`) — 54 Liberty edge cases (45 →Obligation, 9 →none) |
+| f32 epsilon comparison | Done — shadow test uses `< 1e-6` |
+| Top-N alternatives in trail | Deferred — Gemini recommended "start simple, enhance if needed" |
+| Signal IDs for cross-referencing | Deferred |
+| Rejection histogram on trail | Deferred |
 
 ### Implementation (2026-06-22)
 
@@ -127,6 +133,8 @@ All 5 stages implemented in a single session:
 | 1 | `ebaaa2f` | Types (`SignalSet`, `PatternSignal`, `RejectedSignal`, `DecisionTrail`), `extract_all()` stub, `decide()`, `parse_v2_with_trail()` |
 | 2-3 | `ef5da88` | All 5 tiers have `extract_*_signals()` — collect ALL matches + rejections |
 | 4-5 | `5f31c65` | `parse_v2` delegates to `parse_v2_with_trail`, `classify()` deprecated, `taxa show` displays decision trail |
+| trace | `9b96282` | `taxa parse --trace data/trace.json` persists trail to JSON |
+| gemini | `1755999` | Typed `DecisionReason` enum + 54 hard-provision shadow test |
 
 491 tests pass including shadow-mode verification. Zero warnings.
 
