@@ -1,4 +1,4 @@
-# Session: LLM Batch Strategy (PENDING)
+# Session: LLM Batch Strategy (ACTIVE)
 
 ## Problem
 
@@ -50,6 +50,133 @@ Many regulations are small enough to send entirely to the LLM — not just the p
 - `fractalaw-cli/src/main.rs` — `enrich_single_law`, LLM escalation logic
 - `fractalaw-store/src/lance.rs` — `query_legislation_text` (provisions with hierarchy_path)
 - LanceDB schema: `hierarchy_path`, `section_id`, `law_name` for grouping
+
+## Investigation results (2026-06-23)
+
+### Section clustering is weak
+
+Pending_llm provisions are mostly singletons within sections. HSWA: 34 pending in 26 sections (18 singletons, max cluster = 2). Section-level batching barely reduces call count — not worth the complexity.
+
+### Corpus law sizes favour whole-law validation
+
+| Size bucket | Laws | Provisions |
+|---|---|---|
+| ≤20 | 52 | 643 |
+| 21-50 | 58 | 1,950 |
+| 51-100 | 104 | 8,032 |
+| 101-200 | 128 | 17,933 |
+| 201-500 | 112 | 34,616 |
+| 500+ | 78 | 98,714 |
+
+**214 laws (≤100 provisions)** could get whole-law LLM validation. 10,625 provisions total.
+
+### Token cost comparison
+
+| Strategy | Laws ≤100 provs | Calls | Tokens | Cost (Flash) |
+|---|---|---|---|---|
+| Per-provision (pending only, ~4%) | 214 laws | ~425 | ~850K | $0.13 |
+| **Whole-law validation** | 214 laws | **~214** | **~1.2M** | **$0.18** |
+
+Whole-law costs **1.4x more tokens** but uses **half the API calls** and catches the 170 hard-floor errors that per-provision escalation can never reach. At $0.18 for 214 laws, this is negligible cost.
+
+For 101-200 provision laws (128 laws): 1.3x token ratio, ~$0.27. Still negligible.
+
+### Recommended strategy
+
+**Tiered approach based on law size:**
+
+1. **≤100 provisions** → whole-law validation (send all provisions + parse results, one call per law)
+2. **101-500 provisions** → section-batch (group pending by parent section) OR quality-adaptive (whole-law if quality signal is low)
+3. **500+ provisions** → per-provision only (too large for single call, even with 1M context)
+
+The quality-adaptive threshold for medium laws: if >5% of provisions are pending_llm or low-confidence, escalate to whole-law.
+
+## LLM Auditability Plan
+
+### Current state: no audit trail
+
+The existing LLM tier (Tier 2/3 in `enrich_single_law`) has **zero persistence** of the LLM interaction:
+
+| What | Persisted? | Where |
+|---|---|---|
+| Prompt sent to LLM | No | Lost after call |
+| Raw LLM response | No | Parsed then discarded |
+| LLM's DRRP classification | Partial | Written to `drrp_types` (overwrites regex) |
+| LLM's actor labels/positions | Yes | Written to `actors` column |
+| LLM's reasoning per actor | Yes | Actor `reason` field |
+| LLM's overall reasoning | No | Not captured |
+| Which model/provider was used | Partial | `extraction_method` = "agentic"/"local" |
+| Timestamp of LLM call | No | Only `taxa_classified_at` (set during regex, not updated) |
+| Token usage / latency | No | Not captured |
+| Whether LLM agreed or overrode regex | No | Previous regex answer overwritten |
+
+For regulated customers, this is a gap. If an LLM reclassifies a provision from Obligation → Liberty, there's no record of what the regex/classifier said before, what prompt the LLM saw, or what reasoning the LLM gave for the change.
+
+### What needs to be auditable
+
+1. **Pre-LLM state**: What did regex + classifier produce? (Already in `drrp_history` — the new JSON format captures tier entries)
+2. **LLM input**: What prompt was sent? What context was included?
+3. **LLM output**: Raw response (before parsing), parsed classification, reasoning
+4. **Decision**: Did the LLM override a previous classification? What was the delta?
+5. **Metadata**: Model, provider, timestamp, token count, latency
+
+### Proposed: `llm_audit_log` JSON file per law
+
+During LLM processing (whole-law or per-provision), write one JSON file per law to a configurable directory:
+
+```
+data/llm-audit/UK_uksi_1999_3242.json
+```
+
+Each file contains an array of LLM interactions:
+
+```json
+{
+  "law_name": "UK_uksi_1999_3242",
+  "strategy": "whole_law",
+  "model": "gemini-2.5-flash",
+  "timestamp": "2026-06-23T14:30:00Z",
+  "token_usage": { "input": 4200, "output": 1800 },
+  "latency_ms": 2340,
+  "provisions": [
+    {
+      "section_id": "UK_uksi_1999_3242:reg.4(1)",
+      "pre_llm": {
+        "drrp_types": ["Obligation"],
+        "extraction_method": "regex",
+        "confidence": 0.70,
+        "actors": [{"label": "Org: Employer", "position": "active"}]
+      },
+      "llm_output": {
+        "drrp_type": "Obligation",
+        "actors": [
+          {"label": "Org: Employer", "position": "ACTIVE", "reason": "employer bears the duty"}
+        ]
+      },
+      "delta": "no_change",
+      "prompt_excerpt": "Classify this provision..."
+    }
+  ],
+  "prompt_template": "full prompt text here..."
+}
+```
+
+### Integration with existing traceability
+
+- `drrp_history` JSON already captures per-tier predictions — LLM adds an `"agentic"` entry
+- `--trace` flag captures regex/classifier decision trail — LLM audit log is the complementary trace for Tier 3
+- The `decision_trail` from `parse_v2_with_trail` shows the regex journey; the audit log shows the LLM journey
+- Together they form a complete audit chain: regex → classifier → LLM, all traceable
+
+### Implementation approach
+
+1. Add `--audit-dir data/llm-audit` flag to the escalate command
+2. Before each LLM call, snapshot the pre-LLM state from LanceDB
+3. After each LLM call, write the audit entry (prompt, raw response, parsed result, delta)
+4. For whole-law strategy: one audit file per law with all provisions
+5. For per-provision strategy: same file structure, one entry per provision
+
+This is lightweight — JSON files on disk, no schema changes, no LanceDB columns. Queryable with `jq` for compliance review.
 
 ## Prior sessions
 
