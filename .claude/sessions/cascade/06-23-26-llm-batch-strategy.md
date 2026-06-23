@@ -1,4 +1,4 @@
-# Session: LLM Batch Strategy (ACTIVE)
+# Session: LLM Batch Strategy (CLOSED)
 
 ## Problem
 
@@ -256,6 +256,17 @@ Examined all 8 provisions where validate LLM disagreed with gold benchmark:
 The 8 "hurt" are **genuine borderline cases** where gold and validate disagree on doctrine (is beneficial deeming a Liberty or scope?). These ARE the human review surface — the audit log surfaces exactly these provisions with reasoning.
 
 **Key insight**: the value of `taxa validate` is not auto-applying corrections — it's producing a focused review list. A human reviewer looks at 34 corrections (5 minutes) instead of reading 361 provisions. The audit log captures the LLM's reasoning for each correction.
+
+## Implementation summary
+
+| Commit | What |
+|--------|------|
+| `5db9d69` | `taxa validate` command — whole-law LLM validation with audit log |
+| `b703e9f` | Audit-only default, `--apply` flag |
+| `bc5f1d8` | Exemption guidance in prompt — 0 false corrections |
+| `45c67c4` | `/human-review` skill + `adjudicated` source_tier=7 |
+
+Full audit chain: regex (`--trace`) → classifier (`drrp_history`) → LLM (`data/llm-audit/*.json`) → human (`*_adjudicated.json`)
 
 ## Prior sessions
 
