@@ -257,6 +257,48 @@ The 8 "hurt" are **genuine borderline cases** where gold and validate disagree o
 
 **Key insight**: the value of `taxa validate` is not auto-applying corrections — it's producing a focused review list. A human reviewer looks at 34 corrections (5 minutes) instead of reading 361 provisions. The audit log captures the LLM's reasoning for each correction.
 
+## Reopened: Tiered batching (2026-06-23)
+
+The `taxa validate` command only implements whole-law (one call per law). 95 QQ laws remain unvalidated — all medium (63, 101-500 provs) and large (32, 500+). Largest is 5,639 provisions. Whole-law won't work at that scale.
+
+### Section structure validates batching approach
+
+Profiled UK_ukpga_1995_25 (2,562 provisions):
+- 31 sections, avg 83 provisions each
+- Section sizes: 1-5 (4), 6-10 (2), 11-20 (3), 21-50 (9), 50+ (13)
+- Only 4/31 sections have pending_llm provisions
+
+Sections are the natural batching unit — each section is a coherent group of provisions with shared context (definitions, scope, subject matter).
+
+### Implementation needed
+
+Modify `taxa validate` to use a tiered strategy:
+1. **≤200 provisions**: whole-law (current behaviour) — one call
+2. **>200 provisions**: section-batch — one call per top-level section, with section context
+
+Each section call includes:
+- All provisions in that section (with parse results)
+- Section heading/title for context
+- The same classification rules and corrections-only output format
+
+The audit log stays per-law (one JSON file) but records which sections were batched.
+
+### Targeted validation complete (2026-06-23)
+
+Redesigned `taxa validate` to send only uncertain provisions (pending_llm, orphans, low confidence) with section context — not every provision. Implemented and run across entire QQ corpus.
+
+**Small laws (≤100 provisions, whole-law strategy):** 215 laws → 1,907 corrections
+**Medium/large laws (section-targeted strategy):** 95 laws → 1,901 corrections (8 skipped, 0 targets)
+**Benchmark laws (gold labels from Gemini):** 16 laws → written to LanceDB as agentic
+
+**Total QQ corpus human review surface: ~3,808 corrections across 301 audit logs**
+
+Key metrics for targeted approach on 95 medium/large laws:
+- 59,090 provisions scanned, ~3,057 targets identified
+- ~400 Gemini calls (section-batched), not 95 whole-law calls
+- 8 laws had 0 targets — skipped entirely
+- Largest law (5,273 provisions) → only 25 targets in 9 sections
+
 ## Implementation summary
 
 | Commit | What |
