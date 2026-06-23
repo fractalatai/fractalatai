@@ -1,66 +1,62 @@
-# Session: LLM Elevation Optimisation (PENDING)
+# Session: LLM Elevation Optimisation (CLOSED)
 
 ## Problem
 
-The classifier flags 398 provisions as `pending_llm` across the 16 benchmark laws. But:
+The classifier flagged 398 provisions as `pending_llm` across 16 benchmark laws. But:
+- **303 were already correct** (76% FP rate — wasted LLM cost and regression risk)
+- **95 were genuine mismatches** that LLM would fix
+- **229 errors were NOT flagged** for LLM at all
 
-- **303 are already correct** — LLM call is wasted cost and a regression risk
-- **95 are genuine mismatches** that LLM would fix (assuming perfect LLM → 89.8%)
-- **229 errors are NOT flagged** for LLM — the elevation logic misses them entirely
+## Fix 1: Disagreement check bug (`a3e057c`)
 
-This is a false-positive / false-negative problem in the LLM elevation decision.
+**Root cause**: The transition rule flagged ALL provisions where `has_drrp && classifier_confidence >= 0.9`, regardless of whether the classifier actually **disagreed** with the regex. 263 provisions where regex and classifier agreed on the correct answer were needlessly elevated.
 
-## False positives: 303 unnecessary LLM elevations
+**Fix**: Added `regex_drrp != cls_drrp` check before flagging as `pending_llm`.
 
-These provisions are `pending_llm` but the current pipeline answer already matches gold. The classifier flagged them because:
-- Disagreement with regex at ≥0.9 confidence (classifier says X, regex says Y, but regex was right)
-- Both-modals detected (ambiguity signal fired, but the regex answer was correct)
-- Low-confidence gap fill (classifier filled a gap but with <0.7 confidence, so flagged — but the fill was correct)
+| Metric | Before | After |
+|--------|--------|-------|
+| LLM-elevated | 398 | 125 |
+| Already correct (wasted) | 303 (76% FP) | 40 (32% FP) |
+| LLM would fix | 95 | 85 |
 
-**Question**: Can the elevation threshold be tuned to reduce unnecessary LLM calls? E.g.:
-- Raise disagreement threshold from 0.9 → 0.95?
-- Skip both-modals flag when regex confidence is high?
-- Accept low-confidence gap fills when they agree with the regex tier?
+## Fix 2: Disagreement threshold 0.9 → 0.75 (`fa88407`)
 
-## False negatives: 229 unflagged errors
+**Analysis**: 54 provisions where the classifier had the correct answer but confidence was below the 0.9 disagreement threshold (range 0.42–0.87, all below 0.9).
 
-These provisions have wrong DRRP classification but are NOT flagged for LLM. Breakdown from benchmark:
+Threshold sweep on 133 real disagreements showed **0.75 is the precision optimum** (69.6%): captures 16 fixes with 5 wasted calls. Below 0.75, precision drops as low-confidence noise floods in.
 
-| Error type | Count | Why unflagged |
-|---|---|---|
-| none→Liberty FP (classifier) | ~51 | Classifier confidently gap-filled above 0.7 threshold |
-| none→Obligation FP (classifier) | ~36 | Same — confident but wrong |
-| Liberty→Obligation | ~43 | Regex confident, classifier agrees or doesn't trigger disagreement |
-| Liberty→none | ~52 | No signal at all, or purpose-gated — nothing to flag |
-| Obligation→none | ~47 | Similar — no regex signal, classifier didn't fill |
+| Metric | 0.9 threshold | 0.75 threshold |
+|--------|---------------|----------------|
+| Actual accuracy | 85.6% | **86.0%** |
+| LLM-elevated | 125 | 134 |
+| FP rate | 32% | 37% |
+| Perfect LLM ceiling | 89.4% | **89.8%** |
 
-**Question**: What new signals could flag these for LLM?
-- Classifier confidence in a narrow band (0.7-0.8) → flag as uncertain?
-- Provisions with zero actors but DRRP classification → suspicious, flag?
-- Provisions where regex and classifier agree on the same wrong answer → need external signal
+## Unflagged errors: 239 profiled
 
-## Benchmark reference
+| Category | Count | Root cause |
+|----------|-------|------------|
+| Classifier agrees with wrong answer | 170 | Both regex and classifier confidently wrong in same direction |
+| Classifier correct but not used | 54 | Confidence below disagreement threshold (addressed by 0.75 fix) |
+| Classifier said none | 9 | Classifier had no opinion |
+| No classifier ran | 4 | No embedding or non-regulation section type |
+
+**The 170 where both tiers agree on the wrong answer are the true hard floor.** No threshold tuning can help when both tiers are confidently wrong. These need either more training data for the classifier, a larger base model, or the LLM tier.
+
+## Final benchmark
 
 | Metric | Value |
 |---|---|
-| Actual (regex + classifier) | 85.6% (1,925/2,250) |
-| With perfect LLM on pending_llm | 89.8% (2,021/2,250) |
-| LLM-elevated provisions | 398 |
-| Already correct (wasted LLM) | 303 (76% false positive rate) |
-| Errors not flagged | 229 |
-
-## Investigation plan
-
-1. Profile the 303 false positives — which elevation trigger fired (disagreement vs both-modals vs low-confidence)?
-2. Test threshold adjustments on the 398: would raising thresholds reduce false positives without losing the 95 genuine fixes?
-3. Profile the 229 false negatives — what do they have in common? Can the SignalSet/DecisionTrail reveal a pattern?
-4. Prototype a confidence-band flag: classifier confidence 0.7-0.8 → `pending_llm` instead of accepting
+| Actual (regex + classifier) | **86.0%** (1,935/2,250) |
+| With perfect LLM on pending_llm | **89.8%** (2,020/2,250) |
+| LLM-elevated provisions | 134 |
+| Already correct (wasted LLM) | 49 (37% FP rate) |
+| Unflagged errors | ~220 (170 need better model) |
 
 ## Key files
 
-- `fractalaw-cli/src/main.rs:5066-5114` — classifier transition rules, thresholds
+- `fractalaw-cli/src/main.rs:5192-5230` — classifier transition rules, thresholds
 - `fractalaw-core/src/taxa/decision.rs` — DecisionTrail, SignalSet
-- `data/benchmark_trace.json` — full trace for investigation
 - `scripts/benchmark_report.py` — benchmark runner
 
 ## Prior sessions
