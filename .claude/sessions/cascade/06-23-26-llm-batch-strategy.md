@@ -244,7 +244,18 @@ Examined all 8 provisions where validate LLM disagreed with gold benchmark:
 - Gold: `Liberty`, Validate: `Right`
 - **Verdict: non-issue.** Both agree it's not `none`. Right → Liberty in our DRRP taxonomy.
 
-**Action**: Add the exemption/exception guidance from the gold benchmark system prompt (`generate_benchmarks.py:59-64`) to the validate prompt. This will align the two Gemini runs and eliminate the false disagreements.
+**Action**: Added exemption/exception guidance to validate prompt (`bc5f1d8`). Retested on UK_uksi_1999_3242: 25 corrections → 0 corrections.
+
+### Second test: UK_uksi_2002_2788 (27 benchmark errors, 361 provisions)
+
+34 corrections returned. Against gold benchmark:
+- **18 helped** (wrong → right) — mostly Liberty→none (scope/definitional provisions misclassified by regex)
+- **8 hurt** (right → wrong) — 4 "shall be treated as" (deeming), 2 "may vary... provided" (condition vs right), 2 entitlement scope
+- **6 both wrong** — LLM changed one wrong answer to a different wrong answer
+
+The 8 "hurt" are **genuine borderline cases** where gold and validate disagree on doctrine (is beneficial deeming a Liberty or scope?). These ARE the human review surface — the audit log surfaces exactly these provisions with reasoning.
+
+**Key insight**: the value of `taxa validate` is not auto-applying corrections — it's producing a focused review list. A human reviewer looks at 34 corrections (5 minutes) instead of reading 361 provisions. The audit log captures the LLM's reasoning for each correction.
 
 ## Prior sessions
 
