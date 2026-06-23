@@ -5004,8 +5004,8 @@ async fn cmd_taxa_classify(
         let filter = format!("law_name = '{escaped}'");
         let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
 
-        // (section_id, text, embedding, source_tier, section_type, has_govt_active, has_drrp, drrp_history)
-        type Prov = (String, String, Option<Vec<f32>>, u8, String, bool, bool, Option<String>);
+        // (section_id, text, embedding, source_tier, section_type, has_govt_active, has_drrp, drrp_history, regex_drrp)
+        type Prov = (String, String, Option<Vec<f32>>, u8, String, bool, bool, Option<String>, Option<String>);
         let mut provisions: Vec<Prov> = Vec::new();
         for batch in &batches {
             let sid_col = batch.column_by_name("section_id");
@@ -5075,22 +5075,25 @@ async fn cmd_taxa_classify(
                     })
                     .unwrap_or(false);
 
-                let has_drrp = drrp_col
+                let regex_drrp = drrp_col
                     .and_then(|c| {
                         use arrow::array::AsArray;
                         let list = c.as_list_opt::<i32>()?;
                         if list.is_null(row) {
-                            return Some(false);
+                            return None;
                         }
                         let vals = list.value(row);
-                        Some(vals.len() > 0)
-                    })
-                    .unwrap_or(false);
+                        if vals.is_empty() {
+                            return None;
+                        }
+                        get_string_value(vals.as_ref(), 0)
+                    });
+                let has_drrp = regex_drrp.is_some();
 
                 let existing_hist = hist_col
                     .and_then(|c| get_string_value(c.as_ref(), row));
 
-                provisions.push((sid, text, emb, tier, section_type, has_govt_active, has_drrp, existing_hist));
+                provisions.push((sid, text, emb, tier, section_type, has_govt_active, has_drrp, existing_hist, regex_drrp));
             }
         }
 
@@ -5136,6 +5139,7 @@ async fn cmd_taxa_classify(
                 let _is_govt: bool = prov.5;
                 let has_drrp: bool = prov.6;
                 let existing_hist: Option<&str> = prov.7.as_deref();
+                let regex_drrp: Option<&str> = prov.8.as_deref();
 
                 if tier >= source_tier("classifier")
                     || !REGULATION_TYPES.contains(&section_type)
@@ -5211,8 +5215,11 @@ async fn cmd_taxa_classify(
                     cls_conf_b.append_value(prediction.confidence);
                     disagreements += 1;
                     total_classified += 1;
-                } else if has_drrp && prediction.confidence >= threshold {
-                    // Disagreement: regex has DRRP, classifier has different DRRP
+                } else if has_drrp
+                    && prediction.confidence >= threshold
+                    && regex_drrp.is_some_and(|r| r != cls_drrp)
+                {
+                    // Disagreement: regex has DRRP, classifier has DIFFERENT DRRP
                     // Flag for LLM review — don't silently override
                     cls_sid_b.append_value(sid);
                     let drrp_vals = cls_drrp_b.values();
