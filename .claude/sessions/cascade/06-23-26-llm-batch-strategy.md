@@ -178,6 +178,26 @@ Each file contains an array of LLM interactions:
 
 This is lightweight — JSON files on disk, no schema changes, no LanceDB columns. Queryable with `jq` for compliance review.
 
+### Gemini review additions (2026-06-23)
+
+Full review: `data/code-review/llm-batch-strategy.md`
+
+**Audit log schema additions** (from Gemini):
+- `schema_version` — future-proof parsing of older logs
+- `pipeline_version` — links LLM output to the code version that generated pre_llm state
+- `integrity_hash` — SHA256 of prompt + raw response for tamper verification
+- `llm_errors` / `llm_warnings` — capture API errors, malformed responses
+
+**Prompt design decisions** (from Gemini):
+- **Show confidence scores** — beneficial bias that guides LLM attention to low-confidence provisions. Present as `confidence: 0.85, extraction_method: "classifier"`.
+- **Corrections-only output** — omitted provisions are implicitly confirmed. But `pending_llm` provisions MUST get an explicit classification. The audit log `delta: "no_change"` serves as the "LLM agreed" signal.
+- **Over-correction risk** — the biggest risk of whole-law validation. LLM may "fix" correct provisions. Mitigate with post-LLM validation: flag LLM changes to high-confidence provisions for extra scrutiny.
+
+**Quality-adaptive threshold**:
+- 5% is a good starting point but should be monitored
+- A/B test different thresholds (3%, 5%, 7%) on medium laws
+- `pending_llm` provisions should be heavily weighted in the quality score
+
 ## Prior sessions
 
 - `06-22-26-llm-elevation-optimisation.md` (CLOSED) — 134 LLM calls, 37% FP rate, 170 hard-floor errors
