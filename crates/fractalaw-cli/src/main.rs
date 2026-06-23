@@ -5165,7 +5165,8 @@ Provisions:
         });
 
         // Write audit file
-        let audit_path = format!("{audit_dir}/{law_name}.json");
+        let safe_name = law_name.replace('/', "_");
+        let audit_path = format!("{audit_dir}/{safe_name}.json");
         let json = serde_json::to_string_pretty(&audit_entry)?;
         let mut file = std::fs::File::create(&audit_path)?;
         file.write_all(json.as_bytes())?;
