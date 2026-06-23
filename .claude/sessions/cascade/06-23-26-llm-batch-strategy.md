@@ -231,7 +231,20 @@ Our `taxa validate` is different: sends all provisions + existing parse results 
 - **Or**: the gold per-provision labels have inconsistencies that whole-law review would legitimately correct
 - **Or**: different prompt structure (system prompt + cached context vs single prompt with inline context) leads to different interpretations
 
-Either way, disagreements between gold labels and validation corrections need **human adjudication** — the audit log is the right mechanism. The benchmark is useful for regex/classifier iteration but becomes circular for LLM-vs-LLM evaluation.
+### Adjudication of 8 disagreements (2026-06-23)
+
+Examined all 8 provisions where validate LLM disagreed with gold benchmark:
+
+**7 of 8: exemption provisions** — "shall not apply to...", "Nothing in X shall require..."
+- Gold: `none` (scope limitation, not a new legal relation). Gold prompt explicitly instructs: "Creates an exemption or exception to an obligation... is a detail of the obligation, not a new Liberty"
+- Validate: `Liberty` (exemption = freedom from obligation)
+- **Verdict: prompt gap.** The validate prompt lacks the exemption guidance from the benchmark system prompt. Both interpretations are doctrinally defensible, but the pipeline should be consistent. Add the exemption instruction to the validate prompt.
+
+**1 of 8: reg.22(1)** — "shall be actionable by the new or expectant mother"
+- Gold: `Liberty`, Validate: `Right`
+- **Verdict: non-issue.** Both agree it's not `none`. Right → Liberty in our DRRP taxonomy.
+
+**Action**: Add the exemption/exception guidance from the gold benchmark system prompt (`generate_benchmarks.py:59-64`) to the validate prompt. This will align the two Gemini runs and eliminate the false disagreements.
 
 ## Prior sessions
 

@@ -4998,11 +4998,23 @@ Provisions: {count}
 
 Each provision below has been classified by a regex pipeline and ML classifier. The "drrp" field shows the current classification (Obligation, Liberty, or none). The "confidence" field (0-1) indicates pipeline certainty. The "method" field shows which tier classified it (regex, classifier, pending_llm).
 
-Review these classifications. For each provision where the classification is WRONG, return a correction. Focus on:
+Classification rules:
+- Obligation: a legal obligation imposed on someone (shall, must, is required to, has a duty)
+- Liberty: a permission, entitlement, or discretionary power GRANTED to someone (may, is entitled to, has a right to, power to)
+- none: definitions, commencement, repeals, cross-references, structural, offence/penalty provisions
+
+IMPORTANT — classify as 'none' if the provision:
+- Only references, conditions, details, or exempts an obligation/right created in another section
+- Creates an exemption or exception to an obligation (e.g. "shall not apply to..." is a scope limitation, not a new Liberty)
+- Describes "Nothing in X shall require/prevent..." — these limit scope, they do not create new rights
+- States a consequence without a modal verb (e.g. "is guilty of an offence")
+- Only provisions that CREATE a new legal relation count as Obligation or Liberty
+
+Review the classifications below. For each provision where the classification is WRONG, return a correction. Focus on:
 - Provisions with low confidence (< 0.7)
 - Provisions marked pending_llm (the pipeline was uncertain)
 - Provisions where the DRRP type seems inconsistent with the text
-- "none" provisions that actually contain a duty or right
+- "none" provisions that actually contain a duty or right (not just scope/exemptions)
 - Obligations that are actually discretionary powers (Liberty)
 
 For provisions that are correctly classified, do NOT include them in your response.
