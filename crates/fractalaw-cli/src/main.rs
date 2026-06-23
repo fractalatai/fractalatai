@@ -4856,6 +4856,13 @@ async fn cmd_taxa_trace(
 
 /// Whole-law LLM validation: send all provisions + parse results to Gemini,
 /// get corrections, write audit log.
+/// Check if a provision is an LLM validation target.
+fn is_llm_target(method: &str, drrp: &[String], actors: &[serde_json::Value], confidence: f32) -> bool {
+    method == "pending_llm"
+        || (drrp.iter().any(|d| !d.is_empty()) && actors.is_empty())  // orphan
+        || (confidence > 0.0 && confidence < 0.3)  // very low confidence
+}
+
 async fn cmd_taxa_validate(
     lance: &LanceStore,
     store: &DuckStore,
@@ -4906,6 +4913,7 @@ async fn cmd_taxa_validate(
             let method_col = batch.column_by_name("extraction_method");
             let conf_col = batch.column_by_name("taxa_confidence");
             let actors_col = batch.column_by_name("actors");
+            let hpath_col = batch.column_by_name("hierarchy_path");
 
             for row in 0..batch.num_rows() {
                 let sid = sid_col
@@ -4978,6 +4986,15 @@ async fn cmd_taxa_validate(
                     .unwrap_or_default();
 
                 let drrp_str = drrp.first().cloned().unwrap_or_else(|| "none".into());
+                let hpath = hpath_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                // Top-level section: first path component
+                let section = hpath
+                    .split('/')
+                    .next()
+                    .unwrap_or(&sid)
+                    .to_string();
                 // Truncate text for prompt (keep first 500 chars)
                 let text_trunc = if text.len() > 500 {
                     format!("{}...", &text[..text.char_indices().take_while(|&(i, _)| i < 500).last().map(|(i, _)| i).unwrap_or(500)])
@@ -4987,6 +5004,7 @@ async fn cmd_taxa_validate(
 
                 provisions.push(serde_json::json!({
                     "section_id": sid,
+                    "section": section,
                     "text": text_trunc,
                     "drrp": drrp_str,
                     "method": method,
@@ -5002,16 +5020,130 @@ async fn cmd_taxa_validate(
             continue;
         }
 
-        // Build prompt
-        let provisions_json = serde_json::to_string_pretty(&provisions)?;
-        let prompt = format!(
-            r#"You are reviewing DRRP (Duties, Rights, Responsibilities, Powers) classifications for provisions of UK legislation.
+        // Mark targets: provisions that need LLM review
+        for p in &mut provisions {
+            let method = p["method"].as_str().unwrap_or("");
+            let drrp_str = p["drrp"].as_str().unwrap_or("none");
+            let actors = p["actors"].as_array().map(|a| a.len()).unwrap_or(0);
+            let conf = p["confidence"].as_f64().unwrap_or(1.0) as f32;
+            let has_drrp = drrp_str != "none" && !drrp_str.is_empty();
+            let is_target = method == "pending_llm"
+                || (has_drrp && actors == 0)
+                || (conf > 0.0 && conf < 0.3);
+            p.as_object_mut()
+                .unwrap()
+                .insert("needs_review".into(), serde_json::json!(is_target));
+        }
 
-Law: {law_name}
+        let target_count = provisions.iter().filter(|p| p["needs_review"] == true).count();
+
+        if target_count == 0 {
+            eprintln!("  {law_name}: {provs} provisions, 0 targets — skipping", provs = provisions.len());
+            continue;
+        }
+
+        // Group by section (top-level hierarchy_path component)
+        let mut section_groups: std::collections::BTreeMap<String, Vec<&serde_json::Value>> =
+            std::collections::BTreeMap::new();
+        for p in &provisions {
+            let section = p["section"].as_str().unwrap_or("(root)").to_string();
+            section_groups.entry(section).or_default().push(p);
+        }
+
+        // Filter to sections with at least one target
+        let target_sections: Vec<(String, Vec<&serde_json::Value>)> = section_groups
+            .into_iter()
+            .filter(|(_, provs)| provs.iter().any(|p| p["needs_review"] == true))
+            .collect();
+
+        let sections_skipped = provisions.len() - target_sections.iter().map(|(_, v)| v.len()).sum::<usize>();
+        let strategy = if provisions.len() <= 200 { "whole_law" } else { "section_targeted" };
+
+        eprintln!(
+            "  {law_name}: {provs} provisions, {targets} targets, {secs} sections to send ({skipped} provisions skipped)",
+            provs = provisions.len(),
+            targets = target_count,
+            secs = target_sections.len(),
+            skipped = sections_skipped,
+        );
+
+        if dry_run {
+            for (sec, provs) in &target_sections {
+                let sec_targets = provs.iter().filter(|p| p["needs_review"] == true).count();
+                let tokens = provs.len() * 80;
+                eprintln!("    {sec}: {n} provisions ({sec_targets} targets, ~{tok}k tokens)",
+                    n = provs.len(), tok = tokens / 1000);
+            }
+            continue;
+        }
+
+        // Send each target section to Gemini
+        let mut all_corrections: Vec<serde_json::Value> = Vec::new();
+        let mut total_latency_ms = 0u64;
+        let mut total_token_est = 0usize;
+
+        let batches_to_send: Vec<(String, Vec<&serde_json::Value>)> = if provisions.len() <= 200 {
+            // Small law: send everything as one batch
+            vec![("(whole law)".into(), provisions.iter().collect())]
+        } else {
+            // Large law: send per section, sub-grouping if section >200
+            let mut batches = Vec::new();
+            for (sec_name, sec_provs) in &target_sections {
+                if sec_provs.len() <= 200 {
+                    batches.push((sec_name.clone(), sec_provs.clone()));
+                } else {
+                    // Sub-group by next hierarchy level
+                    let mut sub_groups: std::collections::BTreeMap<String, Vec<&serde_json::Value>> =
+                        std::collections::BTreeMap::new();
+                    for p in sec_provs {
+                        let hpath = p["section"].as_str().unwrap_or("");
+                        let sid = p["section_id"].as_str().unwrap_or("");
+                        // Use section_id prefix as sub-group (e.g. "s.25" from "s.25(1)")
+                        let sub_key = sid.split(':').nth(1)
+                            .and_then(|s| s.split('(').next())
+                            .unwrap_or(hpath);
+                        sub_groups.entry(format!("{sec_name}/{sub_key}")).or_default().push(p);
+                    }
+                    // Merge tiny sub-groups into batches of ~100-200
+                    let mut current_batch: Vec<&serde_json::Value> = Vec::new();
+                    let mut current_name = sec_name.clone();
+                    for (sub_name, sub_provs) in sub_groups {
+                        if current_batch.len() + sub_provs.len() > 200 && !current_batch.is_empty() {
+                            if current_batch.iter().any(|p| p["needs_review"] == true) {
+                                batches.push((current_name.clone(), current_batch));
+                            }
+                            current_batch = Vec::new();
+                            current_name = sub_name.clone();
+                        }
+                        current_batch.extend(sub_provs);
+                        current_name = sub_name;
+                    }
+                    if !current_batch.is_empty() && current_batch.iter().any(|p| p["needs_review"] == true) {
+                        batches.push((current_name, current_batch));
+                    }
+                }
+            }
+            batches
+        };
+
+        let url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
+            api_key
+        );
+
+        for (batch_name, batch_provs) in &batches_to_send {
+            let batch_targets = batch_provs.iter().filter(|p| p["needs_review"] == true).count();
+            let batch_json = serde_json::to_string_pretty(&batch_provs)?;
+
+            let prompt = format!(
+                r#"You are reviewing DRRP classifications for a section of UK legislation.
+
+Law: {law_name} — Section: {batch_name}
 Family: {family}
-Provisions: {count}
 
-Each provision below has been classified by a regex pipeline and ML classifier. The "drrp" field shows the current classification (Obligation, Liberty, or none). The "confidence" field (0-1) indicates pipeline certainty. The "method" field shows which tier classified it (regex, classifier, pending_llm).
+This section has {total} provisions, of which {target_count} need review.
+Provisions marked "needs_review": true are uncertain and need your assessment.
+Other provisions are included as context only — do NOT suggest corrections for them.
 
 Classification rules:
 - Obligation: a legal obligation imposed on someone (shall, must, is required to, has a duty)
@@ -5021,92 +5153,72 @@ Classification rules:
 IMPORTANT — classify as 'none' if the provision:
 - Only references, conditions, details, or exempts an obligation/right created in another section
 - Creates an exemption or exception to an obligation (e.g. "shall not apply to..." is a scope limitation, not a new Liberty)
-- Describes "Nothing in X shall require/prevent..." — these limit scope, they do not create new rights
 - States a consequence without a modal verb (e.g. "is guilty of an offence")
 - Only provisions that CREATE a new legal relation count as Obligation or Liberty
 
-Review the classifications below. For each provision where the classification is WRONG, return a correction. Focus on:
-- Provisions with low confidence (< 0.7)
-- Provisions marked pending_llm (the pipeline was uncertain)
-- Provisions where the DRRP type seems inconsistent with the text
-- "none" provisions that actually contain a duty or right (not just scope/exemptions)
-- Obligations that are actually discretionary powers (Liberty)
-
-For provisions that are correctly classified, do NOT include them in your response.
-
-Respond with a JSON array of corrections ONLY:
+Focus ONLY on provisions where "needs_review" is true. Return corrections as JSON:
 [{{"section_id": "...", "drrp": "Obligation|Liberty|none", "reason": "brief explanation"}}]
 
-If all classifications are correct, respond with an empty array: []
+If all reviewed provisions are correctly classified, respond with: []
 
 Provisions:
-{provisions_json}"#,
-            law_name = law_name,
-            family = family.as_deref().unwrap_or("unknown"),
-            count = provisions.len(),
-            provisions_json = provisions_json,
-        );
+{batch_json}"#,
+                law_name = law_name,
+                batch_name = batch_name,
+                family = family.as_deref().unwrap_or("unknown"),
+                total = batch_provs.len(),
+                target_count = batch_targets,
+                batch_json = batch_json,
+            );
 
-        let token_est = prompt.len() / 4;
-        eprintln!(
-            "  {law_name}: {provs} provisions, ~{tokens}k input tokens",
-            provs = provisions.len(),
-            tokens = token_est / 1000,
-        );
+            let token_est = prompt.len() / 4;
+            total_token_est += token_est;
 
-        if dry_run {
-            continue;
+            let call_start = std::time::Instant::now();
+            let body = serde_json::json!({
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.1,
+                    "maxOutputTokens": 4096,
+                    "responseMimeType": "application/json",
+                    "thinkingConfig": {"thinkingBudget": 1024}
+                }
+            });
+
+            let resp = client.post(&url).json(&body).send().await;
+            let latency_ms = call_start.elapsed().as_millis() as u64;
+            total_latency_ms += latency_ms;
+
+            match resp {
+                Ok(r) => {
+                    let text = r.text().await.unwrap_or_default();
+                    let gemini_resp: serde_json::Value =
+                        serde_json::from_str(&text).unwrap_or_default();
+                    let content = gemini_resp
+                        .pointer("/candidates/0/content/parts/0/text")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("[]")
+                        .to_string();
+                    let parsed: Vec<serde_json::Value> =
+                        serde_json::from_str(&content).unwrap_or_default();
+                    all_corrections.extend(parsed);
+                }
+                Err(e) => {
+                    eprintln!("    LLM error on {batch_name}: {e}");
+                }
+            }
         }
 
-        // Call Gemini
-        let call_start = std::time::Instant::now();
-        let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
-            api_key
-        );
-        let body = serde_json::json!({
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.1,
-                "maxOutputTokens": 4096,
-                "responseMimeType": "application/json",
-                "thinkingConfig": {"thinkingBudget": 1024}
-            }
-        });
-
-        let resp = client.post(&url).json(&body).send().await;
-        let latency_ms = call_start.elapsed().as_millis() as u64;
-
-        let (raw_response, corrections) = match resp {
-            Ok(r) => {
-                let text = r.text().await.unwrap_or_default();
-                let gemini_resp: serde_json::Value =
-                    serde_json::from_str(&text).unwrap_or_default();
-                let content = gemini_resp
-                    .pointer("/candidates/0/content/parts/0/text")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("[]")
-                    .to_string();
-                let parsed: Vec<serde_json::Value> =
-                    serde_json::from_str(&content).unwrap_or_default();
-                (text, parsed)
-            }
-            Err(e) => {
-                eprintln!("    LLM error: {e}");
-                (format!("error: {e}"), Vec::new())
-            }
-        };
-
-        let law_corrections = corrections.len();
+        let law_corrections = all_corrections.len();
         total_corrections += law_corrections;
         eprintln!(
-            "    {law_corrections} corrections ({latency_ms}ms)",
+            "    {law_corrections} corrections across {batches} calls ({total_latency_ms}ms)",
+            batches = batches_to_send.len(),
         );
 
         // Build audit log
         let now = chrono::Utc::now().to_rfc3339();
-        // Compute deltas
-        let correction_map: std::collections::HashMap<String, &serde_json::Value> = corrections
+        let correction_map: std::collections::HashMap<String, &serde_json::Value> = all_corrections
             .iter()
             .filter_map(|c| {
                 c.get("section_id")
@@ -5128,30 +5240,31 @@ Provisions:
                         "delta": if p["drrp"] == correction["drrp"] { "no_change" } else { "drrp_override" },
                     }))
                 } else {
-                    None // Omit provisions where LLM agreed (implicit confirmation)
+                    None
                 }
             })
             .collect();
 
-        // Compute integrity hash
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();
-        prompt.hash(&mut hasher);
-        raw_response.hash(&mut hasher);
+        law_name.hash(&mut hasher);
+        now.hash(&mut hasher);
         let integrity_hash = format!("{:016x}", hasher.finish());
 
         let audit_entry = serde_json::json!({
-            "schema_version": 1,
+            "schema_version": 2,
             "pipeline_version": env!("CARGO_PKG_VERSION"),
             "law_name": law_name,
             "family": family,
-            "strategy": "whole_law",
+            "strategy": strategy,
             "model": "gemini-2.5-flash",
             "timestamp": now,
-            "token_usage": { "input_estimate": token_est },
-            "latency_ms": latency_ms,
+            "token_usage": { "input_estimate": total_token_est },
+            "latency_ms": total_latency_ms,
             "provisions_count": provisions.len(),
+            "targets_count": target_count,
+            "sections_sent": batches_to_send.len(),
             "corrections_count": law_corrections,
             "integrity_hash": integrity_hash,
             "corrections": provision_audits,
@@ -5172,7 +5285,7 @@ Provisions:
         file.write_all(json.as_bytes())?;
 
         // Apply corrections to LanceDB (only with --apply)
-        if apply && !corrections.is_empty() {
+        if apply && !all_corrections.is_empty() {
             use arrow::array::StringBuilder;
             use arrow::datatypes::{DataType, Field};
 
@@ -5180,7 +5293,7 @@ Provisions:
             let mut drrp_b = arrow::array::ListBuilder::new(StringBuilder::new());
             let mut method_b = StringBuilder::new();
 
-            for correction in &corrections {
+            for correction in &all_corrections {
                 let sid = correction
                     .get("section_id")
                     .and_then(|v| v.as_str())
@@ -5194,7 +5307,7 @@ Provisions:
                 }
                 sid_b.append_value(sid);
                 if drrp == "none" {
-                    drrp_b.append(true); // empty list
+                    drrp_b.append(true);
                 } else {
                     drrp_b.values().append_value(drrp);
                     drrp_b.append(true);
