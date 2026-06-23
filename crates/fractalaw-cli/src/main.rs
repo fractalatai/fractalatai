@@ -489,6 +489,9 @@ enum TaxaAction {
         /// Dry run: build prompts and show token estimates without calling LLM
         #[arg(long)]
         dry_run: bool,
+        /// Apply corrections to LanceDB (default: audit-only, no writes)
+        #[arg(long)]
+        apply: bool,
     },
 }
 
@@ -714,6 +717,7 @@ async fn main() -> anyhow::Result<()> {
                 laws,
                 audit_dir,
                 dry_run,
+                apply,
             } => {
                 let store = open_duck(&data_dir)?;
                 let lance = LanceStore::open(&data_dir.join("lancedb"))
@@ -721,7 +725,7 @@ async fn main() -> anyhow::Result<()> {
                     .context("opening LanceDB")?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_validate(&lance, &store, &law_names, &audit_dir, dry_run).await
+                cmd_taxa_validate(&lance, &store, &law_names, &audit_dir, dry_run, apply).await
             }
         },
 
@@ -4843,6 +4847,7 @@ async fn cmd_taxa_validate(
     law_names: &[String],
     audit_dir: &str,
     dry_run: bool,
+    apply: bool,
 ) -> anyhow::Result<()> {
     use std::io::Write;
 
@@ -5138,8 +5143,8 @@ Provisions:
         let mut file = std::fs::File::create(&audit_path)?;
         file.write_all(json.as_bytes())?;
 
-        // Apply corrections to LanceDB
-        if !corrections.is_empty() {
+        // Apply corrections to LanceDB (only with --apply)
+        if apply && !corrections.is_empty() {
             use arrow::array::StringBuilder;
             use arrow::datatypes::{DataType, Field};
 
