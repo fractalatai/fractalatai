@@ -4743,7 +4743,8 @@ async fn cmd_taxa_parse(
         }
 
         // Compact LanceDB periodically to prevent fragment bloat.
-        if enriched.is_multiple_of(20) && total > 20 {
+        // Every 5 laws with --force on large corpus to avoid disk exhaustion.
+        if enriched.is_multiple_of(5) && total > 5 {
             eprint!("\r  Compacting LanceDB after {enriched} laws...");
             if let Err(e) = lance.compact().await {
                 eprintln!(" compact error: {e}");
