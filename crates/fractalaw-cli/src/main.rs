@@ -478,6 +478,18 @@ enum TaxaAction {
         #[arg(long)]
         laws: String,
     },
+    /// Whole-law LLM validation: send all provisions + parse results to LLM
+    Validate {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: String,
+        /// Directory for audit log JSON files (e.g. data/llm-audit)
+        #[arg(long, default_value = "data/llm-audit")]
+        audit_dir: String,
+        /// Dry run: build prompts and show token estimates without calling LLM
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[tokio::main]
@@ -697,6 +709,19 @@ async fn main() -> anyhow::Result<()> {
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
                 cmd_taxa_escalate(&lance, &store, &law_names).await
+            }
+            TaxaAction::Validate {
+                laws,
+                audit_dir,
+                dry_run,
+            } => {
+                let store = open_duck(&data_dir)?;
+                let lance = LanceStore::open(&data_dir.join("lancedb"))
+                    .await
+                    .context("opening LanceDB")?;
+                let law_names: Vec<String> =
+                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                cmd_taxa_validate(&lance, &store, &law_names, &audit_dir, dry_run).await
             }
         },
 
@@ -4807,6 +4832,371 @@ async fn cmd_taxa_trace(
     file.write_all(json.as_bytes())?;
 
     eprintln!("Trace: {} provisions written to {trace_path}", entries.len());
+    Ok(())
+}
+
+/// Whole-law LLM validation: send all provisions + parse results to Gemini,
+/// get corrections, write audit log.
+async fn cmd_taxa_validate(
+    lance: &LanceStore,
+    store: &DuckStore,
+    law_names: &[String],
+    audit_dir: &str,
+    dry_run: bool,
+) -> anyhow::Result<()> {
+    use std::io::Write;
+
+    let api_key = std::env::var("GEMINI_API_KEY").unwrap_or_default();
+    if !dry_run && api_key.is_empty() {
+        anyhow::bail!("GEMINI_API_KEY required for taxa validate (use --dry-run to preview)");
+    }
+
+    std::fs::create_dir_all(audit_dir)?;
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .build()?;
+
+    let mut total_corrections = 0usize;
+    let mut total_provisions = 0usize;
+
+    for law_name in law_names {
+        let escaped = law_name.replace('\'', "''");
+
+        // Look up family
+        let family: Option<String> = {
+            let batches = store.query_arrow(&format!(
+                "SELECT family FROM legislation WHERE name = '{escaped}'"
+            ))?;
+            batches.iter().find_map(|b| {
+                let col = b.column_by_name("family")?;
+                get_string_value(col.as_ref(), 0)
+            })
+        };
+
+        // Load all provisions
+        let filter = format!("law_name = '{escaped}'");
+        let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+
+        let mut provisions: Vec<serde_json::Value> = Vec::new();
+        for batch in &batches {
+            let sid_col = batch.column_by_name("section_id");
+            let text_col = batch.column_by_name("text");
+            let drrp_col = batch.column_by_name("drrp_types");
+            let method_col = batch.column_by_name("extraction_method");
+            let conf_col = batch.column_by_name("taxa_confidence");
+            let actors_col = batch.column_by_name("actors");
+
+            for row in 0..batch.num_rows() {
+                let sid = sid_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let text = text_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                if text.trim().is_empty() {
+                    continue;
+                }
+
+                let drrp: Vec<String> = drrp_col
+                    .and_then(|c| {
+                        use arrow::array::AsArray;
+                        let list = c.as_list_opt::<i32>()?;
+                        if list.is_null(row) {
+                            return None;
+                        }
+                        let vals = list.value(row);
+                        let mut types = Vec::new();
+                        for i in 0..vals.len() {
+                            if let Some(s) = get_string_value(vals.as_ref(), i) {
+                                types.push(s);
+                            }
+                        }
+                        Some(types)
+                    })
+                    .unwrap_or_default();
+
+                let method = method_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let confidence = conf_col
+                    .and_then(|c| {
+                        c.as_any()
+                            .downcast_ref::<arrow::array::Float32Array>()
+                            .and_then(|a| {
+                                if a.is_null(row) {
+                                    None
+                                } else {
+                                    Some(a.value(row))
+                                }
+                            })
+                    })
+                    .unwrap_or(0.0);
+
+                // Extract actor labels
+                let actors: Vec<serde_json::Value> = actors_col
+                    .and_then(|c| {
+                        use arrow::array::AsArray;
+                        let list = c.as_list_opt::<i32>()?;
+                        if list.is_null(row) {
+                            return None;
+                        }
+                        let sa = list.value(row);
+                        let sa = sa.as_struct_opt()?;
+                        let lc = sa.column_by_name("label")?;
+                        let pc = sa.column_by_name("position")?;
+                        let mut result = Vec::new();
+                        for i in 0..sa.len() {
+                            let label =
+                                get_string_value(lc.as_ref(), i).unwrap_or_default();
+                            let pos =
+                                get_string_value(pc.as_ref(), i).unwrap_or_default();
+                            result.push(serde_json::json!({"label": label, "position": pos}));
+                        }
+                        Some(result)
+                    })
+                    .unwrap_or_default();
+
+                let drrp_str = drrp.first().cloned().unwrap_or_else(|| "none".into());
+                // Truncate text for prompt (keep first 500 chars)
+                let text_trunc = if text.len() > 500 {
+                    format!("{}...", &text[..text.char_indices().take_while(|&(i, _)| i < 500).last().map(|(i, _)| i).unwrap_or(500)])
+                } else {
+                    text.clone()
+                };
+
+                provisions.push(serde_json::json!({
+                    "section_id": sid,
+                    "text": text_trunc,
+                    "drrp": drrp_str,
+                    "method": method,
+                    "confidence": (confidence * 100.0).round() / 100.0,
+                    "actors": actors,
+                }));
+            }
+        }
+
+        total_provisions += provisions.len();
+
+        if provisions.is_empty() {
+            continue;
+        }
+
+        // Build prompt
+        let provisions_json = serde_json::to_string_pretty(&provisions)?;
+        let prompt = format!(
+            r#"You are reviewing DRRP (Duties, Rights, Responsibilities, Powers) classifications for provisions of UK legislation.
+
+Law: {law_name}
+Family: {family}
+Provisions: {count}
+
+Each provision below has been classified by a regex pipeline and ML classifier. The "drrp" field shows the current classification (Obligation, Liberty, or none). The "confidence" field (0-1) indicates pipeline certainty. The "method" field shows which tier classified it (regex, classifier, pending_llm).
+
+Review these classifications. For each provision where the classification is WRONG, return a correction. Focus on:
+- Provisions with low confidence (< 0.7)
+- Provisions marked pending_llm (the pipeline was uncertain)
+- Provisions where the DRRP type seems inconsistent with the text
+- "none" provisions that actually contain a duty or right
+- Obligations that are actually discretionary powers (Liberty)
+
+For provisions that are correctly classified, do NOT include them in your response.
+
+Respond with a JSON array of corrections ONLY:
+[{{"section_id": "...", "drrp": "Obligation|Liberty|none", "reason": "brief explanation"}}]
+
+If all classifications are correct, respond with an empty array: []
+
+Provisions:
+{provisions_json}"#,
+            law_name = law_name,
+            family = family.as_deref().unwrap_or("unknown"),
+            count = provisions.len(),
+            provisions_json = provisions_json,
+        );
+
+        let token_est = prompt.len() / 4;
+        eprintln!(
+            "  {law_name}: {provs} provisions, ~{tokens}k input tokens",
+            provs = provisions.len(),
+            tokens = token_est / 1000,
+        );
+
+        if dry_run {
+            continue;
+        }
+
+        // Call Gemini
+        let call_start = std::time::Instant::now();
+        let url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={}",
+            api_key
+        );
+        let body = serde_json::json!({
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.1,
+                "maxOutputTokens": 4096,
+                "responseMimeType": "application/json",
+                "thinkingConfig": {"thinkingBudget": 1024}
+            }
+        });
+
+        let resp = client.post(&url).json(&body).send().await;
+        let latency_ms = call_start.elapsed().as_millis() as u64;
+
+        let (raw_response, corrections) = match resp {
+            Ok(r) => {
+                let text = r.text().await.unwrap_or_default();
+                let gemini_resp: serde_json::Value =
+                    serde_json::from_str(&text).unwrap_or_default();
+                let content = gemini_resp
+                    .pointer("/candidates/0/content/parts/0/text")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("[]")
+                    .to_string();
+                let parsed: Vec<serde_json::Value> =
+                    serde_json::from_str(&content).unwrap_or_default();
+                (text, parsed)
+            }
+            Err(e) => {
+                eprintln!("    LLM error: {e}");
+                (format!("error: {e}"), Vec::new())
+            }
+        };
+
+        let law_corrections = corrections.len();
+        total_corrections += law_corrections;
+        eprintln!(
+            "    {law_corrections} corrections ({latency_ms}ms)",
+        );
+
+        // Build audit log
+        let now = chrono::Utc::now().to_rfc3339();
+        // Compute deltas
+        let correction_map: std::collections::HashMap<String, &serde_json::Value> = corrections
+            .iter()
+            .filter_map(|c| {
+                c.get("section_id")
+                    .and_then(|s| s.as_str())
+                    .map(|s| (s.to_string(), c))
+            })
+            .collect();
+
+        let provision_audits: Vec<serde_json::Value> = provisions
+            .iter()
+            .filter_map(|p| {
+                let sid = p["section_id"].as_str()?;
+                if let Some(correction) = correction_map.get(sid) {
+                    Some(serde_json::json!({
+                        "section_id": sid,
+                        "pre_llm_drrp": p["drrp"],
+                        "llm_drrp": correction["drrp"],
+                        "llm_reason": correction["reason"],
+                        "delta": if p["drrp"] == correction["drrp"] { "no_change" } else { "drrp_override" },
+                    }))
+                } else {
+                    None // Omit provisions where LLM agreed (implicit confirmation)
+                }
+            })
+            .collect();
+
+        // Compute integrity hash
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut hasher = DefaultHasher::new();
+        prompt.hash(&mut hasher);
+        raw_response.hash(&mut hasher);
+        let integrity_hash = format!("{:016x}", hasher.finish());
+
+        let audit_entry = serde_json::json!({
+            "schema_version": 1,
+            "pipeline_version": env!("CARGO_PKG_VERSION"),
+            "law_name": law_name,
+            "family": family,
+            "strategy": "whole_law",
+            "model": "gemini-2.5-flash",
+            "timestamp": now,
+            "token_usage": { "input_estimate": token_est },
+            "latency_ms": latency_ms,
+            "provisions_count": provisions.len(),
+            "corrections_count": law_corrections,
+            "integrity_hash": integrity_hash,
+            "corrections": provision_audits,
+            "pre_llm_summary": {
+                "total": provisions.len(),
+                "obligation": provisions.iter().filter(|p| p["drrp"] == "Obligation").count(),
+                "liberty": provisions.iter().filter(|p| p["drrp"] == "Liberty").count(),
+                "none": provisions.iter().filter(|p| p["drrp"] == "none").count(),
+                "pending_llm": provisions.iter().filter(|p| p["method"] == "pending_llm").count(),
+            },
+        });
+
+        // Write audit file
+        let audit_path = format!("{audit_dir}/{law_name}.json");
+        let json = serde_json::to_string_pretty(&audit_entry)?;
+        let mut file = std::fs::File::create(&audit_path)?;
+        file.write_all(json.as_bytes())?;
+
+        // Apply corrections to LanceDB
+        if !corrections.is_empty() {
+            use arrow::array::StringBuilder;
+            use arrow::datatypes::{DataType, Field};
+
+            let mut sid_b = StringBuilder::new();
+            let mut drrp_b = arrow::array::ListBuilder::new(StringBuilder::new());
+            let mut method_b = StringBuilder::new();
+
+            for correction in &corrections {
+                let sid = correction
+                    .get("section_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                let drrp = correction
+                    .get("drrp")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("none");
+                if sid.is_empty() {
+                    continue;
+                }
+                sid_b.append_value(sid);
+                if drrp == "none" {
+                    drrp_b.append(true); // empty list
+                } else {
+                    drrp_b.values().append_value(drrp);
+                    drrp_b.append(true);
+                }
+                method_b.append_value("agentic");
+            }
+
+            let schema = std::sync::Arc::new(arrow::datatypes::Schema::new(vec![
+                Field::new("section_id", DataType::Utf8, false),
+                Field::new(
+                    "drrp_types",
+                    DataType::List(std::sync::Arc::new(Field::new("item", DataType::Utf8, true))),
+                    true,
+                ),
+                Field::new("extraction_method", DataType::Utf8, true),
+            ]));
+            let batch = arrow::record_batch::RecordBatch::try_new(
+                schema,
+                vec![
+                    std::sync::Arc::new(sid_b.finish()),
+                    std::sync::Arc::new(drrp_b.finish()),
+                    std::sync::Arc::new(method_b.finish()),
+                ],
+            )?;
+            lance.upsert_embeddings(&batch).await?;
+        }
+    }
+
+    println!(
+        "Validated {} laws ({total_provisions} provisions, {total_corrections} corrections).",
+        law_names.len(),
+    );
+    if !dry_run {
+        println!("Audit logs in {audit_dir}/");
+    }
     Ok(())
 }
 
