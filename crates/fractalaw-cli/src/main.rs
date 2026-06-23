@@ -3171,6 +3171,7 @@ enum EnrichResult {
 /// confidence scores that conflated routing signals with quality signals.
 fn source_tier(method: &str) -> u8 {
     match method {
+        "adjudicated" => 7,
         "agentic" => 6,
         "agentic_unvalidated" => 5,
         "classifier" => 4,
