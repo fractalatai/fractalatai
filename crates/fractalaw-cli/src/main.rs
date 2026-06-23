@@ -5968,10 +5968,18 @@ async fn cmd_taxa_classify(
 
         total_provisions += provisions.len();
         let law_elapsed = law_start.elapsed();
+        let law_idx = law_names.iter().position(|l| l == law_name).unwrap_or(0) + 1;
         eprintln!(
             "  {law_name}: {total_classified} classified ({:.1}s)",
             law_elapsed.as_secs_f64()
         );
+
+        // Compact periodically to prevent fragment bloat
+        if law_idx.is_multiple_of(10) && law_names.len() > 10 {
+            if let Err(e) = lance.compact().await {
+                eprintln!("    compact error: {e}");
+            }
+        }
     }
 
     let batch_elapsed = batch_start.elapsed();
