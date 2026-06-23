@@ -198,6 +198,41 @@ Full review: `data/code-review/llm-batch-strategy.md`
 - A/B test different thresholds (3%, 5%, 7%) on medium laws
 - `pending_llm` provisions should be heavily weighted in the quality score
 
+## Implementation results (2026-06-23)
+
+### taxa validate command built (`5db9d69`)
+
+```bash
+taxa validate --laws UK_uksi_1999_3242 --audit-dir data/llm-audit
+taxa validate --laws UK_uksi_1999_3242 --dry-run  # preview without API call
+```
+
+Tested on UK_uksi_1999_3242 (230 provisions, ~22k tokens, 13.7s):
+- 25 corrections returned by Gemini 2.5 Flash
+- Full audit log with schema_version, pipeline_version, integrity_hash, corrections + reasoning
+
+### Over-correction confirmed as primary risk
+
+On benchmark provisions for this law:
+- **3 corrections helped** (wrong → right)
+- **8 corrections hurt** (right → wrong)
+- **Net: -5 accuracy** — LLM made things worse
+
+This confirms Gemini's review warning. The LLM confidently changes correct provisions. Next steps:
+- **Do not auto-apply corrections** — write to audit log only, require human review or confidence filter
+- Added `--apply` flag (default: audit-only). Without `--apply`, corrections are logged but not written to LanceDB (`b703e9f`)
+
+### Gold standard methodology (confirmed from `scripts/generate_benchmarks.py`)
+
+The gold labels were built by Gemini 2.5 Flash with **full-law context caching** — all provisions loaded into a Gemini cache, then each provision classified individually in separate API calls (`create_cache` → `classify_provision` per provision). So gold has full-law context but per-provision classification.
+
+Our `taxa validate` is different: sends all provisions + existing parse results in one prompt, asks for corrections. The 8/3 hurt/helped ratio may reflect:
+- **Anchoring bias**: showing Gemini the regex/classifier output may bias it differently than classifying from scratch
+- **Or**: the gold per-provision labels have inconsistencies that whole-law review would legitimately correct
+- **Or**: different prompt structure (system prompt + cached context vs single prompt with inline context) leads to different interpretations
+
+Either way, disagreements between gold labels and validation corrections need **human adjudication** — the audit log is the right mechanism. The benchmark is useful for regex/classifier iteration but becomes circular for LLM-vs-LLM evaluation.
+
 ## Prior sessions
 
 - `06-22-26-llm-elevation-optimisation.md` (CLOSED) — 134 LLM calls, 37% FP rate, 170 hard-floor errors
