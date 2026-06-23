@@ -5193,7 +5193,7 @@ async fn cmd_taxa_classify(
                 // - Gap fill (regex=none, classifier=DRRP): classifier wins if confident
                 // - Disagreement (regex=X, classifier=Y): flag for LLM, don't override
                 // - Both modals present: flag for LLM
-                let threshold = if has_drrp { 0.9 } else { 0.7 };
+                let threshold = if has_drrp { 0.75 } else { 0.7 };
 
                 if !has_drrp && prediction.confidence >= threshold {
                     // Gap fill: regex found nothing, classifier found DRRP with confidence
