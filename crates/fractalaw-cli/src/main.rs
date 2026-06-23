@@ -3696,10 +3696,13 @@ async fn enrich_single_law(
         let escalate_candidates: Vec<usize> = (0..provision_taxa.len())
             .filter(|&i| {
                 let p = &provision_taxa[i];
-                p.drrp_types.is_empty()
-                    && p.governed_actors.is_empty()
-                    && fractalaw_core::taxa::is_duty_bearing_purpose(&p.purposes)
-                    && !p.hierarchy_path.is_empty()
+                let no_actors = p.governed_actors.is_empty() && p.government_actors.is_empty();
+                let needs_inheritance =
+                    // Original: no DRRP, no actors, duty-bearing purpose
+                    (p.drrp_types.is_empty() && no_actors && fractalaw_core::taxa::is_duty_bearing_purpose(&p.purposes))
+                    // New: has DRRP but no actors (thing-subject orphans)
+                    || (!p.drrp_types.is_empty() && no_actors);
+                needs_inheritance && !p.hierarchy_path.is_empty()
             })
             .collect();
 
@@ -3761,12 +3764,22 @@ async fn enrich_single_law(
         // Apply mutations.
         for m in mutations {
             let p = &mut provision_taxa[m.target_idx];
-            p.drrp_types = m.drrp_types;
+            let had_drrp = !p.drrp_types.is_empty();
+            if !had_drrp {
+                // No DRRP — inherit everything (original behaviour)
+                p.drrp_types = m.drrp_types;
+                p.duty_family = m.duty_family;
+                p.duty_sub_type = m.duty_sub_type;
+            }
+            // Always inherit actors if missing
             p.governed_actors = m.governed_actors;
             p.government_actors = m.government_actors;
-            p.duty_family = m.duty_family;
-            p.duty_sub_type = m.duty_sub_type;
-            p.extraction_method = "inherited".to_string();
+            p.extraction_method = if had_drrp {
+                // Keep regex/classifier DRRP, just inherit actors
+                p.extraction_method.clone()
+            } else {
+                "inherited".to_string()
+            };
             p.holder_inferred_from = vec![m.ancestor_sid];
             p.ancestor_distance = Some(m.distance);
             // Rebuild actors struct with inherited actors as holders.
@@ -5856,13 +5869,16 @@ async fn cmd_taxa_classify(
                                 _ => Some(cls_segment),
                             };
 
-                            if !agrees {
-                                // Position disagreement — provenance chain records both
-                            }
+                            // When classifier disagrees with "other", map to "mentioned"
+                            let final_pos = if !agrees && cls_pos == "other" {
+                                "mentioned".to_string()
+                            } else {
+                                regex_pos.clone()
+                            };
 
                             updated_actors.push((
                                 label.clone(),
-                                regex_pos.clone(),
+                                final_pos,
                                 relates_to.clone(),
                                 label_source.clone(),
                                 new_reason,
