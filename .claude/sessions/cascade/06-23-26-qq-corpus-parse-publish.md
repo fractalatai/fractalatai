@@ -4,14 +4,25 @@
 
 Walk-through of the full QQ corpus pipeline, end to end:
 
-### Step 1: Parse full QQ corpus (regex + classifier, no LLM)
+### Step 1: Parse QQ corpus (regex + classifier, no LLM)
+
+Start with a pilot batch (~10 laws, mixed sizes) with `--trace` to evaluate trace usefulness before scaling to full corpus.
 
 ```bash
-taxa parse --laws <all QQ laws> --force
+# Step 1a: Pilot batch with trace
+taxa parse --laws <pilot batch> --force --trace data/pilot_trace.json
+taxa classify --laws <pilot batch>
+
+# Step 1b: Evaluate trace — is it useful for Step 2?
+# If yes, run full corpus with trace
+# If too noisy, run full corpus without trace
+
+# Step 1c: Full corpus
+taxa parse --laws <remaining laws> --force [--trace data/corpus_trace.json]
 taxa classify --laws <all QQ laws>
 ```
 
-Verify: benchmark accuracy holds at 86.0% on the 16 benchmark laws after full corpus parse.
+Verify: benchmark accuracy holds at 86.0% on the 16 benchmark laws.
 
 ### Step 2: Review LLM validation surface
 
