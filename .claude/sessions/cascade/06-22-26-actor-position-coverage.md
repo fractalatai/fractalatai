@@ -1,4 +1,4 @@
-# Session: Actor Position Coverage (PENDING)
+# Session: Actor Position Coverage (CLOSED)
 
 ## Problem
 
@@ -46,10 +46,39 @@ The thing-subject regex detects the coarse obligation signal but cannot identify
 4. Evaluate whether parent-clause inheritance would naturally resolve most thing-subject orphans
 5. Check how many benchmark provisions have beneficiary/mentioned gold labels — is 77 + 32 enough to train on?
 
+## Investigation findings (2026-06-23)
+
+### Position classifier: 3-class (active/counterparty/other)
+
+Confirmed from `docs/position_classifier_v1.json`: classes = `["active", "counterparty", "other"]`. The "other" class exists but was **never written** — the classifier logged its opinion in the `reason` field but always kept the regex position.
+
+### The classifier never overwrites positions
+
+Line 5863 (pre-fix): `regex_pos.clone()` — always keeps regex position regardless of classifier prediction. The classifier is effectively a provenance annotation, not a decision-maker for positions.
+
+### 4,237 orphans across full corpus
+
+Provisions with DRRP but no actors:
+- regex: 3,649 (thing-subject obligations)
+- classifier: 293 (gap-filled DRRP but no actor to assign)
+- pending_llm: 182
+- unclassified: 113
+
+### Inheritance gap
+
+`enrich_single_law` inheritance only ran on provisions with no DRRP AND no actors. Orphans (DRRP but no actors) were excluded because the filter required `p.drrp_types.is_empty()`.
+
+## Fixes applied (`9cd8b84`)
+
+1. **Inheritance extended to orphans**: Provisions with DRRP but no actors now inherit actors from parent clause during `taxa escalate`. Keeps existing DRRP, only inherits actors.
+
+2. **Classifier "other" → "mentioned"**: When the position classifier disagrees with the regex and predicts "other", the position is now written as "mentioned" instead of keeping the regex position.
+
+These fixes don't require retraining the classifier. The remaining gap (beneficiary never predicted) would need either 4-class retraining or LLM assignment — both handled by the `taxa validate` + `/human-review` pipeline.
+
 ## Key files
 
-- `fractalaw-ai/src/position_classifier/` — trained position model
-- `docs/position_classifier_v*.json` — model weights
-- `fractalaw-cli/src/main.rs:5271` — position classifier skips empty actors
-- `fractalaw-core/src/taxa/duty_patterns_rule.rs` — thing-subject regex (Rule tier)
-- `fractalaw-actors-struct-migration.md` — position definitions (Hohfeldian model)
+- `fractalaw-ai/src/position_classifier.rs` — 3-class model (active/counterparty/other)
+- `docs/position_classifier_v1.json` — model weights
+- `fractalaw-cli/src/main.rs:5697-5875` — Phase 4 position classification
+- `fractalaw-cli/src/main.rs:3692-3762` — inheritance escalation (now covers orphans)
