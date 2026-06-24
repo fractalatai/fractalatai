@@ -38,8 +38,12 @@ Changed pipeline + taxa commands from `&LanceStore` → `&dyn ProvisionStore`:
 - Empty `law_name` = query all rows (both LanceStore + PgStore impls updated)
 - misc.rs/sync.rs left on concrete `LanceStore` (Phase 4 CLI integration)
 
-### Phase 4: CLI integration
-Add `--pg` flag dispatch. When set, create PgStore and pass through pipeline. Test: `taxa parse --pg postgres://... --laws UK_ukpga_1974_37`.
+### Phase 4: CLI integration ✅
+`--pg` flag wired for core pipeline commands via `open_provision_store`:
+- `taxa parse`, `embed`, `classify`, `escalate`, `validate`: dispatch via `--pg`
+- `taxa enrich`: accepts `pg_url` parameter, dispatches via `open_provision_store`
+- No `--pg` → LanceStore (default, unchanged behavior)
+- Test: `taxa parse --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw --laws UK_ukpga_1974_37`
 
 ### Phase 5: Validate on Postgres
 Run full pipeline on PgStore: parse → embed → classify → validate. Confirm no disk exhaustion. Resume QQ corpus work.

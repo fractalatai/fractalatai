@@ -515,6 +515,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let cli = Cli::parse();
+    let pg_url = cli.pg.clone();
 
     let data_dir = cli
         .data_dir
@@ -673,6 +674,7 @@ async fn main() -> anyhow::Result<()> {
                     escalate,
                     skip_recent,
                     pending,
+                    pg_url.as_deref(),
                 )
                 .await
             }
@@ -692,41 +694,33 @@ async fn main() -> anyhow::Result<()> {
             } => cmd_taxa_audit_fitness(&data_dir, laws, family, limit).await,
             TaxaAction::Parse { laws, force, trace } => {
                 let store = open_duck(&data_dir)?;
-                let lance = LanceStore::open(&data_dir.join("lancedb"))
-                    .await
-                    .context("opening LanceDB")?;
+                let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_parse(&lance, &store, &law_names, force).await?;
+                cmd_taxa_parse(lance.as_ref(), &store, &law_names, force).await?;
                 if let Some(trace_path) = trace {
-                    cmd_taxa_trace(&lance, &store, &law_names, &trace_path).await?;
+                    cmd_taxa_trace(lance.as_ref(), &store, &law_names, &trace_path).await?;
                 }
                 Ok(())
             }
             TaxaAction::Embed { laws } => {
-                let lance = LanceStore::open(&data_dir.join("lancedb"))
-                    .await
-                    .context("opening LanceDB")?;
+                let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_embed(&lance, &law_names).await
+                cmd_taxa_embed(lance.as_ref(), &law_names).await
             }
             TaxaAction::Classify { laws } => {
-                let lance = LanceStore::open(&data_dir.join("lancedb"))
-                    .await
-                    .context("opening LanceDB")?;
+                let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_classify(&lance, &law_names).await
+                cmd_taxa_classify(lance.as_ref(), &law_names).await
             }
             TaxaAction::Escalate { laws } => {
                 let store = open_duck(&data_dir)?;
-                let lance = LanceStore::open(&data_dir.join("lancedb"))
-                    .await
-                    .context("opening LanceDB")?;
+                let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_escalate(&lance, &store, &law_names).await
+                cmd_taxa_escalate(lance.as_ref(), &store, &law_names).await
             }
             TaxaAction::Validate {
                 laws,
@@ -735,12 +729,10 @@ async fn main() -> anyhow::Result<()> {
                 apply,
             } => {
                 let store = open_duck(&data_dir)?;
-                let lance = LanceStore::open(&data_dir.join("lancedb"))
-                    .await
-                    .context("opening LanceDB")?;
+                let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_validate(&lance, &store, &law_names, &audit_dir, dry_run, apply).await
+                cmd_taxa_validate(lance.as_ref(), &store, &law_names, &audit_dir, dry_run, apply).await
             }
         },
 

@@ -2876,14 +2876,13 @@ pub(crate) async fn cmd_taxa_enrich(
     escalate: bool,
     skip_recent: bool,
     pending: bool,
+    pg_url: Option<&str>,
 ) -> anyhow::Result<()> {
     // Ensure taxa_hash/published_hash and fitness columns exist (idempotent).
     store.ensure_taxa_hash_columns()?;
     store.ensure_fitness_columns()?;
 
-    let lance = LanceStore::open(&data_dir.join("lancedb"))
-        .await
-        .context("opening LanceDB")?;
+    let lance = crate::open_provision_store(data_dir, pg_url).await?;
 
     // --force: clear existing DuckDB taxa columns so all laws get re-enriched
     if force && law_filter.is_none() {
@@ -3011,7 +3010,7 @@ pub(crate) async fn cmd_taxa_enrich(
     let mut failed = 0usize;
     for law_name in &law_names {
         let escaped = law_name.replace('\'', "''");
-        let result = match enrich_single_law(&lance, store, law_name, escalate, force).await {
+        let result = match enrich_single_law(lance.as_ref(), store, law_name, escalate, force).await {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("  {law_name}: enrich error: {e}");
@@ -3083,13 +3082,13 @@ pub(crate) async fn cmd_taxa_enrich(
 
             // --pending: compute embeddings for provisions missing them
             if pending {
-                if let Err(e) = cmd_taxa_embed(&lance, &law_names).await {
+                if let Err(e) = cmd_taxa_embed(lance.as_ref(), &law_names).await {
                     eprintln!("  Embed failed (continuing): {e}");
                 }
             }
 
             // Classify with DRRP + position classifiers
-            if let Err(e) = cmd_taxa_classify(&lance, &law_names).await {
+            if let Err(e) = cmd_taxa_classify(lance.as_ref(), &law_names).await {
                 eprintln!("  Classify failed (continuing): {e}");
             }
         } else {
