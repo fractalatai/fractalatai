@@ -33,6 +33,10 @@ struct Cli {
     #[arg(long, default_value = "./data", global = true)]
     data_dir: PathBuf,
 
+    /// Use PostgreSQL+pgvector instead of LanceDB
+    #[arg(long, global = true, env = "FRACTALAW_PG")]
+    pg: Option<String>,
+
     #[command(subcommand)]
     command: Command,
 }
@@ -493,6 +497,24 @@ enum TaxaAction {
         #[arg(long)]
         apply: bool,
     },
+}
+
+/// Open the provision store (PgStore if --pg is set, otherwise LanceStore).
+async fn open_provision_store(
+    data_dir: &std::path::Path,
+    pg_url: Option<&str>,
+) -> anyhow::Result<Box<dyn fractalaw_store::ProvisionStore>> {
+    if let Some(url) = pg_url {
+        let store = fractalaw_store::PgStore::connect(url)
+            .await
+            .context("connecting to PostgreSQL")?;
+        Ok(Box::new(store))
+    } else {
+        let store = LanceStore::open(&data_dir.join("lancedb"))
+            .await
+            .context("opening LanceDB")?;
+        Ok(Box::new(store))
+    }
 }
 
 #[tokio::main]

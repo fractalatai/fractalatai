@@ -579,6 +579,58 @@ pub fn read_parquet(path: &Path) -> Result<Vec<RecordBatch>, StoreError> {
     Ok(batches?)
 }
 
+#[async_trait::async_trait]
+impl crate::ProvisionStore for LanceStore {
+    async fn query_legislation_text(
+        &self,
+        law_name: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<RecordBatch>, StoreError> {
+        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
+        self.query_legislation_text(&filter, limit, offset).await
+    }
+
+    async fn query_provision_taxa(
+        &self,
+        law_name: &str,
+    ) -> Result<Vec<RecordBatch>, StoreError> {
+        self.query_provision_taxa(law_name).await
+    }
+
+    async fn upsert_lat(&self, batches: Vec<RecordBatch>) -> Result<usize, StoreError> {
+        self.upsert_lat(batches).await
+    }
+
+    async fn upsert_embeddings(&self, batch: &RecordBatch) -> Result<(), StoreError> {
+        self.upsert_embeddings(batch).await
+    }
+
+    async fn update_taxa(&self, batch: RecordBatch) -> Result<(), StoreError> {
+        self.update_taxa(batch).await
+    }
+
+    async fn update_polished(&self, batch: RecordBatch) -> Result<(), StoreError> {
+        self.update_polished(batch).await
+    }
+
+    async fn compact(&self) -> Result<(), StoreError> {
+        self.compact().await
+    }
+
+    async fn ensure_gap_c_columns(&self) -> Result<(), StoreError> {
+        self.ensure_gap_c_columns().await
+    }
+
+    async fn delete_law_lat(&self, law_name: &str) -> Result<usize, StoreError> {
+        self.delete_law_lat(law_name).await
+    }
+
+    async fn legislation_text_count(&self) -> Result<usize, StoreError> {
+        self.legislation_text_count().await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

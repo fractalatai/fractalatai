@@ -3,6 +3,9 @@
 mod error;
 pub use error::StoreError;
 
+mod provision_store;
+pub use provision_store::ProvisionStore;
+
 #[cfg(feature = "duckdb")]
 mod duck;
 #[cfg(feature = "duckdb")]
