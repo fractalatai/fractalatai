@@ -48,6 +48,15 @@ Changed pipeline + taxa commands from `&LanceStore` → `&dyn ProvisionStore`:
 ### Phase 5: Validate on Postgres
 Run full pipeline on PgStore: parse → embed → classify → validate. Confirm no disk exhaustion. Resume QQ corpus work.
 
+## Remaining trait wiring
+
+Commands that still open `LanceStore` internally (not reachable via `--pg`):
+- `cmd_taxa_show`, `cmd_taxa_qa`, `cmd_taxa_eyeball`, `cmd_taxa_audit_fitness` — read-only diagnostic commands, open LanceStore from `data_dir`
+- `misc.rs`: `cmd_text`, `cmd_embed`, `cmd_search`, `cmd_validate`, `cmd_export_training_data` — open LanceStore internally
+- `sync.rs`: `cmd_sync_publish_provisions`, `cmd_sync_pull_lat`, `cmd_sync_watch` — open LanceStore internally
+
+Fix: pass `&dyn ProvisionStore` from caller or thread `pg_url` through. Mechanical, same pattern as Phase 4. Not blocking for Phase 5 validation but needed before hub-only operation.
+
 ## Carried from feasibility spike
 
 - ⬜ Filtered query benchmarks (latency measurement)
