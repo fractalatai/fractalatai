@@ -159,9 +159,9 @@ impl PgStore {
         Ok(total)
     }
 
-    /// Upsert embeddings.
+    /// Update embeddings for existing provisions.
     pub async fn upsert_embeddings(&self, batch: &RecordBatch) -> Result<(), StoreError> {
-        upsert_record_batch(&self.pool, batch, "section_id").await?;
+        update_record_batch(&self.pool, batch, "section_id").await?;
         Ok(())
     }
 
