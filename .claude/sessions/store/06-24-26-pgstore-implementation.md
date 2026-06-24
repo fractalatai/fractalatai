@@ -104,6 +104,32 @@ Trait approach is cleaner and aligns with micro-apps architecture (edge uses Lan
 - `scripts/pg_schema.sql` — Postgres schema
 - `scripts/migrate_to_pg.py` — data migration (already done)
 
+## Gemini feedback (2026-06-24)
+
+Full review: `data/code-review/pgstore-implementation.md`
+
+### Arrow ↔ Postgres conversion
+
+No magic crate — build manually. For reads: fetch `PgRow`s via sqlx, collect into `Vec<Option<T>>` per column, convert to Arrow arrays, build `RecordBatch`. For writes: iterate RecordBatch rows, extract values, bind to sqlx query.
+
+**pgvector + sqlx**: the `pgvector` crate provides `sqlx::Type`/`Encode`/`Decode` for `pgvector::Vector`. Read: `row.try_get::<Option<Vector>, _>("embedding")` → access `.0` for `Vec<f32>`. Write: `pgvector::Vector::from(&[f32])` before binding.
+
+### Trait abstraction: yes, do it
+
+Use `async_trait` crate. Define `ProvisionStore` trait with all read/write methods. Both `LanceStore` and `PgStore` implement it. CLI uses `Box<dyn ProvisionStore>` via factory function. This aligns with micro-apps architecture (edge=LanceStore, hub=PgStore).
+
+### Upsert: UNNEST for batch performance
+
+For batch upserts, use `UNNEST($1::type[], $2::type[], ...)` instead of row-by-row `executemany`. Build the INSERT...ON CONFLICT query dynamically from the RecordBatch schema. Map Arrow DataType → Postgres type for UNNEST casts. This is the most performant approach without COPY.
+
+### Feature gating
+
+Standard pattern: `pg` feature on `fractalaw-store` with `sqlx` and `pgvector` as optional deps. CLI enables features it needs. Same as existing `duckdb`/`lancedb`/`datafusion` gates.
+
+### Key risk: filter string safety
+
+LanceStore passes raw SQL filter strings (e.g. `"law_name = 'UK_ukpga_1974_37'"`). PgStore must sanitise these or convert to parameterised queries. Don't pass raw strings to Postgres.
+
 ## Connection details
 
 ```
