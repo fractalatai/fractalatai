@@ -11,6 +11,7 @@ default = []
 duckdb = ["dep:duckdb", "dep:parquet"]
 lancedb = ["dep:lancedb", "dep:parquet", "dep:futures"]
 datafusion = ["dep:datafusion"]
+pg = ["dep:sqlx", "dep:pgvector", "dep:serde_json", "dep:chrono"]
 full = ["duckdb", "lancedb", "datafusion"]
 
 [dependencies]
@@ -22,6 +23,10 @@ duckdb = { workspace = true, optional = true }
 futures = { workspace = true, optional = true }
 lancedb = { workspace = true, optional = true }
 parquet = { workspace = true, optional = true }
+chrono = { workspace = true, optional = true }
+pgvector = { workspace = true, optional = true, features = ["sqlx"] }
+serde_json = { workspace = true, optional = true }
+sqlx = { workspace = true, optional = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }

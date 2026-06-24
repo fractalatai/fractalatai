@@ -1,0 +1,509 @@
+//! PostgreSQL + pgvector store for hub-side provision data.
+//!
+//! Replaces LanceDB for write-heavy hub operations. LanceDB remains
+//! for edge (embedded, read-only synced slices).
+
+use std::sync::Arc;
+
+use arrow::array::{
+    Array, ArrayRef, Float32Array, Float32Builder, Int32Builder,
+    StringBuilder, ListBuilder, FixedSizeListBuilder,
+    RecordBatch,
+};
+use arrow::datatypes::{DataType, Field, Schema};
+use sqlx::postgres::PgPoolOptions;
+use sqlx::{PgPool, Row};
+use tracing::info;
+
+use crate::StoreError;
+
+/// PostgreSQL + pgvector provision store.
+pub struct PgStore {
+    pool: PgPool,
+}
+
+impl PgStore {
+    /// Connect to PostgreSQL.
+    pub async fn connect(url: &str) -> Result<Self, StoreError> {
+        let pool = PgPoolOptions::new()
+            .max_connections(5)
+            .connect(url)
+            .await
+            .map_err(|e| StoreError::Other(format!("pg connect: {e}")))?;
+
+        info!(url = url, "connected to PostgreSQL");
+        Ok(Self { pool })
+    }
+
+    /// Count rows in legislation_text.
+    pub async fn legislation_text_count(&self) -> Result<usize, StoreError> {
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM legislation_text")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| StoreError::Other(format!("count: {e}")))?;
+        Ok(row.0 as usize)
+    }
+
+    /// Query provisions with a WHERE clause, returning Arrow RecordBatch.
+    pub async fn query_legislation_text(
+        &self,
+        law_name: &str,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<RecordBatch>, StoreError> {
+        // Use parameterised query — no raw SQL injection
+        let rows = sqlx::query(
+            "SELECT * FROM legislation_text WHERE law_name = $1 ORDER BY sort_key LIMIT $2 OFFSET $3"
+        )
+        .bind(law_name)
+        .bind(limit as i64)
+        .bind(offset as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_legislation_text: {e}")))?;
+
+        if rows.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let batch = pg_rows_to_record_batch(&rows)?;
+        Ok(vec![batch])
+    }
+
+    /// Query provision taxa for zenoh publish.
+    pub async fn query_provision_taxa(
+        &self,
+        law_name: &str,
+    ) -> Result<Vec<RecordBatch>, StoreError> {
+        let rows = sqlx::query(
+            "SELECT section_id, drrp_types, duty_family, duty_sub_type, popimar, purposes, \
+             clause_refined, taxa_confidence, taxa_classified_at, \
+             fitness_polarity, fitness_person, fitness_process, fitness_place, \
+             fitness_plant, fitness_property, fitness_sector, \
+             extraction_method, holder_inferred_from, ancestor_distance, actors \
+             FROM legislation_text \
+             WHERE law_name = $1 AND drrp_types IS NOT NULL"
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_provision_taxa: {e}")))?;
+
+        if rows.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let batch = pg_rows_to_record_batch(&rows)?;
+        Ok(vec![batch])
+    }
+
+    /// Vector similarity search.
+    pub async fn search_text(
+        &self,
+        query_embedding: &[f32],
+        law_name: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<RecordBatch>, StoreError> {
+        let vec = pgvector::Vector::from(query_embedding.to_vec());
+
+        let rows = if let Some(law) = law_name {
+            sqlx::query(
+                "SELECT *, 1 - (embedding <=> $1::vector) AS similarity \
+                 FROM legislation_text \
+                 WHERE law_name = $2 AND embedding IS NOT NULL \
+                 ORDER BY embedding <=> $1::vector \
+                 LIMIT $3"
+            )
+            .bind(&vec)
+            .bind(law)
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+        } else {
+            sqlx::query(
+                "SELECT *, 1 - (embedding <=> $1::vector) AS similarity \
+                 FROM legislation_text \
+                 WHERE embedding IS NOT NULL \
+                 ORDER BY embedding <=> $1::vector \
+                 LIMIT $2"
+            )
+            .bind(&vec)
+            .bind(limit as i64)
+            .fetch_all(&self.pool)
+            .await
+        }
+        .map_err(|e| StoreError::Other(format!("search_text: {e}")))?;
+
+        if rows.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let batch = pg_rows_to_record_batch(&rows)?;
+        Ok(vec![batch])
+    }
+
+    /// Upsert provisions (LAT from sertantai).
+    pub async fn upsert_lat(&self, batches: Vec<RecordBatch>) -> Result<usize, StoreError> {
+        let mut total = 0usize;
+        for batch in &batches {
+            total += upsert_record_batch(&self.pool, batch, "section_id").await?;
+        }
+        Ok(total)
+    }
+
+    /// Upsert embeddings.
+    pub async fn upsert_embeddings(&self, batch: &RecordBatch) -> Result<(), StoreError> {
+        upsert_record_batch(&self.pool, batch, "section_id").await?;
+        Ok(())
+    }
+
+    /// Upsert taxa classification results.
+    pub async fn update_taxa(&self, batch: RecordBatch) -> Result<(), StoreError> {
+        upsert_record_batch(&self.pool, &batch, "section_id").await?;
+        Ok(())
+    }
+
+    /// Upsert polished AI results.
+    pub async fn update_polished(&self, batch: RecordBatch) -> Result<(), StoreError> {
+        upsert_record_batch(&self.pool, &batch, "section_id").await?;
+        Ok(())
+    }
+
+    /// No-op: Postgres doesn't need compaction.
+    pub async fn compact(&self) -> Result<(), StoreError> {
+        Ok(())
+    }
+
+    /// Ensure columns exist (no-op if schema is already correct).
+    pub async fn ensure_gap_c_columns(&self) -> Result<(), StoreError> {
+        // Postgres schema is created upfront via pg_schema.sql.
+        // All columns already exist. No-op.
+        Ok(())
+    }
+
+    /// Delete provisions for a law.
+    pub async fn delete_law_lat(&self, law_name: &str) -> Result<usize, StoreError> {
+        let result = sqlx::query("DELETE FROM legislation_text WHERE law_name = $1")
+            .bind(law_name)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StoreError::Other(format!("delete: {e}")))?;
+        Ok(result.rows_affected() as usize)
+    }
+}
+
+// ── Arrow ↔ Postgres conversion ─────────────────────────────────────
+
+/// Convert sqlx PgRows to an Arrow RecordBatch.
+///
+/// Dynamically builds the schema from the column metadata in the first row.
+/// Handles TEXT, INTEGER, REAL, TEXT[], JSONB, vector(384), TIMESTAMPTZ.
+fn pg_rows_to_record_batch(rows: &[sqlx::postgres::PgRow]) -> Result<RecordBatch, StoreError> {
+    use sqlx::Column;
+    use sqlx::TypeInfo;
+
+    if rows.is_empty() {
+        return Err(StoreError::Other("no rows".into()));
+    }
+
+    let columns = rows[0].columns();
+    let mut fields = Vec::with_capacity(columns.len());
+    let mut arrays: Vec<ArrayRef> = Vec::with_capacity(columns.len());
+
+    for col in columns {
+        let name = col.name();
+        let type_name = col.type_info().name();
+
+        match type_name {
+            "TEXT" | "VARCHAR" => {
+                let mut builder = StringBuilder::new();
+                for row in rows {
+                    let val: Option<String> = row.try_get(name)
+                        .unwrap_or(None);
+                    match val {
+                        Some(v) => builder.append_value(v),
+                        None => builder.append_null(),
+                    }
+                }
+                fields.push(Field::new(name, DataType::Utf8, true));
+                arrays.push(Arc::new(builder.finish()));
+            }
+            "INT4" | "INT8" => {
+                let mut builder = Int32Builder::new();
+                for row in rows {
+                    let val: Option<i32> = row.try_get(name).unwrap_or(None);
+                    match val {
+                        Some(v) => builder.append_value(v),
+                        None => builder.append_null(),
+                    }
+                }
+                fields.push(Field::new(name, DataType::Int32, true));
+                arrays.push(Arc::new(builder.finish()));
+            }
+            "FLOAT4" | "FLOAT8" => {
+                let mut builder = Float32Builder::new();
+                for row in rows {
+                    let val: Option<f32> = row.try_get(name).unwrap_or(None);
+                    match val {
+                        Some(v) => builder.append_value(v),
+                        None => builder.append_null(),
+                    }
+                }
+                fields.push(Field::new(name, DataType::Float32, true));
+                arrays.push(Arc::new(builder.finish()));
+            }
+            "TEXT[]" => {
+                let item = Arc::new(Field::new("item", DataType::Utf8, true));
+                let mut builder = ListBuilder::new(StringBuilder::new());
+                for row in rows {
+                    let val: Option<Vec<String>> = row.try_get(name).unwrap_or(None);
+                    match val {
+                        Some(v) => {
+                            for s in &v {
+                                builder.values().append_value(s);
+                            }
+                            builder.append(true);
+                        }
+                        None => builder.append_null(),
+                    }
+                }
+                fields.push(Field::new(name, DataType::List(item), true));
+                arrays.push(Arc::new(builder.finish()));
+            }
+            "JSONB" | "JSON" => {
+                // Store as Utf8 string (serialised JSON)
+                let mut builder = StringBuilder::new();
+                for row in rows {
+                    let val: Option<serde_json::Value> = row.try_get(name).unwrap_or(None);
+                    match val {
+                        Some(v) => builder.append_value(v.to_string()),
+                        None => builder.append_null(),
+                    }
+                }
+                fields.push(Field::new(name, DataType::Utf8, true));
+                arrays.push(Arc::new(builder.finish()));
+            }
+            t if t.starts_with("vector") => {
+                // pgvector → FixedSizeList<Float32, 384>
+                let item = Arc::new(Field::new("item", DataType::Float32, false));
+                let mut builder = FixedSizeListBuilder::new(Float32Builder::new(), 384);
+                for row in rows {
+                    let val: Option<pgvector::Vector> = row.try_get(name).unwrap_or(None);
+                    match val {
+                        Some(v) => {
+                            let values = builder.values();
+                            for &f in v.as_slice() {
+                                values.append_value(f);
+                            }
+                            builder.append(true);
+                        }
+                        None => {
+                            let values = builder.values();
+                            for _ in 0..384 {
+                                values.append_null();
+                            }
+                            builder.append(false);
+                        }
+                    }
+                }
+                fields.push(Field::new(
+                    name,
+                    DataType::FixedSizeList(item, 384),
+                    true,
+                ));
+                arrays.push(Arc::new(builder.finish()));
+            }
+            "TIMESTAMPTZ" | "TIMESTAMP" => {
+                // Store as Utf8 ISO string for simplicity
+                let mut builder = StringBuilder::new();
+                for row in rows {
+                    let val: Option<chrono::DateTime<chrono::Utc>> =
+                        row.try_get(name).unwrap_or(None);
+                    match val {
+                        Some(v) => builder.append_value(v.to_rfc3339()),
+                        None => builder.append_null(),
+                    }
+                }
+                fields.push(Field::new(name, DataType::Utf8, true));
+                arrays.push(Arc::new(builder.finish()));
+            }
+            "INT4[]" => {
+                let item = Arc::new(Field::new("item", DataType::Int32, true));
+                let mut builder = ListBuilder::new(Int32Builder::new());
+                for row in rows {
+                    let val: Option<Vec<i32>> = row.try_get(name).unwrap_or(None);
+                    match val {
+                        Some(v) => {
+                            for i in &v {
+                                builder.values().append_value(*i);
+                            }
+                            builder.append(true);
+                        }
+                        None => builder.append_null(),
+                    }
+                }
+                fields.push(Field::new(name, DataType::List(item), true));
+                arrays.push(Arc::new(builder.finish()));
+            }
+            _ => {
+                // Fallback: read as string
+                let mut builder = StringBuilder::new();
+                for row in rows {
+                    let val: Option<String> = row.try_get(name).unwrap_or(None);
+                    match val {
+                        Some(v) => builder.append_value(v),
+                        None => builder.append_null(),
+                    }
+                }
+                fields.push(Field::new(name, DataType::Utf8, true));
+                arrays.push(Arc::new(builder.finish()));
+            }
+        }
+    }
+
+    let schema = Arc::new(Schema::new(fields));
+    RecordBatch::try_new(schema, arrays)
+        .map_err(|e| StoreError::Other(format!("record_batch: {e}")))
+}
+
+/// Upsert an Arrow RecordBatch into legislation_text.
+///
+/// Converts each row to a dynamic SQL INSERT...ON CONFLICT.
+/// The RecordBatch may contain any subset of columns.
+async fn upsert_record_batch(
+    pool: &PgPool,
+    batch: &RecordBatch,
+    conflict_key: &str,
+) -> Result<usize, StoreError> {
+    if batch.num_rows() == 0 {
+        return Ok(0);
+    }
+
+    let schema = batch.schema();
+    let col_names: Vec<&str> = schema.fields().iter().map(|f| f.name().as_str()).collect();
+    let update_set: Vec<String> = col_names
+        .iter()
+        .filter(|c| **c != conflict_key)
+        .map(|c| format!("{c} = EXCLUDED.{c}"))
+        .collect();
+
+    // Build per-row SQL with literal values (simple but safe for internal data)
+    let mut inserted = 0usize;
+    for row in 0..batch.num_rows() {
+        let mut values = Vec::with_capacity(col_names.len());
+        for (idx, field) in schema.fields().iter().enumerate() {
+            let col = batch.column(idx);
+            values.push(arrow_value_to_sql(col, row, field.data_type()));
+        }
+
+        let sql = format!(
+            "INSERT INTO legislation_text ({}) VALUES ({}) ON CONFLICT ({}) DO UPDATE SET {}",
+            col_names.join(", "),
+            values.join(", "),
+            conflict_key,
+            update_set.join(", "),
+        );
+
+        sqlx::query(&sql)
+            .execute(pool)
+            .await
+            .map_err(|e| StoreError::Other(format!("upsert row {row}: {e}")))?;
+        inserted += 1;
+    }
+
+    Ok(inserted)
+}
+
+/// Convert a single Arrow value to a SQL literal string.
+fn arrow_value_to_sql(col: &ArrayRef, row: usize, data_type: &DataType) -> String {
+    use arrow::array::AsArray;
+
+    if col.is_null(row) {
+        return "NULL".to_string();
+    }
+
+    match data_type {
+        DataType::Utf8 => {
+            let val = col.as_string::<i32>().value(row);
+            format!("'{}'", val.replace('\'', "''"))
+        }
+        DataType::Int32 => {
+            let val = col.as_primitive::<arrow::datatypes::Int32Type>().value(row);
+            val.to_string()
+        }
+        DataType::Float32 => {
+            let val = col.as_primitive::<arrow::datatypes::Float32Type>().value(row);
+            format!("{val}")
+        }
+        DataType::List(_) => {
+            // TEXT[] or INT[]
+            let list = col.as_list::<i32>();
+            let values = list.value(row);
+            if values.is_empty() {
+                return "NULL".to_string();
+            }
+            // Try as string array
+            if let Some(sa) = values.as_any().downcast_ref::<arrow::array::StringArray>() {
+                let items: Vec<String> = (0..sa.len())
+                    .filter(|&i| !sa.is_null(i))
+                    .map(|i| format!("\"{}\"", sa.value(i).replace('"', "\\\"")))
+                    .collect();
+                format!("ARRAY[{}]::TEXT[]", items.join(","))
+            } else {
+                "NULL".to_string()
+            }
+        }
+        DataType::FixedSizeList(_, _) => {
+            // vector(384)
+            let fsl = col
+                .as_any()
+                .downcast_ref::<arrow::array::FixedSizeListArray>()
+                .unwrap();
+            let values = fsl.value(row);
+            let floats = values
+                .as_any()
+                .downcast_ref::<Float32Array>()
+                .unwrap();
+            let nums: Vec<String> = floats.values().iter().map(|f| format!("{f}")).collect();
+            format!("'[{}]'::vector", nums.join(","))
+        }
+        DataType::Timestamp(_, _) => {
+            // Try to read as string (our LanceDB timestamps are stored oddly)
+            if let Some(sa) = col.as_any().downcast_ref::<arrow::array::StringArray>() {
+                let val = sa.value(row);
+                format!("'{}'::TIMESTAMPTZ", val.replace('\'', "''"))
+            } else {
+                "NULL".to_string()
+            }
+        }
+        _ => {
+            // Fallback: try as string
+            if let Some(s) = col.as_any().downcast_ref::<arrow::array::StringArray>() {
+                format!("'{}'", s.value(row).replace('\'', "''"))
+            } else {
+                "NULL".to_string()
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_connect() {
+        // Skip if Postgres not running
+        let result = PgStore::connect(
+            "postgres://fractalaw:fractalaw@localhost:5433/fractalaw"
+        ).await;
+        if result.is_err() {
+            eprintln!("Postgres not available, skipping test");
+            return;
+        }
+        let store = result.unwrap();
+        let count = store.legislation_text_count().await.unwrap();
+        assert!(count > 0, "expected rows in legislation_text");
+        eprintln!("PgStore: {count} rows");
+    }
+}
