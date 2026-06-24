@@ -167,13 +167,13 @@ impl PgStore {
 
     /// Upsert taxa classification results.
     pub async fn update_taxa(&self, batch: RecordBatch) -> Result<(), StoreError> {
-        upsert_record_batch(&self.pool, &batch, "section_id").await?;
+        update_record_batch(&self.pool, &batch, "section_id").await?;
         Ok(())
     }
 
     /// Upsert polished AI results.
     pub async fn update_polished(&self, batch: RecordBatch) -> Result<(), StoreError> {
-        upsert_record_batch(&self.pool, &batch, "section_id").await?;
+        update_record_batch(&self.pool, &batch, "section_id").await?;
         Ok(())
     }
 
@@ -293,7 +293,7 @@ fn pg_rows_to_record_batch(rows: &[sqlx::postgres::PgRow]) -> Result<RecordBatch
             }
             t if t.starts_with("vector") => {
                 // pgvector → FixedSizeList<Float32, 384>
-                let item = Arc::new(Field::new("item", DataType::Float32, false));
+                let item = Arc::new(Field::new("item", DataType::Float32, true));
                 let mut builder = FixedSizeListBuilder::new(Float32Builder::new(), 384);
                 for row in rows {
                     let val: Option<pgvector::Vector> = row.try_get(name).unwrap_or(None);
@@ -422,6 +422,52 @@ async fn upsert_record_batch(
     Ok(inserted)
 }
 
+/// Update existing rows in legislation_text by key column (e.g. section_id).
+/// Only sets columns present in the batch — does not touch other columns.
+async fn update_record_batch(
+    pool: &PgPool,
+    batch: &RecordBatch,
+    key_col: &str,
+) -> Result<usize, StoreError> {
+    if batch.num_rows() == 0 {
+        return Ok(0);
+    }
+
+    let schema = batch.schema();
+    let col_names: Vec<&str> = schema.fields().iter().map(|f| f.name().as_str()).collect();
+    let key_idx = schema
+        .index_of(key_col)
+        .map_err(|_| StoreError::Other(format!("key column '{key_col}' not in batch")))?;
+
+    let mut updated = 0usize;
+    for row in 0..batch.num_rows() {
+        let key_val = arrow_value_to_sql(batch.column(key_idx), row, schema.field(key_idx).data_type());
+
+        let set_clauses: Vec<String> = col_names
+            .iter()
+            .enumerate()
+            .filter(|(idx, _)| *idx != key_idx)
+            .map(|(idx, name)| {
+                let val = arrow_value_to_sql(batch.column(idx), row, schema.field(idx).data_type());
+                format!("{name} = {val}")
+            })
+            .collect();
+
+        let sql = format!(
+            "UPDATE legislation_text SET {} WHERE {key_col} = {key_val}",
+            set_clauses.join(", "),
+        );
+
+        let result = sqlx::query(&sql)
+            .execute(pool)
+            .await
+            .map_err(|e| StoreError::Other(format!("update row {row}: {e}")))?;
+        updated += result.rows_affected() as usize;
+    }
+
+    Ok(updated)
+}
+
 /// Convert a single Arrow value to a SQL literal string.
 fn arrow_value_to_sql(col: &ArrayRef, row: usize, data_type: &DataType) -> String {
     use arrow::array::AsArray;
@@ -443,18 +489,39 @@ fn arrow_value_to_sql(col: &ArrayRef, row: usize, data_type: &DataType) -> Strin
             let val = col.as_primitive::<arrow::datatypes::Float32Type>().value(row);
             format!("{val}")
         }
-        DataType::List(_) => {
-            // TEXT[] or INT[]
+        DataType::List(inner) => {
             let list = col.as_list::<i32>();
             let values = list.value(row);
             if values.is_empty() {
                 return "NULL".to_string();
             }
-            // Try as string array
+            // List<Struct> → JSONB (e.g., actors column)
+            if matches!(inner.data_type(), DataType::Struct(_)) {
+                let struct_arr = values
+                    .as_any()
+                    .downcast_ref::<arrow::array::StructArray>()
+                    .unwrap();
+                let mut json_items = Vec::new();
+                for i in 0..struct_arr.len() {
+                    let mut obj = serde_json::Map::new();
+                    for (fi, field) in struct_arr.fields().iter().enumerate() {
+                        let col = struct_arr.column(fi);
+                        if col.is_null(i) {
+                            obj.insert(field.name().clone(), serde_json::Value::Null);
+                        } else if let Some(sa) = col.as_any().downcast_ref::<arrow::array::StringArray>() {
+                            obj.insert(field.name().clone(), serde_json::Value::String(sa.value(i).to_string()));
+                        }
+                    }
+                    json_items.push(serde_json::Value::Object(obj));
+                }
+                let json = serde_json::Value::Array(json_items).to_string();
+                return format!("'{}'::JSONB", json.replace('\'', "''"));
+            }
+            // TEXT[]
             if let Some(sa) = values.as_any().downcast_ref::<arrow::array::StringArray>() {
                 let items: Vec<String> = (0..sa.len())
                     .filter(|&i| !sa.is_null(i))
-                    .map(|i| format!("\"{}\"", sa.value(i).replace('"', "\\\"")))
+                    .map(|i| format!("'{}'", sa.value(i).replace('\'', "''")))
                     .collect();
                 format!("ARRAY[{}]::TEXT[]", items.join(","))
             } else {
@@ -475,8 +542,35 @@ fn arrow_value_to_sql(col: &ArrayRef, row: usize, data_type: &DataType) -> Strin
             let nums: Vec<String> = floats.values().iter().map(|f| format!("{f}")).collect();
             format!("'[{}]'::vector", nums.join(","))
         }
-        DataType::Timestamp(_, _) => {
-            // Try to read as string (our LanceDB timestamps are stored oddly)
+        DataType::Timestamp(unit, _tz) => {
+            use arrow::datatypes::TimeUnit;
+            // Handle native timestamp arrays (TimestampNanosecondArray etc.)
+            let nanos = match unit {
+                TimeUnit::Nanosecond => col
+                    .as_any()
+                    .downcast_ref::<arrow::array::TimestampNanosecondArray>()
+                    .map(|a| a.value(row)),
+                TimeUnit::Microsecond => col
+                    .as_any()
+                    .downcast_ref::<arrow::array::TimestampMicrosecondArray>()
+                    .map(|a| a.value(row) * 1000),
+                TimeUnit::Millisecond => col
+                    .as_any()
+                    .downcast_ref::<arrow::array::TimestampMillisecondArray>()
+                    .map(|a| a.value(row) * 1_000_000),
+                TimeUnit::Second => col
+                    .as_any()
+                    .downcast_ref::<arrow::array::TimestampSecondArray>()
+                    .map(|a| a.value(row) * 1_000_000_000),
+            };
+            if let Some(ns) = nanos {
+                let secs = ns / 1_000_000_000;
+                let subsec_ns = (ns % 1_000_000_000) as u32;
+                if let Some(dt) = chrono::DateTime::from_timestamp(secs, subsec_ns) {
+                    return format!("'{}'::TIMESTAMPTZ", dt.to_rfc3339());
+                }
+            }
+            // Fallback: try as string
             if let Some(sa) = col.as_any().downcast_ref::<arrow::array::StringArray>() {
                 let val = sa.value(row);
                 format!("'{}'::TIMESTAMPTZ", val.replace('\'', "''"))

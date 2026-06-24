@@ -1442,7 +1442,7 @@ pub(crate) async fn cmd_taxa_parse(
                 }
             }
             Err(e) => {
-                eprintln!("  {law_name}: parse error: {e}");
+                eprintln!("  {law_name}: parse error: {e:#?}");
                 let _ = store.execute(&format!(
                     "UPDATE legislation \
                      SET enrichment_retry_count = COALESCE(enrichment_retry_count, 0) + 1 \

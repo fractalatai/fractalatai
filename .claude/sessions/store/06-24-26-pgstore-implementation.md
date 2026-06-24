@@ -45,8 +45,17 @@ Changed pipeline + taxa commands from `&LanceStore` → `&dyn ProvisionStore`:
 - No `--pg` → LanceStore (default, unchanged behavior)
 - Test: `taxa parse --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw --laws UK_ukpga_1974_37`
 
-### Phase 5: Validate on Postgres
-Run full pipeline on PgStore: parse → embed → classify → validate. Confirm no disk exhaustion. Resume QQ corpus work.
+### Phase 5: Validate on Postgres ✅ (parse)
+`taxa parse --pg postgres://...` validated against 183,509-row Postgres:
+- UK_ukpga_1974_37: parsed successfully, 830 provisions protected (source-tier)
+- UK_uksi_1987_2116 --force: re-enriched, taxa/actors/timestamps written correctly
+- Fixes applied during validation:
+  - FixedSizeList inner field nullability (embedding column)
+  - Timestamp nanos → TIMESTAMPTZ conversion  
+  - List<Struct> → JSONB conversion (actors column)
+  - TEXT[] quoting: double-quote → single-quote (Postgres SQL literals)
+  - update_taxa: INSERT ON CONFLICT → UPDATE WHERE (taxa batch lacks NOT NULL columns)
+- Remaining: embed, classify, validate not yet tested against Postgres
 
 ## Remaining trait wiring
 
