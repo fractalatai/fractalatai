@@ -22,8 +22,13 @@ Split main.rs (8,443 → 897 lines) into focused modules. Mechanical refactor �
 - `commands/misc.rs` (1,055 lines): 13 other command functions
 - main.rs retains: Cli struct, Command enums, ZenohArgs, main(), open_duck
 
-### Phase 2: Decompose enrich_single_law  
-Break the 1,442-line function into pipeline stages: load → parse → transform → write → inherit → escalate. Each stage is a small function with clear inputs/outputs.
+### Phase 2: Decompose enrich_single_law ✅
+1,440-line function → 76-line orchestrator + 5 stage functions:
+- `parse_provisions` (330 lines): regex DRRP extraction per provision
+- `backlink_actors` (28 lines): infer Rule provision holders
+- `apply_escalation` (601 lines): Tier 1/2/3 inheritance + LLM
+- `write_provision_taxa` (294 lines): build Arrow batch → LanceDB
+- `write_law_taxa` (120 lines): hash check → DuckDB UPDATE
 
 ### Phase 3: Wire ProvisionStore trait
 Change decomposed pipeline functions from `&LanceStore` to `&dyn ProvisionStore`. Each function is now small enough to change safely.
@@ -121,10 +126,17 @@ Trait approach is cleaner and aligns with micro-apps architecture (edge uses Lan
 
 ## Key files
 
-- `crates/fractalaw-store/src/lance.rs` — LanceStore to mirror (method signatures)
-- `crates/fractalaw-store/src/pg.rs` — new PgStore (to create)
-- `crates/fractalaw-store/Cargo.toml` — add sqlx dependency
-- `crates/fractalaw-cli/src/main.rs` — wire PgStore into commands
+- `crates/fractalaw-store/src/lance.rs` — LanceStore (implements ProvisionStore)
+- `crates/fractalaw-store/src/pg.rs` — PgStore (implements ProvisionStore)
+- `crates/fractalaw-store/src/provision_store.rs` — ProvisionStore trait
+- `crates/fractalaw-store/Cargo.toml` — sqlx/pgvector deps (pg feature)
+- `crates/fractalaw-cli/src/main.rs` — Cli struct, Command dispatch (897 lines)
+- `crates/fractalaw-cli/src/commands/pipeline.rs` — enrich_single_law + types
+- `crates/fractalaw-cli/src/commands/taxa.rs` — 13 taxa command functions
+- `crates/fractalaw-cli/src/commands/sync.rs` — sync/crdt functions
+- `crates/fractalaw-cli/src/commands/misc.rs` — other commands
+- `crates/fractalaw-cli/src/llm.rs` — ActorMatcher, Gemini parsing
+- `crates/fractalaw-cli/src/utils.rs` — shared utilities
 - `scripts/pg_schema.sql` — Postgres schema
 - `scripts/migrate_to_pg.py` — data migration (already done)
 
@@ -164,21 +176,27 @@ Full review: `data/code-review/cli-architecture.md`
 5. `apply_tier1_inheritance` — parent-clause actor inheritance
 6. `escalate_tier2_llm` — LLM escalation
 
-**Split CLI into modules:**
+**Split CLI into modules** (done — actual structure):
 ```
 src/
-├── main.rs          (minimal: parse args, dispatch)
-├── commands/        (one file per command)
-├── pipeline/        (decomposed enrich stages)
-├── llm/             (Gemini calls, prompt building)
-└── models/          (Provision, Taxa, Actor structs)
+├── main.rs              (897 lines: Cli, Command enums, ZenohArgs, main(), open_duck)
+├── utils.rs             (610 lines: shared utilities, FitnessEntry)
+├── llm.rs               (443 lines: ActorMatcher, Gemini parsing + tests)
+├── display.rs           (pre-existing)
+├── embed.rs             (pre-existing)
+└── commands/
+    ├── mod.rs
+    ├── pipeline.rs      (1,573 lines: enrich_single_law, types)
+    ├── taxa.rs          (3,166 lines: 13 taxa commands)
+    ├── sync.rs          (758 lines: sync/crdt commands)
+    └── misc.rs          (1,055 lines: other commands)
 ```
 
 **Filter string → law_name**: keep ProvisionStore trait using law_name (safe), add backward-compat by constructing filter inside LanceStore impl.
 
-**Order of work:**
-1. Module split (mechanical, low risk) 
-2. Decompose enrich_single_law
+**Remaining order of work:**
+1. ~~Module split (mechanical, low risk)~~ ✅ commit 0a46772
+2. Decompose enrich_single_law (pipeline.rs)
 3. Wire ProvisionStore trait into decomposed functions
 4. Each step is independently testable
 
