@@ -1,4 +1,4 @@
-# Session: PgStore Implementation (PENDING)
+# Session: PgStore Implementation (ACTIVE)
 
 Daughter session 2 of DB migration. Builds the Rust `PgStore` struct to replace `LanceStore` for hub operations.
 
@@ -9,6 +9,30 @@ Implement `PgStore` in `crates/fractalaw-store/src/pg.rs` with the same method s
 ## Prerequisite
 
 Postgres+pgvector running via podman quadlet on port 5433 with 183,509 rows migrated. See `store/06-24-26-pgvector-feasibility-spike.md` for connection details and schema.
+
+## Work plan
+
+### Phase 1: Module split ✅
+Split main.rs (8,443 → 897 lines) into focused modules. Mechanical refactor — no logic changes.
+- `utils.rs` (610 lines): 15 utility functions + FitnessEntry
+- `llm.rs` (443 lines): Gemini parsing, ActorMatcher, ParsedTier3Actor + tests
+- `commands/pipeline.rs` (1,573 lines): enrich_single_law, source_tier, types
+- `commands/taxa.rs` (3,166 lines): 13 cmd_taxa_* functions
+- `commands/sync.rs` (758 lines): 10 sync/crdt functions
+- `commands/misc.rs` (1,055 lines): 13 other command functions
+- main.rs retains: Cli struct, Command enums, ZenohArgs, main(), open_duck
+
+### Phase 2: Decompose enrich_single_law  
+Break the 1,442-line function into pipeline stages: load → parse → transform → write → inherit → escalate. Each stage is a small function with clear inputs/outputs.
+
+### Phase 3: Wire ProvisionStore trait
+Change decomposed pipeline functions from `&LanceStore` to `&dyn ProvisionStore`. Each function is now small enough to change safely.
+
+### Phase 4: CLI integration
+Add `--pg` flag dispatch. When set, create PgStore and pass through pipeline. Test: `taxa parse --pg postgres://... --laws UK_ukpga_1974_37`.
+
+### Phase 5: Validate on Postgres
+Run full pipeline on PgStore: parse → embed → classify → validate. Confirm no disk exhaustion. Resume QQ corpus work.
 
 ## Carried from feasibility spike
 
@@ -125,6 +149,38 @@ For batch upserts, use `UNNEST($1::type[], $2::type[], ...)` instead of row-by-r
 ### Feature gating
 
 Standard pattern: `pg` feature on `fractalaw-store` with `sqlx` and `pgvector` as optional deps. CLI enables features it needs. Same as existing `duckdb`/`lancedb`/`datafusion` gates.
+
+### Architecture review (Gemini, 2026-06-24)
+
+Full review: `data/code-review/cli-architecture.md`
+
+**main.rs is 8,443 lines with enrich_single_law at 1,442 lines.** Gemini says: **refactor before/during wiring, not after.**
+
+**Decompose enrich_single_law into pipeline stages:**
+1. `load_provisions` — query store, prepare raw provisions
+2. `parse_and_extract` — run parse_v2 per provision (pure, no store)
+3. `build_arrow_batch` — transform parsed data to 22-column Arrow batch
+4. `write_enriched_data` — upsert batch to store
+5. `apply_tier1_inheritance` — parent-clause actor inheritance
+6. `escalate_tier2_llm` — LLM escalation
+
+**Split CLI into modules:**
+```
+src/
+├── main.rs          (minimal: parse args, dispatch)
+├── commands/        (one file per command)
+├── pipeline/        (decomposed enrich stages)
+├── llm/             (Gemini calls, prompt building)
+└── models/          (Provision, Taxa, Actor structs)
+```
+
+**Filter string → law_name**: keep ProvisionStore trait using law_name (safe), add backward-compat by constructing filter inside LanceStore impl.
+
+**Order of work:**
+1. Module split (mechanical, low risk) 
+2. Decompose enrich_single_law
+3. Wire ProvisionStore trait into decomposed functions
+4. Each step is independently testable
 
 ### Key risk: filter string safety
 
