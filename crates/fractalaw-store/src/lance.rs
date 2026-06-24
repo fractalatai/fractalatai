@@ -587,7 +587,11 @@ impl crate::ProvisionStore for LanceStore {
         limit: usize,
         offset: usize,
     ) -> Result<Vec<RecordBatch>, StoreError> {
-        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
+        let filter = if law_name.is_empty() {
+            "true".to_string()
+        } else {
+            format!("law_name = '{}'", law_name.replace('\'', "''"))
+        };
         self.query_legislation_text(&filter, limit, offset).await
     }
 

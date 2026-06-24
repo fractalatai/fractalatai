@@ -52,14 +52,22 @@ impl PgStore {
         offset: usize,
     ) -> Result<Vec<RecordBatch>, StoreError> {
         // Use parameterised query — no raw SQL injection
-        let rows = sqlx::query(
-            "SELECT * FROM legislation_text WHERE law_name = $1 ORDER BY sort_key LIMIT $2 OFFSET $3"
-        )
-        .bind(law_name)
-        .bind(limit as i64)
-        .bind(offset as i64)
-        .fetch_all(&self.pool)
-        .await
+        let rows = if law_name.is_empty() {
+            sqlx::query("SELECT * FROM legislation_text ORDER BY sort_key LIMIT $1 OFFSET $2")
+                .bind(limit as i64)
+                .bind(offset as i64)
+                .fetch_all(&self.pool)
+                .await
+        } else {
+            sqlx::query(
+                "SELECT * FROM legislation_text WHERE law_name = $1 ORDER BY sort_key LIMIT $2 OFFSET $3"
+            )
+            .bind(law_name)
+            .bind(limit as i64)
+            .bind(offset as i64)
+            .fetch_all(&self.pool)
+            .await
+        }
         .map_err(|e| StoreError::Other(format!("query_legislation_text: {e}")))?;
 
         if rows.is_empty() {

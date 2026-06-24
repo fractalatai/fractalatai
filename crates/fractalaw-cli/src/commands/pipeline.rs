@@ -1,7 +1,7 @@
 use anyhow::Context;
 use arrow::array::Array;
 use arrow::record_batch::RecordBatch;
-use fractalaw_store::{DuckStore, LanceStore};
+use fractalaw_store::{DuckStore, ProvisionStore};
 
 use crate::llm::*;
 use crate::utils::*;
@@ -119,7 +119,7 @@ pub(crate) struct ProvisionTaxa {
 }
 
 pub(crate) async fn enrich_single_law(
-    lance: &LanceStore,
+    lance: &dyn ProvisionStore,
     store: &DuckStore,
     law_name: &str,
     escalate: bool,
@@ -146,8 +146,7 @@ pub(crate) async fn enrich_single_law(
         lance.ensure_gap_c_columns().await?;
     }
 
-    let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
-    let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+    let batches = lance.query_legislation_text(law_name, 100_000, 0).await?;
     let row_count: usize = batches.iter().map(|b| b.num_rows()).sum();
     if row_count > 2000 {
         tracing::warn!("{law_name}: {row_count} provisions — large law");
@@ -1196,7 +1195,7 @@ Respond in JSON only, no markdown:
 
 /// Build Arrow RecordBatch from per-provision taxa and write to LanceDB.
 async fn write_provision_taxa(
-    lance: &LanceStore,
+    lance: &dyn ProvisionStore,
     law_name: &str,
     provision_taxa: &[ProvisionTaxa],
     existing_tiers: &std::collections::HashMap<String, u8>,

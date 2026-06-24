@@ -1,6 +1,6 @@
 use anyhow::Context;
 use arrow::array::Array;
-use fractalaw_store::{DuckStore, LanceStore};
+use fractalaw_store::{DuckStore, LanceStore, ProvisionStore};
 
 use crate::llm::*;
 use crate::open_duck;
@@ -31,8 +31,7 @@ pub(crate) async fn cmd_taxa_show(
         })
     };
 
-    let filter = format!("law_name = '{}'", name.replace('\'', "''"));
-    let batches = lance.query_legislation_text(&filter, limit, 0).await?;
+    let batches = lance.query_legislation_text(name, limit, 0).await?;
 
     let total: usize = batches.iter().map(|b| b.num_rows()).sum();
     if total == 0 {
@@ -479,8 +478,7 @@ pub(crate) async fn cmd_taxa_eyeball(
     let mut total_sections = 0usize;
 
     for &law_name in law_names {
-        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
-        let batches = lance.query_legislation_text(&filter, limit, 0).await?;
+        let batches = lance.query_legislation_text(law_name, limit, 0).await?;
         let sections: usize = batches.iter().map(|b| b.num_rows()).sum();
         if sections == 0 {
             eprintln!("  WARN: No text sections found for '{law_name}', skipping.");
@@ -614,7 +612,7 @@ pub(crate) async fn cmd_taxa_qa(
         names
     } else {
         // All laws with LanceDB text.
-        let all_batches = lance.query_legislation_text("true", 200_000, 0).await?;
+        let all_batches = lance.query_legislation_text("", 200_000, 0).await?;
         let mut names = std::collections::BTreeSet::new();
         for batch in &all_batches {
             if let Some(col) = batch.column_by_name("law_name") {
@@ -672,8 +670,7 @@ pub(crate) async fn cmd_taxa_qa(
     eprint!("Analysing {} laws", law_names.len());
 
     for law_name in &law_names {
-        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
-        let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+        let batches = lance.query_legislation_text(law_name, 100_000, 0).await?;
 
         let mut stats = LawStats {
             law_name: law_name.clone(),
@@ -1014,7 +1011,7 @@ pub(crate) async fn cmd_taxa_audit_fitness(
         println!("Family '{}': {} laws\n", fam, names.len());
         names
     } else {
-        let all_batches = lance.query_legislation_text("true", 200_000, 0).await?;
+        let all_batches = lance.query_legislation_text("", 200_000, 0).await?;
         let mut names = std::collections::BTreeSet::new();
         for batch in &all_batches {
             if let Some(col) = batch.column_by_name("law_name") {
@@ -1089,8 +1086,7 @@ pub(crate) async fn cmd_taxa_audit_fitness(
             .cloned()
             .unwrap_or_else(|| "(unknown)".to_string());
 
-        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
-        let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+        let batches = lance.query_legislation_text(law_name, 100_000, 0).await?;
 
         let stats = family_stats
             .entry(fam.clone())
@@ -1424,7 +1420,7 @@ pub(crate) async fn cmd_taxa_audit_fitness(
 /// Regex parsing + Tier 1 inheritance for a list of laws.
 /// Runs `enrich_single_law` with `escalate=false` — no LLM calls.
 pub(crate) async fn cmd_taxa_parse(
-    lance: &LanceStore,
+    lance: &dyn ProvisionStore,
     store: &DuckStore,
     law_names: &[String],
     force: bool,
@@ -1437,6 +1433,7 @@ pub(crate) async fn cmd_taxa_parse(
     let total = law_names.len();
 
     for law_name in law_names {
+        let escaped = law_name.replace('\'', "''");
         match enrich_single_law(lance, store, law_name, false, force).await {
             Ok(_) => {
                 enriched += 1;
@@ -1446,7 +1443,6 @@ pub(crate) async fn cmd_taxa_parse(
             }
             Err(e) => {
                 eprintln!("  {law_name}: parse error: {e}");
-                let escaped = law_name.replace('\'', "''");
                 let _ = store.execute(&format!(
                     "UPDATE legislation \
                      SET enrichment_retry_count = COALESCE(enrichment_retry_count, 0) + 1 \
@@ -1481,7 +1477,7 @@ pub(crate) async fn cmd_taxa_parse(
 /// Re-runs `parse_v2_with_trail` on each provision from LanceDB and writes
 /// a JSON array of per-provision trace records to the given path.
 pub(crate) async fn cmd_taxa_trace(
-    lance: &LanceStore,
+    lance: &dyn ProvisionStore,
     store: &DuckStore,
     law_names: &[String],
     trace_path: &str,
@@ -1491,8 +1487,8 @@ pub(crate) async fn cmd_taxa_trace(
     let mut entries = Vec::new();
 
     for law_name in law_names {
+        let escaped = law_name.replace('\'', "''");
         let family: Option<String> = {
-            let escaped = law_name.replace('\'', "''");
             let batches = store.query_arrow(&format!(
                 "SELECT family FROM legislation WHERE name = '{escaped}'"
             ))?;
@@ -1502,9 +1498,7 @@ pub(crate) async fn cmd_taxa_trace(
             })
         };
 
-        let escaped = law_name.replace('\'', "''");
-        let filter = format!("law_name = '{escaped}'");
-        let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+        let batches = lance.query_legislation_text(law_name, 100_000, 0).await?;
 
         for batch in &batches {
             let sid_col = batch.column_by_name("section_id");
@@ -1569,7 +1563,7 @@ pub(crate) async fn cmd_taxa_trace(
 }
 
 pub(crate) async fn cmd_taxa_validate(
-    lance: &LanceStore,
+    lance: &dyn ProvisionStore,
     store: &DuckStore,
     law_names: &[String],
     audit_dir: &str,
@@ -1607,8 +1601,7 @@ pub(crate) async fn cmd_taxa_validate(
         };
 
         // Load all provisions
-        let filter = format!("law_name = '{escaped}'");
-        let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+        let batches = lance.query_legislation_text(law_name, 100_000, 0).await?;
 
         let mut provisions: Vec<serde_json::Value> = Vec::new();
         for batch in &batches {
@@ -2054,7 +2047,7 @@ Provisions:
 /// Compute embeddings for provisions that lack them.
 /// Loads the ONNX embedding model and writes embeddings to LanceDB.
 pub(crate) async fn cmd_taxa_embed(
-    lance: &LanceStore,
+    lance: &dyn ProvisionStore,
     law_names: &[String],
 ) -> anyhow::Result<()> {
     let model_dir = std::path::Path::new("models/all-MiniLM-L6-v2");
@@ -2073,9 +2066,7 @@ pub(crate) async fn cmd_taxa_embed(
     let mut total_provisions = 0usize;
 
     for law_name in law_names {
-        let escaped = law_name.replace('\'', "''");
-        let filter = format!("law_name = '{escaped}'");
-        let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+        let batches = lance.query_legislation_text(law_name, 100_000, 0).await?;
 
         let mut provisions: Vec<(String, String, Option<Vec<f32>>)> = Vec::new();
         for batch in &batches {
@@ -2224,7 +2215,7 @@ pub(crate) async fn cmd_taxa_embed(
 /// Run DRRP + position classifiers on provisions with embeddings.
 /// Loads v8 DRRP classifier, position classifier, and actor dictionary.
 pub(crate) async fn cmd_taxa_classify(
-    lance: &LanceStore,
+    lance: &dyn ProvisionStore,
     law_names: &[String],
 ) -> anyhow::Result<()> {
     let weights_path = std::path::Path::new("docs/drrp_classifier_v8.json");
@@ -2248,10 +2239,8 @@ pub(crate) async fn cmd_taxa_classify(
     let mut total_provisions = 0usize;
 
     for law_name in law_names {
-        let escaped = law_name.replace('\'', "''");
         let law_start = std::time::Instant::now();
-        let filter = format!("law_name = '{escaped}'");
-        let batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+        let batches = lance.query_legislation_text(law_name, 100_000, 0).await?;
 
         // (section_id, text, embedding, source_tier, section_type, has_govt_active, has_drrp, drrp_history, regex_drrp)
         type Prov = (String, String, Option<Vec<f32>>, u8, String, bool, bool, Option<String>, Option<String>);
@@ -2822,7 +2811,7 @@ pub(crate) async fn cmd_taxa_classify(
 /// Re-runs the full pipeline with escalate=true, which enables LLM calls when
 /// LLM_PROVIDER and/or GEMINI_API_KEY are set in the environment.
 pub(crate) async fn cmd_taxa_escalate(
-    lance: &LanceStore,
+    lance: &dyn ProvisionStore,
     store: &DuckStore,
     law_names: &[String],
 ) -> anyhow::Result<()> {
@@ -2922,7 +2911,7 @@ pub(crate) async fn cmd_taxa_enrich(
 
     // Get distinct law names from LanceDB (only laws with full text can be enriched).
     let lance_law_names: std::collections::BTreeSet<String> = {
-        let all_batches = lance.query_legislation_text("true", 200_000, 0).await?;
+        let all_batches = lance.query_legislation_text("", 200_000, 0).await?;
         let mut names = std::collections::BTreeSet::new();
         for batch in &all_batches {
             if let Some(col) = batch.column_by_name("law_name") {
@@ -2990,11 +2979,7 @@ pub(crate) async fn cmd_taxa_enrich(
         let mut filtered = Vec::new();
         let mut skipped = 0usize;
         for name in &law_names {
-            let filter = format!(
-                "law_name = '{}' AND taxa_classified_at IS NOT NULL",
-                name.replace('\'', "''")
-            );
-            let batches = lance.query_legislation_text(&filter, 1, 0).await?;
+            let batches = lance.query_legislation_text(name, 1, 0).await?;
             let recent = batches.iter().any(|b| {
                 b.column_by_name("taxa_classified_at")
                     .and_then(|col| {
@@ -3025,12 +3010,12 @@ pub(crate) async fn cmd_taxa_enrich(
 
     let mut failed = 0usize;
     for law_name in &law_names {
+        let escaped = law_name.replace('\'', "''");
         let result = match enrich_single_law(&lance, store, law_name, escalate, force).await {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("  {law_name}: enrich error: {e}");
                 // Increment retry count so dead-letter kicks in at 3
-                let escaped = law_name.replace('\'', "''");
                 let _ = store.execute(&format!(
                     "UPDATE legislation \
                      SET enrichment_retry_count = COALESCE(enrichment_retry_count, 0) + 1 \
@@ -3052,7 +3037,6 @@ pub(crate) async fn cmd_taxa_enrich(
 
         // Clear enrichment_pending — this law has been enriched
         // (whether via dev --gap-c or production --pending).
-        let escaped = law_name.replace('\'', "''");
         let _ = store.execute(&format!(
             "UPDATE legislation \
              SET enrichment_pending = false, enrichment_retry_count = 0 \
