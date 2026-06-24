@@ -5492,11 +5492,19 @@ async fn cmd_taxa_embed(
         }
 
         total_provisions += provisions.len();
+        let law_idx = law_names.iter().position(|l| l == law_name).unwrap_or(0) + 1;
         eprintln!(
             "  {law_name}: {}/{} embedded",
             needs_embedding.len(),
             provisions.len(),
         );
+
+        // Compact periodically to prevent fragment bloat
+        if law_idx.is_multiple_of(5) && law_names.len() > 5 {
+            if let Err(e) = lance.compact().await {
+                eprintln!("    compact error: {e}");
+            }
+        }
     }
 
     let elapsed = batch_start.elapsed();
