@@ -631,13 +631,37 @@ pub(crate) async fn cmd_sync_watch(
                 };
                 let reply_key = query.key_expr().as_str().to_string();
 
-                // Parse request body as JSON array of law names
-                let law_names: Vec<String> = query
-                    .payload()
-                    .map(|p| {
-                        serde_json::from_slice::<Vec<String>>(&p.to_bytes()).unwrap_or_default()
-                    })
-                    .unwrap_or_default();
+                // Parse law names from:
+                // 1. Selector params: ?laws=UK_ukpga_1974_37,UK_uksi_1999_3242
+                // 2. Payload body: JSON array ["UK_ukpga_1974_37", ...]
+                let law_names: Vec<String> = {
+                    let mut names = Vec::new();
+
+                    // Try selector params first (?laws=...)
+                    let selector = query.selector();
+                    let params = selector.parameters().as_str();
+                    for param in params.split('&') {
+                        if let Some(val) = param.strip_prefix("laws=") {
+                            let decoded = val.replace("%2C", ",").replace("%20", " ");
+                            names.extend(
+                                decoded.split(',')
+                                    .map(|s| s.trim().to_string())
+                                    .filter(|s| !s.is_empty()),
+                            );
+                        }
+                    }
+
+                    // Fallback to payload body (JSON array)
+                    if names.is_empty() {
+                        if let Some(p) = query.payload() {
+                            if let Ok(parsed) = serde_json::from_slice::<Vec<String>>(&p.to_bytes()) {
+                                names = parsed;
+                            }
+                        }
+                    }
+
+                    names
+                };
 
                 // Query DuckDB for status
                 let response = build_status_response(&duck, &law_names);
