@@ -481,6 +481,17 @@ pub(crate) async fn cmd_sync_watch(
         None
     };
 
+    // Serve pipeline status as a queryable
+    let status_key = fractalaw_sync::zenoh_sync::keys::status(sync.tenant());
+    let status_queryable = sync
+        .session()
+        .declare_queryable(&status_key)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to declare status queryable: {e}"))?;
+    println!("Serving pipeline status via queryable ({status_key})");
+
+    duck.ensure_pipeline_status_columns()?;
+
     println!(
         "Watching for sync events (tenant: {}, timeout: {timeout_secs}s per pull)...",
         zenoh.tenant
@@ -612,6 +623,31 @@ pub(crate) async fn cmd_sync_watch(
                 ));
                 total_enriched += 1;
                 eprintln!(" → queued for enrichment");
+            }
+            query = status_queryable.recv_async() => {
+                let query = match query {
+                    Ok(q) => q,
+                    Err(_) => continue,
+                };
+                let reply_key = query.key_expr().as_str().to_string();
+
+                // Parse request body as JSON array of law names
+                let law_names: Vec<String> = query
+                    .payload()
+                    .map(|p| {
+                        serde_json::from_slice::<Vec<String>>(&p.to_bytes()).unwrap_or_default()
+                    })
+                    .unwrap_or_default();
+
+                // Query DuckDB for status
+                let response = build_status_response(&duck, &law_names);
+                let payload = serde_json::to_string(&response).unwrap_or_else(|_| "[]".to_string());
+
+                if let Err(e) = query.reply(&reply_key, payload.into_bytes()).await {
+                    tracing::warn!(error = %e, "failed to reply to status query");
+                } else {
+                    eprintln!("  [status] replied with {} law statuses", response.len());
+                }
             }
             _ = tokio::signal::ctrl_c() => {
                 println!("\nShutting down...");
@@ -755,4 +791,115 @@ pub(crate) async fn cmd_crdt_save(data_dir: &std::path::Path, zenoh: &ZenohArgs)
         println!("  {}", p.display());
     }
     Ok(())
+}
+
+/// Build JSON status response for a list of law names from DuckDB.
+fn build_status_response(
+    duck: &fractalaw_store::DuckStore,
+    law_names: &[String],
+) -> Vec<serde_json::Value> {
+    let where_clause = if law_names.is_empty() {
+        return Vec::new();
+    } else {
+        let list = law_names
+            .iter()
+            .map(|n| format!("'{}'", n.replace('\'', "''")))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("WHERE name IN ({list})")
+    };
+
+    let sql = format!(
+        "SELECT name, lat_pulled_at, embedded_at, parsed_at, classified_at, \
+         validated_at, adjudicated_at, provisions_published_at, \
+         taxa_hash, published_hash \
+         FROM legislation {where_clause}"
+    );
+
+    let batches = match duck.query_arrow(&sql) {
+        Ok(b) => b,
+        Err(e) => {
+            tracing::warn!(error = %e, "status query failed");
+            return Vec::new();
+        }
+    };
+
+    let mut results = Vec::new();
+    for batch in &batches {
+        let name_col = batch.column_by_name("name");
+        let lat_col = batch.column_by_name("lat_pulled_at");
+        let emb_col = batch.column_by_name("embedded_at");
+        let parse_col = batch.column_by_name("parsed_at");
+        let cls_col = batch.column_by_name("classified_at");
+        let val_col = batch.column_by_name("validated_at");
+        let adj_col = batch.column_by_name("adjudicated_at");
+        let pub_at_col = batch.column_by_name("provisions_published_at");
+        let taxa_col = batch.column_by_name("taxa_hash");
+        let pub_col = batch.column_by_name("published_hash");
+
+        for row in 0..batch.num_rows() {
+            let name = name_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+            let has_lat = lat_col.map(|c| !c.is_null(row)).unwrap_or(false);
+            let has_emb = emb_col.map(|c| !c.is_null(row)).unwrap_or(false);
+            let has_parse = parse_col.map(|c| !c.is_null(row)).unwrap_or(false);
+            let has_cls = cls_col.map(|c| !c.is_null(row)).unwrap_or(false);
+            let has_val = val_col.map(|c| !c.is_null(row)).unwrap_or(false);
+            let taxa_hash = taxa_col.and_then(|c| get_string_value(c.as_ref(), row));
+            let pub_hash = pub_col.and_then(|c| get_string_value(c.as_ref(), row));
+            let is_published = taxa_hash.is_some() && pub_hash.is_some() && taxa_hash == pub_hash;
+
+            let stage = if is_published {
+                "published"
+            } else if has_val {
+                "ready_to_publish"
+            } else if has_cls {
+                "needs_validate"
+            } else if has_parse {
+                "needs_classify"
+            } else if has_emb {
+                "needs_parse"
+            } else if has_lat {
+                "needs_embed"
+            } else {
+                "needs_lat"
+            };
+
+            let ts = |col: Option<&std::sync::Arc<dyn arrow::array::Array>>, r: usize| -> serde_json::Value {
+                if let Some(c) = col {
+                    if !c.is_null(r) {
+                        return get_string_value(c.as_ref(), r)
+                            .map(serde_json::Value::String)
+                            .unwrap_or(serde_json::Value::Null);
+                    }
+                }
+                serde_json::Value::Null
+            };
+
+            results.push(serde_json::json!({
+                "law_name": name,
+                "stage": stage,
+                "lat_pulled_at": ts(lat_col, row),
+                "embedded_at": ts(emb_col, row),
+                "parsed_at": ts(parse_col, row),
+                "classified_at": ts(cls_col, row),
+                "validated_at": ts(val_col, row),
+                "adjudicated_at": ts(adj_col, row),
+                "published_at": ts(pub_at_col, row),
+            }));
+        }
+    }
+
+    // Add missing laws as needs_lat
+    for name in law_names {
+        if !results.iter().any(|r| r["law_name"] == name.as_str()) {
+            results.push(serde_json::json!({
+                "law_name": name,
+                "stage": "needs_lat",
+            }));
+        }
+    }
+
+    results
 }

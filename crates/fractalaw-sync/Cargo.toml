@@ -52,4 +52,4 @@ optional = true
 default = []
 flight = ["dep:arrow-flight", "dep:tonic", "dep:prost"]
 http = ["dep:reqwest", "dep:serde", "dep:serde_json", "dep:chrono"]
-zenoh = ["dep:zenoh", "dep:serde", "dep:serde_json"]
+zenoh = ["dep:zenoh", "dep:serde", "dep:serde_json", "dep:chrono"]

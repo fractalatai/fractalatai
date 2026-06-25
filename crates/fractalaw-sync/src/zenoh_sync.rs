@@ -159,6 +159,20 @@ pub mod keys {
     pub fn ack(tenant: &str, law_name: &str) -> String {
         format!("{PREFIX}/@{tenant}/ack/{law_name}")
     }
+
+    /// Key expression for pipeline status queryable.
+    ///
+    /// Example: `fractalaw/@acme/status`
+    pub fn status(tenant: &str) -> String {
+        format!("{PREFIX}/@{tenant}/status")
+    }
+
+    /// Key expression for per-law status events.
+    ///
+    /// Example: `fractalaw/@acme/status/UK_ukpga_1974_37`
+    pub fn status_event(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/status/{law_name}")
+    }
 }
 
 // ── Arrow IPC helpers ──
@@ -255,9 +269,8 @@ impl ZenohSync {
         }
     }
 
-    /// Borrow the underlying zenoh session (test-only).
-    #[cfg(test)]
-    pub(crate) fn session(&self) -> &zenoh::Session {
+    /// Borrow the underlying zenoh session.
+    pub fn session(&self) -> &zenoh::Session {
         &self.session
     }
 
@@ -390,6 +403,27 @@ impl ZenohSync {
         });
 
         Ok(handle)
+    }
+
+    /// Publish a pipeline status event for a law.
+    ///
+    /// Published to `fractalaw/@{tenant}/status/{law_name}` as JSON.
+    pub async fn publish_status_event(
+        &self,
+        law_name: &str,
+        stage: &str,
+    ) -> Result<(), ZenohError> {
+        let key = keys::status_event(&self.tenant, law_name);
+        let payload = serde_json::json!({
+            "law_name": law_name,
+            "stage": stage,
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+        });
+        self.session
+            .put(&key, payload.to_string().into_bytes())
+            .await
+            .map_err(ZenohError::Session)?;
+        Ok(())
     }
 
     /// Query sertantai for legislation text (LAT) for a specific law.
