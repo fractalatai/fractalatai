@@ -582,6 +582,29 @@ impl DuckStore {
         Ok(())
     }
 
+    /// Ensure pipeline status timestamp columns exist on `legislation`.
+    ///
+    /// Tracks when each pipeline stage last completed for a law.
+    /// Used by `taxa status` and Zenoh status queryable.
+    ///
+    /// Idempotent — safe to call multiple times.
+    pub fn ensure_pipeline_status_columns(&self) -> Result<(), StoreError> {
+        for col in [
+            "lat_pulled_at",
+            "embedded_at",
+            "parsed_at",
+            "classified_at",
+            "validated_at",
+            "adjudicated_at",
+        ] {
+            self.conn.execute_batch(&format!(
+                "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS {col} TIMESTAMPTZ"
+            ))?;
+        }
+        info!("ensured pipeline status columns exist");
+        Ok(())
+    }
+
     // ── Training data extraction ──
 
     /// Extract all DRRPEntry records as flat rows from the four DRRP columns.

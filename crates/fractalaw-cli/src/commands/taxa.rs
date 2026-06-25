@@ -7,6 +7,173 @@ use crate::open_duck;
 use crate::utils::*;
 use super::pipeline::*;
 
+/// Show pipeline status for a set of laws.
+pub(crate) fn cmd_taxa_status(
+    store: &DuckStore,
+    laws: Option<String>,
+    law_file: Option<std::path::PathBuf>,
+    summary: bool,
+    stage_filter: Option<String>,
+) -> anyhow::Result<()> {
+    store.ensure_pipeline_status_columns()?;
+
+    // Collect law names from --laws and/or --law-file
+    let law_names: Vec<String> = {
+        let mut names = Vec::new();
+        if let Some(ref csv) = laws {
+            names.extend(csv.split(',').map(|s| s.trim().to_string()));
+        }
+        if let Some(ref path) = law_file {
+            let content = std::fs::read_to_string(path)
+                .with_context(|| format!("reading law file '{}'", path.display()))?;
+            // Handle both formats: one-per-line and comma-separated
+            for token in content.split(|c: char| c == ',' || c == '\n') {
+                let name = token.trim();
+                if !name.is_empty() && !name.starts_with('#') && name.contains('_') {
+                    names.push(name.to_string());
+                }
+            }
+        }
+        names
+    };
+
+    // Build SQL query
+    let where_clause = if law_names.is_empty() {
+        String::new()
+    } else {
+        let list = law_names
+            .iter()
+            .map(|n| format!("'{}'", n.replace('\'', "''")))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("WHERE name IN ({list})")
+    };
+
+    let sql = format!(
+        "SELECT name, \
+            lat_pulled_at, embedded_at, parsed_at, classified_at, \
+            validated_at, adjudicated_at, provisions_published_at, \
+            taxa_hash, published_hash \
+         FROM legislation {where_clause} ORDER BY name"
+    );
+    let batches = store.query_arrow(&sql)?;
+
+    // Derive stage for each law
+    struct LawStatus {
+        name: String,
+        stage: String,
+    }
+
+    let mut statuses: Vec<LawStatus> = Vec::new();
+    for batch in &batches {
+        let name_col = batch.column_by_name("name");
+        let lat_col = batch.column_by_name("lat_pulled_at");
+        let emb_col = batch.column_by_name("embedded_at");
+        let parse_col = batch.column_by_name("parsed_at");
+        let cls_col = batch.column_by_name("classified_at");
+        let val_col = batch.column_by_name("validated_at");
+        let taxa_col = batch.column_by_name("taxa_hash");
+        let pub_col = batch.column_by_name("published_hash");
+
+        for row in 0..batch.num_rows() {
+            let name = name_col
+                .and_then(|c| get_string_value(c.as_ref(), row))
+                .unwrap_or_default();
+            let has_lat = lat_col.map(|c| !c.is_null(row)).unwrap_or(false);
+            let has_emb = emb_col.map(|c| !c.is_null(row)).unwrap_or(false);
+            let has_parse = parse_col.map(|c| !c.is_null(row)).unwrap_or(false);
+            let has_cls = cls_col.map(|c| !c.is_null(row)).unwrap_or(false);
+            let has_val = val_col.map(|c| !c.is_null(row)).unwrap_or(false);
+            let taxa_hash = taxa_col.and_then(|c| get_string_value(c.as_ref(), row));
+            let pub_hash = pub_col.and_then(|c| get_string_value(c.as_ref(), row));
+            let is_published = taxa_hash.is_some()
+                && pub_hash.is_some()
+                && taxa_hash == pub_hash;
+
+            let stage = if is_published {
+                "published"
+            } else if has_val {
+                "ready_to_publish"
+            } else if has_cls {
+                "needs_validate"
+            } else if has_parse {
+                "needs_classify"
+            } else if has_emb {
+                "needs_parse"
+            } else if has_lat {
+                "needs_embed"
+            } else {
+                "needs_lat"
+            };
+
+            statuses.push(LawStatus {
+                name,
+                stage: stage.to_string(),
+            });
+        }
+    }
+
+    // Add laws from the input list that aren't in DuckDB at all
+    for law in &law_names {
+        if !statuses.iter().any(|s| s.name == *law) {
+            statuses.push(LawStatus {
+                name: law.clone(),
+                stage: "needs_lat".to_string(),
+            });
+        }
+    }
+
+    // Apply stage filter
+    if let Some(ref filter) = stage_filter {
+        statuses.retain(|s| s.stage == *filter);
+    }
+
+    // Count by stage
+    let stages = [
+        "published",
+        "ready_to_publish",
+        "needs_validate",
+        "needs_classify",
+        "needs_parse",
+        "needs_embed",
+        "needs_lat",
+    ];
+    let mut counts: std::collections::HashMap<&str, usize> = stages.iter().map(|s| (*s, 0)).collect();
+    for s in &statuses {
+        *counts.entry(s.stage.as_str()).or_default() += 1;
+    }
+
+    // Print summary
+    let total = statuses.len();
+    println!("Pipeline Status ({total} laws)");
+    for stage in &stages {
+        let count = counts[stage];
+        if count > 0 || !summary {
+            println!("  {:<20} {}", stage, count);
+        }
+    }
+
+    // Print per-law detail (unless --summary)
+    if !summary && !statuses.is_empty() {
+        println!();
+        for stage in &stages {
+            let laws_at_stage: Vec<&str> = statuses
+                .iter()
+                .filter(|s| s.stage == *stage)
+                .map(|s| s.name.as_str())
+                .collect();
+            if !laws_at_stage.is_empty() {
+                println!("{stage}:");
+                for name in laws_at_stage {
+                    println!("  {name}");
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 pub(crate) async fn cmd_taxa_show(
     data_dir: &std::path::Path,
     name: &str,
@@ -1436,6 +1603,9 @@ pub(crate) async fn cmd_taxa_parse(
         let escaped = law_name.replace('\'', "''");
         match enrich_single_law(lance, store, law_name, false, force).await {
             Ok(_) => {
+                let _ = store.execute(&format!(
+                    "UPDATE legislation SET parsed_at = CURRENT_TIMESTAMP WHERE name = '{escaped}'"
+                ));
                 enriched += 1;
                 if enriched.is_multiple_of(100) {
                     eprint!("\r  Parsed {enriched}/{total}...");

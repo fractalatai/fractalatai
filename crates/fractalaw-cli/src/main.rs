@@ -475,6 +475,21 @@ enum TaxaAction {
         #[arg(long)]
         laws: String,
     },
+    /// Show pipeline status for laws (which stage each law is at)
+    Status {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Read law names from a file (one per line or CSV)
+        #[arg(long)]
+        law_file: Option<PathBuf>,
+        /// Show summary counts only
+        #[arg(long)]
+        summary: bool,
+        /// Filter to a specific stage (e.g. needs_embed, ready_to_publish)
+        #[arg(long)]
+        stage: Option<String>,
+    },
     /// Whole-law LLM validation: send all provisions + parse results to LLM
     Validate {
         /// Specific laws (comma-separated)
@@ -687,6 +702,15 @@ async fn main() -> anyhow::Result<()> {
                 cmd_taxa_eyeball(&data_dir, &law_names, &output, limit).await
             }
             TaxaAction::Qa { laws, family } => cmd_taxa_qa(&data_dir, laws, family).await,
+            TaxaAction::Status {
+                laws,
+                law_file,
+                summary,
+                stage,
+            } => {
+                let store = open_duck(&data_dir)?;
+                cmd_taxa_status(&store, laws, law_file, summary, stage)
+            }
             TaxaAction::AuditFitness {
                 laws,
                 family,
@@ -704,16 +728,34 @@ async fn main() -> anyhow::Result<()> {
                 Ok(())
             }
             TaxaAction::Embed { laws } => {
+                let store = open_duck(&data_dir)?;
+                store.ensure_pipeline_status_columns()?;
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_embed(lance.as_ref(), &law_names).await
+                let result = cmd_taxa_embed(lance.as_ref(), &law_names).await;
+                for name in &law_names {
+                    let escaped = name.replace('\'', "''");
+                    let _ = store.execute(&format!(
+                        "UPDATE legislation SET embedded_at = CURRENT_TIMESTAMP WHERE name = '{escaped}'"
+                    ));
+                }
+                result
             }
             TaxaAction::Classify { laws } => {
+                let store = open_duck(&data_dir)?;
+                store.ensure_pipeline_status_columns()?;
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_classify(lance.as_ref(), &law_names).await
+                let result = cmd_taxa_classify(lance.as_ref(), &law_names).await;
+                for name in &law_names {
+                    let escaped = name.replace('\'', "''");
+                    let _ = store.execute(&format!(
+                        "UPDATE legislation SET classified_at = CURRENT_TIMESTAMP WHERE name = '{escaped}'"
+                    ));
+                }
+                result
             }
             TaxaAction::Escalate { laws } => {
                 let store = open_duck(&data_dir)?;
@@ -729,10 +771,20 @@ async fn main() -> anyhow::Result<()> {
                 apply,
             } => {
                 let store = open_duck(&data_dir)?;
+                store.ensure_pipeline_status_columns()?;
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_validate(lance.as_ref(), &store, &law_names, &audit_dir, dry_run, apply).await
+                let result = cmd_taxa_validate(lance.as_ref(), &store, &law_names, &audit_dir, dry_run, apply).await;
+                if !dry_run {
+                    for name in &law_names {
+                        let escaped = name.replace('\'', "''");
+                        let _ = store.execute(&format!(
+                            "UPDATE legislation SET validated_at = CURRENT_TIMESTAMP WHERE name = '{escaped}'"
+                        ));
+                    }
+                }
+                result
             }
         },
 
