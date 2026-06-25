@@ -213,14 +213,13 @@ pub(crate) async fn cmd_sync_publish_provisions(
     all: bool,
     changed: bool,
     pending: bool,
+    pg_url: Option<&str>,
 ) -> anyhow::Result<()> {
     let store = open_duck(data_dir)?;
     store.ensure_taxa_hash_columns()?;
     store.ensure_provisions_published_column()?;
 
-    let lance = LanceStore::open(&data_dir.join("lancedb"))
-        .await
-        .context("opening LanceDB")?;
+    let lance = crate::open_provision_store(data_dir, pg_url).await?;
 
     // Resolve law names.
     let law_names: Vec<String> = if pending {
@@ -351,7 +350,8 @@ pub(crate) async fn cmd_sync_publish_provisions(
     let mut published = 0usize;
     let mut total_provisions = 0usize;
     for law_name in &law_names {
-        let batches = lance.query_provision_taxa(law_name).await?;
+        let batches = lance.query_provision_taxa(law_name).await
+            .map_err(|e| anyhow::anyhow!("query provisions for {law_name}: {e}"))?;
         let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
         if rows == 0 {
             eprintln!("  {law_name}: no enriched provisions, skipping");

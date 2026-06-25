@@ -1,4 +1,4 @@
-# Session: PgStore Hardening & Remaining Wiring (PENDING)
+# Session: PgStore Hardening & Remaining Wiring (ACTIVE)
 
 ## Context
 

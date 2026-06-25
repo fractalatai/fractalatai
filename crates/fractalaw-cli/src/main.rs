@@ -597,6 +597,7 @@ async fn main() -> anyhow::Result<()> {
                 if provisions {
                     cmd_sync_publish_provisions(
                         &data_dir, &zenoh, laws, family, all, changed, pending,
+                        pg_url.as_deref(),
                     )
                     .await
                 } else {
