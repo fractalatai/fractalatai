@@ -1,4 +1,4 @@
-# Session: Law Status Tracker (ACTIVE)
+# Session: Law Status Tracker (CLOSED)
 
 ## Problem
 
