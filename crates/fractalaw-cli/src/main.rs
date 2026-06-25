@@ -483,12 +483,18 @@ enum TaxaAction {
         /// Read law names from a file (one per line or CSV)
         #[arg(long)]
         law_file: Option<PathBuf>,
+        /// Query sertantai for a customer's laws (UUID)
+        #[arg(long)]
+        customer: Option<String>,
         /// Show summary counts only
         #[arg(long)]
         summary: bool,
         /// Filter to a specific stage (e.g. needs_embed, ready_to_publish)
         #[arg(long)]
         stage: Option<String>,
+        /// Zenoh connectivity (needed for --customer)
+        #[command(flatten)]
+        zenoh: ZenohArgs,
     },
     /// Whole-law LLM validation: send all provisions + parse results to LLM
     Validate {
@@ -705,11 +711,37 @@ async fn main() -> anyhow::Result<()> {
             TaxaAction::Status {
                 laws,
                 law_file,
+                customer,
                 summary,
                 stage,
+                zenoh,
             } => {
                 let store = open_duck(&data_dir)?;
-                cmd_taxa_status(&store, laws, law_file, summary, stage)
+                // If --customer, query sertantai for law names via Zenoh
+                let customer_laws = if let Some(ref cust_id) = customer {
+                    let config = zenoh.build_zenoh_config()?;
+                    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
+                        .await
+                        .context("connecting to zenoh for customer query")?;
+                    let names = sync
+                        .query_customer_laws(cust_id, std::time::Duration::from_secs(10))
+                        .await
+                        .context("querying sertantai for customer laws")?;
+                    if names.is_empty() {
+                        anyhow::bail!("No laws returned from sertantai for customer {cust_id}");
+                    }
+                    eprintln!("Customer {cust_id}: {} laws from sertantai", names.len());
+                    Some(names.join(","))
+                } else {
+                    None
+                };
+                let combined_laws = match (&laws, &customer_laws) {
+                    (Some(l), Some(c)) => Some(format!("{l},{c}")),
+                    (Some(l), None) => Some(l.clone()),
+                    (None, Some(c)) => Some(c.clone()),
+                    (None, None) => None,
+                };
+                cmd_taxa_status(&store, combined_laws, law_file, summary, stage)
             }
             TaxaAction::AuditFitness {
                 laws,

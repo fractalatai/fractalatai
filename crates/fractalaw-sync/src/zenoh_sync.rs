@@ -173,6 +173,14 @@ pub mod keys {
     pub fn status_event(tenant: &str, law_name: &str) -> String {
         format!("{PREFIX}/@{tenant}/status/{law_name}")
     }
+
+    /// Key expression for sertantai customer laws queryable.
+    ///
+    /// Sertantai serves this — fractalaw queries it to get law names for a customer.
+    /// Example: `fractalaw/@dev/sertantai/customers/c075d56b-8420-4408-b695-ccfbc1ba15ec/laws`
+    pub fn customer_laws(tenant: &str, customer_id: &str) -> String {
+        format!("{PREFIX}/@{tenant}/sertantai/customers/{customer_id}/laws")
+    }
 }
 
 // ── Arrow IPC helpers ──
@@ -424,6 +432,49 @@ impl ZenohSync {
             .await
             .map_err(ZenohError::Session)?;
         Ok(())
+    }
+
+    /// Query sertantai for a customer's law names.
+    ///
+    /// Sends a zenoh `get()` to the sertantai queryable at
+    /// `fractalaw/@{tenant}/sertantai/customers/{customer_id}/laws`.
+    /// Returns a list of law names (e.g. `["UK_ukpga_1974_37", ...]`).
+    ///
+    /// Returns an empty Vec if no peer responds within the timeout.
+    pub async fn query_customer_laws(
+        &self,
+        customer_id: &str,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<String>, ZenohError> {
+        let key = keys::customer_laws(&self.tenant, customer_id);
+        let replies = self
+            .session
+            .get(&key)
+            .timeout(timeout)
+            .await
+            .map_err(ZenohError::Session)?;
+
+        while let Ok(reply) = replies.recv_async().await {
+            if let Ok(sample) = reply.into_result() {
+                let bytes = sample.payload().to_bytes();
+                if let Ok(names) = serde_json::from_slice::<Vec<String>>(&bytes) {
+                    return Ok(names);
+                }
+                // Try as newline-separated text
+                if let Ok(text) = std::str::from_utf8(&bytes) {
+                    let names: Vec<String> = text
+                        .lines()
+                        .filter(|l| !l.is_empty() && l.contains('_'))
+                        .map(|l| l.trim().to_string())
+                        .collect();
+                    if !names.is_empty() {
+                        return Ok(names);
+                    }
+                }
+            }
+        }
+
+        Ok(Vec::new())
     }
 
     /// Query sertantai for legislation text (LAT) for a specific law.
