@@ -492,6 +492,10 @@ fn arrow_value_to_sql(col: &ArrayRef, row: usize, data_type: &DataType) -> Strin
             let val = col.as_string::<i32>().value(row);
             format!("'{}'", val.replace('\'', "''"))
         }
+        DataType::LargeUtf8 => {
+            let val = col.as_string::<i64>().value(row);
+            format!("'{}'", val.replace('\'', "''"))
+        }
         DataType::Int32 => {
             let val = col.as_primitive::<arrow::datatypes::Int32Type>().value(row);
             val.to_string()
