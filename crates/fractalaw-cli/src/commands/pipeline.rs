@@ -197,9 +197,8 @@ pub(crate) async fn enrich_single_law(
 }
 
 
-/// Whole-law LLM validation: send all provisions + parse results to Gemini,
-/// get corrections, write audit log.
 /// Check if a provision is an LLM validation target.
+#[allow(dead_code)]
 pub(crate) fn is_llm_target(method: &str, drrp: &[String], actors: &[serde_json::Value], confidence: f32) -> bool {
     method == "pending_llm"
         || (drrp.iter().any(|d| !d.is_empty()) && actors.is_empty())  // orphan

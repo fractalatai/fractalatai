@@ -1981,7 +1981,6 @@ pub(crate) async fn cmd_taxa_validate(
                                 batches.push((current_name.clone(), current_batch));
                             }
                             current_batch = Vec::new();
-                            current_name = sub_name.clone();
                         }
                         current_batch.extend(sub_provs);
                         current_name = sub_name;
