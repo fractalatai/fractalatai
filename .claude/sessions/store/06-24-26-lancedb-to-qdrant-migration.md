@@ -1,4 +1,4 @@
-# Session: Vector DB Migration — pgvector hub + LanceDB edge (ACTIVE)
+# Session: Vector DB Migration — pgvector hub + LanceDB edge (CLOSED)
 
 ## Meta-plan — daughter sessions for investigation + implementation
 

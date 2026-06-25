@@ -1,4 +1,4 @@
-# Session: PgStore Implementation (ACTIVE)
+# Session: PgStore Implementation (CLOSED)
 
 Daughter session 2 of DB migration. Builds the Rust `PgStore` struct to replace `LanceStore` for hub operations.
 
