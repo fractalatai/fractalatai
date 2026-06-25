@@ -154,7 +154,18 @@ impl PgStore {
     pub async fn upsert_lat(&self, batches: Vec<RecordBatch>) -> Result<usize, StoreError> {
         let mut total = 0usize;
         for batch in &batches {
-            total += upsert_record_batch(&self.pool, batch, "section_id").await?;
+            // Filter out rows where law_name is null (Postgres NOT NULL constraint)
+            if let Some(law_col) = batch.column_by_name("law_name") {
+                let not_null = arrow::compute::is_not_null(law_col)
+                    .map_err(|e| StoreError::Other(format!("filter null law_name: {e}")))?;
+                let filtered = arrow::compute::filter_record_batch(batch, &not_null)
+                    .map_err(|e| StoreError::Other(format!("filter batch: {e}")))?;
+                if filtered.num_rows() > 0 {
+                    total += upsert_record_batch(&self.pool, &filtered, "section_id").await?;
+                }
+            } else {
+                total += upsert_record_batch(&self.pool, batch, "section_id").await?;
+            }
         }
         Ok(total)
     }
