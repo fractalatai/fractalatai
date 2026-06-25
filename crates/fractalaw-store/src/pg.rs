@@ -90,7 +90,7 @@ impl PgStore {
              fitness_plant, fitness_property, fitness_sector, \
              extraction_method, holder_inferred_from, ancestor_distance, actors \
              FROM legislation_text \
-             WHERE law_name = $1 AND drrp_types IS NOT NULL"
+             WHERE law_name = $1 AND extraction_method IS NOT NULL"
         )
         .bind(law_name)
         .fetch_all(&self.pool)
