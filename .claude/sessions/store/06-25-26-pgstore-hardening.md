@@ -1,41 +1,35 @@
-# Session: PgStore Hardening & Remaining Wiring (ACTIVE)
+# Session: PgStore Hardening & Remaining Wiring (CLOSED)
 
 ## Context
 
-PgStore is live — full pipeline (parse → embed → classify → validate) proven against 183K-row Postgres. 49 QQ corpus laws processed successfully. This session collects the remaining work to make PgStore the default hub store.
+PgStore is live — full pipeline (parse → embed → classify → validate → publish) proven against Postgres. 224+ QQ corpus laws published to sertantai.
 
-## Carried from PgStore Implementation session
+## Completed (2026-06-25)
 
-### Remaining trait wiring
+- ✅ `cmd_sync_publish_provisions` wired to `--pg`
+- ✅ `cmd_sync_pull_lat` wired to `--pg`
+- ✅ PgStore `query_provision_taxa` filter fixed: `drrp_types IS NOT NULL` → `extraction_method IS NOT NULL`
+- ✅ PgStore `upsert_embeddings` fixed: INSERT ON CONFLICT → UPDATE WHERE
+- ✅ Zenoh status queryable: selector params `?laws=` support (Zenoh GET has no body)
+- ✅ `is_benchmark` column added to DuckDB (20 laws flagged)
+- ✅ Benchmark restoration from Arrow backup after accidental re-validation
+- ✅ Law status tracker: schema, CLI, backfill, Zenoh queryable, `--customer` flag
+- ✅ 224 QQ laws published (enrichment + provisions)
+- ✅ Build warnings cleaned (zero warnings)
 
-Commands that still open `LanceStore` internally (not reachable via `--pg`):
-- `cmd_taxa_show`, `cmd_taxa_qa`, `cmd_taxa_eyeball`, `cmd_taxa_audit_fitness` — read-only diagnostic commands
+## Remaining (not blocking, carry forward as needed)
+
+### Trait wiring (read-only diagnostic commands)
+- `cmd_taxa_show`, `cmd_taxa_qa`, `cmd_taxa_eyeball`, `cmd_taxa_audit_fitness`
 - `misc.rs`: `cmd_text`, `cmd_embed`, `cmd_search`, `cmd_validate`, `cmd_export_training_data`
-- `sync.rs`: `cmd_sync_publish_provisions`, `cmd_sync_pull_lat`, `cmd_sync_watch`
+- `cmd_sync_watch` (still opens LanceStore internally for enrichment queue)
 
-Fix: pass `&dyn ProvisionStore` from caller or thread `pg_url` through. Mechanical, same pattern as Phase 4.
-
-### Postgres infrastructure
-
+### Postgres infrastructure (quality-of-life)
 - ⬜ Enable quadlet on boot (`systemctl --user enable fractalaw-pg.service`)
-- ⬜ Filtered query benchmarks (latency measurement vs LanceDB)
-- ⬜ JSONB validation with `jsonb_pretty()` for actors/drrp_history
-- ⬜ Batch upsert performance: UNNEST approach vs current row-by-row (Gemini recommended UNNEST)
+- ⬜ Batch upsert performance: UNNEST approach vs current row-by-row
+- ⬜ Default to `--pg` via `FRACTALAW_PG` env var
 
-## Carried from Law Status Tracker session (PENDING)
-
-- ⬜ Build `law_pipeline_status` DuckDB table tracking per-law pipeline stage
-- ⬜ `fractalaw taxa status` CLI command
-- ⬜ Wire status updates into each pipeline stage (parse, embed, classify, validate, publish)
-- See `store/06-24-26-law-status-tracker.md` for full design (Option D: DuckDB table + CLI command)
-
-## Carried from QQ Corpus session
-
-- ⬜ 20 QQ laws missing LAT from sertantai (parse failures on their side)
-- ⬜ `UK_ukpga_2023_55` excluded (3,351 provisions) — needs confirmation before processing
-- ⬜ ~4,191 corrections across 310+ audit logs awaiting `/human-review` adjudication
-
-## New work
-
-- ⬜ Default to `--pg` when `FRACTALAW_PG` env var is set (avoid typing URL every time)
-- ⬜ Consider making PgStore the default (no flag needed) once all commands are wired
+### QQ corpus outstanding
+- ⬜ `UK_ukpga_2023_55` excluded (3,351 provisions) — needs confirmation
+- ⬜ ~41 QQ laws still missing LAT from sertantai (parse failures on their side)
+- ⬜ ~4,191 corrections across audit logs awaiting `/human-review` adjudication
