@@ -385,10 +385,9 @@ pub(crate) async fn cmd_sync_pull_lat(
     zenoh: &ZenohArgs,
     law_names: &[String],
     timeout_secs: u64,
+    pg_url: Option<&str>,
 ) -> anyhow::Result<()> {
-    let lance = LanceStore::open(&data_dir.join("lancedb"))
-        .await
-        .context("opening LanceDB")?;
+    let lance = crate::open_provision_store(data_dir, pg_url).await?;
 
     let config = zenoh.build_zenoh_config()?;
     let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)

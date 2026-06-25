@@ -611,7 +611,7 @@ async fn main() -> anyhow::Result<()> {
             } => {
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_sync_pull_lat(&data_dir, &zenoh, &law_names, timeout).await
+                cmd_sync_pull_lat(&data_dir, &zenoh, &law_names, timeout, pg_url.as_deref()).await
             }
             SyncAction::Watch { zenoh, timeout } => {
                 cmd_sync_watch(&data_dir, &zenoh, timeout).await
