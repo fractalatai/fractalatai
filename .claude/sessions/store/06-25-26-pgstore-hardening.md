@@ -1,4 +1,4 @@
-# Session: PgStore Hardening & Remaining Wiring (CLOSED)
+# Session: PgStore Hardening & Remaining Wiring (ACTIVE)
 
 ## Context
 
@@ -19,10 +19,36 @@ PgStore is live — full pipeline (parse → embed → classify → validate →
 
 ## Remaining (not blocking, carry forward as needed)
 
-### Trait wiring (read-only diagnostic commands)
-- `cmd_taxa_show`, `cmd_taxa_qa`, `cmd_taxa_eyeball`, `cmd_taxa_audit_fitness`
+### sync watch → PgStore wiring
+
+`cmd_sync_watch` is 250 lines (440-689) with 3 `lance.` calls:
+- `lance.delete_law_lat(law_name)` — LAT deletion handler
+- `lance.upsert_lat(batches)` — LAT ingestion (the main one)
+- `lance.delete_law_annotations(law_name)` — annotation cleanup
+
+The function also:
+- Opens `LanceStore` at line 445 (hardcoded)
+- Runs the DuckDB status queryable (already works)
+- Handles Zenoh events in a `tokio::select!` loop
+
+#### Assessment
+
+The wiring change itself is simple — replace `LanceStore::open(...)` with `open_provision_store(data_dir, pg_url)` and change `lance` type. But this function has broader quality issues:
+
+1. **250 lines in one function** — the event handler loop mixes LAT ingestion, LRT upsert, ack, enrichment queue, status queryable, and deletion. Similar to the old `enrich_single_law` before decomposition.
+2. **`delete_law_annotations` not on the trait** — `ProvisionStore` doesn't have this method. Need to add it or handle differently.
+3. **Event handler logic is inline** — each event type (lat, lrt, lat_deleted) is handled inline in the select loop rather than dispatched to functions.
+
+#### Plan
+
+1. Check if `delete_law_annotations` exists on PgStore / needs adding to trait
+2. Add `pg_url` parameter, swap `LanceStore::open` → `open_provision_store`
+3. Optionally: decompose the event handler into smaller functions (same pattern as enrich_single_law decomposition)
+4. Get Gemini review on sync.rs shape before/after
+
+### Remaining trait wiring (lower priority)
+- `cmd_taxa_show`, `cmd_taxa_qa`, `cmd_taxa_eyeball`, `cmd_taxa_audit_fitness` — read-only diagnostic commands
 - `misc.rs`: `cmd_text`, `cmd_embed`, `cmd_search`, `cmd_validate`, `cmd_export_training_data`
-- `cmd_sync_watch` (still opens LanceStore internally for enrichment queue)
 
 ### Postgres infrastructure (quality-of-life)
 - ⬜ Enable quadlet on boot (`systemctl --user enable fractalaw-pg.service`)

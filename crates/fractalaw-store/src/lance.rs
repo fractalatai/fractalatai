@@ -633,6 +633,10 @@ impl crate::ProvisionStore for LanceStore {
     async fn legislation_text_count(&self) -> Result<usize, StoreError> {
         self.legislation_text_count().await
     }
+
+    async fn delete_law_annotations(&self, law_name: &str) -> Result<usize, StoreError> {
+        self.delete_law_annotations(law_name).await
+    }
 }
 
 #[cfg(test)]

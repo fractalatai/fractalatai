@@ -1,6 +1,4 @@
-use anyhow::Context;
 use arrow::array::Array;
-use fractalaw_store::LanceStore;
 
 use crate::open_duck;
 use crate::utils::*;
@@ -441,10 +439,9 @@ pub(crate) async fn cmd_sync_watch(
     data_dir: &std::path::Path,
     zenoh: &ZenohArgs,
     timeout_secs: u64,
+    pg_url: Option<&str>,
 ) -> anyhow::Result<()> {
-    let lance = LanceStore::open(&data_dir.join("lancedb"))
-        .await
-        .context("opening LanceDB")?;
+    let lance = crate::open_provision_store(data_dir, pg_url).await?;
     let duck = open_duck(data_dir)?;
     duck.ensure_taxa_hash_columns()?;
     duck.ensure_provisions_published_column()?;

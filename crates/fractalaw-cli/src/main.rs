@@ -614,7 +614,7 @@ async fn main() -> anyhow::Result<()> {
                 cmd_sync_pull_lat(&data_dir, &zenoh, &law_names, timeout, pg_url.as_deref()).await
             }
             SyncAction::Watch { zenoh, timeout } => {
-                cmd_sync_watch(&data_dir, &zenoh, timeout).await
+                cmd_sync_watch(&data_dir, &zenoh, timeout, pg_url.as_deref()).await
             }
             SyncAction::Crdt { action } => match action {
                 CrdtAction::Status { zenoh } => cmd_crdt_status(&data_dir, &zenoh).await,

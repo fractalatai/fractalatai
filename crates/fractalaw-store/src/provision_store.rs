@@ -48,4 +48,9 @@ pub trait ProvisionStore: Send + Sync {
 
     /// Count total provisions.
     async fn legislation_text_count(&self) -> Result<usize, StoreError>;
+
+    /// Delete annotations for a law (LanceDB-only, no-op for Postgres).
+    async fn delete_law_annotations(&self, _law_name: &str) -> Result<usize, StoreError> {
+        Ok(0)
+    }
 }
