@@ -1,4 +1,4 @@
-# Session: Position Classifier Training (SUSPENDED)
+# Session: Position Classifier Training (ACTIVE)
 
 ## Context
 
@@ -8,9 +8,25 @@ Position classifier v2 trained with correct features (Obligation/Liberty, 4 clas
 
 1. ✅ Evaluate v2 classifier against gold benchmarks (57.7% position, 986/4,062 matched)
 2. ✅ Disagreement analysis (classifier right 60% when disagreeing)
-3. ⬜ Feature importance analysis
-4. ⬜ Retrain with GBT if LR doesn't reach >80%
+3. ✅ Feature importance + GBT comparison
+4. ⬜ Better features (dependency parsing, grammatical role) or different embedding
 5. ⬜ Fine-tuned local LLM as future tier
+
+## GBT vs LR comparison (2026-06-26)
+
+| Model | CV Accuracy |
+|-------|------------|
+| LR | 61.0% |
+| LightGBM | 60.5% |
+
+GBT is NOT better — same features, same ceiling. Feature importance from GBT:
+- Embedding: 79.9%
+- Offset: 14.0%
+- Category: 4.9%
+- DRRP: 1.0%
+- Modal: 0.2%
+
+**Conclusion**: bottleneck is feature quality, not model architecture. The embedding dominates. Non-embedding features barely contribute. Need richer features (dependency parsing, grammatical role) or a domain-specific embedding (Legal-BERT) to break past 60%.
 
 ## Actor recall analysis (the real #1 problem)
 
@@ -92,8 +108,30 @@ Commission (16), competent authority (16), Authority (16)
 - ✅ Per-actor-category breakdown — classifier better on Ind/Spc/other/EU, regex better on Gvt/Org
 - ✅ Disagreement analysis — when disagreeing, classifier right 60% (195 vs 131)
 
+## Since suspension (2026-06-26)
+
+Actor recall blocker largely resolved:
+- Matched gold actors: 986 → 1,758 (78% increase)
+- ALIASES: 80+ label mappings
+- Gold cleanup: 135 non-actors removed
+- Dictionary: authority + undertaking patterns widened
+- Correlative inference: 615 actors inferred at 86.7% position accuracy
+
+Updated benchmark (all 20 laws, 1,758 matched):
+
+| Tier | Position | DRRP |
+|------|----------|------|
+| Regex | 51.3% | 87.3% |
+| Classifier | 57.4% | 87.3% |
+| Inferred | 86.7% | 41.7% |
+
+Gemini Tier 1 item 1 (actor recall) addressed. Ready for items 3-4:
+- **Item 3**: Switch to GBT (XGBoost/LightGBM)
+- **Item 4**: Deep-dive the 325 agree+wrong cases
+
 ## Dependencies
 
 - ✅ provision_actors table with cls_* columns populated
-- ✅ Benchmark QA baseline: regex 51.2%, classifier 57.7% position
+- ✅ Benchmark QA baseline updated: 1,758 matched actors
 - ✅ gold_benchmarks table in Postgres
+- ✅ Actor recall improved from 24% to 46%
