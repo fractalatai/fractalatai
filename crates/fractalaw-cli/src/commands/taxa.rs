@@ -2850,7 +2850,8 @@ pub(crate) async fn cmd_taxa_classify(
                 let mut pos_classified = 0usize;
                 type ActorTuple = (String, String, Option<String>, String, Option<String>);
                 let mut pos_updates: Vec<(String, Vec<ActorTuple>)> = Vec::new();
-                let mut cls_actors_updates: Vec<(String, Vec<serde_json::Value>)> = Vec::new();
+                // (section_id, actor_label, category, drrp, cls_position, "classifier")
+                let mut cls_actor_rows: Vec<(String, String, String, Option<String>, String, String)> = Vec::new();
 
                 for batch in &batches {
                     let sid_col = batch.column_by_name("section_id");
@@ -3009,7 +3010,23 @@ pub(crate) async fn cmd_taxa_classify(
                             let cls_pos = pred.class.as_str();
                             pos_classified += 1;
 
-                            #[allow(unused)] // used in reason trail, needed for future LLM elevation
+                            // Collect classifier position for provision_actors
+                            let category = if label.contains(':') {
+                                label.split(':').next().unwrap_or("other").trim().to_string()
+                            } else {
+                                "other".to_string()
+                            };
+                            let cls_drrp_for_actor = drrp_types.first().cloned();
+                            cls_actor_rows.push((
+                                sid.to_string(),
+                                label.clone(),
+                                category,
+                                cls_drrp_for_actor,
+                                cls_pos.to_string(),
+                                "classifier".to_string(),
+                            ));
+
+                            #[allow(unused)]
                             let agrees = regex_pos == cls_pos
                                 || (regex_pos == "mentioned" && cls_pos == "other")
                                 || (regex_pos == "beneficiary" && cls_pos == "other");
@@ -3038,26 +3055,6 @@ pub(crate) async fn cmd_taxa_classify(
                         }
 
                         if !updated_actors.is_empty() {
-                            // Build cls_actors: classifier's own {label, position} predictions
-                            let cls_actors_json: Vec<serde_json::Value> = updated_actors
-                                .iter()
-                                .map(|(label, _regex_pos, _, _, reason)| {
-                                    // Extract classifier's position prediction from reason trail
-                                    let cls_pos = reason.as_ref()
-                                        .and_then(|r| {
-                                            // Find last "classifier:X@N.NN" segment
-                                            r.rsplit("classifier:").next()
-                                        })
-                                        .and_then(|s| s.split('@').next())
-                                        .unwrap_or("mentioned");
-                                    serde_json::json!({
-                                        "label": label,
-                                        "position": cls_pos,
-                                    })
-                                })
-                                .collect();
-
-                            cls_actors_updates.push((sid.to_string(), cls_actors_json));
                             pos_updates.push((sid, updated_actors));
                         }
                     }
@@ -3128,19 +3125,15 @@ pub(crate) async fn cmd_taxa_classify(
                     lance.upsert_embeddings(&batch).await?;
                 }
 
-                // Write cls_actors (classifier's position predictions) to Postgres
-                if !cls_actors_updates.is_empty() {
-                    let updates: Vec<(String, String)> = cls_actors_updates
-                        .iter()
-                        .map(|(sid, json)| (sid.clone(), serde_json::Value::Array(json.clone()).to_string()))
-                        .collect();
-                    lance.write_cls_actors(&updates).await.ok();
+                // Write classifier position predictions to provision_actors
+                if !cls_actor_rows.is_empty() {
+                    lance.upsert_provision_actors(&cls_actor_rows).await.ok();
                 }
 
                 if pos_classified > 0 {
                     eprintln!(
-                        "    position: {pos_classified} actors, {} cls_actors written",
-                        cls_actors_updates.len()
+                        "    position: {pos_classified} actors classified, {} written to provision_actors",
+                        cls_actor_rows.len()
                     );
                 }
             }
