@@ -6,12 +6,40 @@ Position classifier v2 trained with correct features (Obligation/Liberty, 4 clas
 
 ## Work
 
-1. Evaluate v2 classifier against gold benchmarks using provision_actors
-2. Analyse where classifier disagrees with regex — is the classifier or regex right?
-3. Feature importance analysis (are non-embedding features contributing?)
-4. Consider retraining with larger dataset if benchmarks supply enough data
-5. Try GBT (XGBoost/LightGBM) if LR doesn't reach >80% — Gemini recommended this as fallback
-6. Consider fine-tuned local LLM (gemma3:4b) as future tier between classifier and Gemini
+1. ✅ Evaluate v2 classifier against gold benchmarks (57.7% position, 986/4,062 matched)
+2. ✅ Disagreement analysis (classifier right 60% when disagreeing)
+3. ⬜ Feature importance analysis
+4. ⬜ Retrain with GBT if LR doesn't reach >80%
+5. ⬜ Fine-tuned local LLM as future tier
+
+## Actor recall analysis (the real #1 problem)
+
+3,076 gold actors NOT found in provision_actors. Breakdown:
+
+| Category | Count | Cause |
+|----------|-------|-------|
+| Canonical labels regex missed | 200 | Regex has the pattern but text uses indirect reference (e.g. "An employee is entitled..." — employer implied, not stated) |
+| Natural-language actors not in dictionary | ~2,500 | "responsible undertaking", "scheme administrator", "Member States", "compliance body", "appellant" etc. |
+| Gold quality issues | ~375 est. | Gemini classifying things as actors: "electrical equipment", "civil explosive" |
+
+### Top 30 missing actor labels (from gold)
+```
+Member States (76), Member State (54), Org: Manufacturer (53),
+responsible undertaking (38), undertaking (38), Scottish Ministers (38),
+electrical equipment (36), Org: Employer (32), participant (30),
+hazardous substances authority (27), Org: Importer (27), appellant (27),
+Health and Safety Executive (25), scheme administrator (21),
+economic operator (20), relevant persons (20),
+Office for Nuclear Regulation (19), Gvt: Authority: Enforcement (18),
+compliance body (18), authorised person (17), Company (17),
+Commission (16), competent authority (16), Authority (16)
+```
+
+### Actions needed
+1. **Dictionary expansion** — add missing actors (undertaking, appellant, scheme administrator etc.) to actor-dictionary.yaml
+2. **Gold cleanup** — remove non-actor entries (electrical equipment, civil explosive) from benchmarks
+3. **ALIASES expansion** — map natural-language gold labels to canonical (Member States → EU: Member States, etc.)
+4. **Regex improvement** — handle implied actors (employee provision → infer employer)
 
 ## Classifier v2 stats
 
