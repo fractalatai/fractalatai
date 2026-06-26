@@ -2842,6 +2842,7 @@ pub(crate) async fn cmd_taxa_classify(
                             let cls_pos = pred.class.as_str();
                             pos_classified += 1;
 
+                            #[allow(unused)] // used in reason trail, needed for future LLM elevation
                             let agrees = regex_pos == cls_pos
                                 || (regex_pos == "mentioned" && cls_pos == "other")
                                 || (regex_pos == "beneficiary" && cls_pos == "other");
@@ -2855,12 +2856,10 @@ pub(crate) async fn cmd_taxa_classify(
                                 _ => Some(cls_segment),
                             };
 
-                            // When classifier disagrees with "other", map to "mentioned"
-                            let final_pos = if !agrees && cls_pos == "other" {
-                                "mentioned".to_string()
-                            } else {
-                                regex_pos.clone()
-                            };
+                            // Keep regex position — classifier records its view in reason
+                            // field for QA, but doesn't override. Disagreements are
+                            // candidates for LLM elevation.
+                            let final_pos = regex_pos.clone();
 
                             updated_actors.push((
                                 label.clone(),

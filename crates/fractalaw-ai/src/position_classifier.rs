@@ -2,7 +2,7 @@
 //!
 //! Predicts whether an actor in a provision is active (duty-bearer),
 //! counterparty (claim-holder), or other (beneficiary/mentioned).
-//! Input: 413-dim feature vector per (provision, actor) pair.
+//! Input: 411-dim feature vector per (provision, actor) pair.
 //! Output: active / counterparty / other.
 
 use std::path::Path;
@@ -14,7 +14,8 @@ use tracing::info;
 pub enum PositionClass {
     Active,
     Counterparty,
-    Other,
+    Beneficiary,
+    Mentioned,
 }
 
 impl PositionClass {
@@ -22,14 +23,15 @@ impl PositionClass {
         match self {
             Self::Active => "active",
             Self::Counterparty => "counterparty",
-            Self::Other => "other",
+            Self::Beneficiary => "beneficiary",
+            Self::Mentioned => "mentioned",
         }
     }
 }
 
 /// Per-actor position classifier.
 ///
-/// Logistic regression with 3 classes and 413 features:
+/// Logistic regression with 3 classes and 411 features:
 /// embedding(384) + modal(13) + drrp(5) + category(10) + offset(1).
 pub struct PositionClassifier {
     coef: Vec<Vec<f32>>,
@@ -49,7 +51,7 @@ const CATEGORIES: &[&str] = &[
 ];
 
 /// DRRP type labels for one-hot encoding (must match training order).
-const DRRP_TYPES: &[&str] = &["Duty", "Right", "Responsibility", "Power", "none"];
+const DRRP_TYPES: &[&str] = &["Obligation", "Liberty", "none"];
 
 impl PositionClassifier {
     /// Load classifier weights from a JSON file.
@@ -105,10 +107,10 @@ impl PositionClassifier {
 
     /// Predict position for a single (provision, actor) pair.
     ///
-    /// Feature vector must be 413 dimensions:
+    /// Feature vector must be 411 dimensions:
     /// embedding(384) + modal(13) + drrp(5) + category(10) + offset(1).
     pub fn predict(&self, features: &[f32]) -> PositionPrediction {
-        assert_eq!(features.len(), 413, "expected 413 features");
+        assert_eq!(features.len(), 411, "expected 411 features");
 
         let n_classes = self.classes.len();
         let mut logits = vec![0.0f32; n_classes];
@@ -131,14 +133,15 @@ impl PositionClassifier {
         let class = match self.classes[best_idx].as_str() {
             "active" => PositionClass::Active,
             "counterparty" => PositionClass::Counterparty,
-            _ => PositionClass::Other,
+            "beneficiary" => PositionClass::Beneficiary,
+            _ => PositionClass::Mentioned,
         };
 
         PositionPrediction { class, confidence }
     }
 }
 
-/// Build the 413-dim feature vector for a (provision, actor) pair.
+/// Build the 411-dim feature vector for a (provision, actor) pair.
 ///
 /// Combines provision embedding + modal features + DRRP type + actor category + text offset.
 pub fn build_position_features(
@@ -148,7 +151,7 @@ pub fn build_position_features(
     actor_label: &str,
     actor_text_offset: f32,
 ) -> Vec<f32> {
-    let mut features = Vec::with_capacity(413);
+    let mut features = Vec::with_capacity(411);
 
     // Embedding (384)
     features.extend_from_slice(embedding);
@@ -193,7 +196,7 @@ mod tests {
         ];
         let drrp = vec!["Duty".to_string()];
         let features = build_position_features(&embedding, &modals, &drrp, "Org: Employer", 0.1);
-        assert_eq!(features.len(), 413);
+        assert_eq!(features.len(), 411);
     }
 
     #[test]
