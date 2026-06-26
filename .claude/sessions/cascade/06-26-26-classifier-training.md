@@ -38,8 +38,8 @@ Commission (16), competent authority (16), Authority (16)
 ### Actions (iterative)
 1. ✅ **ALIASES expansion** — shared `scripts/actor_aliases.py` with 80+ mappings. Matched actors: 986 → 1,428 (+45%)
 2. ✅ **Gold cleanup** — 107 non-actors removed (electrical equipment, civil explosive, etc.)
-3. ⬜ **Regex pattern gaps** — 2,527 canonical actors still not found by regex. Top: Org: Undertaking (78), Org: Manufacturer (53), Gvt: Authority (53), Org: Employer (32). These have dictionary triggers but regex doesn't fire on the provision text.
-4. ⬜ **Implied actors** — 32 provisions where "employer" is gold but text only mentions "employee". Needs inference or inheritance.
+3. ➡️ **Regex pattern gaps** — 2,527 actors not found by regex. Moved to `cascade/06-26-26-regex-actor-gaps.md` (PENDING)
+4. ➡️ **Implied actors** — included in regex actor gaps session
 
 ## Classifier v2 stats
 
