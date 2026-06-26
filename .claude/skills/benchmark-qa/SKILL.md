@@ -1,88 +1,85 @@
 ---
-description: Run benchmark regression tests — compare pipeline DRRP and actor positions against Gemini golden benchmarks on NAS.
+description: Run benchmark regression tests — compare pipeline DRRP and actor positions against golden benchmarks per tier.
 ---
 
-# Skill: Benchmark QA — Golden Benchmark Regression Testing
+# Skill: Benchmark QA
 
 ## When This Applies
 
-After code changes to the DRRP pipeline (regex patterns, purpose gates, classifiers) to verify accuracy hasn't regressed. Compares current pipeline output against Gemini-verified golden benchmarks.
+After code changes to the DRRP pipeline (regex patterns, classifier, reconciliation) to verify accuracy hasn't regressed. Compares each tier's output independently against gold standard.
 
-**Trigger**: User asks to run benchmarks, check regression, compare against gold standard, or test pipeline accuracy.
+**Trigger**: User asks to run benchmarks, check regression, compare against gold, or test pipeline accuracy.
 
-## What It Does
+## Architecture
 
-1. Loads golden benchmark Parquet files from NAS (2,250+ Gemini-verified provisions across 16 families)
-2. Queries LanceDB for the same provisions (current pipeline output)
-3. Reports DRRP type accuracy: confusion matrix, per-class precision/recall/F1
-4. Reports actor position accuracy: regex vs gold standard
-5. Optionally runs the position classifier to compare regex vs classifier vs gold (three-way)
+Benchmarks use two Postgres tables:
+- `provision_actors` — per-actor signals from each tier (regex_drrp, regex_position, cls_drrp, cls_position, etc.)
+- `gold_benchmarks` — gold standard (section_id, actor_label, gold_drrp, gold_position)
+
+Comparison is a simple SQL JOIN — no JSONB parsing, no Python extraction.
 
 ## Usage
 
 ```bash
-# Full benchmark report — DRRP types + actor positions vs gold
+# Full benchmark report — per-tier accuracy + disagreement analysis
 /usr/bin/python3 scripts/benchmark_report.py
 
-# Filter to one family
-/usr/bin/python3 scripts/benchmark_report.py --family "OH&S"
-
-# Show more mismatches
-/usr/bin/python3 scripts/benchmark_report.py --mismatches 30
-
-# Position classifier disagreement analysis — regex vs classifier vs gold
-/usr/bin/python3 scripts/benchmark_classifier_disagreements.py
-
-# Filter classifier analysis to one family
-/usr/bin/python3 scripts/benchmark_classifier_disagreements.py --family "OH&S"
+# Filter by actor category
+/usr/bin/python3 scripts/benchmark_report.py --category Gvt
 ```
+
+## What It Reports
+
+1. **Per-tier accuracy**: regex vs classifier DRRP and position accuracy
+2. **Disagreement analysis**: when tiers disagree, who's right?
+3. **Per-category breakdown**: accuracy by actor type (Org, Ind, Gvt, Spc, etc.)
+4. **Confusion matrices**: per-tier position confusion matrix
+
+## Current Baseline (2026-06-26)
+
+| Metric | Regex | Classifier |
+|--------|-------|-----------|
+| DRRP | 84.6% | 84.6% |
+| Position | 51.2% | 57.7% |
+| Matched actors | 986/4,062 | Same |
+
+### Disagreement analysis
+- Agree + correct: 37.9%
+- Agree + wrong: 18.5%
+- Disagree, regex right: 13.3%
+- Disagree, classifier right: 19.8%
+- Both wrong: 10.5%
+
+### Per-category highlights
+- Classifier better on: Ind (52.8% vs 42.2%), Spc (72.3% vs 44.7%)
+- Regex better on: Gvt (59.7% vs 55.1%), Org (72.5% vs 70.6%)
 
 ## Benchmark Data
 
-- **Location**: `/mnt/nas/sertantai-data/data/fractalaw-benchmarks/tier2-*.parquet`
-- **Size**: 2,250 provisions across 16 families (20 Parquet files)
+- **Gold table**: `gold_benchmarks` in Postgres (4,062 rows)
+- **Source**: NAS parquets at `/mnt/nas/sertantai-data/data/fractalaw-benchmarks/tier2-*.parquet`
 - **Gold source**: Gemini 2.5 Flash structured classification
-- **Schema**: `section_id, law_name, family, text, gold_drrp_types, gold_actors (JSON), gold_reasoning, gold_source, created_at`
+- **Scope**: 20 benchmark laws across 16 families
+- **IMPORTANT**: Never re-process benchmark laws (is_benchmark = true in DuckDB)
 
-## Key Metrics (Baseline — 2026-06-11)
+## Prerequisites
 
-| Metric | Value | Target |
-|--------|-------|--------|
-| DRRP accuracy | 67.1% | 80%+ |
-| Position accuracy (regex) | 37.1% → 43.9%* | 60%+ |
-| Position accuracy (classifier) | 57.1%* | 60%+ |
-| Duty recall | 47% | 70%+ |
-| Right recall | 37% | 60%+ |
+- Postgres running on port 5433
+- `provision_actors` table populated (run `taxa parse --pg --force` + `taxa classify --pg` on benchmark laws)
+- `gold_benchmarks` table populated (run the load script in benchmark-qa session)
 
-*Measured on 1,040 actor-position pairs with embeddings (2026-06-17)
+## Populating for new benchmarks
 
-## Classifier Disagreement Analysis
+```bash
+# Re-parse + re-classify benchmark laws to populate provision_actors
+BENCH="UK_asp_2005_13,UK_eudr_2013_59,..."
+fractalaw taxa parse --pg postgres://...  --laws "$BENCH" --force
+fractalaw taxa classify --pg postgres://... --laws "$BENCH"
+```
 
-The three-way analysis (`benchmark_classifier_disagreements.py`) compares:
-- **Regex position**: what the pipeline currently ships
-- **Classifier prediction**: logistic regression on embeddings (413-dim features)
-- **Gemini gold**: ground truth
+## Notes
 
-Key finding: classifier beats regex overall (57.1% vs 43.9%) but the advantage is entirely from non-DRRP provisions. For actual Duty/Right/Responsibility/Power provisions, regex is better. See session doc for full breakdown.
-
-## Environment
-
-- Requires NAS mounted at `/mnt/nas/sertantai-data/`
-- Uses `/usr/bin/python3` (system Python)
-- Dependencies: `lancedb`, `pyarrow`, `numpy`
-- LanceDB at `data/lancedb`
-- Position classifier weights at `docs/position_classifier_v1.json`
-
-## Scripts
-
-- `scripts/benchmark_report.py` — DRRP + position accuracy vs gold
-- `scripts/benchmark_classifier_disagreements.py` — three-way regex vs classifier vs gold
-- `scripts/generate_benchmarks.py` — generate new benchmarks (requires `GEMINI_API_KEY`)
-- `scripts/generate_benchmarks_batch.py` — batch benchmark generation
-
-## Limitations
-
-- Gemini is the gold standard — LLM-checking-LLM, not human-verified
-- 39% of benchmark provisions lack embeddings (invisible to classifier analysis)
-- Actor label matching between gold and pipeline is fuzzy — some pairs missed
-- 6 benchmark laws failed due to Gemini rate limits (Environmental Protection x2, HR Employment, Nuclear, Planning, Pollution)
+- Gold standard is Gemini-generated, not human-verified
+- Actor label matching uses canonical labels (ALIASES dict in benchmark_report.py)
+- 35% actor recall — regex only finds ~1/3 of gold actors. The rest are gap-fill candidates.
+- Position classifier v2 weights: `docs/position_classifier_v2.json` (4-class, 411 features)
