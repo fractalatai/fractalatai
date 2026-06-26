@@ -19,12 +19,37 @@ Ind: Employee (14), Ind: Owner (12), Ind: Occupier (10)
 1. **Trigger gaps** (~2,200) — actors exist in dictionary but their trigger words don't appear in the provision text. Either the text uses different phrasing, or the actor is implied not stated.
 2. **Implied actors** (~300) — actor is logically present but not textually mentioned (e.g. "An employee is entitled..." implies an employer as counterparty).
 
-## Investigation needed
+## Findings
 
-1. For each top-missing actor, check if the dictionary trigger words appear in the provision text
-2. If triggers appear but regex doesn't fire — regex pattern bug
-3. If triggers don't appear — either add new triggers or accept as LLM-only extraction
-4. For implied actors — consider inheritance rules (employee → employer correlation)
+### Progress: 986 → 1,637 matched actors (66% improvement)
+- ALIASES expansion: +442 (label normalisation)
+- Gold cleanup: -135 (non-actors removed)
+- Label remapping: +197 (SC:/Org: category mismatches)
+
+### Three categories of remaining 2,200 unmatched
+
+**1. Trigger words present but regex doesn't fire (~1,600)**
+Top: Gvt: Authority (53), Org: Responsible Undertaking (46), Ind: Public (30), Org: Economic Operator (29). The word is in the text but `run_patterns()` doesn't match. Likely: regex pattern doesn't cover the specific phrasing, or a prior pattern consumes the match first.
+
+**2. Implied actors (~200)**
+Actor is logically present but not textually stated. Deterministic correlative rules found:
+
+| When regex finds | Infer | Position | Coverage |
+|-----------------|-------|----------|----------|
+| Employee active (Obligation) | Employer | counterparty | 19/28 (68%) |
+| Member State active (EU reg) | Responsible Undertaking | counterparty | 16/22 (73%) |
+| Enforcement Authority active | Public | beneficiary | 7/11 (64%) |
+
+These are Hohfeldian correlatives — codeable as deterministic rules without LLM.
+
+**3. Genuine LLM-only extractions (~400)**
+Complex inferences the LLM makes from context that no regex or rule can replicate.
+
+## Remaining work
+
+1. ⬜ Debug why regex misses provisions where trigger words appear (run_patterns investigation)
+2. ⬜ Implement correlative inference rules for implied actors
+3. ⬜ Re-run benchmark after fixes
 
 ## Key files
 
