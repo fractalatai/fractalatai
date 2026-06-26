@@ -88,6 +88,120 @@ Fix the training data and retrain. The v1 model was trained on a small dataset w
 
 **Recommended: A then C.** Remove the override now (fixes the corpus), retrain later (improves future classifications).
 
+### 7. How the classifier is coded — root causes
+
+The position classifier has three structural problems that make it fundamentally unable to do its job:
+
+#### Problem 1: DRRP features use wrong labels (features are dead)
+
+`position_classifier.rs` line 52:
+```rust
+const DRRP_TYPES: &[&str] = &["Duty", "Right", "Responsibility", "Power", "none"];
+```
+
+The pipeline stores DRRP types as `Obligation` and `Liberty` — the 3-class system we use everywhere. The one-hot encoding checks `drrp_types.iter().any(|d| d == drrp)` against "Duty", "Right" etc. — it never matches. **The 5 DRRP features are always zero.** The classifier has no information about whether the provision creates an Obligation or Liberty.
+
+This is critical because position depends on DRRP type:
+- Obligation active = bears the duty
+- Liberty active = exercises the permission
+- The actor who bears an Obligation is DIFFERENT from the actor who exercises a Liberty
+
+Without knowing the DRRP type, the classifier can't distinguish these — it's guessing positions blind.
+
+#### Problem 2: 3-class output conflates beneficiary and mentioned
+
+```rust
+pub enum PositionClass { Active, Counterparty, Other }
+```
+
+`Other` = beneficiary OR mentioned. These are legally distinct:
+- Beneficiary has a genuine interest (public benefits from safety duties)
+- Mentioned has NO legal relation (referenced in a definition)
+
+Collapsing them into one class means the classifier never learns to distinguish them. And when `other` maps to `mentioned` in the cascade logic, all beneficiaries also become mentioned.
+
+#### Problem 3: Training data was only 2,200 agentic provisions
+
+From the original session: "3-class LogisticRegression, 68% overall accuracy, 74% precision on active". This was already marginal — and with dead DRRP features, the model was really only learning from embeddings + modals + category + offset. Not enough signal for a 3-class problem.
+
+#### Problem 4: The original design said "detection only, don't auto-override"
+
+From the session doc (Step 4): *"Don't auto-override position — regex position stays as source of truth. Detection only — counts disagreements, doesn't write back yet."*
+
+But the implementation in `cmd_taxa_classify` (taxa.rs:2858-2863) DOES override:
+```rust
+let final_pos = if !agrees && cls_pos == "other" {
+    "mentioned".to_string()
+} else {
+    regex_pos.clone()
+};
+```
+
+The design was explicitly "don't override", but the code overrides. This is the proximate cause of the 51K false-mentioned — the implementation diverged from the design.
+
+### Summary: three layers of failure
+
+1. **Features broken** — DRRP labels mismatch, 5 features always zero
+2. **Classes too coarse** — beneficiary conflated with mentioned
+3. **Design violated** — "detection only" became "override to mentioned"
+
+The classifier was set up to fail — and then wired to override rather than detect.
+
+## The cure
+
+### Goal
+
+Regex + classifier agree on position for >80% of provisions, matching benchmarks. The remaining ~20% get elevated to LLM. This keeps LLM calls to the hard cases — ambiguous multi-actor provisions, structural provisions that look like duties, etc.
+
+### Step 1: Fix the override logic (immediate, zero risk)
+
+Change taxa.rs:2858-2863 — when classifier disagrees, **keep regex position** instead of overriding to `mentioned`. This restores the original "detection only" design. The regex was right 96.6% of the time for active actors (per the position confusion matrix: gold=active, pipeline=active for provisions without classifier override).
+
+No retraining needed. This alone should bring legal relation accuracy from 31.8% to ~80%+ since DRRP types are already 100%.
+
+### Step 2: Fix the DRRP feature encoding
+
+Change `position_classifier.rs` line 52:
+```rust
+// Before (broken — never matches):
+const DRRP_TYPES: &[&str] = &["Duty", "Right", "Responsibility", "Power", "none"];
+
+// After (matches pipeline output):
+const DRRP_TYPES: &[&str] = &["Obligation", "Liberty", "none"];
+```
+
+Reduce from 5 to 3 features (413 → 411 dims). Requires retraining the classifier with the correct feature vector.
+
+### Step 3: Retrain with 4 classes
+
+Change output from `active/counterparty/other` to `active/counterparty/beneficiary/mentioned`. Train on the gold benchmark data (2,250 provisions with correct positions). The benchmarks are the cleanest training signal we have.
+
+### Step 4: Wire disagreement → LLM elevation
+
+When regex and retrained classifier disagree on position, flag as `pending_llm` — same pattern as DRRP disagreements. LLM adjudicates the ~20% hard cases. This completes the cascade: regex (fast, free) → classifier (fast, free) → LLM (slow, paid, accurate).
+
+### Step 5: Re-run benchmark QA
+
+Target: legal relation accuracy >80%. The benchmark script now tests the right thing.
+
+### Order of work
+
+1. Fix override logic (Step 1) — immediate corpus fix
+2. Re-run benchmark to confirm improvement
+3. Fix features + retrain (Steps 2-3) — better classifier
+4. Wire LLM elevation (Step 4) — handle the remaining ~20%
+5. Re-classify corpus with new classifier
+6. Final benchmark QA (Step 5)
+
+### Gemini review feedback (2026-06-26)
+
+- **Fix data/logic first** — LR with 1,242 params may be sufficient once features work and classes are correct. Don't jump to GBT/MLP prematurely.
+- **Non-embedding features matter** — modal, DRRP, category, offset will contribute once DRRP encoding is fixed. Don't strip them.
+- **Fine-tuned local LLM (gemma3:4b)** — valid future direction but larger undertaking. Fix current classifier first.
+- **2,200 provisions adequate** for LR with 411 features + embeddings. Watch `beneficiary` class imbalance.
+- **Confidence thresholding for LLM escalation** — don't just escalate on disagreement. If classifier confidence < 0.7, escalate even when regex agrees. This catches uncertain-but-agreeing cases.
+- **GBT (XGBoost/LightGBM) as fallback** — if fixed LR still < 80%, gradient boosted trees handle mixed features well and provide feature importance for debugging.
+
 ### 5. Position determines whether DRRP applies to an actor
 
 The DRRP type (Obligation/Liberty) and actor position (active/counterparty/mentioned) are coupled — not independent:
@@ -97,9 +211,11 @@ The DRRP type (Obligation/Liberty) and actor position (active/counterparty/menti
 | Obligation | **active** | Bears the duty | Employer *shall ensure* safety |
 | Obligation | **counterparty** | Holds a claim against the duty | Employee *is owed* the duty |
 | Liberty | **active** | Exercises the liberty/permission | Inspector *may enter* premises |
-| Liberty | **counterparty** | Subject to the liberty | Occupier must *permit entry* |
+| Liberty | **counterparty** | No-duty: cannot prevent the liberty | Occupier *has no right to prevent* entry |
 | — | **beneficiary** | Benefits without a direct legal relation | Public benefits from safety duty |
 | — | **mentioned** | **No legal relation — referenced only** | "as defined in the Act" |
+
+Every Obligation has an antecedent — the counterparty who holds a claim. "Occupier must permit entry" is itself an Obligation on the occupier (active), not a Liberty counterparty. The Liberty is the inspector's permission to enter; the occupier's duty to permit is a *separate* correlative Obligation.
 
 Rights and Powers are not separate DRRP types — they emerge from the combination of actor type + position:
 - Government actor + active Liberty = **Power** (e.g. HSE *may* prosecute)
