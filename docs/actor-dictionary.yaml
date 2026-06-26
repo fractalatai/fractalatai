@@ -267,8 +267,8 @@
   type: government
   category: Gvt
   regex_patterns:
-    - "(?:(?:[Tt]he|[Aa]n|appropriate|allocating|[Cc]ompetent|[Dd]esignated) authority?i?e?s?|[Rr]egulators?|[Mm]onitoring [Aa]uthority?i?e?s?|that authority)"
-  triggers: [authority, competent authority, competent authorities, competent national authorities, national authority]
+    - "(?:(?:[Tt]he|[Aa]n|appropriate|allocating|[Cc]ompetent|[Dd]esignated|[Rr]elevant|hazardous substances) authorit(?:y|ies)|[Rr]egulators?|[Mm]onitoring [Aa]uthorit(?:y|ies)|that authority)"
+  triggers: [authority, competent authority, competent authorities, competent national authorities, national authority, relevant authority, hazardous substances authority]
   drrp_keywords: [authority, appropriate authority, national authority]
 
 - label: "Gvt: Commissioners"
@@ -568,8 +568,8 @@
   type: governed
   category: Org
   regex_patterns:
-    - "[Rr]esponsible [Uu]ndertakings?"
-  triggers: [responsible undertaking, the responsible undertaking]
+    - "(?:[Rr]esponsible |[Tt]he |[Aa]n |[Ee]ach )[Uu]ndertakings?"
+  triggers: [responsible undertaking, the responsible undertaking, undertaking, the undertaking, an undertaking]
 
 - label: "Spc: Responsible Officer"
   type: governed

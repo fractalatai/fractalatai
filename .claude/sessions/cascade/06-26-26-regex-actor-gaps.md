@@ -45,11 +45,27 @@ These are Hohfeldian correlatives — codeable as deterministic rules without LL
 **3. Genuine LLM-only extractions (~400)**
 Complex inferences the LLM makes from context that no regex or rule can replicate.
 
-## Remaining work
+## Progress
 
-1. ⬜ Debug why regex misses provisions where trigger words appear (run_patterns investigation)
-2. ✅ Correlative inference patterns identified → moved to `cascade/06-26-26-correlative-inference.md` (PENDING)
-3. ⬜ Re-run benchmark after fixes
+| Iteration | Matched | % of gold | Change |
+|-----------|---------|-----------|--------|
+| Start | 986 | 24% | Original aliases |
+| +ALIASES | 1,428 | 36% | 80+ label mappings |
+| +Gold cleanup | 1,637 | 43% | Non-actors removed, label remapping |
+| +Dictionary fixes | **1,743** | **46%** | Authority/undertaking patterns widened |
+
+## Completed work
+
+1. ✅ ALIASES expansion (scripts/actor_aliases.py) — 80+ mappings
+2. ✅ Gold cleanup — 135 non-actors removed
+3. ✅ Label remapping — SC:/Org: category mismatches, specific authority → generic
+4. ✅ Dictionary pattern fixes — Gvt: Authority (added relevant/hazardous prefixes), Org: Responsible Undertaking (added bare undertaking)
+5. ✅ Correlative inference patterns identified → `cascade/06-26-26-correlative-inference.md` (PENDING)
+6. ✅ Benchmark re-run after fixes: 1,743 matched, 87.3% DRRP, 57.4% classifier position
+
+## Remaining ~2,000 unmatched
+
+Mostly implied actors (word not in text) — correlative inference session's domain. Remaining trigger-present gaps are diminishing returns (~50 actors across many small patterns).
 
 ## Key files
 
