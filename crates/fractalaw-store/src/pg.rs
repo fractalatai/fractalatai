@@ -201,10 +201,12 @@ impl PgStore {
     }
 
     /// Copy drrp_types/actors → regex_drrp/regex_actors for a law.
+    /// Snapshots ALL provisions with taxa data (not just extraction_method=regex),
+    /// because the classifier may change extraction_method later.
     pub async fn snapshot_regex_signals(&self, law_name: &str) -> Result<(), StoreError> {
         sqlx::query(
             "UPDATE legislation_text SET regex_drrp = drrp_types, regex_actors = actors \
-             WHERE law_name = $1 AND extraction_method = 'regex'"
+             WHERE law_name = $1 AND (drrp_types IS NOT NULL OR actors IS NOT NULL)"
         )
         .bind(law_name)
         .execute(&self.pool)
@@ -213,12 +215,14 @@ impl PgStore {
         Ok(())
     }
 
-    /// Copy drrp_types/actors → cls_drrp/cls_actors for classified provisions.
+    /// Copy drrp_types/actors → cls_drrp/cls_actors after classifier runs.
+    /// Snapshots all provisions that have classifier-tier or higher extraction_method.
     pub async fn snapshot_classifier_signals(&self, law_name: &str) -> Result<(), StoreError> {
         sqlx::query(
             "UPDATE legislation_text SET cls_drrp = drrp_types, cls_actors = actors, \
              cls_confidence = taxa_confidence \
-             WHERE law_name = $1 AND extraction_method = 'classifier'"
+             WHERE law_name = $1 AND extraction_method IN ('classifier', 'pending_llm') \
+             AND (drrp_types IS NOT NULL OR actors IS NOT NULL)"
         )
         .bind(law_name)
         .execute(&self.pool)

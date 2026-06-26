@@ -208,22 +208,45 @@ pub(crate) async fn cmd_taxa_reconcile(
             let llm_drrp_col = batch.column_by_name("llm_drrp");
             let llm_actors_col = batch.column_by_name("llm_actors");
 
+            // Helper: read first element from a TEXT[] (List<Utf8>) or fall back to Utf8 string
+            let get_list_first = |col: &dyn arrow::array::Array, row: usize| -> Option<String> {
+                // Try List<Utf8> (Postgres TEXT[])
+                if let Some(list) = col.as_any().downcast_ref::<arrow::array::ListArray>() {
+                    if !list.is_null(row) {
+                        let vals = list.value(row);
+                        if vals.len() > 0 {
+                            if let Some(sa) = vals.as_any().downcast_ref::<arrow::array::StringArray>() {
+                                if !sa.is_null(0) {
+                                    let v = sa.value(0).to_string();
+                                    if !v.is_empty() {
+                                        return Some(v);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return None;
+                }
+                // Fall back to Utf8/LargeUtf8
+                get_string_value(col, row)
+            };
+
             for row in 0..batch.num_rows() {
-                let sid = match sid_col.and_then(|c| get_string_value(c.as_ref(), row)) {
+                let _sid = match sid_col.and_then(|c| get_string_value(c.as_ref(), row)) {
                     Some(s) => s,
                     None => continue,
                 };
 
-                let regex_drrp = regex_drrp_col.and_then(|c| get_string_value(c.as_ref(), row));
+                let regex_drrp = regex_drrp_col.and_then(|c| get_list_first(c.as_ref(), row));
                 let regex_actors = regex_actors_col.and_then(|c| get_string_value(c.as_ref(), row));
-                let cls_drrp = cls_drrp_col.and_then(|c| get_string_value(c.as_ref(), row));
+                let cls_drrp = cls_drrp_col.and_then(|c| get_list_first(c.as_ref(), row));
                 let cls_actors = cls_actors_col.and_then(|c| get_string_value(c.as_ref(), row));
                 let cls_conf = cls_conf_col.and_then(|c| {
                     c.as_any()
                         .downcast_ref::<arrow::array::Float32Array>()
                         .and_then(|a| if a.is_null(row) { None } else { Some(a.value(row)) })
                 });
-                let llm_drrp = llm_drrp_col.and_then(|c| get_string_value(c.as_ref(), row));
+                let llm_drrp = llm_drrp_col.and_then(|c| get_list_first(c.as_ref(), row));
                 let llm_actors = llm_actors_col.and_then(|c| get_string_value(c.as_ref(), row));
 
                 // Skip provisions with no regex signal
