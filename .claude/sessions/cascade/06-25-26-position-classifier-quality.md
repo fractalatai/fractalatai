@@ -184,14 +184,60 @@ When regex and retrained classifier disagree on position, flag as `pending_llm` 
 
 Target: legal relation accuracy >80%. The benchmark script now tests the right thing.
 
+### Revised architecture: separate signals from decisions
+
+The current architecture tangles regex output, classifier output, and reconciliation into one pass. This makes it impossible to re-run one tier without corrupting another, and debugging requires reverting data.
+
+**New design: store each tier's signal separately, reconcile as a distinct step.**
+
+#### Per-provision columns in Postgres
+
+| Column | What | Written by |
+|--------|------|-----------|
+| `regex_drrp` | Regex DRRP prediction | `taxa parse` |
+| `regex_actors` | Regex actor positions (JSONB) | `taxa parse` |
+| `cls_drrp` | Classifier DRRP prediction | `taxa classify` |
+| `cls_actors` | Classifier actor positions (JSONB) | `taxa classify` |
+| `cls_confidence` | Classifier confidence | `taxa classify` |
+| `llm_drrp` | LLM DRRP prediction | `taxa validate` |
+| `llm_actors` | LLM actor positions (JSONB) | `taxa validate` |
+| `drrp_types` | **Final reconciled** DRRP | `taxa reconcile` (new) |
+| `actors` | **Final reconciled** actors | `taxa reconcile` (new) |
+| `extraction_method` | Which tier won | `taxa reconcile` |
+
+#### Pipeline steps (independent, re-runnable)
+
+1. `taxa parse` — regex only → writes `regex_drrp`, `regex_actors`
+2. `taxa embed` — embeddings (unchanged)
+3. `taxa classify` — classifier only → writes `cls_drrp`, `cls_actors`, `cls_confidence`
+4. `taxa reconcile` (NEW) — reads all signals, picks winner → writes `drrp_types`, `actors`, `extraction_method`
+5. `taxa validate` — LLM for disagreements → writes `llm_drrp`, `llm_actors`
+6. `taxa reconcile` — re-run after validate to incorporate LLM results
+
+#### Benefits
+
+- Re-run classifier without touching regex data
+- Re-run reconciliation without re-running regex or classifier
+- Inspect each tier's output independently
+- Benchmark QA can compare gold vs any tier (regex, classifier, reconciled)
+- No more "revert to regex" — regex output is always preserved
+- Reconciliation rules can be tuned without re-processing
+
+#### Reconciliation rules (in `taxa reconcile`)
+
+1. If regex + classifier agree → high confidence, use that answer
+2. If they disagree → flag for LLM, use regex as interim answer
+3. If LLM has answered → LLM wins (highest tier)
+4. Confidence thresholding: if classifier confidence < 0.7, don't trust it even if it agrees
+
 ### Order of work
 
-1. Fix override logic (Step 1) — immediate corpus fix
-2. Re-run benchmark to confirm improvement
-3. Fix features + retrain (Steps 2-3) — better classifier
-4. Wire LLM elevation (Step 4) — handle the remaining ~20%
-5. Re-classify corpus with new classifier
-6. Final benchmark QA (Step 5)
+1. Add per-tier columns to Postgres schema
+2. Refactor `taxa parse` to write `regex_drrp` + `regex_actors` (not `drrp_types`/`actors`)
+3. Refactor `taxa classify` to write `cls_drrp` + `cls_actors` (not overwrite)
+4. Build `taxa reconcile` command
+5. Run benchmark QA at each stage
+6. Wire LLM elevation into reconcile for disagreements
 
 ### Gemini review feedback (2026-06-26)
 

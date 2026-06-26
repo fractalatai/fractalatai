@@ -2695,7 +2695,7 @@ pub(crate) async fn cmd_taxa_classify(
 
         // Phase 4: Position classification
         {
-            let pos_weights = std::path::Path::new("docs/position_classifier_v1.json");
+            let pos_weights = std::path::Path::new("docs/position_classifier_v2.json");
             if pos_weights.exists() {
                 let pos_classifier = fractalaw_ai::PositionClassifier::load(pos_weights)
                     .context("loading position classifier")?;
@@ -2767,32 +2767,51 @@ pub(crate) async fn cmd_taxa_classify(
 
                         let actors: Vec<ActorTuple> = actors_col
                             .and_then(|c| {
+                                // Try List<Struct> (LanceDB format)
                                 use arrow::array::AsArray;
-                                let list = c.as_list_opt::<i32>()?;
-                                if list.is_null(row) {
-                                    return None;
+                                if let Some(list) = c.as_list_opt::<i32>() {
+                                    if list.is_null(row) {
+                                        return None;
+                                    }
+                                    let sa = list.value(row);
+                                    let sa = sa.as_struct_opt()?;
+                                    let lc = sa.column_by_name("label")?;
+                                    let pc = sa.column_by_name("position")?;
+                                    let rtc = sa.column_by_name("relates_to");
+                                    let lsc = sa.column_by_name("label_source");
+                                    let rc = sa.column_by_name("reason");
+                                    let mut result = Vec::new();
+                                    for i in 0..sa.len() {
+                                        result.push((
+                                            get_string_value(lc.as_ref(), i)
+                                                .unwrap_or_default(),
+                                            get_string_value(pc.as_ref(), i)
+                                                .unwrap_or_default(),
+                                            rtc.and_then(|c| get_string_value(c.as_ref(), i)),
+                                            lsc.and_then(|c| get_string_value(c.as_ref(), i))
+                                                .unwrap_or_else(|| "canonical".into()),
+                                            rc.and_then(|c| get_string_value(c.as_ref(), i)),
+                                        ));
+                                    }
+                                    return Some(result);
                                 }
-                                let sa = list.value(row);
-                                let sa = sa.as_struct_opt()?;
-                                let lc = sa.column_by_name("label")?;
-                                let pc = sa.column_by_name("position")?;
-                                let rtc = sa.column_by_name("relates_to");
-                                let lsc = sa.column_by_name("label_source");
-                                let rc = sa.column_by_name("reason");
-                                let mut result = Vec::new();
-                                for i in 0..sa.len() {
-                                    result.push((
-                                        get_string_value(lc.as_ref(), i)
-                                            .unwrap_or_default(),
-                                        get_string_value(pc.as_ref(), i)
-                                            .unwrap_or_default(),
-                                        rtc.and_then(|c| get_string_value(c.as_ref(), i)),
-                                        lsc.and_then(|c| get_string_value(c.as_ref(), i))
-                                            .unwrap_or_else(|| "canonical".into()),
-                                        rc.and_then(|c| get_string_value(c.as_ref(), i)),
-                                    ));
+                                // Try JSONB string (Postgres format)
+                                if let Some(s) = get_string_value(c.as_ref(), row) {
+                                    if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(&s) {
+                                        let mut result = Vec::new();
+                                        for a in &arr {
+                                            result.push((
+                                                a.get("label").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+                                                a.get("position").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+                                                a.get("relates_to").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                                                a.get("label_source").and_then(|v| v.as_str()).unwrap_or("canonical").to_string(),
+                                                a.get("reason").and_then(|v| v.as_str()).map(|s| s.to_string()),
+                                            ));
+                                        }
+                                        return Some(result);
+                                    }
                                 }
-                                Some(result)
+                                None
                             })
                             .unwrap_or_default();
 
