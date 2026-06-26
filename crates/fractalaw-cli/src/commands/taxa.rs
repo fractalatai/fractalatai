@@ -3139,9 +3139,6 @@ pub(crate) async fn cmd_taxa_classify(
             }
         }
 
-        // Snapshot classifier signals (preserves classifier tier output separately)
-        lance.snapshot_classifier_signals(law_name).await.ok();
-
         total_provisions += provisions.len();
         let law_elapsed = law_start.elapsed();
         let law_idx = law_names.iter().position(|l| l == law_name).unwrap_or(0) + 1;

@@ -200,20 +200,6 @@ impl PgStore {
         Ok(())
     }
 
-    /// Write classifier actor predictions to cls_actors column.
-    /// Input: Vec of (section_id, json_string) pairs.
-    pub async fn write_cls_actors(&self, updates: &[(String, String)]) -> Result<(), StoreError> {
-        for (sid, json) in updates {
-            sqlx::query("UPDATE legislation_text SET cls_actors = $1::jsonb WHERE section_id = $2")
-                .bind(json)
-                .bind(sid)
-                .execute(&self.pool)
-                .await
-                .map_err(|e| StoreError::Other(format!("write_cls_actors: {e}")))?;
-        }
-        Ok(())
-    }
-
     /// Upsert per-actor signals into provision_actors.
     /// Each tuple: (section_id, actor_label, actor_category, drrp, position, tier)
     pub async fn upsert_provision_actors(
@@ -244,50 +230,6 @@ impl PgStore {
                 .await
                 .map_err(|e| StoreError::Other(format!("upsert_provision_actors: {e}")))?;
         }
-        Ok(())
-    }
-
-    /// Copy drrp_types/actors → regex_drrp/regex_actors for a law.
-    /// Snapshots ALL provisions with taxa data (not just extraction_method=regex),
-    /// because the classifier may change extraction_method later.
-    pub async fn snapshot_regex_signals(&self, law_name: &str) -> Result<(), StoreError> {
-        sqlx::query(
-            "UPDATE legislation_text SET regex_drrp = drrp_types, regex_actors = actors \
-             WHERE law_name = $1 AND (drrp_types IS NOT NULL OR actors IS NOT NULL)"
-        )
-        .bind(law_name)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| StoreError::Other(format!("snapshot_regex: {e}")))?;
-        Ok(())
-    }
-
-    /// Copy drrp_types/actors → cls_drrp/cls_actors after classifier runs.
-    /// Snapshots all provisions that have classifier-tier or higher extraction_method.
-    pub async fn snapshot_classifier_signals(&self, law_name: &str) -> Result<(), StoreError> {
-        sqlx::query(
-            "UPDATE legislation_text SET cls_drrp = drrp_types, cls_actors = actors, \
-             cls_confidence = taxa_confidence \
-             WHERE law_name = $1 AND extraction_method IN ('classifier', 'pending_llm') \
-             AND (drrp_types IS NOT NULL OR actors IS NOT NULL)"
-        )
-        .bind(law_name)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| StoreError::Other(format!("snapshot_classifier: {e}")))?;
-        Ok(())
-    }
-
-    /// Copy drrp_types/actors → llm_drrp/llm_actors for LLM-validated provisions.
-    pub async fn snapshot_llm_signals(&self, law_name: &str) -> Result<(), StoreError> {
-        sqlx::query(
-            "UPDATE legislation_text SET llm_drrp = drrp_types, llm_actors = actors \
-             WHERE law_name = $1 AND extraction_method IN ('agentic', 'agentic_unvalidated')"
-        )
-        .bind(law_name)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| StoreError::Other(format!("snapshot_llm: {e}")))?;
         Ok(())
     }
 
@@ -745,10 +687,6 @@ impl crate::ProvisionStore for PgStore {
         self.legislation_text_count().await
     }
 
-    async fn write_cls_actors(&self, updates: &[(String, String)]) -> Result<(), StoreError> {
-        self.write_cls_actors(updates).await
-    }
-
     async fn upsert_provision_actors(
         &self,
         actors: &[(String, String, String, Option<String>, String, String)],
@@ -756,17 +694,6 @@ impl crate::ProvisionStore for PgStore {
         self.upsert_provision_actors(actors).await
     }
 
-    async fn snapshot_regex_signals(&self, law_name: &str) -> Result<(), StoreError> {
-        self.snapshot_regex_signals(law_name).await
-    }
-
-    async fn snapshot_classifier_signals(&self, law_name: &str) -> Result<(), StoreError> {
-        self.snapshot_classifier_signals(law_name).await
-    }
-
-    async fn snapshot_llm_signals(&self, law_name: &str) -> Result<(), StoreError> {
-        self.snapshot_llm_signals(law_name).await
-    }
 }
 
 #[cfg(test)]

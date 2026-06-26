@@ -193,7 +193,7 @@ pub(crate) async fn enrich_single_law(
 
     // Stage 4b: Write per-actor regex signals to provision_actors
     {
-        let mut actor_rows: Vec<(String, String, String, Option<String>, String, String)> = Vec::new();
+        let mut actor_rows = Vec::new();
         for pt in &provision_taxa {
             let drrp = pt.drrp_types.first().cloned();
             for actor in &pt.actors {

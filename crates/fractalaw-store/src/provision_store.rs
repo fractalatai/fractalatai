@@ -54,11 +54,6 @@ pub trait ProvisionStore: Send + Sync {
         Ok(0)
     }
 
-    /// Write classifier actor predictions to cls_actors for specific provisions.
-    async fn write_cls_actors(&self, _updates: &[(String, String)]) -> Result<(), StoreError> {
-        Ok(()) // default no-op
-    }
-
     /// Upsert per-actor signals into provision_actors table.
     /// Each tuple: (section_id, actor_label, actor_category, drrp, position, tier)
     /// tier = "regex" | "classifier" | "llm"
@@ -67,23 +62,5 @@ pub trait ProvisionStore: Send + Sync {
         _actors: &[(String, String, String, Option<String>, String, String)],
     ) -> Result<(), StoreError> {
         Ok(()) // default no-op, PgStore overrides
-    }
-
-    /// Copy current drrp_types/actors to regex_drrp/regex_actors for a law.
-    /// Called after taxa parse to preserve the regex tier signal.
-    async fn snapshot_regex_signals(&self, _law_name: &str) -> Result<(), StoreError> {
-        Ok(()) // default no-op, PgStore overrides
-    }
-
-    /// Copy current drrp_types/actors to cls_drrp/cls_actors for a law.
-    /// Called after taxa classify to preserve the classifier tier signal.
-    async fn snapshot_classifier_signals(&self, _law_name: &str) -> Result<(), StoreError> {
-        Ok(())
-    }
-
-    /// Copy current drrp_types/actors to llm_drrp/llm_actors for a law.
-    /// Called after taxa validate to preserve the LLM tier signal.
-    async fn snapshot_llm_signals(&self, _law_name: &str) -> Result<(), StoreError> {
-        Ok(())
     }
 }

@@ -1,4 +1,4 @@
-# Session: Position Classifier Quality (ACTIVE)
+# Session: Position Classifier Quality (CLOSED)
 
 ## Problem
 
@@ -354,11 +354,32 @@ DRRP classifier elevation rules (taxa.rs:2599-2641):
 
 **Position classifier has NO elevation rules.** When the position classifier disagrees with regex, it silently overrides to `mentioned` (taxa.rs:2858-2863). There's no `pending_llm` flagging, no LLM adjudication, no disagreement tracking for positions. This is the fundamental gap — DRRP has a principled disagreement→LLM path, positions don't.
 
+## Outstanding in this session
+
+### Cleanup ✅
+- ✅ Dropped 8 per-tier columns from legislation_text (superseded by provision_actors)
+- ✅ Removed snapshot_regex/classifier/llm_signals and write_cls_actors from ProvisionStore + PgStore
+- ✅ Archived position_classifier_v1.json → v1.json.archived
+
+### Corpus-wide (carried to daughter sessions)
+- ⬜ 51K false-mentioned actors in non-benchmark corpus — NOT FIXED. Full corpus needs re-parse + re-classify to populate provision_actors. Carried to reconciliation session.
+- ⬜ DRRP classifier agreement recording — currently writes to legislation_text (cls_drrp on agree). This is now redundant since provision_actors captures it. The taxa.rs agreement code can be simplified in a future cleanup. Low priority.
+
+## Daughter sessions created
+
+- `cascade/06-26-26-reconciliation.md` — reconcile engine, LLM elevation, sertantai backfill
+- `cascade/06-26-26-benchmark-qa.md` — per-tier benchmarking from provision_actors
+- `cascade/06-26-26-classifier-training.md` — improve position classifier, GBT fallback, local LLM
+
 ## Key files
 
-- `crates/fractalaw-cli/src/commands/taxa.rs:2858` — the override logic (the bug)
-- `crates/fractalaw-core/src/taxa/` — regex actor extraction, position assignment
-- `crates/fractalaw-ai/src/position_classifier.rs` — position classifier
-- `scripts/retrain_drrp_classifier.py` — training pipeline
-- `data/position_classifier_v1.pkl` — trained model weights
+- `crates/fractalaw-cli/src/commands/taxa.rs` — classify + position classifier
+- `crates/fractalaw-cli/src/commands/pipeline.rs` — parse → provision_actors write
+- `crates/fractalaw-ai/src/position_classifier.rs` — 4-class, 411 features
+- `crates/fractalaw-store/src/pg.rs` — upsert_provision_actors
+- `crates/fractalaw-store/src/provision_store.rs` — trait with new methods
+- `scripts/train_position_classifier.py` — v2 training script
+- `scripts/benchmark_report.py` — rewritten but needs provision_actors update
+- `docs/position_classifier_v2.json` — active weights
+- `docs/position_classifier_v1.json` — deprecated, archive
 - `.claude/sessions/cascade/06-11-26-position-classifier.md` — original training session
