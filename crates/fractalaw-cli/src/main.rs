@@ -496,6 +496,12 @@ enum TaxaAction {
         #[command(flatten)]
         zenoh: ZenohArgs,
     },
+    /// Reconcile per-tier signals (regex/classifier/LLM) into final drrp_types + actors
+    Reconcile {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: String,
+    },
     /// Whole-law LLM validation: send all provisions + parse results to LLM
     Validate {
         /// Specific laws (comma-separated)
@@ -743,6 +749,12 @@ async fn main() -> anyhow::Result<()> {
                     (None, None) => None,
                 };
                 cmd_taxa_status(&store, combined_laws, law_file, summary, stage)
+            }
+            TaxaAction::Reconcile { laws } => {
+                let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
+                let law_names: Vec<String> =
+                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                cmd_taxa_reconcile(lance.as_ref(), &law_names).await
             }
             TaxaAction::AuditFitness {
                 laws,

@@ -200,6 +200,46 @@ impl PgStore {
         Ok(())
     }
 
+    /// Copy drrp_types/actors → regex_drrp/regex_actors for a law.
+    pub async fn snapshot_regex_signals(&self, law_name: &str) -> Result<(), StoreError> {
+        sqlx::query(
+            "UPDATE legislation_text SET regex_drrp = drrp_types, regex_actors = actors \
+             WHERE law_name = $1 AND extraction_method = 'regex'"
+        )
+        .bind(law_name)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("snapshot_regex: {e}")))?;
+        Ok(())
+    }
+
+    /// Copy drrp_types/actors → cls_drrp/cls_actors for classified provisions.
+    pub async fn snapshot_classifier_signals(&self, law_name: &str) -> Result<(), StoreError> {
+        sqlx::query(
+            "UPDATE legislation_text SET cls_drrp = drrp_types, cls_actors = actors, \
+             cls_confidence = taxa_confidence \
+             WHERE law_name = $1 AND extraction_method = 'classifier'"
+        )
+        .bind(law_name)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("snapshot_classifier: {e}")))?;
+        Ok(())
+    }
+
+    /// Copy drrp_types/actors → llm_drrp/llm_actors for LLM-validated provisions.
+    pub async fn snapshot_llm_signals(&self, law_name: &str) -> Result<(), StoreError> {
+        sqlx::query(
+            "UPDATE legislation_text SET llm_drrp = drrp_types, llm_actors = actors \
+             WHERE law_name = $1 AND extraction_method IN ('agentic', 'agentic_unvalidated')"
+        )
+        .bind(law_name)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("snapshot_llm: {e}")))?;
+        Ok(())
+    }
+
     /// Delete provisions for a law.
     pub async fn delete_law_lat(&self, law_name: &str) -> Result<usize, StoreError> {
         let result = sqlx::query("DELETE FROM legislation_text WHERE law_name = $1")
@@ -652,6 +692,18 @@ impl crate::ProvisionStore for PgStore {
 
     async fn legislation_text_count(&self) -> Result<usize, StoreError> {
         self.legislation_text_count().await
+    }
+
+    async fn snapshot_regex_signals(&self, law_name: &str) -> Result<(), StoreError> {
+        self.snapshot_regex_signals(law_name).await
+    }
+
+    async fn snapshot_classifier_signals(&self, law_name: &str) -> Result<(), StoreError> {
+        self.snapshot_classifier_signals(law_name).await
+    }
+
+    async fn snapshot_llm_signals(&self, law_name: &str) -> Result<(), StoreError> {
+        self.snapshot_llm_signals(law_name).await
     }
 }
 

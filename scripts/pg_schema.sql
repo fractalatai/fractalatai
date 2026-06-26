@@ -58,7 +58,15 @@ CREATE TABLE IF NOT EXISTS legislation_text (
     ancestor_distance    INTEGER,
     holder_inferred_from TEXT,
     actors              JSONB,
-    drrp_history        TEXT
+    drrp_history        TEXT,
+    -- Per-tier signal columns (separate from reconciled drrp_types/actors)
+    regex_drrp          TEXT[],
+    regex_actors        JSONB,
+    cls_drrp            TEXT[],
+    cls_actors          JSONB,
+    cls_confidence      REAL,
+    llm_drrp            TEXT[],
+    llm_actors          JSONB
 );
 
 CREATE INDEX IF NOT EXISTS idx_lt_law_name ON legislation_text (law_name);

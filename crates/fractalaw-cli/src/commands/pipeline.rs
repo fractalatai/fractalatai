@@ -191,6 +191,9 @@ pub(crate) async fn enrich_single_law(
     write_provision_taxa(lance, law_name, &provision_taxa, &existing_tiers, force)
         .await?;
 
+    // Stage 4b: Snapshot regex signals (preserves regex tier output separately)
+    lance.snapshot_regex_signals(law_name).await.ok();
+
     // Stage 5: Write law-level taxa to DuckDB
     write_law_taxa(store, law_name, &taxa)
 

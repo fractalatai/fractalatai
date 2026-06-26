@@ -53,4 +53,22 @@ pub trait ProvisionStore: Send + Sync {
     async fn delete_law_annotations(&self, _law_name: &str) -> Result<usize, StoreError> {
         Ok(0)
     }
+
+    /// Copy current drrp_types/actors to regex_drrp/regex_actors for a law.
+    /// Called after taxa parse to preserve the regex tier signal.
+    async fn snapshot_regex_signals(&self, _law_name: &str) -> Result<(), StoreError> {
+        Ok(()) // default no-op, PgStore overrides
+    }
+
+    /// Copy current drrp_types/actors to cls_drrp/cls_actors for a law.
+    /// Called after taxa classify to preserve the classifier tier signal.
+    async fn snapshot_classifier_signals(&self, _law_name: &str) -> Result<(), StoreError> {
+        Ok(())
+    }
+
+    /// Copy current drrp_types/actors to llm_drrp/llm_actors for a law.
+    /// Called after taxa validate to preserve the LLM tier signal.
+    async fn snapshot_llm_signals(&self, _law_name: &str) -> Result<(), StoreError> {
+        Ok(())
+    }
 }
