@@ -1,4 +1,4 @@
-# Session: Benchmark QA (PENDING)
+# Session: Benchmark QA (ACTIVE)
 
 ## Context
 
@@ -16,13 +16,39 @@
 5. Per-actor-category breakdown (are Gvt actors harder than Org?)
 6. Disagreement analysis: where regex and classifier disagree, who's right?
 
-## Current baseline (from provision_actors)
+## Baseline (from provision_actors, all 20 benchmarks)
 
-- Regex DRRP: 81.3% (960/1,181 matched actors)
-- Regex Position: 47.8% (721/1,509 matched actors)
-- 1,509/4,061 gold actors matched by regex (37% recall)
+| Metric | Regex | Classifier |
+|--------|-------|-----------|
+| DRRP | 93.0% | 93.0% |
+| Position | **47.2%** | **56.9%** |
+| Actor recall | 1,414/4,061 (35%) | Same |
+
+Classifier adds +10% on position over regex. Key patterns:
+- Regex never predicts beneficiary/mentioned — assigns active/counterparty to all
+- Classifier correctly identifies 143 mentioned + 59 beneficiary that regex can't
+- Classifier loses some counterparty accuracy (130 vs 190 correct)
+- 2,647 gold actors not found by regex at all (gap-fill candidates)
+
+### Regex position confusion matrix
+```
+gold↓ pipe→        active  counterparty
+     active           477            89
+counterparty          100           190
+ beneficiary           36            48
+   mentioned          393            80
+```
+
+### Classifier position confusion matrix
+```
+gold↓ pipe→        active  counterparty   beneficiary     mentioned
+     active           473            53            28            12
+counterparty          135           130            20             5
+ beneficiary           17             8            59             0
+   mentioned          215            67            48           143
+```
 
 ## Dependencies
 
-- provision_actors populated (done)
-- Classifier signals populated for benchmarks (done for HSWA, need all 20)
+- ✅ provision_actors populated for all 20 benchmarks
+- ✅ Both regex and classifier signals populated
