@@ -1,4 +1,4 @@
-# Session: Correlative Actor Inference (ACTIVE)
+# Session: Correlative Actor Inference (CLOSED)
 
 ## Problem
 
@@ -46,7 +46,9 @@ Gemini critical review (2026-06-26) unanimously recommends Option B: separate co
    - Org: Responsible Undertaking (counterparty): 223  
    - Org: Employer (counterparty): 14
    - Matched gold actors: 1,743 → 1,758 (+15 directly matched)
-   - Note: benchmark_report.py needs update to include inferred tier in comparison
+   - ✅ benchmark_report.py updated with inferred tier
+   - **Inferred position accuracy: 86.7%** (13/15 matched gold actors correct)
+   - Ind: 100%, Org: 71.4%
 
 ## Dependencies
 
