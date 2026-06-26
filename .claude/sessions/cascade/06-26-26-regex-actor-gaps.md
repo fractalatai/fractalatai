@@ -48,7 +48,7 @@ Complex inferences the LLM makes from context that no regex or rule can replicat
 ## Remaining work
 
 1. ⬜ Debug why regex misses provisions where trigger words appear (run_patterns investigation)
-2. ⬜ Implement correlative inference rules for implied actors
+2. ✅ Correlative inference patterns identified → moved to `cascade/06-26-26-correlative-inference.md` (PENDING)
 3. ⬜ Re-run benchmark after fixes
 
 ## Key files
