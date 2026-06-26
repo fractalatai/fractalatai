@@ -174,6 +174,83 @@ pub(crate) fn cmd_taxa_status(
     Ok(())
 }
 
+/// Infer correlative actors from regex signals (Hohfeldian correlatives).
+///
+/// Reads regex-tier actors from provision_actors, applies correlative rules,
+/// and writes inferred actors with tier="inferred".
+pub(crate) async fn cmd_taxa_infer(
+    lance: &dyn ProvisionStore,
+    law_names: &[String],
+) -> anyhow::Result<()> {
+    let rules = fractalaw_core::taxa::correlatives::load_rules();
+    eprintln!("Loaded {} correlative rules", rules.len());
+
+    let mut total_inferred = 0usize;
+    let mut rule_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+
+    for law_name in law_names {
+        // Clear previous inferences for re-runnability
+        lance.clear_inferred_actors(law_name).await.ok();
+
+        // Query regex-tier actors
+        let actors = lance.query_provision_actors(law_name).await?;
+        if actors.is_empty() {
+            continue;
+        }
+
+        // Group by section_id
+        let mut by_section: std::collections::HashMap<
+            String,
+            Vec<(String, String, Option<String>, Option<String>)>,
+        > = std::collections::HashMap::new();
+        for (sid, label, category, drrp, pos) in &actors {
+            by_section
+                .entry(sid.clone())
+                .or_default()
+                .push((label.clone(), category.clone(), drrp.clone(), pos.clone()));
+        }
+
+        // Apply rules
+        let inferred = fractalaw_core::taxa::correlatives::apply_rules(&rules, &by_section);
+
+        if inferred.is_empty() {
+            continue;
+        }
+
+        // Track which rules fired
+        for inf in &inferred {
+            *rule_counts.entry(inf.actor_label.clone()).or_default() += 1;
+        }
+
+        // Build upsert tuples
+        let rows: Vec<(String, String, String, Option<String>, String, String)> = inferred
+            .iter()
+            .map(|a| {
+                (
+                    a.section_id.clone(),
+                    a.actor_label.clone(),
+                    a.actor_category.clone(),
+                    a.drrp.clone(),
+                    a.position.clone(),
+                    "inferred".to_string(),
+                )
+            })
+            .collect();
+
+        let count = rows.len();
+        lance.upsert_provision_actors(&rows).await?;
+        total_inferred += count;
+        eprintln!("  {law_name}: {count} actors inferred");
+    }
+
+    println!("Inferred {total_inferred} actors across {} laws", law_names.len());
+    for (actor, count) in rule_counts.iter() {
+        println!("  {actor}: {count}");
+    }
+
+    Ok(())
+}
+
 /// Reconcile per-tier signals into final drrp_types + actors.
 ///
 /// Reads regex_drrp/regex_actors, cls_drrp/cls_actors, llm_drrp/llm_actors

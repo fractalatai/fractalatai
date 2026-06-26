@@ -56,11 +56,25 @@ pub trait ProvisionStore: Send + Sync {
 
     /// Upsert per-actor signals into provision_actors table.
     /// Each tuple: (section_id, actor_label, actor_category, drrp, position, tier)
-    /// tier = "regex" | "classifier" | "llm"
+    /// tier = "regex" | "classifier" | "llm" | "inferred"
     async fn upsert_provision_actors(
         &self,
         _actors: &[(String, String, String, Option<String>, String, String)],
     ) -> Result<(), StoreError> {
-        Ok(()) // default no-op, PgStore overrides
+        Ok(())
+    }
+
+    /// Query provision_actors for a law — returns regex-tier signals.
+    /// Returns: Vec<(section_id, actor_label, actor_category, regex_drrp, regex_position)>
+    async fn query_provision_actors(
+        &self,
+        _law_name: &str,
+    ) -> Result<Vec<(String, String, String, Option<String>, Option<String>)>, StoreError> {
+        Ok(vec![])
+    }
+
+    /// Clear inferred actors for a law (re-runnability).
+    async fn clear_inferred_actors(&self, _law_name: &str) -> Result<usize, StoreError> {
+        Ok(0)
     }
 }

@@ -1,0 +1,27 @@
+# Correlative Actor Inference Rules
+#
+# When regex finds a trigger actor with a matching position and DRRP,
+# infer a new actor with a correlative position.
+#
+# Hohfeldian correlatives: every duty-holder (active) has a counterparty
+# who holds the correlative claim.
+
+- trigger_actor: "Ind: Employee"
+  trigger_position: active
+  trigger_drrp: Obligation
+  inferred_actor: "Org: Employer"
+  inferred_category: Org
+  inferred_position: counterparty
+  inferred_drrp: Obligation
+
+- trigger_actor: "EU: Member State"
+  trigger_position: active
+  inferred_actor: "Org: Responsible Undertaking"
+  inferred_category: Org
+  inferred_position: counterparty
+
+- trigger_actor: "Gvt: Authority: Enforcement"
+  trigger_position: active
+  inferred_actor: "Ind: Public"
+  inferred_category: Ind
+  inferred_position: beneficiary

@@ -59,16 +59,40 @@ CREATE TABLE IF NOT EXISTS legislation_text (
     holder_inferred_from TEXT,
     actors              JSONB,
     drrp_history        TEXT,
-    -- Per-tier signal columns (separate from reconciled drrp_types/actors)
-    regex_drrp          TEXT[],
-    regex_actors        JSONB,
-    cls_drrp            TEXT[],
-    cls_actors          JSONB,
-    cls_confidence      REAL,
-    llm_drrp            TEXT[],
-    llm_actors          JSONB
+    drrp_history        TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_lt_law_name ON legislation_text (law_name);
 CREATE INDEX IF NOT EXISTS idx_lt_extraction_method ON legislation_text (extraction_method);
 CREATE INDEX IF NOT EXISTS idx_lt_drrp_types ON legislation_text USING GIN (drrp_types);
+
+-- Per-actor classification signals (one row per provision×actor)
+CREATE TABLE IF NOT EXISTS provision_actors (
+    section_id        TEXT NOT NULL,
+    actor_label       TEXT NOT NULL,
+    actor_category    TEXT,
+    regex_drrp        TEXT,
+    regex_position    TEXT,
+    cls_drrp          TEXT,
+    cls_position      TEXT,
+    cls_confidence    REAL,
+    llm_drrp          TEXT,
+    llm_position      TEXT,
+    inferred_drrp     TEXT,
+    inferred_position TEXT,
+    drrp              TEXT,
+    position          TEXT,
+    extraction_method TEXT,
+    PRIMARY KEY (section_id, actor_label)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pa_section ON provision_actors (section_id);
+
+-- Gold benchmark data for QA
+CREATE TABLE IF NOT EXISTS gold_benchmarks (
+    section_id    TEXT NOT NULL,
+    actor_label   TEXT NOT NULL,
+    gold_drrp     TEXT,
+    gold_position TEXT NOT NULL,
+    PRIMARY KEY (section_id, actor_label)
+);

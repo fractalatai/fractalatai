@@ -211,6 +211,7 @@ impl PgStore {
                 "regex" => ("regex_drrp", "regex_position"),
                 "classifier" => ("cls_drrp", "cls_position"),
                 "llm" => ("llm_drrp", "llm_position"),
+                "inferred" => ("inferred_drrp", "inferred_position"),
                 _ => continue,
             };
             let sql = format!(
@@ -231,6 +232,54 @@ impl PgStore {
                 .map_err(|e| StoreError::Other(format!("upsert_provision_actors: {e}")))?;
         }
         Ok(())
+    }
+
+    /// Query provision_actors for a law — returns regex-tier signals.
+    pub async fn query_provision_actors(
+        &self,
+        law_name: &str,
+    ) -> Result<Vec<(String, String, String, Option<String>, Option<String>)>, StoreError> {
+        let rows = sqlx::query_as::<_, (String, String, String, Option<String>, Option<String>)>(
+            "SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, pa.regex_position \
+             FROM provision_actors pa \
+             JOIN legislation_text lt ON pa.section_id = lt.section_id \
+             WHERE lt.law_name = $1 AND pa.regex_position IS NOT NULL"
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_provision_actors: {e}")))?;
+        Ok(rows)
+    }
+
+    /// Clear inferred actors for a law (re-runnability).
+    pub async fn clear_inferred_actors(&self, law_name: &str) -> Result<usize, StoreError> {
+        // NULL out inferred columns
+        let r1 = sqlx::query(
+            "UPDATE provision_actors pa SET inferred_drrp = NULL, inferred_position = NULL \
+             FROM legislation_text lt \
+             WHERE pa.section_id = lt.section_id AND lt.law_name = $1 \
+             AND pa.inferred_drrp IS NOT NULL"
+        )
+        .bind(law_name)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("clear_inferred: {e}")))?;
+
+        // Delete purely-inferred rows (no regex/cls/llm signals)
+        let r2 = sqlx::query(
+            "DELETE FROM provision_actors pa USING legislation_text lt \
+             WHERE pa.section_id = lt.section_id AND lt.law_name = $1 \
+             AND pa.regex_drrp IS NULL AND pa.regex_position IS NULL \
+             AND pa.cls_drrp IS NULL AND pa.cls_position IS NULL \
+             AND pa.llm_drrp IS NULL AND pa.llm_position IS NULL"
+        )
+        .bind(law_name)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("delete_inferred: {e}")))?;
+
+        Ok(r1.rows_affected() as usize + r2.rows_affected() as usize)
     }
 
     /// Delete provisions for a law.
@@ -694,6 +743,16 @@ impl crate::ProvisionStore for PgStore {
         self.upsert_provision_actors(actors).await
     }
 
+    async fn query_provision_actors(
+        &self,
+        law_name: &str,
+    ) -> Result<Vec<(String, String, String, Option<String>, Option<String>)>, StoreError> {
+        self.query_provision_actors(law_name).await
+    }
+
+    async fn clear_inferred_actors(&self, law_name: &str) -> Result<usize, StoreError> {
+        self.clear_inferred_actors(law_name).await
+    }
 }
 
 #[cfg(test)]

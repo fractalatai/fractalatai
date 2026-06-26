@@ -33,13 +33,15 @@ Gemini critical review (2026-06-26) unanimously recommends Option B: separate co
 
 **Worth building for 200 actors?** Yes — 200 in benchmarks likely means thousands in full corpus. Rules are deterministic, explainable, and free vs LLM calls.
 
-## Implementation plan
+## Implementation
 
-1. Add `inferred_drrp`, `inferred_position` columns to provision_actors
-2. Build `taxa infer` command — reads regex signals, applies correlative rules, writes inferred tier
-3. Define correlative rules (start with the 3 proven patterns)
-4. Wire into pipeline: parse → infer → classify → reconcile
-5. Re-run benchmark to measure impact
+1. ✅ Add `inferred_drrp`, `inferred_position` columns to provision_actors
+2. ✅ PgStore: extend upsert tier + query_provision_actors + clear_inferred_actors
+3. ✅ Correlative rules: `docs/correlative-rules.yaml` + `fractalaw-core/src/taxa/correlatives.rs` (3 tests pass)
+4. ✅ `cmd_taxa_infer` command in taxa.rs
+5. ✅ CLI wiring: `TaxaAction::Infer` + dispatch
+6. ✅ Verified: HSWA → 27 actors inferred (26 Public beneficiary, 1 Employer counterparty). Idempotent.
+7. ⬜ Run benchmark across all 20 laws to measure impact
 
 ## Dependencies
 

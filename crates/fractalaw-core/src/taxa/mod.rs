@@ -30,6 +30,7 @@ pub mod actors;
 pub mod clause_refiner;
 pub mod clause_structure;
 pub mod confidence;
+pub mod correlatives;
 pub mod decision;
 pub mod duty_patterns;
 pub mod duty_patterns_offence;
