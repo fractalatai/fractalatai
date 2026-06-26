@@ -1,4 +1,4 @@
-# Session: Regex Actor Pattern Gaps (ACTIVE)
+# Session: Regex Actor Pattern Gaps (CLOSED)
 
 ## Problem
 
