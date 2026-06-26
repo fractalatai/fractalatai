@@ -35,11 +35,11 @@ compliance body (18), authorised person (17), Company (17),
 Commission (16), competent authority (16), Authority (16)
 ```
 
-### Actions needed
-1. **Dictionary expansion** — add missing actors (undertaking, appellant, scheme administrator etc.) to actor-dictionary.yaml
-2. **Gold cleanup** — remove non-actor entries (electrical equipment, civil explosive) from benchmarks
-3. **ALIASES expansion** — map natural-language gold labels to canonical (Member States → EU: Member States, etc.)
-4. **Regex improvement** — handle implied actors (employee provision → infer employer)
+### Actions (iterative)
+1. ✅ **ALIASES expansion** — shared `scripts/actor_aliases.py` with 80+ mappings. Matched actors: 986 → 1,428 (+45%)
+2. ✅ **Gold cleanup** — 107 non-actors removed (electrical equipment, civil explosive, etc.)
+3. ⬜ **Regex pattern gaps** — 2,527 canonical actors still not found by regex. Top: Org: Undertaking (78), Org: Manufacturer (53), Gvt: Authority (53), Org: Employer (32). These have dictionary triggers but regex doesn't fire on the provision text.
+4. ⬜ **Implied actors** — 32 provisions where "employer" is gold but text only mentions "employee". Needs inference or inheritance.
 
 ## Classifier v2 stats
 
