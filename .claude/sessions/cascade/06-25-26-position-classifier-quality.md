@@ -289,7 +289,7 @@ Key feedback:
 
 1. ✅ Create `provision_actors` table
 2. ✅ Populate from existing actors JSONB (124K actors, 72K with regex_drrp)
-3. Modify `taxa parse` to write regex_drrp + regex_position to provision_actors
+3. ✅ Modify `taxa parse` to write regex_drrp + regex_position to provision_actors (tested: HSWA 914 actors)
 4. Modify `taxa classify` to write cls_drrp + cls_position to provision_actors
 5. Build `taxa reconcile` reading from provision_actors
 6. Run benchmark QA per-tier

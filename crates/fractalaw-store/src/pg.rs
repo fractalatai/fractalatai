@@ -214,6 +214,39 @@ impl PgStore {
         Ok(())
     }
 
+    /// Upsert per-actor signals into provision_actors.
+    /// Each tuple: (section_id, actor_label, actor_category, drrp, position, tier)
+    pub async fn upsert_provision_actors(
+        &self,
+        actors: &[(String, String, String, Option<String>, String, String)],
+    ) -> Result<(), StoreError> {
+        for (sid, label, category, drrp, position, tier) in actors {
+            let (drrp_col, pos_col) = match tier.as_str() {
+                "regex" => ("regex_drrp", "regex_position"),
+                "classifier" => ("cls_drrp", "cls_position"),
+                "llm" => ("llm_drrp", "llm_position"),
+                _ => continue,
+            };
+            let sql = format!(
+                "INSERT INTO provision_actors (section_id, actor_label, actor_category, {drrp_col}, {pos_col}) \
+                 VALUES ($1, $2, $3, $4, $5) \
+                 ON CONFLICT (section_id, actor_label) DO UPDATE SET \
+                 actor_category = COALESCE(EXCLUDED.actor_category, provision_actors.actor_category), \
+                 {drrp_col} = EXCLUDED.{drrp_col}, {pos_col} = EXCLUDED.{pos_col}"
+            );
+            sqlx::query(&sql)
+                .bind(sid)
+                .bind(label)
+                .bind(category)
+                .bind(drrp.as_deref())
+                .bind(position)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| StoreError::Other(format!("upsert_provision_actors: {e}")))?;
+        }
+        Ok(())
+    }
+
     /// Copy drrp_types/actors → regex_drrp/regex_actors for a law.
     /// Snapshots ALL provisions with taxa data (not just extraction_method=regex),
     /// because the classifier may change extraction_method later.
@@ -714,6 +747,13 @@ impl crate::ProvisionStore for PgStore {
 
     async fn write_cls_actors(&self, updates: &[(String, String)]) -> Result<(), StoreError> {
         self.write_cls_actors(updates).await
+    }
+
+    async fn upsert_provision_actors(
+        &self,
+        actors: &[(String, String, String, Option<String>, String, String)],
+    ) -> Result<(), StoreError> {
+        self.upsert_provision_actors(actors).await
     }
 
     async fn snapshot_regex_signals(&self, law_name: &str) -> Result<(), StoreError> {

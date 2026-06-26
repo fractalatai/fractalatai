@@ -191,8 +191,31 @@ pub(crate) async fn enrich_single_law(
     write_provision_taxa(lance, law_name, &provision_taxa, &existing_tiers, force)
         .await?;
 
-    // Stage 4b: Snapshot regex signals (preserves regex tier output separately)
-    lance.snapshot_regex_signals(law_name).await.ok();
+    // Stage 4b: Write per-actor regex signals to provision_actors
+    {
+        let mut actor_rows: Vec<(String, String, String, Option<String>, String, String)> = Vec::new();
+        for pt in &provision_taxa {
+            let drrp = pt.drrp_types.first().cloned();
+            for actor in &pt.actors {
+                let category = if actor.label.contains(':') {
+                    actor.label.split(':').next().unwrap_or("other").trim().to_string()
+                } else {
+                    "other".to_string()
+                };
+                actor_rows.push((
+                    pt.section_id.clone(),
+                    actor.label.clone(),
+                    category,
+                    drrp.clone(),
+                    actor.position.clone(),
+                    "regex".to_string(),
+                ));
+            }
+        }
+        if !actor_rows.is_empty() {
+            lance.upsert_provision_actors(&actor_rows).await.ok();
+        }
+    }
 
     // Stage 5: Write law-level taxa to DuckDB
     write_law_taxa(store, law_name, &taxa)

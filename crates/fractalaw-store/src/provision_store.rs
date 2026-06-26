@@ -59,6 +59,16 @@ pub trait ProvisionStore: Send + Sync {
         Ok(()) // default no-op
     }
 
+    /// Upsert per-actor signals into provision_actors table.
+    /// Each tuple: (section_id, actor_label, actor_category, drrp, position, tier)
+    /// tier = "regex" | "classifier" | "llm"
+    async fn upsert_provision_actors(
+        &self,
+        _actors: &[(String, String, String, Option<String>, String, String)],
+    ) -> Result<(), StoreError> {
+        Ok(()) // default no-op, PgStore overrides
+    }
+
     /// Copy current drrp_types/actors to regex_drrp/regex_actors for a law.
     /// Called after taxa parse to preserve the regex tier signal.
     async fn snapshot_regex_signals(&self, _law_name: &str) -> Result<(), StoreError> {
