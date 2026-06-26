@@ -1,4 +1,4 @@
-# Session: Position Classifier Training (PENDING)
+# Session: Position Classifier Training (ACTIVE)
 
 ## Context
 
@@ -22,13 +22,40 @@ Position classifier v2 trained with correct features (Obligation/Liberty, 4 clas
 - Class distribution: active 1,282, counterparty 905, beneficiary 374, mentioned 1,499
 - Weights: `docs/position_classifier_v2.json`
 
-## Gemini review feedback
+## Gemini critical review (2026-06-26)
 
-- Fix data/logic first — LR may suffice once features work correctly
-- Non-embedding features matter — modal, DRRP, category will contribute
-- 2,200 provisions adequate for LR. Watch beneficiary class imbalance
-- Confidence thresholding for LLM escalation (< 0.7 → escalate)
-- GBT as fallback if LR < 80%
+### Core problems identified
+
+1. **65% actor recall is the #1 problem** — classifier accuracy is misleadingly high because we only classify 35% of gold actors. The rest aren't even found by regex. This must be solved before optimising the classifier.
+
+2. **LR is fundamentally limited** — linear model can't capture non-linear interactions between features. The 384-dim embedding dominates; the other 27 features have minimal impact via LR.
+
+3. **Feature engineering is too superficial** — modal keyword presence and text offset aren't enough. Need grammatical role (subject/object), dependency parsing, clause structure, verb voice (active/passive).
+
+4. **DRRP feature is per-provision, but position is per-actor** — misleading when a provision has multiple actors with different roles. All actors get the same DRRP signal.
+
+5. **Text offset feature is broken** — `text.find(label)` is fragile, 0.5 default is noise. Replace with proper NER span extraction.
+
+### Prioritised action plan (from Gemini)
+
+**Tier 1 — Foundational (must do)**
+1. Solve actor recall (65% missed) — custom NER or expanded regex patterns
+2. Upgrade embedding — Legal-BERT or domain-specific model instead of all-MiniLM-L6-v2
+3. Switch to GBT (XGBoost/LightGBM) — non-linear, handles mixed features
+4. Deep-dive the 182 "agree + wrong" cases — find systematic patterns
+
+**Tier 2 — Significant impact**
+5. Dependency parsing features — grammatical role, main verb, active/passive voice
+6. Fix positional features — NER entity span, not text.find()
+7. Address beneficiary class imbalance — oversampling or focal loss
+
+**Tier 3 — Refinements**
+8. Make DRRP actor-specific (not per-provision)
+9. Coreference resolution (pronouns → canonical actors)
+10. Try MLP if GBT plateaus
+
+### Realistic ceiling assessment
+80% achievable without LLM IF actor recall is solved + rich features + GBT. The 20% LLM tier handles truly ambiguous cases.
 
 ## From benchmark-qa session (all done)
 
