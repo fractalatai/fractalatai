@@ -41,7 +41,12 @@ Gemini critical review (2026-06-26) unanimously recommends Option B: separate co
 4. ✅ `cmd_taxa_infer` command in taxa.rs
 5. ✅ CLI wiring: `TaxaAction::Infer` + dispatch
 6. ✅ Verified: HSWA → 27 actors inferred (26 Public beneficiary, 1 Employer counterparty). Idempotent.
-7. ⬜ Run benchmark across all 20 laws to measure impact
+7. ✅ Run infer across all 20 benchmark laws: **615 actors inferred**
+   - Ind: Public (beneficiary): 378
+   - Org: Responsible Undertaking (counterparty): 223  
+   - Org: Employer (counterparty): 14
+   - Matched gold actors: 1,743 → 1,758 (+15 directly matched)
+   - Note: benchmark_report.py needs update to include inferred tier in comparison
 
 ## Dependencies
 
