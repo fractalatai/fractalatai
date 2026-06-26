@@ -54,6 +54,11 @@ pub trait ProvisionStore: Send + Sync {
         Ok(0)
     }
 
+    /// Write classifier actor predictions to cls_actors for specific provisions.
+    async fn write_cls_actors(&self, _updates: &[(String, String)]) -> Result<(), StoreError> {
+        Ok(()) // default no-op
+    }
+
     /// Copy current drrp_types/actors to regex_drrp/regex_actors for a law.
     /// Called after taxa parse to preserve the regex tier signal.
     async fn snapshot_regex_signals(&self, _law_name: &str) -> Result<(), StoreError> {

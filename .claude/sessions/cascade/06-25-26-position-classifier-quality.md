@@ -184,51 +184,116 @@ When regex and retrained classifier disagree on position, flag as `pending_llm` 
 
 Target: legal relation accuracy >80%. The benchmark script now tests the right thing.
 
-### Revised architecture: separate signals from decisions
+### Revised architecture (v2): normalised per-actor signals
 
-The current architecture tangles regex output, classifier output, and reconciliation into one pass. This makes it impossible to re-run one tier without corrupting another, and debugging requires reverting data.
+The v1 architecture (per-provision columns) was wrong because the unit of classification is **(provision, actor)**, not provision. A single provision can have multiple actors, each with a different DRRP type and position:
 
-**New design: store each tier's signal separately, reconcile as a distinct step.**
+```
+s.2(1) HSWA:
+  Org: Employer  → Obligation, active (bears the duty)
+  Ind: Employee  → Obligation, counterparty (holds the claim)
+```
 
-#### Per-provision columns in Postgres
+Flat columns on `legislation_text` (regex_drrp, cls_drrp, etc.) can't represent per-actor signals. JSONB actors columns require parsing for every comparison. Neither is queryable or benchmarkable per-actor.
 
-| Column | What | Written by |
-|--------|------|-----------|
-| `regex_drrp` | Regex DRRP prediction | `taxa parse` |
-| `regex_actors` | Regex actor positions (JSONB) | `taxa parse` |
-| `cls_drrp` | Classifier DRRP prediction | `taxa classify` |
-| `cls_actors` | Classifier actor positions (JSONB) | `taxa classify` |
-| `cls_confidence` | Classifier confidence | `taxa classify` |
-| `llm_drrp` | LLM DRRP prediction | `taxa validate` |
-| `llm_actors` | LLM actor positions (JSONB) | `taxa validate` |
-| `drrp_types` | **Final reconciled** DRRP | `taxa reconcile` (new) |
-| `actors` | **Final reconciled** actors | `taxa reconcile` (new) |
-| `extraction_method` | Which tier won | `taxa reconcile` |
+#### New table: `provision_actors`
 
-#### Pipeline steps (independent, re-runnable)
+One row per (section_id, actor_label). Each tier writes to its own columns. No JSON parsing for benchmarking.
 
-1. `taxa parse` — regex only → writes `regex_drrp`, `regex_actors`
-2. `taxa embed` — embeddings (unchanged)
-3. `taxa classify` — classifier only → writes `cls_drrp`, `cls_actors`, `cls_confidence`
-4. `taxa reconcile` (NEW) — reads all signals, picks winner → writes `drrp_types`, `actors`, `extraction_method`
-5. `taxa validate` — LLM for disagreements → writes `llm_drrp`, `llm_actors`
-6. `taxa reconcile` — re-run after validate to incorporate LLM results
+```sql
+CREATE TABLE provision_actors (
+    section_id      TEXT NOT NULL,
+    actor_label     TEXT NOT NULL,    -- "Org: Employer"
+    actor_category  TEXT,            -- "Org" (extracted from label prefix)
 
-#### Benefits
+    -- Regex tier signals
+    regex_drrp      TEXT,            -- "Obligation"
+    regex_position  TEXT,            -- "active"
 
-- Re-run classifier without touching regex data
-- Re-run reconciliation without re-running regex or classifier
-- Inspect each tier's output independently
-- Benchmark QA can compare gold vs any tier (regex, classifier, reconciled)
-- No more "revert to regex" — regex output is always preserved
-- Reconciliation rules can be tuned without re-processing
+    -- Classifier tier signals
+    cls_drrp        TEXT,            -- "Obligation"
+    cls_position    TEXT,            -- "mentioned"
+    cls_confidence  REAL,            -- 0.92
 
-#### Reconciliation rules (in `taxa reconcile`)
+    -- LLM tier signals
+    llm_drrp        TEXT,            -- "Obligation"
+    llm_position    TEXT,            -- "active"
 
-1. If regex + classifier agree → high confidence, use that answer
-2. If they disagree → flag for LLM, use regex as interim answer
-3. If LLM has answered → LLM wins (highest tier)
-4. Confidence thresholding: if classifier confidence < 0.7, don't trust it even if it agrees
+    -- Reconciled (final answer — what sertantai consumes)
+    drrp            TEXT,            -- "Obligation"
+    position        TEXT,            -- "active"
+    extraction_method TEXT,          -- "agentic"
+
+    PRIMARY KEY (section_id, actor_label)
+);
+
+CREATE INDEX idx_pa_section ON provision_actors (section_id);
+```
+
+#### Pipeline steps
+
+1. `taxa parse` — regex → writes `regex_drrp`, `regex_position` per (section_id, actor)
+2. `taxa embed` — embeddings (unchanged, stays on legislation_text)
+3. `taxa classify` — classifier → writes `cls_drrp`, `cls_position`, `cls_confidence` per (section_id, actor)
+4. `taxa reconcile` — reads all tier columns, writes `drrp`, `position`, `extraction_method`
+5. `taxa validate` — LLM for disagreements → writes `llm_drrp`, `llm_position`
+6. `taxa reconcile` — re-run to incorporate LLM
+
+#### Benchmark QA (per-actor, per-tier)
+
+```sql
+-- Compare regex positions against gold
+SELECT pa.section_id, pa.actor_label, pa.regex_position, g.gold_position
+FROM provision_actors pa
+JOIN gold_benchmarks g ON pa.section_id = g.section_id AND pa.actor_label = g.actor_label
+WHERE pa.regex_position != g.gold_position;
+
+-- Position accuracy per tier
+SELECT 'regex' as tier,
+  count(*) FILTER (WHERE regex_position = gold_position) as correct,
+  count(*) as total
+FROM provision_actors pa JOIN gold_benchmarks g USING (section_id, actor_label)
+UNION ALL
+SELECT 'classifier',
+  count(*) FILTER (WHERE cls_position = gold_position),
+  count(cls_position)
+FROM provision_actors pa JOIN gold_benchmarks g USING (section_id, actor_label);
+```
+
+#### Benefits over v1 (JSONB columns)
+
+- Each signal is a plain TEXT column — queryable, indexable, no JSON parsing
+- Benchmark is a simple JOIN, not Python JSONB extraction
+- Re-run any tier independently — writes to its own columns only
+- Per-actor granularity matches the gold standard format
+- `legislation_text` stays clean — provision-level data only (text, embeddings)
+- `provision_actors` has the classification signals — one row per actor
+
+#### What stays on legislation_text
+
+- All LAT columns (text, section_type, hierarchy_path, etc.)
+- Embeddings (vector)
+- The existing `drrp_types` / `actors` / `extraction_method` stay for backward compat with sertantai publish — updated from `provision_actors` during reconcile
+
+#### Gemini harsh review (2026-06-26)
+
+Key feedback:
+1. **PK (section_id, actor_label) is fine** — checked gold benchmarks: 1/1,711 has a dupe (data quality issue, not schema). Safe for our data.
+2. **Migration is a full re-run** — can't reconstruct per-actor DRRP from old per-provision drrp_types. Must re-parse all provisions. This is OK since regex is fast.
+3. **Actor identity** — string matching is fragile. Already have actor dictionary for normalisation. FK to dictionary is a future improvement.
+4. **Case/enum validation** — already normalise in code but should enforce. Defer.
+5. **Versioning/audit** — not needed now. drrp_history JSON already captures tier progression.
+6. **500K rows is trivial** for Postgres. Not a concern.
+
+#### Implementation order
+
+1. Create `provision_actors` table
+2. Populate from existing actors JSONB (migration script)
+3. Modify `taxa parse` to write regex_drrp + regex_position to provision_actors
+4. Modify `taxa classify` to write cls_drrp + cls_position to provision_actors
+5. Build `taxa reconcile` reading from provision_actors
+6. Run benchmark QA per-tier
+7. Backfill legislation_text drrp_types/actors from provision_actors (sertantai compat)
 
 ### Order of work
 

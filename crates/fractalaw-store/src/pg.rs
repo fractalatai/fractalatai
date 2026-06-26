@@ -200,6 +200,20 @@ impl PgStore {
         Ok(())
     }
 
+    /// Write classifier actor predictions to cls_actors column.
+    /// Input: Vec of (section_id, json_string) pairs.
+    pub async fn write_cls_actors(&self, updates: &[(String, String)]) -> Result<(), StoreError> {
+        for (sid, json) in updates {
+            sqlx::query("UPDATE legislation_text SET cls_actors = $1::jsonb WHERE section_id = $2")
+                .bind(json)
+                .bind(sid)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| StoreError::Other(format!("write_cls_actors: {e}")))?;
+        }
+        Ok(())
+    }
+
     /// Copy drrp_types/actors → regex_drrp/regex_actors for a law.
     /// Snapshots ALL provisions with taxa data (not just extraction_method=regex),
     /// because the classifier may change extraction_method later.
@@ -696,6 +710,10 @@ impl crate::ProvisionStore for PgStore {
 
     async fn legislation_text_count(&self) -> Result<usize, StoreError> {
         self.legislation_text_count().await
+    }
+
+    async fn write_cls_actors(&self, updates: &[(String, String)]) -> Result<(), StoreError> {
+        self.write_cls_actors(updates).await
     }
 
     async fn snapshot_regex_signals(&self, law_name: &str) -> Result<(), StoreError> {

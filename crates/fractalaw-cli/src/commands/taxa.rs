@@ -2719,8 +2719,15 @@ pub(crate) async fn cmd_taxa_classify(
                     has_obligation_modal(text) && has_enabling_modal(text);
 
                 if prediction.class == fractalaw_ai::DrrpClass::None {
-                    // Classifier says none — flag for LLM if both modals present
-                    if both_modals && has_drrp {
+                    if !has_drrp {
+                        // Both agree: none — record classifier confirmation
+                        cls_sid_b.append_value(sid);
+                        cls_drrp_b.values().append_value("none");
+                        cls_drrp_b.append(true);
+                        cls_method_b.append_value("regex"); // confirmed, no tier change
+                        cls_conf_b.append_value(prediction.confidence);
+                    } else if both_modals {
+                        // Classifier says none but regex has DRRP + both modals — flag for LLM
                         disagreements += 1;
                     }
                     continue;
@@ -2728,6 +2735,7 @@ pub(crate) async fn cmd_taxa_classify(
 
                 // Transition rules:
                 // - Gap fill (regex=none, classifier=DRRP): classifier wins if confident
+                // - Agreement (regex=X, classifier=X): record confirmation
                 // - Disagreement (regex=X, classifier=Y): flag for LLM, don't override
                 // - Both modals present: flag for LLM
                 let threshold = if has_drrp { 0.75 } else { 0.7 };
@@ -2766,6 +2774,15 @@ pub(crate) async fn cmd_taxa_classify(
                     cls_conf_b.append_value(prediction.confidence);
                     disagreements += 1;
                     total_classified += 1;
+                } else if has_drrp
+                    && regex_drrp.is_some_and(|r| r == cls_drrp)
+                {
+                    // Agreement: regex and classifier predict the same DRRP
+                    cls_sid_b.append_value(sid);
+                    cls_drrp_b.values().append_value(cls_drrp);
+                    cls_drrp_b.append(true);
+                    cls_method_b.append_value("regex"); // confirmed, no tier change
+                    cls_conf_b.append_value(prediction.confidence);
                 } else if both_modals && has_drrp {
                     // Both obligation + enabling modals — ambiguous, flag for LLM
                     disagreements += 1;
@@ -2833,6 +2850,7 @@ pub(crate) async fn cmd_taxa_classify(
                 let mut pos_classified = 0usize;
                 type ActorTuple = (String, String, Option<String>, String, Option<String>);
                 let mut pos_updates: Vec<(String, Vec<ActorTuple>)> = Vec::new();
+                let mut cls_actors_updates: Vec<(String, Vec<serde_json::Value>)> = Vec::new();
 
                 for batch in &batches {
                     let sid_col = batch.column_by_name("section_id");
@@ -3020,6 +3038,26 @@ pub(crate) async fn cmd_taxa_classify(
                         }
 
                         if !updated_actors.is_empty() {
+                            // Build cls_actors: classifier's own {label, position} predictions
+                            let cls_actors_json: Vec<serde_json::Value> = updated_actors
+                                .iter()
+                                .map(|(label, _regex_pos, _, _, reason)| {
+                                    // Extract classifier's position prediction from reason trail
+                                    let cls_pos = reason.as_ref()
+                                        .and_then(|r| {
+                                            // Find last "classifier:X@N.NN" segment
+                                            r.rsplit("classifier:").next()
+                                        })
+                                        .and_then(|s| s.split('@').next())
+                                        .unwrap_or("mentioned");
+                                    serde_json::json!({
+                                        "label": label,
+                                        "position": cls_pos,
+                                    })
+                                })
+                                .collect();
+
+                            cls_actors_updates.push((sid.to_string(), cls_actors_json));
                             pos_updates.push((sid, updated_actors));
                         }
                     }
@@ -3090,10 +3128,19 @@ pub(crate) async fn cmd_taxa_classify(
                     lance.upsert_embeddings(&batch).await?;
                 }
 
+                // Write cls_actors (classifier's position predictions) to Postgres
+                if !cls_actors_updates.is_empty() {
+                    let updates: Vec<(String, String)> = cls_actors_updates
+                        .iter()
+                        .map(|(sid, json)| (sid.clone(), serde_json::Value::Array(json.clone()).to_string()))
+                        .collect();
+                    lance.write_cls_actors(&updates).await.ok();
+                }
+
                 if pos_classified > 0 {
                     eprintln!(
-                        "    position: {pos_classified} actors, {} disagreements written",
-                        pos_updates.len()
+                        "    position: {pos_classified} actors, {} cls_actors written",
+                        cls_actors_updates.len()
                     );
                 }
             }
