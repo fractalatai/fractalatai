@@ -30,7 +30,15 @@ Position classifier v2 trained with correct features (Obligation/Liberty, 4 clas
 - Confidence thresholding for LLM escalation (< 0.7 → escalate)
 - GBT as fallback if LR < 80%
 
+## From benchmark-qa session (all done)
+
+- ✅ `benchmark_report.py` rewritten to query provision_actors + gold_benchmarks
+- ✅ `gold_benchmarks` table populated (4,062 rows)
+- ✅ Per-actor-category breakdown — classifier better on Ind/Spc/other/EU, regex better on Gvt/Org
+- ✅ Disagreement analysis — when disagreeing, classifier right 60% (195 vs 131)
+
 ## Dependencies
 
-- provision_actors table with cls_* columns populated (done)
-- Benchmark QA infrastructure to measure improvement (pending — see benchmark-qa session)
+- ✅ provision_actors table with cls_* columns populated
+- ✅ Benchmark QA baseline: regex 51.2%, classifier 57.7% position
+- ✅ gold_benchmarks table in Postgres

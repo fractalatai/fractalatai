@@ -1,4 +1,4 @@
-# Session: Benchmark QA (ACTIVE)
+# Session: Benchmark QA (CLOSED)
 
 ## Context
 
@@ -6,47 +6,44 @@
 
 ## Work
 
-1. Rewrite `benchmark_report.py` to query `provision_actors` (not legislation_text JSONB)
-2. Report per-tier accuracy independently:
-   - Regex: DRRP accuracy, position accuracy, actor recall
-   - Classifier: DRRP accuracy, position accuracy (where cls_* populated)
-   - Reconciled: legal relation accuracy (composite)
-3. Load gold benchmarks into a `gold_benchmarks` table in Postgres for SQL joins
-4. Position confusion matrix per tier
-5. Per-actor-category breakdown (are Gvt actors harder than Org?)
-6. Disagreement analysis: where regex and classifier disagree, who's right?
+1. ✅ Rewrite `benchmark_report.py` to query `provision_actors` + `gold_benchmarks`
+2. ✅ Per-tier accuracy — regex 51.2% / classifier 57.7% position, both 84.6% DRRP
+3. ✅ Load gold into `gold_benchmarks` Postgres table (4,062 rows)
+4. ✅ Position confusion matrix per tier
+5. ✅ Per-actor-category breakdown
+6. ✅ Disagreement analysis
 
-## Baseline (from provision_actors, all 20 benchmarks)
+## Results (from provision_actors + gold_benchmarks, all 20 benchmarks)
 
 | Metric | Regex | Classifier |
 |--------|-------|-----------|
-| DRRP | 93.0% | 93.0% |
-| Position | **47.2%** | **56.9%** |
-| Actor recall | 1,414/4,061 (35%) | Same |
+| DRRP | 84.6% | 84.6% |
+| Position | **51.2%** | **57.7%** |
+| Matched actors | 986/4,062 | Same |
 
-Classifier adds +10% on position over regex. Key patterns:
-- Regex never predicts beneficiary/mentioned — assigns active/counterparty to all
-- Classifier correctly identifies 143 mentioned + 59 beneficiary that regex can't
-- Classifier loses some counterparty accuracy (130 vs 190 correct)
-- 2,647 gold actors not found by regex at all (gap-fill candidates)
+### Disagreement analysis (986 actors with both tiers)
+| Outcome | Count | % |
+|---------|-------|---|
+| Agree + correct | 374 | 37.9% |
+| Agree + wrong | 182 | 18.5% |
+| Disagree, regex right | 131 | 13.3% |
+| Disagree, classifier right | 195 | 19.8% |
+| Disagree, both wrong | 104 | 10.5% |
 
-### Regex position confusion matrix
-```
-gold↓ pipe→        active  counterparty
-     active           477            89
-counterparty          100           190
- beneficiary           36            48
-   mentioned          393            80
-```
+Key: when they disagree, classifier is right more often (195 vs 131).
+When they agree, 67% correct (374/556). 18.5% agree on the wrong answer.
 
-### Classifier position confusion matrix
-```
-gold↓ pipe→        active  counterparty   beneficiary     mentioned
-     active           473            53            28            12
-counterparty          135           130            20             5
- beneficiary           17             8            59             0
-   mentioned          215            67            48           143
-```
+### Per-category position accuracy
+| Category | Total | Regex | Classifier |
+|----------|-------|-------|-----------|
+| Ind | 398 | 42.2% | 52.8% |
+| Gvt | 365 | 59.7% | 55.1% |
+| Org | 109 | 72.5% | 70.6% |
+| Spc | 47 | 44.7% | 72.3% |
+| other | 44 | 11.4% | 72.7% |
+| EU | 21 | 66.7% | 71.4% |
+
+Classifier better on Ind, Spc, other, EU. Regex better on Gvt, Org.
 
 ## Dependencies
 
