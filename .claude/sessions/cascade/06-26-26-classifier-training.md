@@ -1,4 +1,4 @@
-# Session: Position Classifier Training (ACTIVE)
+# Session: Position Classifier Training (SUSPENDED)
 
 ## Context
 
