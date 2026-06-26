@@ -1,4 +1,4 @@
-# Session: Position Classifier Training (ACTIVE)
+# Session: Position Classifier Training (CLOSED)
 
 ## Context
 
@@ -9,8 +9,39 @@ Position classifier v2 trained with correct features (Obligation/Liberty, 4 clas
 1. ✅ Evaluate v2 classifier against gold benchmarks (57.7% position, 986/4,062 matched)
 2. ✅ Disagreement analysis (classifier right 60% when disagreeing)
 3. ✅ Feature importance + GBT comparison
-4. ⬜ Better features (dependency parsing, grammatical role) or different embedding
-5. ⬜ Fine-tuned local LLM as future tier
+4. ✅ Deep-dive agree+wrong cases (325 cases analysed)
+5. ➡️ Better features (dependency parsing) → `cascade/06-26-26-dependency-parsing.md` (PENDING)
+6. ⬜ Fine-tuned local LLM as future tier (deferred — feature quality is the bottleneck, not model)
+
+## Deep-dive: 325 agree+wrong cases
+
+Both regex and classifier predict the same wrong position. Three dominant error patterns:
+
+### Pattern 1: mentioned→active (183 cases, 56%)
+
+Actors mentioned in definitions, references, amendments, and structural provisions — not in duty-creating clauses. Both tiers see the actor label + modal language and assume active, but the provision is describing/referencing, not creating a duty.
+
+Examples: "duty of the Scottish Ministers" in a repeal clause, "powers of the Secretary of State" in a cross-reference, HSE described as performing functions "on behalf of the Crown".
+
+Breakdown: Gvt 79, Ind 51, Spc 23, Org 21, EU 9.
+
+### Pattern 2: counterparty→active (62 cases, 19%)
+
+Actors who hold claims (counterparty) but both tiers predict active. The text mentions the actor prominently but in a receiving role — the actor benefits from the provision rather than bearing the duty.
+
+Examples: "authority responsible for maintaining the service" — authority receives the service, Secretary of State bears the duty.
+
+Breakdown: Gvt 35, Ind 16, EU 6, Spc 5.
+
+### Pattern 3: beneficiary→active or counterparty (24 cases, 7%)
+
+Actors who benefit without a direct legal relation but both tiers assign a legal role.
+
+### What would fix these
+
+1. **Provision purpose classification** — is this provision creating a duty, or is it a definition/reference/amendment? The existing purpose classifier could gate this. If purpose=structural/definition, position should be mentioned regardless of actor presence.
+2. **Grammatical role** — dependency parsing would show whether the actor is the subject of a duty verb or mentioned in a subordinate clause/cross-reference.
+3. **Section type signal** — 151 errors come from sub_article, 128 from sub_section. These structural types are more likely to be references. Currently the classifier has no section_type feature.
 
 ## GBT vs LR comparison (2026-06-26)
 
