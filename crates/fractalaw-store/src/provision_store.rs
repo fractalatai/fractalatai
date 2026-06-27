@@ -77,4 +77,13 @@ pub trait ProvisionStore: Send + Sync {
     async fn clear_inferred_actors(&self, _law_name: &str) -> Result<usize, StoreError> {
         Ok(0)
     }
+
+    /// Query dep parsing features for a law's actors.
+    /// Returns: Vec<(section_id, actor_label, [7 dep features])>
+    async fn query_dep_features(
+        &self,
+        _law_name: &str,
+    ) -> Result<Vec<(String, String, [f32; 7])>, StoreError> {
+        Ok(vec![])
+    }
 }

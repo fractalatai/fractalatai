@@ -2927,8 +2927,18 @@ pub(crate) async fn cmd_taxa_classify(
                 let mut pos_classified = 0usize;
                 type ActorTuple = (String, String, Option<String>, String, Option<String>);
                 let mut pos_updates: Vec<(String, Vec<ActorTuple>)> = Vec::new();
-                // (section_id, actor_label, category, drrp, cls_position, "classifier")
                 let mut cls_actor_rows: Vec<(String, String, String, Option<String>, String, String)> = Vec::new();
+
+                // Load dep features from provision_actors for this law
+                let dep_features_map: std::collections::HashMap<(String, String), fractalaw_ai::position_classifier::DepFeatures> = {
+                    let mut map = std::collections::HashMap::new();
+                    if let Ok(deps) = lance.query_dep_features(law_name).await {
+                        for (sid, label, feats) in deps {
+                            map.insert((sid, label), feats);
+                        }
+                    }
+                    map
+                };
 
                 for batch in &batches {
                     let sid_col = batch.column_by_name("section_id");
@@ -2937,6 +2947,7 @@ pub(crate) async fn cmd_taxa_classify(
                     let method_col = batch.column_by_name("extraction_method");
                     let actors_col = batch.column_by_name("actors");
                     let drrp_col = batch.column_by_name("drrp_types");
+                    let stype_col = batch.column_by_name("section_type");
 
                     for row in 0..batch.num_rows() {
                         let method = method_col
@@ -2952,6 +2963,9 @@ pub(crate) async fn cmd_taxa_classify(
                         let text = text_col
                             .and_then(|c| get_string_value(c.as_ref(), row))
                             .unwrap_or_default();
+                        let section_type = stype_col
+                            .and_then(|c| get_string_value(c.as_ref(), row))
+                            .unwrap_or_else(|| "other".to_string());
 
                         let embedding = emb_col
                             .and_then(|c| {
@@ -3079,13 +3093,15 @@ pub(crate) async fn cmd_taxa_classify(
                                 .map(|o| o as f32 / text.len().max(1) as f32)
                                 .unwrap_or(0.5);
 
-                            // TODO: read dep features from provision_actors when available
+                            // Look up precomputed dep features from provision_actors
+                            let dep_key = (sid.clone(), label.clone());
+                            let dep = dep_features_map.get(&dep_key);
                             let features =
                                 fractalaw_ai::position_classifier::build_position_features(
                                     embedding, &modals, &drrp_types, label, rel_offset,
-                                    None, None,
+                                    dep, Some(section_type.as_str()),
                                 );
-                            // Skip if feature count doesn't match weights (v3 needs dep features)
+                            // Skip if feature count doesn't match weights
                             if features.len() != pos_classifier.n_features() {
                                 updated_actors.push((
                                     label.clone(),

@@ -282,6 +282,33 @@ impl PgStore {
         Ok(r1.rows_affected() as usize + r2.rows_affected() as usize)
     }
 
+    /// Query dep parsing features for a law's actors.
+    pub async fn query_dep_features(
+        &self,
+        law_name: &str,
+    ) -> Result<Vec<(String, String, [f32; 7])>, StoreError> {
+        let rows = sqlx::query_as::<_, (String, String, Option<f32>, Option<f32>, Option<f32>, Option<f32>, Option<f32>, Option<f32>, Option<f32>)>(
+            "SELECT pa.section_id, pa.actor_label, \
+             pa.dep_is_subject, pa.dep_is_object, pa.dep_is_agent, pa.dep_is_attr, \
+             pa.dep_voice_passive, pa.dep_has_modal, pa.dep_verb_distance \
+             FROM provision_actors pa \
+             JOIN legislation_text lt ON pa.section_id = lt.section_id \
+             WHERE lt.law_name = $1 AND pa.dep_is_subject IS NOT NULL"
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_dep_features: {e}")))?;
+
+        Ok(rows.iter().map(|(sid, label, s, o, a, at, v, m, d)| {
+            (sid.clone(), label.clone(), [
+                s.unwrap_or(0.0), o.unwrap_or(0.0), a.unwrap_or(0.0),
+                at.unwrap_or(0.0), v.unwrap_or(0.0), m.unwrap_or(0.0),
+                d.unwrap_or(0.5),
+            ])
+        }).collect())
+    }
+
     /// Delete provisions for a law.
     pub async fn delete_law_lat(&self, law_name: &str) -> Result<usize, StoreError> {
         let result = sqlx::query("DELETE FROM legislation_text WHERE law_name = $1")
@@ -752,6 +779,13 @@ impl crate::ProvisionStore for PgStore {
 
     async fn clear_inferred_actors(&self, law_name: &str) -> Result<usize, StoreError> {
         self.clear_inferred_actors(law_name).await
+    }
+
+    async fn query_dep_features(
+        &self,
+        law_name: &str,
+    ) -> Result<Vec<(String, String, [f32; 7])>, StoreError> {
+        self.query_dep_features(law_name).await
     }
 }
 

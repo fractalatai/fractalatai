@@ -107,6 +107,14 @@ v3 exported: `docs/position_classifier_v3.json` (64.8% CV, 428 features)
 | + dep (sm, token) | 63.9% | 0.666 | 0.507 |
 | + dep (md, phrase) | **64.8%** | **0.676** | **0.510** |
 
+### Live benchmark (v3 with dep features from Postgres)
+
+| Metric | v2 (no dep) | v3 (with dep) | Change |
+|--------|-------------|---------------|--------|
+| Classifier position | 57.4% | **65.2%** | **+7.8%** |
+| Agree+wrong | 243 (13.9%) | **188 (10.8%)** | -55 errors |
+| Disagree, cls right | 356 (20.4%) | **429 (24.6%)** | +73 more correct |
+
 ## Carried from classifier training + agree-wrong fixes
 
 - Deep-dive on agree+wrong cases done in classifier training session — findings inform feature priorities here.
