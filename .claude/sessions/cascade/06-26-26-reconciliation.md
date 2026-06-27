@@ -29,12 +29,27 @@ Per (section_id, actor_label):
 
 Rationale: regex is 87.7% on DRRP, classifier is 66.7% (makes it worse), inferred is 41.7% (terrible). Don't let weaker signals corrupt a strong one.
 
-**Position** (classifier + inferred participate):
+**Position** (classifier + inferred participate, confidence-tiered):
 1. LLM present → LLM wins (confidence = HIGHEST)
 2. Inferred present → use inferred (confidence = HIGH, 86.7% accurate)
 3. Regex + classifier agree → confirmed (confidence = HIGH, 79% accurate)
-4. Disagree → use classifier (confidence = MEDIUM, right 65% when disagreeing)
-5. Only regex → use regex (confidence = LOW)
+4. Disagree + classifier confidence ≥ 0.7 → use classifier (confidence = HIGH, 60-91% right)
+5. Disagree + classifier confidence 0.5-0.7 → flag pending_llm, use regex interim (confidence = LOW)
+6. Disagree + classifier confidence < 0.5 → use regex (confidence = MEDIUM, regex better below 0.5)
+7. Only regex → use regex (confidence = LOW)
+
+### Confidence validation (2026-06-27)
+
+Classifier accuracy by confidence when disagreeing with regex:
+
+| Confidence | Classifier right | Regex right |
+|-----------|-----------------|-------------|
+| ≥ 0.9 | **90.9%** | 4.0% |
+| 0.7-0.9 | **60.4%** | 19.3% |
+| 0.5-0.7 | 35.1% | 37.2% |
+| < 0.5 | 21.8% | **43.5%** |
+
+Confidence IS a valid signal. Crossover at ~0.6. Trust classifier above 0.7, trust regex below 0.5, flag LLM between.
 
 **Output columns:**
 - `drrp` — reconciled DRRP type
