@@ -76,7 +76,26 @@ Counterparty got biggest boost — subject/object distinction working.
 3. ✅ Try en_core_web_md — 64.8% total (+3.8% over baseline)
 4. ✅ Retrain position classifier v3 with dep + section_type features (428 dims)
 5. ✅ Section_type feature added — no additional gain on top of dep parsing (dep already captures it)
-6. ⬜ Integrate v3 into pipeline (update Rust classifier to 428 features, add spaCy preprocessing)
+6. ⬜ Integrate v3 into pipeline — **Option A: Python batch job** (Gemini-recommended)
+
+### Gemini architecture review (2026-06-27)
+
+**Recommended: Option A (Python batch job) + incremental updates.**
+
+- Batch Python script parses all provisions with spaCy, stores 7 dep features in `provision_actors`
+- Rust classifier reads precomputed features — no Python at classify time
+- Incremental: only re-parse provisions where text changed (text_hash column)
+- Use `en_core_web_trf` for best quality (GPU recommended for 550K provisions)
+- `nlp.pipe()` batching + multiprocessing for throughput
+- Clean separation: Python for NLP, Rust for classification
+
+Why not other options:
+- Microservice (B): network overhead for 550K calls, service management
+- Rust-native (C): no mature Rust dep parser with spaCy quality
+- Lazy cache (D): Python subprocess from Rust is messy, first run = 300hrs
+- ONNX export (E): tree postprocessing in Rust is massive engineering
+
+Future: fine-tune transformer on legal dependency treebank for best legal parse quality.
 
 v3 exported: `docs/position_classifier_v3.json` (64.8% CV, 428 features)
 
