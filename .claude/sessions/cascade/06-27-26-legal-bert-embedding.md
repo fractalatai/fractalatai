@@ -34,8 +34,14 @@ The embedding is 79.9% of the classifier's feature importance. A legal-specific 
 5. ⬜ If significant: re-embed full corpus (183K provisions)
 6. ⬜ Update ONNX model in fractalaw-ai for production inference
 
+## Sequencing note
+
+v3 classifier ships with MiniLM embedding (384-dim) + dep features (7) + section_type (10) = 428 features. Legal-BERT would change the embedding dimension (likely 768 for BERT-base), requiring a v4 retrain with both Legal-BERT + dep features together. Do this AFTER v3 is in production and measured.
+
 ## Dependencies
 
 - ✅ provision_actors table for per-tier benchmarking
 - ✅ Classifier training script (scripts/train_position_classifier.py)
+- ✅ v3 classifier with dep features (baseline to beat)
 - Current embedding: models/all-MiniLM-L6-v2 (ONNX, 384-dim)
+- GH issue #46: en_core_web_trf upgrade (GPU required)
