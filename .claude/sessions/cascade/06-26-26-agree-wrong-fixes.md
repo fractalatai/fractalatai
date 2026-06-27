@@ -1,4 +1,4 @@
-# Session: Agree+Wrong Pattern Fixes (ACTIVE)
+# Session: Agree+Wrong Pattern Fixes (CLOSED)
 
 ## Problem
 
