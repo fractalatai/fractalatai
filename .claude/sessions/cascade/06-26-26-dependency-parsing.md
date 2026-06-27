@@ -69,14 +69,22 @@ Counterparty got biggest boost — subject/object distinction working.
 - `en_core_web_sm` is small model — `en_core_web_trf` would give better parses
 - Only checks ROOT verb — nested clauses with secondary verbs not captured
 
-## Implementation approach
+## Implementation progress
 
 1. ✅ Prototype with spaCy en_core_web_sm — +3.0% accuracy
-2. ⬜ Improve actor matching (phrase-level, not token)
-3. ⬜ Try en_core_web_trf (transformer model) for better parses
+2. ✅ Improve actor matching (phrase-level via char_span) — +0.9% more
+3. ✅ Try en_core_web_md — 64.8% total (+3.8% over baseline)
 4. ⬜ Retrain position classifier v3 with dep features
 5. ⬜ Add section_type feature (carried from agree-wrong session)
-6. ⬜ If significant: cache parse results in Postgres, integrate into pipeline
+6. ⬜ Cache parse results in Postgres, integrate into pipeline
+
+### Comparison table
+
+| Config | CV Accuracy | Active F1 | Counterparty F1 |
+|--------|------------|-----------|-----------------|
+| Baseline (no dep) | 61.0% | 0.625 | 0.439 |
+| + dep (sm, token) | 63.9% | 0.666 | 0.507 |
+| + dep (md, phrase) | **64.8%** | **0.676** | **0.510** |
 
 ## Carried from classifier training + agree-wrong fixes
 
