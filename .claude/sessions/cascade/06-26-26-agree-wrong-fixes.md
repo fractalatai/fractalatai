@@ -1,4 +1,4 @@
-# Session: Agree+Wrong Pattern Fixes (PENDING)
+# Session: Agree+Wrong Pattern Fixes (ACTIVE)
 
 ## Problem
 
@@ -22,20 +22,51 @@ Actors who benefit without a direct legal relation.
 
 **Fix: Section type feature.** 151 errors from sub_article, 128 from sub_section. Add `section_type` as a classifier feature — structural section types are more likely to have mentioned/beneficiary actors. Currently the classifier has no section_type signal.
 
-## Actions
+## Review findings (2026-06-27)
 
-1. ⬜ Add purpose-gating rule: if provision purpose is structural/definition → all actors = mentioned
-2. ⬜ Add section_type as classifier feature (10 categories one-hot, cheap win)
-3. ⬜ Dependency parsing for grammatical role (subject/object distinction) — see `cascade/06-26-26-dependency-parsing.md`
+### Purpose classifier assessment
 
-## Expected impact
+15 purpose labels, regex-based. Key issue: `Process+Rule+Constraint+Condition` is the DEFAULT when nothing matches. 148 of 183 errors have this default — they're unclassified, not genuinely process/rule provisions.
 
-- Pattern 1 fix (purpose gating): ~183 errors → mostly correct. Deterministic, no retraining.
-- Pattern 3 fix (section_type feature): ~24 errors reduced. Requires classifier retrain.
-- Pattern 2 fix (dep parsing): ~62 errors reduced. Requires new infrastructure.
+Current `should_skip_drrp` gates DRRP extraction but NOT position assignment. Has a flawed `has_any_actor` override: "if actors present, allow DRRP even for structural purposes." This is wrong — actors appear in definitions too.
+
+### Gemini critical review (2026-06-27)
+
+1. **Process+Rule default is a red flag** — should be `Unclassified` with cautious handling, not assumed duty-bearing
+2. **`has_any_actor` override is fundamentally flawed** — remove for structural purposes
+3. **Gate must be on BOTH DRRP and position** — currently only gates DRRP
+4. **Mixed provisions need modal override** — "In this regulation, 'employer' means a person who shall ensure..." contains a real duty inside a definition. Purpose gate must check for modal verbs before overriding to mentioned
+5. **Gate at actor level, not provision level** — actor near "shall" = active. Actor in "means..." = mentioned
+
+### Purpose distribution of 183 errors
+| Purpose | Count |
+|---------|-------|
+| Process+Rule (DEFAULT) | 148 |
+| Interpretation+Definition | 50 |
+| Application+Scope | 18 |
+| Enforcement+Prosecution | 13 |
+| Amendment | 8 |
+| Offence | 7 |
+
+## Revised actions
+
+1. ⬜ **Fix the default**: change Process+Rule from default to explicit match. Add `Unclassified` category for provisions matching no pattern. Actors in `Unclassified` provisions → `mentioned` unless modal verb detected.
+2. ⬜ **Remove `has_any_actor` override** in `should_skip_drrp` for structural purposes (Interpretation, Amendment, Repeal, Enactment, Extent, Transitional). Actors in these → `mentioned` regardless.
+3. ⬜ **Add position gating**: new function `should_override_position_to_mentioned(purposes, has_modal)` — returns true for structural purposes without duty-bearing modals.
+4. ⬜ **Modal proximity check**: for mixed provisions (structural purpose + modal verb), only actors NEAR the modal get active. Others get mentioned. (Simpler version: any modal in provision → allow normal position assignment.)
+5. ⬜ **Add section_type as classifier feature** (cheap win, 24 errors)
+6. ⬜ Dependency parsing for grammatical role → see `cascade/06-26-26-dependency-parsing.md`
+
+## Expected impact (revised)
+
+- Actions 1-3: ~148 + ~50 = ~198 errors fixed (deterministic rules)
+- Action 4: handles mixed provisions without false negatives
+- Action 5: ~24 errors (requires classifier retrain)
+- Action 6: ~62 errors (requires new infrastructure)
 
 ## Dependencies
 
 - ✅ Deep-dive analysis done in classifier training session
 - ✅ Purpose classifier exists in fractalaw-core/taxa/purpose.rs
-- Dependency parsing session for Pattern 2
+- ✅ `should_skip_drrp` exists in fractalaw-core/taxa/mod.rs
+- Dependency parsing session for action 6
