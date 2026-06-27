@@ -2919,7 +2919,7 @@ pub(crate) async fn cmd_taxa_classify(
 
         // Phase 4: Position classification
         {
-            let pos_weights = std::path::Path::new("docs/position_classifier_v2.json");
+            let pos_weights = std::path::Path::new("docs/position_classifier_v3.json");
             if pos_weights.exists() {
                 let pos_classifier = fractalaw_ai::PositionClassifier::load(pos_weights)
                     .context("loading position classifier")?;
@@ -3079,10 +3079,23 @@ pub(crate) async fn cmd_taxa_classify(
                                 .map(|o| o as f32 / text.len().max(1) as f32)
                                 .unwrap_or(0.5);
 
+                            // TODO: read dep features from provision_actors when available
                             let features =
                                 fractalaw_ai::position_classifier::build_position_features(
                                     embedding, &modals, &drrp_types, label, rel_offset,
+                                    None, None,
                                 );
+                            // Skip if feature count doesn't match weights (v3 needs dep features)
+                            if features.len() != pos_classifier.n_features() {
+                                updated_actors.push((
+                                    label.clone(),
+                                    regex_pos.clone(),
+                                    relates_to.clone(),
+                                    label_source.clone(),
+                                    existing_reason.clone(),
+                                ));
+                                continue;
+                            }
                             let pred = pos_classifier.predict(&features);
                             let cls_pos = pred.class.as_str();
                             pos_classified += 1;

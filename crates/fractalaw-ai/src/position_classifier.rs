@@ -31,12 +31,14 @@ impl PositionClass {
 
 /// Per-actor position classifier.
 ///
-/// Logistic regression with 3 classes and 411 features:
-/// embedding(384) + modal(13) + drrp(5) + category(10) + offset(1).
+/// Logistic regression with 4 classes and variable features:
+/// v2: embedding(384) + modal(13) + drrp(3) + category(10) + offset(1) = 411
+/// v3: + dep_parsing(7) + section_type(10) = 428
 pub struct PositionClassifier {
     coef: Vec<Vec<f32>>,
     intercept: Vec<f32>,
     classes: Vec<String>,
+    n_features: usize,
 }
 
 /// Position prediction result.
@@ -98,19 +100,30 @@ impl PositionClassifier {
             "loaded position classifier"
         );
 
+        let n_features = coef.first().map(|c| c.len()).unwrap_or(0);
+
         Ok(Self {
             coef,
             intercept,
             classes,
+            n_features,
         })
     }
 
+    /// Number of features this classifier expects.
+    pub fn n_features(&self) -> usize {
+        self.n_features
+    }
+
     /// Predict position for a single (provision, actor) pair.
-    ///
-    /// Feature vector must be 411 dimensions:
-    /// embedding(384) + modal(13) + drrp(5) + category(10) + offset(1).
     pub fn predict(&self, features: &[f32]) -> PositionPrediction {
-        assert_eq!(features.len(), 411, "expected 411 features");
+        assert_eq!(
+            features.len(),
+            self.n_features,
+            "expected {} features, got {}",
+            self.n_features,
+            features.len()
+        );
 
         let n_classes = self.classes.len();
         let mut logits = vec![0.0f32; n_classes];
@@ -141,17 +154,31 @@ impl PositionClassifier {
     }
 }
 
-/// Build the 411-dim feature vector for a (provision, actor) pair.
+/// Section type labels for one-hot encoding (must match training order).
+const SECTION_TYPES: &[&str] = &[
+    "article", "sub_article", "section", "sub_section", "schedule",
+    "part", "chapter", "heading", "table", "other",
+];
+
+/// Dep parsing features (7 floats, from provision_actors columns).
+/// Order: is_subject, is_object, is_agent, is_attr, voice_passive, has_modal, verb_distance.
+pub type DepFeatures = [f32; 7];
+
+/// Build the feature vector for a (provision, actor) pair.
 ///
-/// Combines provision embedding + modal features + DRRP type + actor category + text offset.
+/// v2 (411 dims): embedding(384) + modal(13) + drrp(3) + category(10) + offset(1)
+/// v3 (428 dims): + dep_parsing(7) + section_type(10)
 pub fn build_position_features(
     embedding: &[f32],
     modal_features: &[f32; 13],
     drrp_types: &[String],
     actor_label: &str,
     actor_text_offset: f32,
+    dep_features: Option<&DepFeatures>,
+    section_type: Option<&str>,
 ) -> Vec<f32> {
-    let mut features = Vec::with_capacity(411);
+    let capacity = if dep_features.is_some() { 428 } else { 411 };
+    let mut features = Vec::with_capacity(capacity);
 
     // Embedding (384)
     features.extend_from_slice(embedding);
@@ -159,7 +186,7 @@ pub fn build_position_features(
     // Modal features (13)
     features.extend_from_slice(modal_features);
 
-    // DRRP one-hot (5)
+    // DRRP one-hot (3)
     for drrp in DRRP_TYPES {
         features.push(if drrp_types.iter().any(|d| d == drrp) {
             1.0
@@ -181,6 +208,19 @@ pub fn build_position_features(
     // Relative text offset (1)
     features.push(actor_text_offset);
 
+    // Dep parsing features (7) — optional for v3
+    if let Some(dep) = dep_features {
+        features.extend_from_slice(dep);
+    }
+
+    // Section type one-hot (10) — optional for v3
+    if dep_features.is_some() {
+        let st = section_type.unwrap_or("other");
+        for s in SECTION_TYPES {
+            features.push(if *s == st { 1.0 } else { 0.0 });
+        }
+    }
+
     features
 }
 
@@ -189,14 +229,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn build_features_correct_length() {
+    fn build_features_v2_length() {
         let embedding = vec![0.1f32; 384];
-        let modals = [
-            1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        ];
-        let drrp = vec!["Duty".to_string()];
-        let features = build_position_features(&embedding, &modals, &drrp, "Org: Employer", 0.1);
+        let modals = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let drrp = vec!["Obligation".to_string()];
+        let features = build_position_features(&embedding, &modals, &drrp, "Org: Employer", 0.1, None, None);
         assert_eq!(features.len(), 411);
+    }
+
+    #[test]
+    fn build_features_v3_length() {
+        let embedding = vec![0.1f32; 384];
+        let modals = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        let drrp = vec!["Obligation".to_string()];
+        let dep: DepFeatures = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.3];
+        let features = build_position_features(&embedding, &modals, &drrp, "Org: Employer", 0.1, Some(&dep), Some("section"));
+        assert_eq!(features.len(), 428);
     }
 
     #[test]
@@ -205,13 +253,13 @@ mod tests {
         let modals = [0.0; 13];
         let drrp = vec![];
 
-        let f_org = build_position_features(&embedding, &modals, &drrp, "Org: Employer", 0.0);
-        let f_gvt = build_position_features(&embedding, &modals, &drrp, "Gvt: Minister", 0.0);
+        let f_org = build_position_features(&embedding, &modals, &drrp, "Org: Employer", 0.0, None, None);
+        let f_gvt = build_position_features(&embedding, &modals, &drrp, "Gvt: Minister", 0.0, None, None);
 
-        // Category one-hot starts at index 384+13+5 = 402
-        assert_eq!(f_org[402], 1.0); // Org
-        assert_eq!(f_org[404], 0.0); // Gvt
-        assert_eq!(f_gvt[402], 0.0); // Org
+        // Category one-hot starts at index 384+13+3 = 400
+        assert_eq!(f_org[400], 1.0); // Org
+        assert_eq!(f_org[402], 0.0); // Gvt
+        assert_eq!(f_gvt[400], 0.0); // Org
         assert_eq!(f_gvt[404], 1.0); // Gvt
     }
 }
