@@ -49,9 +49,10 @@ Both improve the classifier but through different mechanisms. Dep parsing is hig
 3. Test impact on classifier accuracy before full pipeline integration
 4. If significant: add spaCy as a Python preprocessing step, cache parse results in Postgres
 
-## Carried from classifier training
+## Carried from classifier training + agree-wrong fixes
 
 - Deep-dive on agree+wrong cases done in classifier training session — findings inform feature priorities here.
+- ⬜ Add `section_type` as classifier feature (10 categories one-hot) — cheap win for ~24 errors where structural section types (sub_article, sub_section) correlate with mentioned/beneficiary positions. Requires classifier retrain.
 
 ## Dependencies
 
