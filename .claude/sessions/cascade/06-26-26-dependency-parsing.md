@@ -1,4 +1,4 @@
-# Session: Dependency Parsing Features (PENDING)
+# Session: Dependency Parsing Features (ACTIVE)
 
 ## Problem
 
@@ -42,12 +42,41 @@ Independent — additive, not either/or:
 
 Both improve the classifier but through different mechanisms. Dep parsing is higher impact for position since it's per-actor.
 
+## Results (2026-06-27)
+
+### 7 dep features, spaCy en_core_web_sm
+
+| Metric | Without dep | With dep | Change |
+|--------|-------------|----------|--------|
+| CV accuracy | 61.0% | **63.9%** | **+3.0%** |
+| Active F1 | 0.625 | 0.666 | +0.041 |
+| Counterparty F1 | 0.439 | 0.507 | +0.068 |
+| Beneficiary F1 | 0.429 | 0.446 | +0.017 |
+
+Counterparty got biggest boost — subject/object distinction working.
+
+### Features extracted per (provision, actor)
+- `is_subject` — actor in nsubj subtree of ROOT verb
+- `is_object` — actor in dobj/pobj subtree
+- `is_agent_of_passive` — passive agent
+- `is_in_attr_subtree` — "duty of every employer" pattern
+- `voice_passive` — passive voice detection
+- `has_modal` — shall/must/may auxiliary
+- `verb_distance` — hops from actor token to ROOT (normalised)
+
+### Known limitations
+- Actor matching is token-level (misses multi-word "Secretary of State")
+- `en_core_web_sm` is small model — `en_core_web_trf` would give better parses
+- Only checks ROOT verb — nested clauses with secondary verbs not captured
+
 ## Implementation approach
 
-1. Use spaCy (`en_core_web_trf` or `en_core_web_lg`) for dependency parsing
-2. Extract features at training time from benchmark texts
-3. Test impact on classifier accuracy before full pipeline integration
-4. If significant: add spaCy as a Python preprocessing step, cache parse results in Postgres
+1. ✅ Prototype with spaCy en_core_web_sm — +3.0% accuracy
+2. ⬜ Improve actor matching (phrase-level, not token)
+3. ⬜ Try en_core_web_trf (transformer model) for better parses
+4. ⬜ Retrain position classifier v3 with dep features
+5. ⬜ Add section_type feature (carried from agree-wrong session)
+6. ⬜ If significant: cache parse results in Postgres, integrate into pipeline
 
 ## Carried from classifier training + agree-wrong fixes
 
