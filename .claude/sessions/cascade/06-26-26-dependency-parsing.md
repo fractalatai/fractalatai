@@ -1,4 +1,4 @@
-# Session: Dependency Parsing Features (ACTIVE)
+# Session: Dependency Parsing Features (CLOSED)
 
 ## Problem
 
@@ -76,7 +76,7 @@ Counterparty got biggest boost — subject/object distinction working.
 3. ✅ Try en_core_web_md — 64.8% total (+3.8% over baseline)
 4. ✅ Retrain position classifier v3 with dep + section_type features (428 dims)
 5. ✅ Section_type feature added — no additional gain on top of dep parsing (dep already captures it)
-6. ⬜ Integrate v3 into pipeline — **Option A: Python batch job** (Gemini-recommended)
+6. ✅ Integrate v3 into pipeline — batch script + Rust wiring + live benchmark: position 57→65%
 
 ### Gemini architecture review (2026-06-27)
 
@@ -118,7 +118,7 @@ v3 exported: `docs/position_classifier_v3.json` (64.8% CV, 428 features)
 ## Carried from classifier training + agree-wrong fixes
 
 - Deep-dive on agree+wrong cases done in classifier training session — findings inform feature priorities here.
-- ⬜ Add `section_type` as classifier feature (10 categories one-hot) — cheap win for ~24 errors where structural section types (sub_article, sub_section) correlate with mentioned/beneficiary positions. Requires classifier retrain.
+- ✅ `section_type` included in v3 training (10 one-hot features, no additional gain over dep parsing but included in weights)
 
 ## Dependencies
 
