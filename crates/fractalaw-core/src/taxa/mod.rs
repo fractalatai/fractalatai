@@ -533,7 +533,7 @@ pub fn should_skip_drrp(
         return false;
     }
 
-    let has_any_actor = has_governed_actor || has_government_actor;
+    let _has_any_actor = has_governed_actor || has_government_actor;
 
     // Amendment provisions never bear their own DRRP — obligations in quoted
     // text belong to the target section, not this provision.
@@ -559,24 +559,31 @@ pub fn should_skip_drrp(
         return !has_government_actor;
     }
 
-    // ALL strategy: skip when every detected purpose is a skip-purpose
-    // AND no actors are present. Actor presence indicates real DRRP may
-    // be embedded (e.g., Interpretation-only provisions with "No person
-    // may transfer..." or "A notice may include directions...").
+    // ALL strategy: skip when every detected purpose is structural.
+    // Actor presence alone does NOT indicate real DRRP — actors appear
+    // in definitions, references, and amendments without bearing duties.
+    // Only government actors with modal verbs indicate embedded duties.
     if purposes.iter().all(|p| SKIP_PURPOSES.contains(p)) {
-        return !has_any_actor;
+        return !has_government_actor;
     }
 
-    // Interpretation-primary: skip unless actors present.
+    // Interpretation-primary: skip unless government actors present
+    // (government actors in definitions may exercise powers).
     if purposes.first() == Some(&purpose::INTERPRETATION) {
-        return !has_any_actor;
+        return !has_government_actor;
     }
 
-    // Enactment-primary: commencement/citation blocks usually skip, but
-    // transitional provisions with actors contain real Powers/Duties
-    // (e.g., "Secretary of State may by order appoint...").
+    // Enactment-primary: skip unless government actors present
+    // (Secretary of State may by order appoint...).
     if purposes.first() == Some(&purpose::ENACTMENT) {
-        return !has_any_actor;
+        return !has_government_actor;
+    }
+
+    // Unclassified provisions (matched no purpose pattern): skip unless
+    // government actors present. These are structural provisions that
+    // the purpose classifier couldn't categorise.
+    if purposes.first() == Some(&purpose::UNCLASSIFIED) {
+        return !has_government_actor;
     }
 
     // Application+Scope-primary: "These Regulations shall apply to..."
@@ -593,6 +600,37 @@ pub fn should_skip_drrp(
     }
 
     false
+}
+
+/// Check whether actors in this provision should default to "mentioned" position.
+///
+/// Returns true when the provision's purpose is structural (definition,
+/// amendment, repeal, etc.) AND no duty-bearing modal verbs are detected.
+/// This prevents actors in references and definitions from being classified
+/// as active duty-bearers.
+///
+/// For mixed provisions (structural purpose + modal verb), returns false
+/// to allow normal position assignment.
+pub fn should_default_to_mentioned(purposes: &[&str], text: &str) -> bool {
+    // Only apply to structural purposes
+    if !purposes
+        .iter()
+        .all(|p| purpose::STRUCTURAL_PURPOSES.contains(p))
+    {
+        return false;
+    }
+
+    // Check for duty-bearing modals — if present, this might be a mixed
+    // provision with a real duty embedded in a definition/reference.
+    let lower = text.to_lowercase();
+    let has_duty_modal = lower.contains(" shall ")
+        || lower.contains(" must ")
+        || lower.contains(" ensure ")
+        || lower.contains(" required to ")
+        || lower.contains(" responsible for ");
+
+    // If modal present, allow normal position assignment (mixed provision)
+    !has_duty_modal
 }
 
 /// Check whether text uses "shall" in the legal fiction / interpretive sense

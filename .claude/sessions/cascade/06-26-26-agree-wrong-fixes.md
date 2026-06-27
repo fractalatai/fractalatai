@@ -50,12 +50,14 @@ Current `should_skip_drrp` gates DRRP extraction but NOT position assignment. Ha
 
 ## Revised actions
 
-1. ⬜ **Fix the default**: change Process+Rule from default to explicit match. Add `Unclassified` category for provisions matching no pattern. Actors in `Unclassified` provisions → `mentioned` unless modal verb detected.
-2. ⬜ **Remove `has_any_actor` override** in `should_skip_drrp` for structural purposes (Interpretation, Amendment, Repeal, Enactment, Extent, Transitional). Actors in these → `mentioned` regardless.
-3. ⬜ **Add position gating**: new function `should_override_position_to_mentioned(purposes, has_modal)` — returns true for structural purposes without duty-bearing modals.
-4. ⬜ **Modal proximity check**: for mixed provisions (structural purpose + modal verb), only actors NEAR the modal get active. Others get mentioned. (Simpler version: any modal in provision → allow normal position assignment.)
-5. ⬜ **Add section_type as classifier feature** (cheap win, 24 errors)
-6. ⬜ Dependency parsing for grammatical role → see `cascade/06-26-26-dependency-parsing.md`
+1. ✅ **Fix the default**: `Unclassified` replaces `Process+Rule` as default. `STRUCTURAL_PURPOSES` constant defined.
+2. ✅ **Remove `has_any_actor` override**: changed to `has_government_actor` for structural purposes.
+3. ✅ **Position gating**: `should_default_to_mentioned(purposes, text)` — returns true for structural purposes without duty-bearing modals. Wired into `parse_provisions`.
+4. ✅ **Modal check** (simpler version): any modal in provision → allow normal position assignment. Per-actor proximity deferred to dependency parsing session.
+
+**Result: 82 agree+wrong errors fixed (325 → 243). Regex position 51.3% → 53.8%.**
+5. ⬜ **Add section_type as classifier feature** (cheap win, 24 errors) — requires classifier retrain, carry to dependency parsing session alongside other feature improvements
+6. ➡️ Dependency parsing for grammatical role → see `cascade/06-26-26-dependency-parsing.md`
 
 ## Expected impact (revised)
 

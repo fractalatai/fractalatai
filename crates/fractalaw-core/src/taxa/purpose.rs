@@ -28,6 +28,7 @@ pub const LIABILITY: &str = "Liability";
 pub const REPEAL_REVOCATION: &str = "Repeal+Revocation";
 pub const AMENDMENT: &str = "Amendment";
 pub const TRANSITIONAL: &str = "Transitional Arrangement";
+pub const UNCLASSIFIED: &str = "Unclassified";
 
 /// All purpose labels in priority order.
 pub const ALL_PURPOSES: &[&str] = &[
@@ -46,6 +47,18 @@ pub const ALL_PURPOSES: &[&str] = &[
     REPEAL_REVOCATION,
     AMENDMENT,
     TRANSITIONAL,
+    UNCLASSIFIED,
+];
+
+/// Structural purposes where actors are typically mentioned, not duty-bearing.
+pub const STRUCTURAL_PURPOSES: &[&str] = &[
+    ENACTMENT,
+    INTERPRETATION,
+    AMENDMENT,
+    REPEAL_REVOCATION,
+    EXTENT,
+    TRANSITIONAL,
+    UNCLASSIFIED,
 ];
 
 // ── Pattern definitions ──────────────────────────────────────────────
@@ -164,7 +177,7 @@ pub fn classify(text: &str) -> Vec<&'static str> {
         .collect();
 
     if result.is_empty() {
-        result.push(PROCESS_RULE);
+        result.push(UNCLASSIFIED);
     }
     sort_purposes(&mut result);
     result.dedup();

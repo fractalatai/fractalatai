@@ -515,6 +515,23 @@ fn parse_provisions(
                             .collect()
                     },
                 });
+
+                // Purpose gate: override positions to "mentioned" for structural
+                // provisions without duty-bearing modals.
+                if fractalaw_core::taxa::should_default_to_mentioned(
+                    &record.purposes,
+                    &text,
+                ) {
+                    if let Some(pt) = provision_taxa.last_mut() {
+                        for actor in &mut pt.actors {
+                            actor.position = "mentioned".to_string();
+                            actor.reason = Some(format!(
+                                "purpose_gated:mentioned ({})",
+                                record.purposes.join(", ")
+                            ));
+                        }
+                    }
+                }
             }
 
             // Aggregate actors into holder sets and role sets.
