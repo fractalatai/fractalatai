@@ -74,9 +74,11 @@ Counterparty got biggest boost — subject/object distinction working.
 1. ✅ Prototype with spaCy en_core_web_sm — +3.0% accuracy
 2. ✅ Improve actor matching (phrase-level via char_span) — +0.9% more
 3. ✅ Try en_core_web_md — 64.8% total (+3.8% over baseline)
-4. ⬜ Retrain position classifier v3 with dep features
-5. ⬜ Add section_type feature (carried from agree-wrong session)
-6. ⬜ Cache parse results in Postgres, integrate into pipeline
+4. ✅ Retrain position classifier v3 with dep + section_type features (428 dims)
+5. ✅ Section_type feature added — no additional gain on top of dep parsing (dep already captures it)
+6. ⬜ Integrate v3 into pipeline (update Rust classifier to 428 features, add spaCy preprocessing)
+
+v3 exported: `docs/position_classifier_v3.json` (64.8% CV, 428 features)
 
 ### Comparison table
 
