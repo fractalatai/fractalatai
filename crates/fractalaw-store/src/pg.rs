@@ -282,6 +282,56 @@ impl PgStore {
         Ok(r1.rows_affected() as usize + r2.rows_affected() as usize)
     }
 
+    /// Write reconciled drrp + position + extraction_method to provision_actors.
+    pub async fn write_reconciled(
+        &self,
+        updates: &[(String, String, Option<String>, String, String, String)],
+        // (section_id, actor_label, drrp, position, extraction_method, confidence)
+    ) -> Result<usize, StoreError> {
+        let mut count = 0usize;
+        for (sid, label, drrp, pos, method, confidence) in updates {
+            sqlx::query(
+                "UPDATE provision_actors SET drrp = $1, position = $2, \
+                 extraction_method = $3, reconcile_confidence = $4 \
+                 WHERE section_id = $5 AND actor_label = $6"
+            )
+            .bind(drrp.as_deref())
+            .bind(pos)
+            .bind(method)
+            .bind(confidence)
+            .bind(sid)
+            .bind(label)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| StoreError::Other(format!("write_reconciled: {e}")))?;
+            count += 1;
+        }
+        Ok(count)
+    }
+
+    /// Query all tier signals for reconciliation.
+    #[allow(clippy::type_complexity)]
+    pub async fn query_all_actor_signals(
+        &self,
+        law_name: &str,
+    ) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>)>, StoreError> {
+        let rows = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>)>(
+            "SELECT pa.section_id, pa.actor_label, \
+             pa.regex_drrp, pa.regex_position, \
+             pa.cls_drrp, pa.cls_position, pa.cls_confidence, \
+             pa.inferred_drrp, pa.inferred_position, \
+             pa.llm_drrp, pa.llm_position \
+             FROM provision_actors pa \
+             JOIN legislation_text lt ON pa.section_id = lt.section_id \
+             WHERE lt.law_name = $1"
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_all_actor_signals: {e}")))?;
+        Ok(rows)
+    }
+
     /// Query dep parsing features for a law's actors.
     pub async fn query_dep_features(
         &self,
@@ -307,6 +357,46 @@ impl PgStore {
                 d.unwrap_or(0.5),
             ])
         }).collect())
+    }
+
+    /// Backfill legislation_text.actors, drrp_types, extraction_method
+    /// from reconciled provision_actors data for a given law.
+    pub async fn backfill_from_actors(&self, law_name: &str) -> Result<usize, StoreError> {
+        let result = sqlx::query(
+            "UPDATE legislation_text lt SET \
+             actors = agg.actors_json, \
+             drrp_types = agg.drrp_arr, \
+             extraction_method = agg.best_method \
+             FROM ( \
+               SELECT pa.section_id, \
+                 jsonb_agg(jsonb_build_object( \
+                   'label', pa.actor_label, \
+                   'position', pa.position, \
+                   'label_source', 'canonical', \
+                   'reason', pa.extraction_method, \
+                   'relates_to', null \
+                 )) AS actors_json, \
+                 ARRAY(SELECT DISTINCT unnest FROM unnest( \
+                   ARRAY_AGG(pa.drrp) FILTER (WHERE pa.drrp IS NOT NULL) \
+                 )) AS drrp_arr, \
+                 CASE \
+                   WHEN bool_or(pa.extraction_method = 'llm') THEN 'llm' \
+                   WHEN bool_or(pa.extraction_method LIKE 'reconciled%') THEN 'reconciled' \
+                   WHEN bool_or(pa.extraction_method = 'inferred') THEN 'inferred' \
+                   ELSE 'regex' \
+                 END AS best_method \
+               FROM provision_actors pa \
+               JOIN legislation_text lt2 ON pa.section_id = lt2.section_id \
+               WHERE lt2.law_name = $1 AND pa.position IS NOT NULL \
+               GROUP BY pa.section_id \
+             ) agg \
+             WHERE lt.section_id = agg.section_id"
+        )
+        .bind(law_name)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("backfill_from_actors: {e}")))?;
+        Ok(result.rows_affected() as usize)
     }
 
     /// Delete provisions for a law.
@@ -755,6 +845,10 @@ impl crate::ProvisionStore for PgStore {
         self.ensure_gap_c_columns().await
     }
 
+    async fn backfill_from_actors(&self, law_name: &str) -> Result<usize, StoreError> {
+        self.backfill_from_actors(law_name).await
+    }
+
     async fn delete_law_lat(&self, law_name: &str) -> Result<usize, StoreError> {
         self.delete_law_lat(law_name).await
     }
@@ -779,6 +873,21 @@ impl crate::ProvisionStore for PgStore {
 
     async fn clear_inferred_actors(&self, law_name: &str) -> Result<usize, StoreError> {
         self.clear_inferred_actors(law_name).await
+    }
+
+    async fn write_reconciled(
+        &self,
+        updates: &[(String, String, Option<String>, String, String, String)],
+    ) -> Result<usize, StoreError> {
+        self.write_reconciled(updates).await
+    }
+
+    #[allow(clippy::type_complexity)]
+    async fn query_all_actor_signals(
+        &self,
+        law_name: &str,
+    ) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>)>, StoreError> {
+        self.query_all_actor_signals(law_name).await
     }
 
     async fn query_dep_features(

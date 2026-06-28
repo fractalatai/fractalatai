@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS provision_actors (
     drrp              TEXT,
     position          TEXT,
     extraction_method TEXT,
+    reconcile_confidence TEXT,
     PRIMARY KEY (section_id, actor_label)
 );
 

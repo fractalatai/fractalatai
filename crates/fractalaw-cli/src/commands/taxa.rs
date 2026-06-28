@@ -251,132 +251,91 @@ pub(crate) async fn cmd_taxa_infer(
     Ok(())
 }
 
-/// Reconcile per-tier signals into final drrp_types + actors.
+/// Reconcile per-tier signals into final drrp + position per actor.
 ///
-/// Reads regex_drrp/regex_actors, cls_drrp/cls_actors, llm_drrp/llm_actors
-/// and picks the best answer per provision. Writes to drrp_types + actors.
-///
-/// Rules:
-/// 1. LLM wins (highest quality) if present
-/// 2. Regex + classifier agree → use that, extraction_method = "classifier"
-/// 3. Disagree → use regex, flag extraction_method = "pending_llm"
-/// 4. Classifier confidence < 0.7 → don't trust, use regex
-/// 5. Only regex available → use regex
+/// Reads from provision_actors (all tier columns).
+/// DRRP: LLM wins, else regex.
+/// Position: LLM > inferred > agree > classifier\@>=0.7 > pending_llm > regex-only.
 pub(crate) async fn cmd_taxa_reconcile(
     lance: &dyn ProvisionStore,
     law_names: &[String],
 ) -> anyhow::Result<()> {
-    let mut total_reconciled = 0usize;
-    let mut total_agreed = 0usize;
-    let mut total_disagreed = 0usize;
-    let mut total_llm = 0usize;
-    let mut total_regex_only = 0usize;
+    let mut total = 0usize;
+    let mut counts = std::collections::HashMap::<&str, usize>::new();
 
     for law_name in law_names {
-        let batches = lance.query_legislation_text(law_name, 100_000, 0).await?;
+        let signals = lance.query_all_actor_signals(law_name).await?;
+        if signals.is_empty() {
+            continue;
+        }
 
-        for batch in &batches {
-            let sid_col = batch.column_by_name("section_id");
-            let regex_drrp_col = batch.column_by_name("regex_drrp");
-            let regex_actors_col = batch.column_by_name("regex_actors");
-            let cls_drrp_col = batch.column_by_name("cls_drrp");
-            let cls_actors_col = batch.column_by_name("cls_actors");
-            let cls_conf_col = batch.column_by_name("cls_confidence");
-            let llm_drrp_col = batch.column_by_name("llm_drrp");
-            let llm_actors_col = batch.column_by_name("llm_actors");
+        let mut updates: Vec<(String, String, Option<String>, String, String, String)> = Vec::new();
 
-            // Helper: read first element from a TEXT[] (List<Utf8>) or fall back to Utf8 string
-            let get_list_first = |col: &dyn arrow::array::Array, row: usize| -> Option<String> {
-                // Try List<Utf8> (Postgres TEXT[])
-                if let Some(list) = col.as_any().downcast_ref::<arrow::array::ListArray>() {
-                    if !list.is_null(row) {
-                        let vals = list.value(row);
-                        if vals.len() > 0 {
-                            if let Some(sa) = vals.as_any().downcast_ref::<arrow::array::StringArray>() {
-                                if !sa.is_null(0) {
-                                    let v = sa.value(0).to_string();
-                                    if !v.is_empty() {
-                                        return Some(v);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    return None;
-                }
-                // Fall back to Utf8/LargeUtf8
-                get_string_value(col, row)
+        for (sid, label, regex_drrp, regex_pos, _cls_drrp, cls_pos, cls_conf,
+             _inferred_drrp, inferred_pos, llm_drrp, llm_pos) in &signals
+        {
+            // === DRRP reconciliation (simplified: LLM wins, else regex) ===
+            let final_drrp = if llm_drrp.is_some() {
+                llm_drrp.clone()
+            } else {
+                regex_drrp.clone()
             };
 
-            for row in 0..batch.num_rows() {
-                let _sid = match sid_col.and_then(|c| get_string_value(c.as_ref(), row)) {
-                    Some(s) => s,
-                    None => continue,
-                };
-
-                let regex_drrp = regex_drrp_col.and_then(|c| get_list_first(c.as_ref(), row));
-                let regex_actors = regex_actors_col.and_then(|c| get_string_value(c.as_ref(), row));
-                let cls_drrp = cls_drrp_col.and_then(|c| get_list_first(c.as_ref(), row));
-                let cls_actors = cls_actors_col.and_then(|c| get_string_value(c.as_ref(), row));
-                let cls_conf = cls_conf_col.and_then(|c| {
-                    c.as_any()
-                        .downcast_ref::<arrow::array::Float32Array>()
-                        .and_then(|a| if a.is_null(row) { None } else { Some(a.value(row)) })
-                });
-                let llm_drrp = llm_drrp_col.and_then(|c| get_list_first(c.as_ref(), row));
-                let llm_actors = llm_actors_col.and_then(|c| get_string_value(c.as_ref(), row));
-
-                // Skip provisions with no regex signal
-                if regex_drrp.is_none() && regex_actors.is_none() {
-                    continue;
-                }
-
-                // Pick winner
-                let (final_drrp, final_actors, method) = if llm_drrp.is_some() || llm_actors.is_some() {
-                    // Rule 1: LLM wins
-                    total_llm += 1;
-                    (
-                        llm_drrp.or(regex_drrp),
-                        llm_actors.or(regex_actors),
-                        "agentic",
-                    )
-                } else if let (Some(r_drrp), Some(c_drrp)) = (&regex_drrp, &cls_drrp) {
-                    let confident = cls_conf.unwrap_or(0.0) >= 0.7;
-                    if r_drrp == c_drrp && confident {
-                        // Rule 2: agree + confident
-                        total_agreed += 1;
-                        (
-                            cls_drrp.or(regex_drrp),
-                            cls_actors.or(regex_actors),
-                            "classifier",
-                        )
-                    } else {
-                        // Rule 3: disagree or low confidence → use regex, flag for LLM
-                        total_disagreed += 1;
-                        (regex_drrp, regex_actors, "pending_llm")
-                    }
+            // === Position reconciliation (confidence-tiered) ===
+            let (final_pos, method, confidence) = if let Some(pos) = llm_pos {
+                // Rule 1: LLM wins
+                *counts.entry("llm").or_default() += 1;
+                (pos.clone(), "llm", "HIGHEST")
+            } else if let Some(pos) = inferred_pos {
+                // Rule 2: Inferred (86.7% accurate)
+                *counts.entry("inferred").or_default() += 1;
+                (pos.clone(), "inferred", "HIGH")
+            } else if let (Some(rp), Some(cp)) = (regex_pos, cls_pos) {
+                if rp == cp {
+                    // Rule 3: Agree
+                    *counts.entry("agree").or_default() += 1;
+                    (rp.clone(), "reconciled_agree", "HIGH")
                 } else {
-                    // Rule 5: only regex
-                    total_regex_only += 1;
-                    (regex_drrp, regex_actors, "regex")
-                };
+                    let conf = cls_conf.unwrap_or(0.0);
+                    if conf >= 0.7 {
+                        // Rule 4: Disagree, classifier confident
+                        *counts.entry("cls_confident").or_default() += 1;
+                        (cp.clone(), "reconciled_classifier", "HIGH")
+                    } else {
+                        // Rule 5: Disagree, not confident → flag LLM
+                        *counts.entry("pending_llm").or_default() += 1;
+                        (rp.clone(), "pending_llm", "LOW")
+                    }
+                }
+            } else if let Some(rp) = regex_pos {
+                // Rule 6: Only regex
+                *counts.entry("regex_only").or_default() += 1;
+                (rp.clone(), "regex", "MEDIUM")
+            } else {
+                continue;
+            };
 
-                // Write reconciled result (SQL UPDATE)
-                // For now, use a simple per-row update via the store
-                // This is the reconciled output that sertantai consumes
-                total_reconciled += 1;
-                let _ = final_drrp; // TODO: write back via batch UPDATE
-                let _ = final_actors;
-                let _ = method;
-            }
+            updates.push((
+                sid.clone(),
+                label.clone(),
+                final_drrp,
+                final_pos,
+                method.to_string(),
+                confidence.to_string(),
+            ));
+            total += 1;
+        }
+
+        if !updates.is_empty() {
+            lance.write_reconciled(&updates).await?;
+            eprintln!("  {law_name}: {} actors reconciled", updates.len());
         }
     }
 
-    println!("Reconciled {total_reconciled} provisions across {} laws", law_names.len());
-    println!("  LLM wins:      {total_llm}");
-    println!("  Agreed:        {total_agreed}");
-    println!("  Disagreed:     {total_disagreed}");
-    println!("  Regex only:    {total_regex_only}");
+    println!("Reconciled {total} actors across {} laws", law_names.len());
+    for (method, count) in counts.iter() {
+        println!("  {method}: {count}");
+    }
 
     Ok(())
 }

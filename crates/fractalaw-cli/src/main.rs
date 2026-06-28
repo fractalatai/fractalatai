@@ -508,6 +508,12 @@ enum TaxaAction {
         #[arg(long)]
         laws: String,
     },
+    /// Backfill legislation_text.actors/drrp_types from reconciled provision_actors
+    Backfill {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: String,
+    },
     /// Whole-law LLM validation: send all provisions + parse results to LLM
     Validate {
         /// Specific laws (comma-separated)
@@ -767,6 +773,19 @@ async fn main() -> anyhow::Result<()> {
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
                 cmd_taxa_reconcile(lance.as_ref(), &law_names).await
+            }
+            TaxaAction::Backfill { laws } => {
+                let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
+                let law_names: Vec<String> =
+                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                let mut total = 0usize;
+                for law_name in &law_names {
+                    let updated = lance.backfill_from_actors(law_name).await?;
+                    eprintln!("  {law_name}: {updated} provisions backfilled");
+                    total += updated;
+                }
+                println!("Backfilled {total} provisions across {} laws", law_names.len());
+                Ok(())
             }
             TaxaAction::AuditFitness {
                 laws,
