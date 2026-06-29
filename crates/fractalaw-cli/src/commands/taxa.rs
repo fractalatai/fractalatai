@@ -2618,7 +2618,7 @@ pub(crate) async fn cmd_taxa_embed(
         let needs_embedding: Vec<usize> = (0..provisions.len())
             .filter(|&i| {
                 provisions[i].3 == "substantive"
-                    && provisions[i].1.len() > 20
+                    && provisions[i].1.len() >= 20
                     && provisions[i].2.is_none()
             })
             .collect();
