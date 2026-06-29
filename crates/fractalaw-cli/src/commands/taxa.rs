@@ -2571,17 +2571,22 @@ pub(crate) async fn cmd_taxa_embed(
     for law_name in law_names {
         let batches = lance.query_legislation_text(law_name, 100_000, 0).await?;
 
-        let mut provisions: Vec<(String, String, Option<Vec<f32>>)> = Vec::new();
+        // (section_id, text, existing_embedding, scope)
+        let mut provisions: Vec<(String, String, Option<Vec<f32>>, String)> = Vec::new();
         for batch in &batches {
             let sid_col = batch.column_by_name("section_id");
             let text_col = batch.column_by_name("text");
             let emb_col = batch.column_by_name("embedding");
+            let scope_col = batch.column_by_name("scope");
 
             for row in 0..batch.num_rows() {
                 let sid = sid_col
                     .and_then(|c| get_string_value(c.as_ref(), row))
                     .unwrap_or_default();
                 let text = text_col
+                    .and_then(|c| get_string_value(c.as_ref(), row))
+                    .unwrap_or_default();
+                let scope = scope_col
                     .and_then(|c| get_string_value(c.as_ref(), row))
                     .unwrap_or_default();
 
@@ -2601,7 +2606,7 @@ pub(crate) async fn cmd_taxa_embed(
                         Some(values.values()[offset..offset + dim].to_vec())
                     });
 
-                provisions.push((sid, text, emb));
+                provisions.push((sid, text, emb, scope));
             }
         }
 
@@ -2609,8 +2614,13 @@ pub(crate) async fn cmd_taxa_embed(
             continue;
         }
 
+        // Only embed substantive provisions that are missing embeddings
         let needs_embedding: Vec<usize> = (0..provisions.len())
-            .filter(|&i| provisions[i].1.len() > 20 && provisions[i].2.is_none())
+            .filter(|&i| {
+                provisions[i].3 == "substantive"
+                    && provisions[i].1.len() > 20
+                    && provisions[i].2.is_none()
+            })
             .collect();
 
         if !needs_embedding.is_empty() {

@@ -31,6 +31,18 @@ Implementation first, heavy processing last:
 
 Note: regex parse and embed are independent — both operate on raw text. The 106 gap laws already have regex parse done (extraction_method set, actors in provision_actors). They just need embeddings so the classifier (Tier 2) can run.
 
+## Implemented
+
+- ✅ **`scope` column added to `legislation_text`** — currently two values: `out` (31,678) and `substantive` (156,655). Backfilled via SQL.
+- ✅ **`taxa embed` now filters by scope** — only embeds `scope = 'substantive'` provisions. Reads from Postgres via `--laws`, not stale Parquet.
+- ✅ **`taxa embed --laws` already existed** — under the `taxa` subcommand (not top-level `embed`). Accepts comma-separated law names.
+
+## TODOs (beyond this session)
+
+- ⬜ **Set STRUCTURAL scope from Rust during parse** — the SQL backfill can't reliably evaluate purpose + modal override. The `provision_scope()` function in `taxa/mod.rs` does this correctly (Pass 2 with purpose). Wire it into `parse_provisions` to set `scope` on `legislation_text` at parse time. Then backfill existing provisions by re-running parse.
+- ⬜ **Wire scope into LAT sync ingest** — when sertantai sends new laws, set scope at ingest time so downstream steps know immediately what's in/out.
+- ⬜ **Top-level `embed` command should use Postgres** — currently reads from stale Parquet. Low priority since `taxa embed --laws` works correctly.
+
 ## QA checks (close signal)
 
 - count(in-scope provisions without embedding) = 0

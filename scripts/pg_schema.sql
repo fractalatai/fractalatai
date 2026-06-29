@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS legislation_text (
     fitness_plant       TEXT[],
     fitness_property    TEXT[],
     fitness_sector      TEXT[],
+    scope                TEXT,
     extraction_method    TEXT,
     ancestor_distance    INTEGER,
     holder_inferred_from TEXT,
