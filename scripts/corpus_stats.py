@@ -41,20 +41,38 @@ DRRP_MODALS = (
 def main():
     parser = argparse.ArgumentParser(description="Corpus pipeline coverage stats")
     parser.add_argument("--laws", help="Comma-separated law names")
+    parser.add_argument("--law-file", help="CSV file with law names (e.g. data/qq-applicable-laws.csv)")
     parser.add_argument("--benchmarks-only", action="store_true")
+    parser.add_argument("--all", action="store_true", help="All laws (no filter)")
     args = parser.parse_args()
 
     conn = psycopg2.connect(PG)
     cur = conn.cursor()
 
     law_filter = ""
+    label = ""
     if args.laws:
         names = [f"'{n.strip()}'" for n in args.laws.split(",")]
         law_filter = f"AND lt.law_name IN ({','.join(names)})"
+        label = f"{len(names)} specified laws"
+    elif args.law_file:
+        import os
+        with open(args.law_file) as f:
+            csv_laws = [n.strip() for n in f.read().split(",") if n.strip()]
+        names = [f"'{n}'" for n in csv_laws]
+        law_filter = f"AND lt.law_name IN ({','.join(names)})"
+        label = f"{len(csv_laws)} laws from {os.path.basename(args.law_file)}"
     elif args.benchmarks_only:
         law_filter = "AND lt.law_name IN (SELECT DISTINCT split_part(section_id, ':', 1) FROM gold_benchmarks)"
+        label = "benchmark laws"
+    elif args.all:
+        law_filter = ""
+        label = "all laws"
     else:
         law_filter = "AND lt.law_name NOT IN (SELECT DISTINCT split_part(section_id, ':', 1) FROM gold_benchmarks)"
+        label = "non-benchmark laws"
+
+    print(f"Corpus: {label}\n")
 
     # Tier 0: Base case
     print("=" * 70)
@@ -99,7 +117,7 @@ def main():
         SELECT
             count(*) as in_scope,
             count(*) FILTER (WHERE embedding IS NOT NULL) as has_embedding,
-            count(*) FILTER (WHERE extraction_method IS NOT NULL) as has_extraction
+            count(*) FILTER (WHERE lt.extraction_method IS NOT NULL) as has_extraction
         FROM legislation_text lt
         WHERE text IS NOT NULL
         AND section_type NOT IN %s
@@ -107,10 +125,51 @@ def main():
         {law_filter}
     """, (OUT_SECTION_TYPES,))
     in_scope, has_emb, has_ext = cur.fetchone()
+    emb_gap = in_scope - has_emb
 
     print(f"  In-scope provisions:    {in_scope:>8,}")
     print(f"  Has embedding:          {has_emb:>8,}  ({100*has_emb/in_scope:.1f}%)")
+    print(f"  Embedding gap:          {emb_gap:>8,}  ({100*emb_gap/in_scope:.1f}%)")
     print(f"  Has extraction_method:  {has_ext:>8,}  ({100*has_ext/in_scope:.1f}%)")
+
+    # Laws with embedding gaps
+    cur.execute(f"""
+        SELECT lt.law_name, count(*) as missing
+        FROM legislation_text lt
+        WHERE embedding IS NULL
+        AND section_type NOT IN %s
+        AND length(text) >= 20
+        AND text IS NOT NULL
+        {law_filter}
+        GROUP BY lt.law_name
+        ORDER BY count(*) DESC
+    """, (OUT_SECTION_TYPES,))
+    gap_laws = cur.fetchall()
+    if gap_laws:
+        print(f"  Laws with gaps:         {len(gap_laws):>8,}")
+        for name, cnt in gap_laws[:5]:
+            print(f"    {name}: {cnt} provisions")
+        if len(gap_laws) > 5:
+            print(f"    ... and {len(gap_laws) - 5} more")
+
+    # Actor coverage
+    cur.execute(f"""
+        SELECT
+            count(DISTINCT pa.section_id) as provisions_with_actors,
+            count(*) as total_actors,
+            count(*) FILTER (WHERE pa.regex_position IS NOT NULL) as has_regex_pos
+        FROM provision_actors pa
+        JOIN legislation_text lt ON pa.section_id = lt.section_id
+        WHERE lt.section_type NOT IN %s
+        AND length(lt.text) >= 20
+        {law_filter}
+    """, (OUT_SECTION_TYPES,))
+    prov_with_actors, total_actors, has_regex = cur.fetchone()
+    print(f"  Provisions with actors: {prov_with_actors:>8,}  ({100*prov_with_actors/in_scope:.1f}%)")
+    print(f"  Total actors:           {total_actors:>8,}")
+    print(f"  Has regex_position:     {has_regex:>8,}  ({100*has_regex/total_actors:.1f}%)" if total_actors > 0 else "")
+    emb_status = "PASS" if emb_gap == 0 else f"FAIL ({emb_gap} in-scope provisions without embedding)"
+    print(f"  QA: Embedding coverage: {emb_status}")
 
     # Tier 2: Classifier
     print(f"\n{'=' * 70}")
