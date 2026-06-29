@@ -602,6 +602,106 @@ pub fn should_skip_drrp(
     false
 }
 
+// ── Base case filter ────────────────────────────────────────────────
+
+/// Pipeline scope category for a provision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProvisionScope {
+    /// Not processed — headings, part/chapter titles, signed blocks, stubs.
+    Out,
+    /// Parsed for discovery but not embedded/classified — definitions, amendments,
+    /// repeals. Actors default to "mentioned" unless modal override triggers.
+    Structural,
+    /// Full pipeline — embedded, classified, reconciled, SLM'd.
+    Substantive,
+}
+
+impl ProvisionScope {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Out => "out",
+            Self::Structural => "structural",
+            Self::Substantive => "substantive",
+        }
+    }
+}
+
+/// Section types that never contain legal obligations.
+const OUT_SECTION_TYPES: &[&str] = &[
+    "heading", "part", "chapter", "signed",
+    "title", "table", "commencement", "note",
+    "schedule",  // schedule titles/headers — schedule_part and schedule_paragraph ARE substantive
+];
+
+/// Determine pipeline scope for a provision.
+///
+/// Pass 1: section_type filter (available at ingest, no analysis).
+/// Pass 2: purpose filter (requires regex analysis of text).
+///
+/// Call with `purposes = &[]` for Pass 1 only (before purpose classification).
+/// Call with actual purposes for the full two-pass filter.
+pub fn provision_scope(
+    section_type: Option<&str>,
+    text: &str,
+    purposes: &[&str],
+) -> ProvisionScope {
+    // Pass 1: section_type exclusions
+    if let Some(st) = section_type {
+        if OUT_SECTION_TYPES.iter().any(|&out| st.eq_ignore_ascii_case(out)) {
+            return ProvisionScope::Out;
+        }
+    }
+
+    // Text too short to contain any legal content
+    if text.len() < 20 {
+        return ProvisionScope::Out;
+    }
+
+    // Pass 2: purpose-based classification (if purposes available)
+    if purposes.is_empty() {
+        // No purpose yet — assume substantive (will be refined after purpose classification)
+        return ProvisionScope::Substantive;
+    }
+
+    // If all purposes are structural, check for modal override
+    if purposes
+        .iter()
+        .all(|p| purpose::STRUCTURAL_PURPOSES.contains(p))
+    {
+        if has_drrp_modal(text) {
+            // Structural provision with obligation/rights/powers modal — promote
+            ProvisionScope::Substantive
+        } else {
+            ProvisionScope::Structural
+        }
+    } else {
+        ProvisionScope::Substantive
+    }
+}
+
+/// Check for DRRP-bearing modals — obligations, rights, and powers.
+///
+/// Used by the base case filter to promote structural provisions that contain
+/// legal obligations, rights, or powers.
+fn has_drrp_modal(text: &str) -> bool {
+    let lower = text.to_lowercase();
+
+    // Obligation modals
+    lower.contains(" shall ")
+        || lower.contains(" must ")
+        || lower.contains(" ensure ")
+        || lower.contains(" required to ")
+        || lower.contains(" responsible for ")
+        // Rights modals
+        || lower.contains(" entitled to ")
+        || lower.contains(" has the right ")
+        || lower.contains(" have the right ")
+        // Powers modals
+        || lower.contains(" may ")
+        || lower.contains(" has the power ")
+        || lower.contains(" have the power ")
+}
+
 /// Check whether actors in this provision should default to "mentioned" position.
 ///
 /// Returns true when the provision's purpose is structural (definition,

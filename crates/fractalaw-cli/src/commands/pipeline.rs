@@ -281,9 +281,13 @@ fn parse_provisions(
             if text.trim().is_empty() {
                 continue;
             }
-            // Heading rows are structural markers (e.g. "Application") with
-            // no legal obligation text — skip before any taxa parsing.
-            if section_type == "heading" {
+            // Base case filter: skip provisions that can't contain legal obligations.
+            let scope = fractalaw_core::taxa::provision_scope(
+                Some(section_type.as_str()),
+                &text,
+                &[], // purposes not yet known — Pass 1 only (section_type + text length)
+            );
+            if scope == fractalaw_core::taxa::ProvisionScope::Out {
                 continue;
             }
 
