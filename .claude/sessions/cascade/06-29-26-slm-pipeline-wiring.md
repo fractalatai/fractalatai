@@ -1,4 +1,76 @@
-# Session: SLM Pipeline Wiring (ACTIVE)
+---
+session: SLM Pipeline Wiring
+status: closed
+opened: 2026-06-29
+closed: 2026-06-29
+outcome: success
+
+summary: >
+  Wired fine-tuned gemma3-position as Tier 3 in a 4-tier classification cascade
+  (regex → classifier → SLM → LLM). Per-class gating trusts SLM on active (92%)
+  and counterparty (87%), flags beneficiary/mentioned for human-triggered LLM.
+  Overall benchmark accuracy 78.2% (+11.7% over reconcile-only).
+
+decisions:
+  - what: Separate SLM and LLM as distinct tiers with own columns
+    why: User identified conflation — SLM (local, free, 77%) is fundamentally different from LLM (Gemini, paid, ~95%). Benchmark laws already have LLM gold labels.
+    result: slm_drrp/slm_position columns added, reconciliation rules updated for 4 tiers
+
+  - what: Per-class gating for SLM → LLM elevation
+    why: SLM accuracy varies dramatically by class — 92% active but 31% beneficiary. Gemini review recommended Option D (per-class) as pragmatic starting point.
+    result: Active/counterparty trusted, beneficiary/mentioned flagged as pending_llm
+
+  - what: LLM tier is human-triggered, not automated
+    why: Cost control — Gemini is paid. SLM improvement cycle means each retrain shrinks the pending_llm backlog. Human decides when to run Gemini batch.
+    result: pending_llm actors accumulate until human triggers LLM. Results feed back as SLM training data.
+
+  - what: Inferred ranks above SLM in reconciliation order
+    why: Inferred is 86.7% vs SLM 77.1%. Gemini review caught the ordering error.
+    result: In practice they don't compete — inferred creates new actors, SLM classifies existing pending actors
+
+metrics:
+  overall_benchmark: { accuracy: 78.2%, matched: 1756, correct: 1374, laws: 15 }
+  slm_tier: { accuracy: 78.6%, matched: 350, correct: 275 }
+  pending_llm_tier: { accuracy: 87.7%, matched: 122, correct: 107, note: "high accuracy because gold IS mostly beneficiary/mentioned" }
+  accuracy_progression: { regex_only: 53.8%, plus_classifier: 66.5%, plus_slm: 78.2% }
+  slm_per_class: { active: 91.7%, counterparty: 87.4%, beneficiary: 31.2%, mentioned: 58.3% }
+  slm_classified: 3249
+  slm_parse_errors: 101
+
+lessons:
+  - title: Do not conflate SLM and LLM — they are different tiers
+    detail: SLM is local/free/77%. LLM is cloud/paid/95%. Writing SLM predictions to llm_* columns meant benchmark laws (which have real LLM gold data) would be overwritten. User caught this immediately.
+    tag: architecture
+
+  - title: Per-class accuracy varies dramatically — gate on it
+    detail: SLM is 92% on active but 31% on beneficiary. A single accuracy number (77%) hides this. Per-class gating means you trust the model where it's strong and escalate where it's weak.
+    tag: methodology
+
+  - title: Reconcile → SLM → re-reconcile is a three-step flow
+    detail: First reconcile flags pending_slm. SLM classifies those. Second reconcile applies per-class gating and writes final extraction_method. Must run reconcile twice.
+    tag: architecture
+
+  - title: SLM parse errors cluster on definition sections
+    detail: reg.2(1) and art.2(1) provisions (statutory definitions) produce plain text instead of JSON from the SLM. 101 of 3,350 actors (3%). These stay as pending_slm.
+    tag: models
+
+artifacts:
+  - crates/fractalaw-cli/src/commands/taxa.rs
+  - crates/fractalaw-store/src/pg.rs
+  - crates/fractalaw-store/src/provision_store.rs
+  - crates/fractalaw-cli/src/main.rs
+  - scripts/pg_schema.sql
+
+depends_on:
+  - 06-27-26-local-llm-tier
+  - 06-26-26-reconciliation
+
+enables:
+  - QQ corpus 4-tier enrichment and republish
+  - SLM improvement cycle (retrain on LLM feedback)
+---
+
+# Session: SLM Pipeline Wiring (CLOSED)
 
 ## Problem
 
@@ -81,7 +153,7 @@ SLM currently classifies position only, not DRRP. `slm_drrp` carries regex DRRP 
 8. ✅ Per-class gating working: active/counterparty trusted, beneficiary/mentioned flagged for LLM
 9. ✅ Run across all 15 benchmark laws: 3,249 classified, 101 errors. Overall 78.2% (+11.7% over reconcile-only)
 10. ✅ Run `taxa backfill` — 6,244 provisions across 15 benchmark laws updated in legislation_text
-11. ⬜ Corpus-wide: classify all pending actors
+11. ⏸️ Corpus-wide: classify all pending actors (deferred — new session 06-29-26-qq-corpus-4tier)
 
 ## Local eval results (2026-06-29)
 
