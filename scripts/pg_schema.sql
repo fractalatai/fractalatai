@@ -76,6 +76,8 @@ CREATE TABLE IF NOT EXISTS provision_actors (
     cls_drrp          TEXT,
     cls_position      TEXT,
     cls_confidence    REAL,
+    slm_drrp          TEXT,
+    slm_position      TEXT,
     llm_drrp          TEXT,
     llm_position      TEXT,
     inferred_drrp     TEXT,

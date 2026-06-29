@@ -514,6 +514,12 @@ enum TaxaAction {
         #[arg(long)]
         laws: String,
     },
+    /// Classify pending_llm actors via local SLM (Ollama gemma3-position)
+    Slm {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: String,
+    },
     /// Whole-law LLM validation: send all provisions + parse results to LLM
     Validate {
         /// Specific laws (comma-separated)
@@ -786,6 +792,12 @@ async fn main() -> anyhow::Result<()> {
                 }
                 println!("Backfilled {total} provisions across {} laws", law_names.len());
                 Ok(())
+            }
+            TaxaAction::Slm { laws } => {
+                let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
+                let law_names: Vec<String> =
+                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                cmd_taxa_slm(lance.as_ref(), &law_names).await
             }
             TaxaAction::AuditFitness {
                 laws,

@@ -43,6 +43,14 @@ pub trait ProvisionStore: Send + Sync {
     /// Ensure required columns exist.
     async fn ensure_gap_c_columns(&self) -> Result<(), StoreError>;
 
+    /// Query pending_llm actors with provision text for SLM classification.
+    async fn query_pending_slm_actors(
+        &self,
+        _law_name: &str,
+    ) -> Result<Vec<(String, String, Option<String>, String)>, StoreError> {
+        Ok(vec![])
+    }
+
     /// Backfill legislation_text from reconciled provision_actors.
     async fn backfill_from_actors(&self, _law_name: &str) -> Result<usize, StoreError> {
         Ok(0)
@@ -94,12 +102,12 @@ pub trait ProvisionStore: Send + Sync {
     /// Query all tier signals for a law's actors (for reconciliation).
     /// Returns: Vec<(section_id, actor_label, regex_drrp, regex_position,
     ///   cls_drrp, cls_position, cls_confidence, inferred_drrp, inferred_position,
-    ///   llm_drrp, llm_position)>
+    ///   slm_drrp, slm_position, llm_drrp, llm_position)>
     #[allow(clippy::type_complexity)]
     async fn query_all_actor_signals(
         &self,
         _law_name: &str,
-    ) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>)>, StoreError> {
+    ) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)>, StoreError> {
         Ok(vec![])
     }
 

@@ -272,43 +272,55 @@ pub(crate) async fn cmd_taxa_reconcile(
         let mut updates: Vec<(String, String, Option<String>, String, String, String)> = Vec::new();
 
         for (sid, label, regex_drrp, regex_pos, _cls_drrp, cls_pos, cls_conf,
-             _inferred_drrp, inferred_pos, llm_drrp, llm_pos) in &signals
+             _inferred_drrp, inferred_pos, _slm_drrp, slm_pos,
+             llm_drrp, llm_pos) in &signals
         {
-            // === DRRP reconciliation (simplified: LLM wins, else regex) ===
+            // === DRRP reconciliation: LLM > regex (SLM passes through regex DRRP) ===
             let final_drrp = if llm_drrp.is_some() {
                 llm_drrp.clone()
             } else {
                 regex_drrp.clone()
             };
 
-            // === Position reconciliation (confidence-tiered) ===
+            // === Position reconciliation (4-tier cascade) ===
             let (final_pos, method, confidence) = if let Some(pos) = llm_pos {
-                // Rule 1: LLM wins
+                // Rule 1: LLM (Gemini) wins (~95%)
                 *counts.entry("llm").or_default() += 1;
                 (pos.clone(), "llm", "HIGHEST")
             } else if let Some(pos) = inferred_pos {
-                // Rule 2: Inferred (86.7% accurate)
+                // Rule 2: Inferred (86.7% — correlative rules)
                 *counts.entry("inferred").or_default() += 1;
                 (pos.clone(), "inferred", "HIGH")
+            } else if let Some(pos) = slm_pos {
+                // Rule 3: SLM (77.1% overall, but per-class gating)
+                if pos == "beneficiary" || pos == "mentioned" {
+                    // SLM weak on these (31%, 58%) — flag for LLM
+                    *counts.entry("pending_llm").or_default() += 1;
+                    (pos.clone(), "pending_llm", "LOW")
+                } else {
+                    // SLM strong on active (92%) and counterparty (87%)
+                    *counts.entry("slm").or_default() += 1;
+                    (pos.clone(), "slm", "HIGH")
+                }
             } else if let (Some(rp), Some(cp)) = (regex_pos, cls_pos) {
                 if rp == cp {
-                    // Rule 3: Agree
+                    // Rule 4: Agree
                     *counts.entry("agree").or_default() += 1;
                     (rp.clone(), "reconciled_agree", "HIGH")
                 } else {
                     let conf = cls_conf.unwrap_or(0.0);
                     if conf >= 0.7 {
-                        // Rule 4: Disagree, classifier confident
+                        // Rule 5: Disagree, classifier confident
                         *counts.entry("cls_confident").or_default() += 1;
                         (cp.clone(), "reconciled_classifier", "HIGH")
                     } else {
-                        // Rule 5: Disagree, not confident → flag LLM
-                        *counts.entry("pending_llm").or_default() += 1;
-                        (rp.clone(), "pending_llm", "LOW")
+                        // Rule 6: Disagree, not confident → flag SLM
+                        *counts.entry("pending_slm").or_default() += 1;
+                        (rp.clone(), "pending_slm", "LOW")
                     }
                 }
             } else if let Some(rp) = regex_pos {
-                // Rule 6: Only regex
+                // Rule 7: Only regex
                 *counts.entry("regex_only").or_default() += 1;
                 (rp.clone(), "regex", "MEDIUM")
             } else {
@@ -337,6 +349,162 @@ pub(crate) async fn cmd_taxa_reconcile(
         println!("  {method}: {count}");
     }
 
+    Ok(())
+}
+
+/// Classify pending_slm actors via local SLM (Ollama gemma3-position).
+///
+/// Queries provision_actors for actors with extraction_method='pending_slm' and
+/// slm_position IS NULL, sends each to Ollama /api/chat, writes results to
+/// slm_drrp/slm_position via upsert_provision_actors with tier="slm".
+pub(crate) async fn cmd_taxa_slm(
+    lance: &dyn ProvisionStore,
+    law_names: &[String],
+) -> anyhow::Result<()> {
+    let client = reqwest::Client::new();
+    let ollama_url = "http://localhost:11434/api/chat";
+    let model = "gemma3-position";
+
+    // Verify Ollama is reachable and model exists
+    let tags_resp = client
+        .get("http://localhost:11434/api/tags")
+        .send()
+        .await?
+        .json::<serde_json::Value>()
+        .await?;
+    let models: Vec<String> = tags_resp
+        .get("models")
+        .and_then(|m| m.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|m| m.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+    if !models.iter().any(|m| m.starts_with(model)) {
+        anyhow::bail!(
+            "Ollama model '{model}' not found. Available: {}",
+            models.join(", ")
+        );
+    }
+
+    let system_prompt = "You are a UK statutory law classifier. Given a provision from UK legislation \
+        and an actor mentioned in it, classify the actor's Hohfeldian legal position.\n\n\
+        Positions:\n\
+        - active: The actor bears the duty, obligation, or exercises the power/liberty.\n\
+        - counterparty: The actor to whom the duty is owed, or against whom the right is held.\n\
+        - beneficiary: The actor who benefits from the provision but is neither the duty-bearer \
+        nor the direct correlative.\n\
+        - mentioned: The actor is referenced but has no active legal role in this provision.\n\n\
+        Respond with ONLY a JSON object: {\"position\": \"active\"|\"counterparty\"|\"beneficiary\"|\"mentioned\"}";
+
+    let mut total = 0usize;
+    let mut classified = 0usize;
+    let mut errors = 0usize;
+
+    for law_name in law_names {
+        let actors = lance.query_pending_slm_actors(law_name).await?;
+        if actors.is_empty() {
+            continue;
+        }
+
+        let mut updates: Vec<(String, String, String, Option<String>, String, String)> = Vec::new();
+
+        for (sid, label, regex_drrp, text) in &actors {
+            let user_msg = format!(
+                "Provision ({sid}): {text}\n\nActor: {label}\n\n\
+                 What is this actor's Hohfeldian position in this provision?"
+            );
+
+            let body = serde_json::json!({
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_msg},
+                ],
+                "stream": false,
+                "options": {"temperature": 0.0},
+            });
+
+            let resp = match client.post(ollama_url).json(&body).send().await {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("  ERROR {sid} | {label}: {e}");
+                    errors += 1;
+                    continue;
+                }
+            };
+
+            let resp_json: serde_json::Value = resp.json().await.unwrap_or_default();
+            let content = resp_json
+                .pointer("/message/content")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim();
+
+            // Parse JSON response
+            let json_text = if content.contains("```json") {
+                content
+                    .split("```json")
+                    .nth(1)
+                    .and_then(|s| s.split("```").next())
+                    .unwrap_or(content)
+                    .trim()
+            } else if content.contains("```") {
+                content
+                    .split("```")
+                    .nth(1)
+                    .and_then(|s| s.split("```").next())
+                    .unwrap_or(content)
+                    .trim()
+            } else {
+                content
+            };
+
+            let position = serde_json::from_str::<serde_json::Value>(json_text)
+                .ok()
+                .and_then(|v| v.get("position").and_then(|p| p.as_str()).map(|s| s.to_string()));
+
+            match position {
+                Some(pos)
+                    if pos == "active"
+                        || pos == "counterparty"
+                        || pos == "beneficiary"
+                        || pos == "mentioned" =>
+                {
+                    // Use regex DRRP (SLM only classifies position)
+                    let category = label.split(':').next().unwrap_or("").trim().to_string();
+                    updates.push((
+                        sid.clone(),
+                        label.clone(),
+                        category,
+                        regex_drrp.clone(),
+                        pos,
+                        "slm".to_string(),
+                    ));
+                    classified += 1;
+                }
+                _ => {
+                    eprintln!("  PARSE ERROR {sid} | {label}: {json_text}");
+                    errors += 1;
+                }
+            }
+
+            total += 1;
+            if total % 50 == 0 {
+                eprintln!(
+                    "  [{total} done] {classified} classified, {errors} errors"
+                );
+            }
+        }
+
+        if !updates.is_empty() {
+            lance.upsert_provision_actors(&updates).await?;
+            eprintln!("  {law_name}: {} actors classified by SLM", updates.len());
+        }
+    }
+
+    println!("SLM classification complete: {classified} classified, {errors} errors, {total} total");
     Ok(())
 }
 

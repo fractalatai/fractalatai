@@ -210,6 +210,7 @@ impl PgStore {
             let (drrp_col, pos_col) = match tier.as_str() {
                 "regex" => ("regex_drrp", "regex_position"),
                 "classifier" => ("cls_drrp", "cls_position"),
+                "slm" => ("slm_drrp", "slm_position"),
                 "llm" => ("llm_drrp", "llm_position"),
                 "inferred" => ("inferred_drrp", "inferred_position"),
                 _ => continue,
@@ -314,12 +315,13 @@ impl PgStore {
     pub async fn query_all_actor_signals(
         &self,
         law_name: &str,
-    ) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>)>, StoreError> {
-        let rows = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>)>(
+    ) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)>, StoreError> {
+        let rows = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)>(
             "SELECT pa.section_id, pa.actor_label, \
              pa.regex_drrp, pa.regex_position, \
              pa.cls_drrp, pa.cls_position, pa.cls_confidence, \
              pa.inferred_drrp, pa.inferred_position, \
+             pa.slm_drrp, pa.slm_position, \
              pa.llm_drrp, pa.llm_position \
              FROM provision_actors pa \
              JOIN legislation_text lt ON pa.section_id = lt.section_id \
@@ -357,6 +359,27 @@ impl PgStore {
                 d.unwrap_or(0.5),
             ])
         }).collect())
+    }
+
+    /// Query pending_slm actors with their provision text for SLM classification.
+    /// Returns: Vec<(section_id, actor_label, regex_drrp, text)>
+    pub async fn query_pending_slm_actors(
+        &self,
+        law_name: &str,
+    ) -> Result<Vec<(String, String, Option<String>, String)>, StoreError> {
+        let rows = sqlx::query_as::<_, (String, String, Option<String>, String)>(
+            "SELECT pa.section_id, pa.actor_label, pa.regex_drrp, lt.text \
+             FROM provision_actors pa \
+             JOIN legislation_text lt ON pa.section_id = lt.section_id \
+             WHERE lt.law_name = $1 \
+             AND pa.extraction_method = 'pending_slm' \
+             AND pa.slm_position IS NULL"
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_pending_slm_actors: {e}")))?;
+        Ok(rows)
     }
 
     /// Backfill legislation_text.actors, drrp_types, extraction_method
@@ -849,6 +872,13 @@ impl crate::ProvisionStore for PgStore {
         self.backfill_from_actors(law_name).await
     }
 
+    async fn query_pending_slm_actors(
+        &self,
+        law_name: &str,
+    ) -> Result<Vec<(String, String, Option<String>, String)>, StoreError> {
+        self.query_pending_slm_actors(law_name).await
+    }
+
     async fn delete_law_lat(&self, law_name: &str) -> Result<usize, StoreError> {
         self.delete_law_lat(law_name).await
     }
@@ -886,7 +916,7 @@ impl crate::ProvisionStore for PgStore {
     async fn query_all_actor_signals(
         &self,
         law_name: &str,
-    ) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>)>, StoreError> {
+    ) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)>, StoreError> {
         self.query_all_actor_signals(law_name).await
     }
 
