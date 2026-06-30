@@ -42,17 +42,28 @@ PG_DSN = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=frac
 
 SYSTEM_PROMPT = (
     "You are a UK statutory law classifier. Given a provision from UK legislation "
-    "and an actor mentioned in it, classify the actor's Hohfeldian legal position.\n\n"
-    "Positions:\n"
-    "- active: The actor bears the duty, obligation, or exercises the power/liberty.\n"
-    "- counterparty: The actor to whom the duty is owed, or against whom the right is held.\n"
-    "- beneficiary: The actor who benefits from the provision but is neither the duty-bearer "
-    "nor the direct correlative.\n"
-    "- mentioned: The actor is referenced but has no active legal role in this provision.\n\n"
-    'Respond with ONLY a JSON object: {"position": "active"|"counterparty"|"beneficiary"|"mentioned"}'
+    "and an actor mentioned in it, classify:\n\n"
+    "1. The DRRP type of the provision for this actor:\n"
+    "- Obligation: The provision imposes a duty or prohibition on the actor. "
+    "Language: 'shall', 'shall not', 'must', 'must not', 'is required to', "
+    "'has a duty', 'ensure', 'responsible for', 'so far as is reasonably practicable'.\n"
+    "- Liberty: The provision grants a power, permission, or entitlement to the actor. "
+    "Language: 'may', 'may not' (limiting a power), 'power to', 'entitled to', "
+    "'authorise', 'enable', 'has the right'.\n"
+    "- none: The provision does not create an obligation or liberty for this actor.\n\n"
+    "2. The actor's Hohfeldian legal position in this provision:\n"
+    "- active: The actor bears the duty or exercises the power/liberty.\n"
+    "- counterparty: The actor to whom the duty is owed or who is subject to the power.\n"
+    "- beneficiary: The actor benefits but is neither duty-bearer nor direct correlative.\n"
+    "- mentioned: The actor is referenced but has no active legal role.\n\n"
+    "Note: An actor can be 'active' with drrp 'none' — e.g. in an offence provision "
+    "('A person who contravenes... is guilty') the actor is active but no new duty is created.\n\n"
+    'Respond with ONLY a JSON object: {"drrp": "Obligation"|"Liberty"|"none", '
+    '"position": "active"|"counterparty"|"beneficiary"|"mentioned"}'
 )
 
 VALID_POSITIONS = {"active", "counterparty", "beneficiary", "mentioned"}
+VALID_DRRP = {"Obligation", "Liberty", "none"}
 
 # ── Preflight ───────────────────────────────────────────────────────────
 
@@ -80,8 +91,10 @@ def preflight():
         conn = psycopg2.connect(PG_DSN)
         cur = conn.cursor()
         cur.execute(
-            "SELECT count(*) FROM provision_actors "
-            "WHERE extraction_method = 'pending_slm' AND slm_position IS NULL"
+            "SELECT count(*) FROM provision_actors pa "
+            "JOIN legislation_text lt ON pa.section_id = lt.section_id "
+            "WHERE pa.slm_position IS NULL AND pa.regex_position IS NOT NULL "
+            "AND lt.scope = 'substantive'"
         )
         count = cur.fetchone()[0]
         cur.close()
@@ -112,13 +125,14 @@ def preflight():
 # ── Query ───────────────────────────────────────────────────────────────
 
 def query_pending_slm(conn, limit=None):
-    """Fetch pending_slm actors with provision text."""
+    """Fetch actors needing SLM classification (all actors without slm_position on substantive provisions)."""
     sql = """
         SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text
         FROM provision_actors pa
         JOIN legislation_text lt ON pa.section_id = lt.section_id
-        WHERE pa.extraction_method = 'pending_slm'
-        AND pa.slm_position IS NULL
+        WHERE pa.slm_position IS NULL
+        AND pa.regex_position IS NOT NULL
+        AND lt.scope = 'substantive'
         ORDER BY pa.section_id, pa.actor_label
     """
     if limit:
@@ -132,11 +146,11 @@ def query_pending_slm(conn, limit=None):
 # ── Classify ────────────────────────────────────────────────────────────
 
 def classify_actor(text, actor_label, timeout=60):
-    """Send a single (provision, actor) to Ollama and parse the response."""
+    """Send a single (provision, actor) to Ollama and parse the dual DRRP+position response."""
     user_msg = (
         f"Provision: {text}\n\n"
         f"Actor: {actor_label}\n\n"
-        f"What is this actor's Hohfeldian position in this provision?"
+        f"Classify this actor's DRRP type and Hohfeldian position in this provision."
     )
     body = {
         "model": MODEL,
@@ -159,8 +173,16 @@ def classify_actor(text, actor_label, timeout=60):
 
         parsed = json.loads(content)
         position = parsed.get("position", "").lower().strip()
+        drrp = parsed.get("drrp", "none").strip()
+        # Normalise DRRP capitalisation
+        if drrp.lower() == "obligation":
+            drrp = "Obligation"
+        elif drrp.lower() == "liberty":
+            drrp = "Liberty"
+        else:
+            drrp = "none"
         if position in VALID_POSITIONS:
-            return position
+            return (drrp, position)
         return None
     except (requests.RequestException, json.JSONDecodeError, KeyError, IndexError):
         return None
@@ -171,18 +193,21 @@ def classify_actor(text, actor_label, timeout=60):
 lock = threading.Lock()
 stats = {"classified": 0, "errors": 0, "done": 0}
 class_counts = Counter()
+drrp_counts = Counter()
 
 def process_actor(actor):
     """Classify one actor and return the update tuple (or None on error)."""
     sid, label, category, regex_drrp, text = actor
-    position = classify_actor(text, label)
+    result = classify_actor(text, label)
 
     with lock:
         stats["done"] += 1
-        if position:
+        if result:
+            drrp, position = result
             stats["classified"] += 1
             class_counts[position] += 1
-            return (sid, label, regex_drrp, position)
+            drrp_counts[drrp] += 1
+            return (sid, label, drrp, position)
         else:
             stats["errors"] += 1
             return None
@@ -197,8 +222,9 @@ def write_batch(conn, updates):
     for sid, label, drrp, position in updates:
         cur.execute(
             "UPDATE provision_actors SET slm_drrp = %s, slm_position = %s "
-            "WHERE section_id = %s AND actor_label = %s",
-            (drrp, position, sid, label)
+            "WHERE section_id = %s AND actor_label = %s "
+            "AND (slm_position IS NULL OR slm_position != %s OR slm_drrp IS NULL OR slm_drrp != %s)",
+            (drrp, position, sid, label, position, drrp)
         )
     conn.commit()
     cur.close()
@@ -276,9 +302,12 @@ def main():
     print(f"Errors:     {stats['errors']}")
     print(f"Workers:    {args.workers}")
     print(f"Time:       {elapsed/60:.1f} min ({total/elapsed:.1f}/s)")
-    print(f"\nPer-class:")
+    print(f"\nPer-position:")
     for pos in ["active", "counterparty", "beneficiary", "mentioned"]:
         print(f"  {pos:15s}: {class_counts.get(pos, 0):,}")
+    print(f"\nPer-DRRP:")
+    for d in ["Obligation", "Liberty", "none"]:
+        print(f"  {d:15s}: {drrp_counts.get(d, 0):,}")
 
     conn.close()
 
