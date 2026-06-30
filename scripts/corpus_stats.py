@@ -82,28 +82,27 @@ def main():
     cur.execute(f"""
         SELECT
             count(*) as total,
-            count(*) FILTER (WHERE section_type IN %s) as out_section_type,
-            count(*) FILTER (WHERE section_type NOT IN %s AND length(text) < 20) as out_short,
-            count(*) FILTER (WHERE section_type NOT IN %s AND length(text) >= 20) as in_scope
+            count(*) FILTER (WHERE scope = 'out') as out_count,
+            count(*) FILTER (WHERE scope = 'structural') as structural_count,
+            count(*) FILTER (WHERE scope = 'substantive') as substantive_count
         FROM legislation_text lt
         WHERE text IS NOT NULL {law_filter}
-    """, (OUT_SECTION_TYPES, OUT_SECTION_TYPES, OUT_SECTION_TYPES))
-    total, out_st, out_short, in_scope = cur.fetchone()
-    out_total = out_st + out_short
+    """)
+    total, out_count, structural_count, substantive_count = cur.fetchone()
 
     print(f"  Total provisions:       {total:>8,}")
-    print(f"  OUT (section_type):     {out_st:>8,}  ({100*out_st/total:.1f}%)")
-    print(f"  OUT (short text):       {out_short:>8,}  ({100*out_short/total:.1f}%)")
-    print(f"  IN SCOPE:               {in_scope:>8,}  ({100*in_scope/total:.1f}%)")
+    print(f"  OUT:                    {out_count:>8,}  ({100*out_count/total:.1f}%)")
+    print(f"  STRUCTURAL:             {structural_count:>8,}  ({100*structural_count/total:.1f}%)")
+    print(f"  SUBSTANTIVE:            {substantive_count:>8,}  ({100*substantive_count/total:.1f}%)")
 
     # Orphan actors on OUT provisions
     cur.execute(f"""
         SELECT count(*)
         FROM provision_actors pa
         JOIN legislation_text lt ON pa.section_id = lt.section_id
-        WHERE (lt.section_type IN %s OR length(lt.text) < 20)
+        WHERE lt.scope = 'out'
         {law_filter}
-    """, (OUT_SECTION_TYPES,))
+    """)
     orphans = cur.fetchone()[0]
     status = "PASS" if orphans == 0 else f"FAIL ({orphans} orphan actors)"
     print(f"  QA: No actors on OUT:   {status}")

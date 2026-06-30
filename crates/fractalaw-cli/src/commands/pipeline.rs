@@ -300,6 +300,17 @@ fn parse_provisions(
                 continue;
             }
 
+            // Pass 2: re-evaluate scope with purposes now available
+            let purpose_strs: Vec<&str> = record.purposes.iter().map(|s| &**s).collect();
+            let scope = fractalaw_core::taxa::provision_scope(
+                Some(section_type.as_str()),
+                &text,
+                &purpose_strs,
+            );
+            // OUT = no actors at all (headings, titles, stubs)
+            // STRUCTURAL = actors kept but defaulted to "mentioned" (handled by should_default_to_mentioned below)
+            let is_structural = scope == fractalaw_core::taxa::ProvisionScope::Out;
+
             // Collect per-provision taxa for LanceDB.
             if !section_id.is_empty() {
                 let (duty_family, duty_sub_type) = if let Some(ref cls) = record.classification {
@@ -310,19 +321,6 @@ fn parse_provisions(
                 } else {
                     (None, None)
                 };
-                // v0.3 confidence: based on routing decision, not regex match quality
-                const NON_DRRP_TYPES: &[&str] = &[
-                    "title",
-                    "signed",
-                    "heading",
-                    "table",
-                    "schedule",
-                    "part",
-                    "chapter",
-                    "commencement",
-                    "note",
-                ];
-                let is_structural = NON_DRRP_TYPES.contains(&section_type.as_str());
                 let has_actors =
                     !record.governed_actors.is_empty() || !record.government_actors.is_empty();
                 let actor_count = record.governed_actors.len() + record.government_actors.len();
