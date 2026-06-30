@@ -1,4 +1,4 @@
-# Session: Duty Significance / Importance Rating (PENDING)
+# Session: Duty Significance / Importance Rating (ACTIVE)
 
 ## Problem
 
@@ -108,8 +108,67 @@ This helps prioritise compliance effort.
 4. ⬜ Add `significance` column to provision_actors
 5. ⬜ Publish significance signal to sertantai
 
+## Option E: Dedicated fine-tuned SLM (2026-06-30)
+
+Given the success of the position+DRRP SLM (80.3% position, 96.2% DRRP, 18.8/s on RunPod), a dedicated significance SLM is the natural approach.
+
+### Why dedicated, not extending the existing SLM
+
+- Significance is a different task — *how important* vs *who bears it*
+- Only runs on Obligation provisions (not all actors)
+- Training data would be purpose-built (Gemini rates significance)
+- Adding dimensions to the position/DRRP model dilutes the training signal
+- Separate model can be retrained independently
+
+### Dimension storage: separate vs combined
+
+Store each dimension separately — combining is a display/business decision:
+- `significance_scope: HIGH/MEDIUM/LOW` — breadth of who's affected
+- `significance_gravity: HIGH/MEDIUM/LOW` — what's at stake (health/property/admin)
+- `significance_strength: HIGH/MEDIUM/LOW` — verb strength + qualification
+- `significance_hierarchy: HIGH/MEDIUM/LOW` — structural position in the law
+- `significance_overall: HIGH/MEDIUM/LOW` — algorithm-derived from dimensions
+
+Sertantai can re-weight dimensions per customer without re-running the model.
+
+### Open question: decomposed dimensions vs single overall rating
+
+Option 1: Train SLM on 4 decomposed dimensions → combine algorithmically
+- More granular, explainable
+- Needs 4× the labels in training data
+- Each dimension needs clear definition boundaries
+
+Option 2: Train SLM on single overall significance (HIGH/MEDIUM/LOW)
+- Simpler, one label per training example
+- Gemini can rate overall significance in one call
+- Loses granularity — can't re-weight later
+- But: is the customer really going to re-weight? Or do they just want "which duties matter?"
+
+Option 3: Gemini rates all 4 dimensions → store separately → train SLM on each
+- Best of both — decomposed storage, single training pipeline
+- 4 separate SLM models or one multi-output model
+- More expensive training data generation (Gemini rates 4 fields per provision)
+
+### Training data pipeline
+
+1. Query all Obligation provisions from benchmark laws
+2. Send to Gemini with significance prompt → get ratings per dimension
+3. Human validates/corrects a sample
+4. Export as JSONL training data
+5. Fine-tune dedicated gemma-3-4b-it on RunPod (~$2, 90 min)
+6. Run on corpus Obligation provisions
+
+### Cost estimate
+
+- Gemini training data: ~2,000 Obligation provisions × $0.001 = ~$2
+- RunPod training: ~$2
+- RunPod inference (full corpus): ~60K Obligation actors at 18.8/s = ~53 min, ~$1
+- Total: ~$5
+
 ## Dependencies
 
 - ✅ Dep parsing features available (v3 classifier)
 - ✅ provision_actors table with per-actor signals
+- ✅ RunPod fine-tuning pipeline proven (gemma-3-4b-it, LoRA, GGUF export)
+- ✅ SLM batch inference proven (18.8/s with concurrent workers)
 - Would benefit from verb lemma extraction (extend dep features)
