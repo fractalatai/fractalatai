@@ -260,10 +260,16 @@ def evaluate(model, tokenizer):
     confusion = Counter()
     t0 = time.time()
 
+    drrp_confusion = Counter()
+    drrp_correct = 0
+    drrp_total = 0
+
     for i, example in enumerate(test_dataset):
         messages = example["messages"]
         eval_messages = [m for m in messages if m["role"] != "assistant"]
-        gold = json.loads(messages[-1]["content"])["position"]
+        gold_resp = json.loads(messages[-1]["content"])
+        gold_pos = gold_resp["position"] if "position" in gold_resp else gold_resp.get("position", "")
+        gold_drrp = gold_resp.get("drrp", None)
 
         input_text = tokenizer.apply_chat_template(
             eval_messages, tokenize=False, add_generation_prompt=True
@@ -273,7 +279,7 @@ def evaluate(model, tokenizer):
         with torch.no_grad(), warnings.catch_warnings():
             warnings.simplefilter("ignore")
             outputs = model.generate(
-                **inputs, max_new_tokens=50, temperature=0.0, do_sample=False
+                **inputs, max_new_tokens=80, temperature=0.0, do_sample=False
             )
 
         response = tokenizer.decode(
@@ -285,14 +291,23 @@ def evaluate(model, tokenizer):
                 response = response.split("```json")[1].split("```")[0].strip()
             elif "```" in response:
                 response = response.split("```")[1].split("```")[0].strip()
-            predicted = json.loads(response)["position"]
-            if predicted in ("active", "counterparty", "beneficiary", "mentioned"):
+            parsed = json.loads(response)
+            predicted_pos = parsed.get("position", "")
+            predicted_drrp = parsed.get("drrp", None)
+
+            if predicted_pos in ("active", "counterparty", "beneficiary", "mentioned"):
                 total += 1
-                if predicted == gold:
+                if predicted_pos == gold_pos:
                     correct += 1
-                confusion[(predicted, gold)] += 1
+                confusion[(predicted_pos, gold_pos)] += 1
             else:
                 errors += 1
+
+            if predicted_drrp and gold_drrp:
+                drrp_total += 1
+                if predicted_drrp == gold_drrp:
+                    drrp_correct += 1
+                drrp_confusion[(predicted_drrp, gold_drrp)] += 1
         except (json.JSONDecodeError, KeyError):
             errors += 1
 
@@ -304,12 +319,13 @@ def evaluate(model, tokenizer):
     acc = 100 * correct / total if total > 0 else 0
 
     print(f"\n{'=' * 60}")
-    print(f"RESULTS: Fine-tuned gemma-3-4b-it (16-bit)")
+    print(f"RESULTS: Fine-tuned gemma-3-4b-it (16-bit, dual DRRP+position)")
     print(f"{'=' * 60}")
-    print(f"Test accuracy: {correct}/{total} = {acc:.1f}%")
-    print(f"Parse errors:  {errors}")
-    print(f"Previous (4-bit RunPod): 81.5%")
-    print(f"Baseline (prompt-only): 47.5%")
+    print(f"Position accuracy: {correct}/{total} = {acc:.1f}%")
+    if drrp_total > 0:
+        drrp_acc = 100 * drrp_correct / drrp_total
+        print(f"DRRP accuracy:     {drrp_correct}/{drrp_total} = {drrp_acc:.1f}%")
+    print(f"Parse errors:      {errors}")
     print(f"Time: {elapsed:.0f}s")
 
     positions = ["active", "counterparty", "beneficiary", "mentioned"]
@@ -320,11 +336,26 @@ def evaluate(model, tokenizer):
         if golds > 0:
             print(f"  {pos:15s}: {right}/{golds} = {100*right/golds:.1f}%")
 
-    print(f"\nConfusion (predicted -> gold):")
+    print(f"\nPosition confusion (predicted -> gold):")
     print(f"  {'':15s} " + " ".join(f"{p:>12s}" for p in positions))
     for pred in positions:
         counts = [confusion.get((pred, gold), 0) for gold in positions]
         print(f"  {pred:15s} " + " ".join(f"{c:12d}" for c in counts))
+
+    if drrp_total > 0:
+        drrp_types = ["Obligation", "Liberty", "none"]
+        print(f"\nPer-DRRP accuracy:")
+        for d in drrp_types:
+            golds = sum(drrp_confusion.get((p, d), 0) for p in drrp_types)
+            right = drrp_confusion.get((d, d), 0)
+            if golds > 0:
+                print(f"  {d:15s}: {right}/{golds} = {100*right/golds:.1f}%")
+
+        print(f"\nDRRP confusion (predicted -> gold):")
+        print(f"  {'':15s} " + " ".join(f"{d:>12s}" for d in drrp_types))
+        for pred in drrp_types:
+            counts = [drrp_confusion.get((pred, gold), 0) for gold in drrp_types]
+            print(f"  {pred:15s} " + " ".join(f"{c:12d}" for c in counts))
 
     results_path = "/workspace/output/eval_results.json"
     with open(results_path, "w") as f:
