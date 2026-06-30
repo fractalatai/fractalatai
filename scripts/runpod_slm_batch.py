@@ -159,12 +159,24 @@ def classify_actor(text, actor_label, timeout=60):
             {"role": "user", "content": user_msg},
         ],
         "stream": False,
+        "logprobs": True,
+        "top_logprobs": 1,
         "options": {"temperature": 0.0},
     }
     try:
         resp = requests.post(OLLAMA_URL, json=body, timeout=timeout)
         resp.raise_for_status()
-        content = resp.json().get("message", {}).get("content", "").strip()
+        resp_json = resp.json()
+        content = resp_json.get("message", {}).get("content", "").strip()
+
+        # Extract average log probability as confidence
+        token_logprobs = resp_json.get("logprobs", [])
+        if token_logprobs:
+            import math
+            avg_logprob = sum(t.get("logprob", 0) for t in token_logprobs) / len(token_logprobs)
+            confidence = math.exp(avg_logprob)  # convert log prob to probability 0-1
+        else:
+            confidence = None
 
         if "```json" in content:
             content = content.split("```json")[1].split("```")[0].strip()
@@ -182,7 +194,7 @@ def classify_actor(text, actor_label, timeout=60):
         else:
             drrp = "none"
         if position in VALID_POSITIONS:
-            return (drrp, position)
+            return (drrp, position, confidence)
         return None
     except (requests.RequestException, json.JSONDecodeError, KeyError, IndexError):
         return None
@@ -203,11 +215,11 @@ def process_actor(actor):
     with lock:
         stats["done"] += 1
         if result:
-            drrp, position = result
+            drrp, position, confidence = result
             stats["classified"] += 1
             class_counts[position] += 1
             drrp_counts[drrp] += 1
-            return (sid, label, drrp, position)
+            return (sid, label, drrp, position, confidence)
         else:
             stats["errors"] += 1
             return None
@@ -215,16 +227,15 @@ def process_actor(actor):
 # ── Write back ──────────────────────────────────────────────────────────
 
 def write_batch(conn, updates):
-    """Write slm_drrp and slm_position to provision_actors."""
+    """Write slm_drrp, slm_position, and slm_confidence to provision_actors."""
     if not updates:
         return
     cur = conn.cursor()
-    for sid, label, drrp, position in updates:
+    for sid, label, drrp, position, confidence in updates:
         cur.execute(
-            "UPDATE provision_actors SET slm_drrp = %s, slm_position = %s "
-            "WHERE section_id = %s AND actor_label = %s "
-            "AND (slm_position IS NULL OR slm_position != %s OR slm_drrp IS NULL OR slm_drrp != %s)",
-            (drrp, position, sid, label, position, drrp)
+            "UPDATE provision_actors SET slm_drrp = %s, slm_position = %s, slm_confidence = %s "
+            "WHERE section_id = %s AND actor_label = %s",
+            (drrp, position, confidence, sid, label)
         )
     conn.commit()
     cur.close()
