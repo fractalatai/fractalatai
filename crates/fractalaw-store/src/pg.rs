@@ -315,13 +315,13 @@ impl PgStore {
     pub async fn query_all_actor_signals(
         &self,
         law_name: &str,
-    ) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)>, StoreError> {
-        let rows = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)>(
+    ) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>)>, StoreError> {
+        let rows = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>)>(
             "SELECT pa.section_id, pa.actor_label, \
              pa.regex_drrp, pa.regex_position, \
              pa.cls_drrp, pa.cls_position, pa.cls_confidence, \
              pa.inferred_drrp, pa.inferred_position, \
-             pa.slm_drrp, pa.slm_position, \
+             pa.slm_drrp, pa.slm_position, pa.slm_confidence, \
              pa.llm_drrp, pa.llm_position \
              FROM provision_actors pa \
              JOIN legislation_text lt ON pa.section_id = lt.section_id \
@@ -916,7 +916,7 @@ impl crate::ProvisionStore for PgStore {
     async fn query_all_actor_signals(
         &self,
         law_name: &str,
-    ) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>)>, StoreError> {
+    ) -> Result<Vec<(String, String, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>, Option<String>, Option<String>, Option<f32>, Option<String>, Option<String>)>, StoreError> {
         self.query_all_actor_signals(law_name).await
     }
 

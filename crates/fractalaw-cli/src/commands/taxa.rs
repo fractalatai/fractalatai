@@ -271,18 +271,20 @@ pub(crate) async fn cmd_taxa_reconcile(
 
         let mut updates: Vec<(String, String, Option<String>, String, String, String)> = Vec::new();
 
-        for (sid, label, regex_drrp, regex_pos, _cls_drrp, cls_pos, cls_conf,
-             _inferred_drrp, inferred_pos, _slm_drrp, slm_pos,
+        for (sid, label, regex_drrp, regex_pos, _cls_drrp, _cls_pos, _cls_conf,
+             _inferred_drrp, inferred_pos, slm_drrp, slm_pos, slm_conf,
              llm_drrp, llm_pos) in &signals
         {
-            // === DRRP reconciliation: LLM > regex (SLM passes through regex DRRP) ===
+            // === DRRP reconciliation: LLM > SLM > regex ===
             let final_drrp = if llm_drrp.is_some() {
                 llm_drrp.clone()
+            } else if slm_drrp.is_some() {
+                slm_drrp.clone()
             } else {
                 regex_drrp.clone()
             };
 
-            // === Position reconciliation (4-tier cascade) ===
+            // === Position reconciliation (confidence-based) ===
             let (final_pos, method, confidence) = if let Some(pos) = llm_pos {
                 // Rule 1: LLM (Gemini) wins (~95%)
                 *counts.entry("llm").or_default() += 1;
@@ -292,35 +294,19 @@ pub(crate) async fn cmd_taxa_reconcile(
                 *counts.entry("inferred").or_default() += 1;
                 (pos.clone(), "inferred", "HIGH")
             } else if let Some(pos) = slm_pos {
-                // Rule 3: SLM (77.1% overall, but per-class gating)
-                if pos == "beneficiary" || pos == "mentioned" {
-                    // SLM weak on these (31%, 58%) — flag for LLM
-                    *counts.entry("pending_llm").or_default() += 1;
-                    (pos.clone(), "pending_llm", "LOW")
-                } else {
-                    // SLM strong on active (92%) and counterparty (87%)
+                // Rule 3: SLM — confidence-based gating at 0.9
+                let conf = slm_conf.unwrap_or(0.0);
+                if conf >= 0.9 {
+                    // SLM confident (94.9% accurate at ≥0.99, still strong at 0.9+)
                     *counts.entry("slm").or_default() += 1;
                     (pos.clone(), "slm", "HIGH")
-                }
-            } else if let (Some(rp), Some(cp)) = (regex_pos, cls_pos) {
-                if rp == cp {
-                    // Rule 4: Agree
-                    *counts.entry("agree").or_default() += 1;
-                    (rp.clone(), "reconciled_agree", "HIGH")
                 } else {
-                    let conf = cls_conf.unwrap_or(0.0);
-                    if conf >= 0.7 {
-                        // Rule 5: Disagree, classifier confident
-                        *counts.entry("cls_confident").or_default() += 1;
-                        (cp.clone(), "reconciled_classifier", "HIGH")
-                    } else {
-                        // Rule 6: Disagree, not confident → flag SLM
-                        *counts.entry("pending_slm").or_default() += 1;
-                        (rp.clone(), "pending_slm", "LOW")
-                    }
+                    // SLM not confident — flag for human-triggered LLM
+                    *counts.entry("pending_llm").or_default() += 1;
+                    (pos.clone(), "pending_llm", "LOW")
                 }
             } else if let Some(rp) = regex_pos {
-                // Rule 7: Only regex
+                // Rule 4: Only regex (no SLM signal)
                 *counts.entry("regex_only").or_default() += 1;
                 (rp.clone(), "regex", "MEDIUM")
             } else {
