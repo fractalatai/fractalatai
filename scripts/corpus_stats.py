@@ -119,11 +119,9 @@ def main():
             count(*) FILTER (WHERE embedding IS NOT NULL) as has_embedding,
             count(*) FILTER (WHERE lt.extraction_method IS NOT NULL) as has_extraction
         FROM legislation_text lt
-        WHERE text IS NOT NULL
-        AND section_type NOT IN %s
-        AND length(text) >= 20
+        WHERE lt.scope = 'substantive'
         {law_filter}
-    """, (OUT_SECTION_TYPES,))
+    """)
     in_scope, has_emb, has_ext = cur.fetchone()
     emb_gap = in_scope - has_emb
 
@@ -137,13 +135,11 @@ def main():
         SELECT lt.law_name, count(*) as missing
         FROM legislation_text lt
         WHERE embedding IS NULL
-        AND section_type NOT IN %s
-        AND length(text) >= 20
-        AND text IS NOT NULL
+        AND lt.scope = 'substantive'
         {law_filter}
         GROUP BY lt.law_name
         ORDER BY count(*) DESC
-    """, (OUT_SECTION_TYPES,))
+    """)
     gap_laws = cur.fetchall()
     if gap_laws:
         print(f"  Laws with gaps:         {len(gap_laws):>8,}")
@@ -160,10 +156,9 @@ def main():
             count(*) FILTER (WHERE pa.regex_position IS NOT NULL) as has_regex_pos
         FROM provision_actors pa
         JOIN legislation_text lt ON pa.section_id = lt.section_id
-        WHERE lt.section_type NOT IN %s
-        AND length(lt.text) >= 20
+        WHERE lt.scope = 'substantive'
         {law_filter}
-    """, (OUT_SECTION_TYPES,))
+    """)
     prov_with_actors, total_actors, has_regex = cur.fetchone()
     print(f"  Provisions with actors: {prov_with_actors:>8,}  ({100*prov_with_actors/in_scope:.1f}%)")
     print(f"  Total actors:           {total_actors:>8,}")
@@ -182,24 +177,29 @@ def main():
             count(*) FILTER (WHERE pa.regex_position IS NOT NULL) as has_regex,
             count(*) FILTER (WHERE pa.dep_is_subject IS NOT NULL) as has_dep,
             count(*) FILTER (WHERE pa.cls_position IS NOT NULL) as has_cls,
+            count(*) FILTER (WHERE pa.cls_confidence IS NOT NULL) as has_conf,
             count(*) FILTER (WHERE lt.embedding IS NOT NULL AND pa.dep_is_subject IS NOT NULL) as eligible,
             count(*) FILTER (WHERE lt.embedding IS NOT NULL AND pa.dep_is_subject IS NOT NULL AND pa.cls_position IS NOT NULL) as classified
         FROM provision_actors pa
         JOIN legislation_text lt ON pa.section_id = lt.section_id
-        WHERE lt.section_type NOT IN %s
-        AND length(lt.text) >= 20
+        WHERE lt.scope = 'substantive'
         {law_filter}
-    """, (OUT_SECTION_TYPES,))
-    total_a, has_regex, has_dep, has_cls, eligible, classified = cur.fetchone()
+    """)
+    total_a, has_regex, has_dep, has_cls, has_conf, eligible, classified = cur.fetchone()
 
-    print(f"  Total actors (in-scope):{total_a:>8,}")
-    print(f"  Has regex position:     {has_regex:>8,}  ({100*has_regex/total_a:.1f}%)")
-    print(f"  Has dep features:       {has_dep:>8,}  ({100*has_dep/total_a:.1f}%)")
-    print(f"  Eligible (emb + dep):   {eligible:>8,}  ({100*eligible/total_a:.1f}%)")
-    print(f"  Has cls position:       {has_cls:>8,}  ({100*has_cls/total_a:.1f}%)")
-    gap = eligible - classified
-    status = "PASS" if gap == 0 else f"FAIL ({gap} eligible actors without cls_position)"
-    print(f"  QA: Classifier gap:     {status}")
+    if total_a == 0:
+        print("  No actors found")
+    else:
+        print(f"  Total actors (in-scope):{total_a:>8,}")
+        print(f"  Has regex position:     {has_regex:>8,}  ({100*has_regex/total_a:.1f}%)")
+        print(f"  Has dep features:       {has_dep:>8,}  ({100*has_dep/total_a:.1f}%)")
+        print(f"  Eligible (emb + dep):   {eligible:>8,}  ({100*eligible/total_a:.1f}%)")
+        print(f"  Has cls position:       {has_cls:>8,}  ({100*has_cls/total_a:.1f}%)")
+        gap = eligible - classified
+        not_eligible = total_a - eligible
+        status = "PASS" if gap == 0 else f"FAIL ({gap} eligible actors without cls_position)"
+        print(f"  Not eligible (no emb):  {not_eligible:>8,}  ({100*not_eligible/total_a:.1f}%)")
+        print(f"  QA: Classifier gap:     {status}")
 
     # Tier 3: Reconciliation + SLM
     print(f"\n{'=' * 70}")
@@ -212,13 +212,12 @@ def main():
             count(*) as cnt
         FROM provision_actors pa
         JOIN legislation_text lt ON pa.section_id = lt.section_id
-        WHERE lt.section_type NOT IN %s
-        AND length(lt.text) >= 20
+        WHERE lt.scope = 'substantive'
         AND pa.extraction_method IS NOT NULL
         {law_filter}
         GROUP BY pa.extraction_method
         ORDER BY count(*) DESC
-    """, (OUT_SECTION_TYPES,))
+    """)
     methods = cur.fetchall()
     reconciled = sum(c for _, c in methods)
 

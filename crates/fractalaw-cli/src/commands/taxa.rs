@@ -3062,6 +3062,7 @@ pub(crate) async fn cmd_taxa_classify(
                     .context("loading position classifier")?;
 
                 let mut pos_classified = 0usize;
+                let mut pos_skipped = 0usize;
                 type ActorTuple = (String, String, Option<String>, String, Option<String>);
                 let mut pos_updates: Vec<(String, Vec<ActorTuple>)> = Vec::new();
                 let mut cls_actor_rows: Vec<(String, String, String, Option<String>, String, String)> = Vec::new();
@@ -3087,13 +3088,6 @@ pub(crate) async fn cmd_taxa_classify(
                     let stype_col = batch.column_by_name("section_type");
 
                     for row in 0..batch.num_rows() {
-                        let method = method_col
-                            .and_then(|c| get_string_value(c.as_ref(), row))
-                            .unwrap_or_default();
-                        if method == "agentic" || method == "agentic_unvalidated" {
-                            continue;
-                        }
-
                         let sid = sid_col
                             .and_then(|c| get_string_value(c.as_ref(), row))
                             .unwrap_or_default();
@@ -3240,6 +3234,7 @@ pub(crate) async fn cmd_taxa_classify(
                                 );
                             // Skip if feature count doesn't match weights
                             if features.len() != pos_classifier.n_features() {
+                                pos_skipped += 1;
                                 updated_actors.push((
                                     label.clone(),
                                     regex_pos.clone(),
@@ -3373,11 +3368,18 @@ pub(crate) async fn cmd_taxa_classify(
                     lance.upsert_provision_actors(&cls_actor_rows).await.ok();
                 }
 
-                if pos_classified > 0 {
+                if pos_classified > 0 || pos_skipped > 0 {
                     eprintln!(
                         "    position: {pos_classified} actors classified, {} written to provision_actors",
                         cls_actor_rows.len()
                     );
+                    if pos_skipped > 0 {
+                        eprintln!(
+                            "    WARNING: {pos_skipped} actors skipped (feature count {} != expected {})",
+                            if pos_skipped > 0 { "mismatch" } else { "ok" },
+                            pos_classifier.n_features()
+                        );
+                    }
                 }
             }
         }
