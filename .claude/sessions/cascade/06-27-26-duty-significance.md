@@ -100,13 +100,62 @@ In sertantai, the compliance register could show:
 
 This helps prioritise compliance effort.
 
-## Work
+## Revised model (post Gemini review, 2026-07-01)
 
-1. ⬜ Define significance taxonomy (HIGH/MEDIUM/LOW or numeric)
-2. ⬜ Build rule-based scorer using dep features + verb analysis + hierarchy
-3. ⬜ Score benchmark provisions and compare against human judgement
-4. ⬜ Add `significance` column to provision_actors
-5. ⬜ Publish significance signal to sertantai
+### Decisions
+
+- **Strength refined**: HIGH reserved for absolute duties with no qualification. SFARP-qualified → MEDIUM.
+- **Hierarchy dropped as SLM dimension**: derive from metadata (section_type + depth). Not an LLM classification.
+- **Scope split**: `scope_duty_bearer` and `scope_protected_class` as separate sub-dimensions
+- **Penalty NOT in SLM**: sertantai models this separately by extracting Offence provisions from the schema
+- **3-point scale retained**: HIGH/MEDIUM/LOW — well understood by users
+- **Weighted combination deferred**: run across corpus first, then tune weights (ML as future experiment)
+
+### Final dimensions
+
+**SLM-rated (4 dimensions, single inference call):**
+
+1. **Scope: Duty Bearer**
+   - HIGH: universal ("every employer", "any person")
+   - MEDIUM: categorical ("an employer who operates...", "a competent person")
+   - LOW: individual/specific ("the person", "an inspector")
+
+2. **Scope: Protected Class**
+   - HIGH: universal ("all employees", "persons", "the public")
+   - MEDIUM: categorical ("employees in that workplace", "young persons")
+   - LOW: specific ("the document", "the premises")
+
+3. **Gravity**
+   - HIGH: health, safety, life, welfare, serious environmental harm
+   - MEDIUM: property, financial loss, moderate environmental impact
+   - LOW: administrative, procedural, record-keeping, notification
+
+4. **Strength** (refined)
+   - HIGH: absolute duty, no qualification ("shall ensure", "must provide" — unqualified)
+   - MEDIUM: qualified ("shall ensure SFARP", "shall have regard to", "all reasonable steps")
+   - LOW: procedural ("shall notify", "shall keep records", "shall display")
+
+**Metadata-derived (not SLM):**
+
+5. **Hierarchy** — from section_type + depth columns
+6. **Penalty** — future, sertantai extracts from Offence provisions
+
+### SLM output
+
+```json
+{"scope_duty_bearer": "HIGH"|"MEDIUM"|"LOW", "scope_protected_class": "HIGH"|"MEDIUM"|"LOW", "gravity": "HIGH"|"MEDIUM"|"LOW", "strength": "HIGH"|"MEDIUM"|"LOW"}
+```
+
+## Work (revised)
+
+1. ✅ Gemini benchmark ratings generated (2,592 provisions — original 4-dimension model)
+2. ✅ Web research (2026-07-01): no direct equivalent found. See below.
+3. ⬜ Re-run Gemini with revised dimensions (scope split, strength refined, hierarchy dropped)
+4. ⬜ Human review 10-20% sample of revised ratings
+5. ⬜ Fine-tune dedicated significance SLM on RunPod
+6. ⬜ Add significance columns to provision_actors
+7. ⬜ Run across QQ corpus Obligation provisions
+8. ⬜ Publish significance signal to sertantai
 
 ## Option E: Dedicated fine-tuned SLM (2026-06-30)
 
@@ -172,3 +221,97 @@ Option 3: Gemini rates all 4 dimensions → store separately → train SLM on ea
 - ✅ RunPod fine-tuning pipeline proven (gemma-3-4b-it, LoRA, GGUF export)
 - ✅ SLM batch inference proven (18.8/s with concurrent workers)
 - Would benefit from verb lemma extraction (extend dep features)
+
+## Web research: equivalent models (2026-07-01)
+
+No direct equivalent found. Nobody rates inherent duty significance at the provision level.
+
+**Closest models from different angles:**
+
+1. **Compliance risk frameworks** (Adherent, Secureframe) — likelihood × impact matrix. Rates *organisational risk of breach*, not the duty's inherent weight. Depends on company controls.
+2. **RegTech obligation extraction** (Ascent RegTech, FinregE) — extract obligations as objects, classify by topic/jurisdiction. No published importance rating.
+3. **Contract obligation scoring** (Sirion) — criticality = financial impact × regulatory exposure × relationship importance. Closest to ours but for contracts, not statutes.
+4. **EU AI Act extraction** (ScienceDirect 2025) — LLMs + knowledge graphs, 93% precision. Classifies type/addressee/predicate but no severity rating.
+5. **Hohfeldian analysis in AI** — academic work models responsibility, not severity. Deontic vs potestative maps to our Obligation/Liberty.
+
+**The gap we fill:** everyone extracts and classifies obligations. Nobody rates their *inherent significance*. Compliance frameworks rate breach risk (organisational). We rate the duty itself (universal).
+
+### Gemini confidence (2026-07-01) — skipped
+
+Gemini 2.5 Flash does not support logprobs on the AI Studio API (Vertex AI only). Self-reported confidence tested but poorly calibrated — returns 0.9-1.0 on everything, not discriminating. Skipped for training data generation.
+
+When the SLM is trained on this data, its own logprobs (proven to work at 0.9 threshold for position/DRRP) will provide the quality signal. Gemini is generating training labels, not production predictions.
+
+Sources: [Adherent](https://www.adherent.com/blog/compliance-risk-assessment-a-step-by-step-framework-for-regulatory-teams/), [Ascent RegTech](https://www.ascentregtech.com/our-difference/change-management/), [FinregE](https://finreg-e.com/compliance-services/regulatory-obligations/), [Sirion](https://www.sirion.ai/library/contract-obligations/contract-obligation-compliance-management/), [ScienceDirect](https://www.sciencedirect.com/science/article/pii/S2212473X25001026)
+
+# Gemini Review: Duty Significance Model (2026-07-01)
+
+## Context
+
+Reviewed the 4-dimension significance rating model for UK statutory Obligation provisions. 2,592 benchmark provisions rated by Gemini Flash. Dimensions: scope, gravity, strength, hierarchy.
+
+## Distribution
+
+| Dimension | HIGH | MEDIUM | LOW |
+|-----------|------|--------|-----|
+| Scope | 136 (5%) | 1,123 (43%) | 1,333 (51%) |
+| Gravity | 632 (24%) | 948 (37%) | 1,012 (39%) |
+| Strength | 1,638 (63%) | 679 (26%) | 275 (11%) |
+| Hierarchy | 30 (1%) | 1,833 (71%) | 729 (28%) |
+
+## Feedback
+
+### 1. Dimensions — right decomposition?
+
+- **Right decomposition** overall. Covers key aspects.
+- **Missing: Enforceability/Penalty** — severity of penalty for breach (criminal, civil, admin fine). High-gravity duty with low penalty is treated differently.
+- **Missing: Clarity/Ambiguity** — how clearly defined. Ambiguous duties harder to comply with.
+- **Missing: Frequency/Recurrence** — one-off vs ongoing obligation.
+- **Redundant: Hierarchy** — more about structural metadata than semantic significance. 1% HIGH confirms this.
+
+### 2. Strength skews 63% HIGH — too broad
+
+- "Shall ensure" and "must provide" are standard legislative drafting. Nearly every Obligation uses them.
+- **HIGH should be reserved for truly absolute duties** with no explicit or implicit qualification.
+- **MEDIUM should encompass majority** of shall/must duties qualified by SFARP, "all reasonable steps", "due diligence".
+- **LOW remains** for procedural, discretionary, weak obligations.
+
+### 3. Hierarchy — 1% HIGH, limited usefulness
+
+- Primarily reflects location within statute, not semantic significance.
+- **Highly derivable from metadata** (section number, Part, schedule).
+- Recommendation: remove as LLM-rated dimension. Use as metadata weighting factor instead.
+
+### 4. Scope — duty-bearer vs protected-class
+
+- Current AND condition for HIGH too strict (5%).
+- **Both matter** — duty-bearer breadth AND protected-class breadth.
+- Recommendation: split into `Scope_DutyBearer` and `Scope_ProtectedClass`, or relax AND to weighted combination.
+
+### 5. Combining dimensions into overall score
+
+- No single right way — depends on intended use.
+- **Weighted sum**: LOW=1, MEDIUM=2, HIGH=3, apply weights per dimension.
+- **Rule-based**: "If Gravity=HIGH, Overall=HIGH regardless".
+- **ML post-hoc**: train decision tree on expert-assigned overall scores.
+- Start with weighted sum, review weights with legal experts.
+
+### 6. Granularity — 3-level vs 5-level
+
+- **3-level good for initial training** — simpler, more consistent LLM output.
+- Explore 5-level or numeric later if human-annotated data supports it.
+
+### 7. Concerns about Gemini-generated labels
+
+- **Hallucination risk** — plausible but incorrect labels.
+- **Bias propagation** — Gemini biases transfer to SLM.
+- **Inconsistency** — may not apply definitions uniformly.
+- **Mitigation**: human review 10-20% of labels, measure inter-annotator agreement, iterative refinement.
+
+## Actions
+
+- Refine Strength dimension — SFARP-qualified → MEDIUM, not HIGH
+- Drop Hierarchy as LLM dimension — derive from metadata
+- Split or relax Scope AND condition
+- Consider Enforceability/Penalty as 4th dimension (replacing Hierarchy)
+- Human review sample before SLM training

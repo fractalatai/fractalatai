@@ -92,6 +92,20 @@ Review this database schema change. Focus on:
 Bullet points, max 400 words.
 ```
 
+## Persisting reviews
+
+**ALWAYS persist the review.** Two outputs:
+
+1. **Raw unedited Gemini response** → `data/code-review/<topic>.md`. No editing, no summarising. The human reads this directly.
+2. **Action summary** → append to the active session doc under a "Gemini review feedback (YYYY-MM-DD)" section. This is Claude's interpretation of what's actionable.
+
+```
+data/code-review/
+├── significance-rating-model.md
+├── gemini-cascade-architecture-review.md
+├── ...
+```
+
 ## Guidelines
 
 - **Set thinking budget.** Use `"thinkingBudget": 4096` for complex reviews, `2048` for simple ones. This gives Gemini time to reason before answering.
@@ -101,7 +115,6 @@ Bullet points, max 400 words.
 - **Parse the response.** The Python one-liner extracts the text from Gemini's response format, handling the thinking/response split.
 - **Ask Gemini to be harsh.** It defaults to being polite and encouraging. "Be a harsh critic" or "Be brutal" produces more useful feedback.
 - **Filter the noise.** Gemini often flags things that are already handled or makes assumptions about the codebase. Read critically — not every critique is valid.
-- **Record useful feedback in session docs.** If Gemini identifies a real issue, capture it in the session doc under a "Gemini review feedback" section with the date.
 
 ## Model selection
 
