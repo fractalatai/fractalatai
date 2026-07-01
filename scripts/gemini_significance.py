@@ -29,28 +29,28 @@ You are rating the significance of a UK statutory provision that creates a legal
 
 Rate on 4 dimensions, each HIGH / MEDIUM / LOW:
 
-1. **scope** — breadth of who is affected.
-   - HIGH: universal duty-bearer AND universal protected class ("every employer... all employees")
-   - MEDIUM: categorical ("an employer who operates...") or one side is broad
+1. **scope_duty_bearer** — breadth of who bears the duty.
+   - HIGH: universal ("every employer", "any person", "all self-employed persons")
+   - MEDIUM: categorical ("an employer who operates...", "a competent person", "the responsible person")
    - LOW: individual/specific ("the person", "an inspector", "the authority")
 
-2. **gravity** — what is at stake if the duty is breached.
-   - HIGH: health, safety, life, welfare, serious environmental harm
-   - MEDIUM: property, financial loss, moderate environmental impact
-   - LOW: administrative, procedural, record-keeping, notification
+2. **scope_protected_class** — breadth of who is protected by the duty.
+   - HIGH: universal ("all employees", "persons", "the public", "any person affected")
+   - MEDIUM: categorical ("employees in that workplace", "young persons", "new or expectant mothers")
+   - LOW: specific ("the document", "the premises", "the apparatus", "the record")
 
-3. **strength** — how absolute is the obligation.
-   - HIGH: absolute duty ("shall ensure", "must provide", "shall maintain") with no qualification
-   - MEDIUM: qualified duty ("so far as is reasonably practicable", "shall have regard to") or discretionary element
-   - LOW: procedural obligation ("shall notify", "shall keep records", "shall display")
+3. **gravity** — what is at stake if the duty is breached.
+   - HIGH: health, safety, life, welfare, serious environmental harm, risk of death or serious injury
+   - MEDIUM: property damage, financial loss, moderate environmental impact, risk of minor injury
+   - LOW: administrative, procedural, record-keeping, notification, display of notices
 
-4. **hierarchy** — structural importance within the law.
-   - HIGH: general duties section (Part I, reg.3-5), primary obligations
-   - MEDIUM: specific regulations, named duties
-   - LOW: sub-paragraphs, schedules, transitional provisions, procedural annexes
+4. **strength** — how absolute is the obligation.
+   - HIGH: absolute unqualified duty ("shall ensure" with NO qualification, "must provide", "shall maintain" — where no defence or mitigation language appears)
+   - MEDIUM: qualified duty ("shall ensure so far as is reasonably practicable", "shall take all reasonable steps", "shall have regard to", "due diligence") or duty with built-in discretion
+   - LOW: procedural obligation ("shall notify", "shall keep records", "shall display", "shall produce", "shall inform")
 
 Respond with ONLY a JSON object:
-{"scope": "HIGH"|"MEDIUM"|"LOW", "gravity": "HIGH"|"MEDIUM"|"LOW", "strength": "HIGH"|"MEDIUM"|"LOW", "hierarchy": "HIGH"|"MEDIUM"|"LOW"}"""
+{"scope_duty_bearer": "HIGH"|"MEDIUM"|"LOW", "scope_protected_class": "HIGH"|"MEDIUM"|"LOW", "gravity": "HIGH"|"MEDIUM"|"LOW", "strength": "HIGH"|"MEDIUM"|"LOW"}"""
 
 
 def query_obligation_provisions(conn, limit=None):
@@ -110,8 +110,9 @@ def rate_provision(api_key, section_id, text, section_type):
 
         parsed = json.loads(text_resp)
         valid = {"HIGH", "MEDIUM", "LOW"}
-        if all(parsed.get(d, "").upper() in valid for d in ["scope", "gravity", "strength", "hierarchy"]):
-            return {d: parsed[d].upper() for d in ["scope", "gravity", "strength", "hierarchy"]}
+        dims = ["scope_duty_bearer", "scope_protected_class", "gravity", "strength"]
+        if all(parsed.get(d, "").upper() in valid for d in dims):
+            return {d: parsed[d].upper() for d in dims}
         return None
     except json.JSONDecodeError as e:
         print(f"  PARSE ERROR {section_id}: {e} — [{text_resp[:100]}]", file=sys.stderr)
@@ -149,9 +150,10 @@ def main():
         conn.close()
         return
 
+    dims = ["scope_duty_bearer", "scope_protected_class", "gravity", "strength"]
     results = []
     errors = 0
-    dim_counts = {d: Counter() for d in ["scope", "gravity", "strength", "hierarchy"]}
+    dim_counts = {d: Counter() for d in dims}
     t0 = time.time()
 
     for i, (sid, text, stype, law) in enumerate(provisions):
@@ -159,7 +161,7 @@ def main():
 
         if rating:
             results.append({"section_id": sid, "law_name": law, **rating})
-            for d in ["scope", "gravity", "strength", "hierarchy"]:
+            for d in dims:
                 dim_counts[d][rating[d]] += 1
         else:
             errors += 1
@@ -181,8 +183,8 @@ def main():
     print(f"Errors:   {errors}")
     print(f"Time:     {elapsed/60:.1f} min")
 
-    for d in ["scope", "gravity", "strength", "hierarchy"]:
-        print(f"\n{d.capitalize()}:")
+    for d in dims:
+        print(f"\n{d}:")
         for level in ["HIGH", "MEDIUM", "LOW"]:
             print(f"  {level:8s}: {dim_counts[d].get(level, 0):,}")
 

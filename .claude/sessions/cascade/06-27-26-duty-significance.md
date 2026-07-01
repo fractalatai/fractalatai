@@ -155,7 +155,14 @@ This helps prioritise compliance effort.
 5. ⬜ Fine-tune dedicated significance SLM on RunPod
 6. ⬜ Add significance columns to provision_actors
 7. ⬜ Run across QQ corpus Obligation provisions
-8. ⬜ Publish significance signal to sertantai
+8. ⬜ Derive hierarchy signal from metadata (NOT SLM):
+   - Map section_type + depth to HIGH/MEDIUM/LOW
+   - HIGH: section_type in (section, article) AND depth <= 3 (general duties, Part I)
+   - MEDIUM: section_type in (section, sub_section, article, sub_article, regulation) AND depth 4-6
+   - LOW: section_type in (paragraph, sub_paragraph, schedule_paragraph) OR depth > 6
+   - Store as `significance_hierarchy` on provision_actors or legislation_text
+   - Validate against benchmark laws (HSWA Part I = HIGH, Schedule provisions = LOW)
+9. ⬜ Publish significance signal to sertantai
 
 ## Option E: Dedicated fine-tuned SLM (2026-06-30)
 
