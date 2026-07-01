@@ -154,15 +154,41 @@ This helps prioritise compliance effort.
 4. ⏸️ Human review 10-20% sample (deferred — POC user feedback will provide this)
 5. ✅ Fine-tuned significance SLM on RunPod (gemma3-significance-q4.gguf, 2.4GB)
 6. ✅ Added significance columns to legislation_text (per-provision, not per-actor)
-7. ⬜ Run across QQ corpus Obligation provisions
-8. ⬜ Derive hierarchy signal from metadata (NOT SLM):
+7. ✅ Run across full corpus — 40,468 Obligation provisions rated on RunPod (~65 min, $1)
+8. ✅ Derive hierarchy signal from metadata — v1 (absolute depth) was too coarse (HSWA s.2(1) = LOW). Revised to **law-type-relative thresholds**: Acts have deeper structure than SIs/EU Directives, so depth thresholds differ. Distribution improved from 4%/36%/60% to 14%/43%/43%. HSWA s.2(1) now MEDIUM (not perfect but defensible).
+
+   Law-type-relative depth mapping (v2 — Acts include sub_section as primary duty level):
+   - **Acts** (ukpga, asp, anaw): depth ≤4 = HIGH, =5 = MEDIUM, >5 = LOW
+     (In Acts, sub_section at depth 4 IS the primary duty — s.2(1) not s.2)
+   - **SIs** (uksi, wsi): depth ≤2 = HIGH, ≤3 = MEDIUM, >3 = LOW
+   - **EU Directives** (eudr): depth ≤2 = HIGH, ≤3 = MEDIUM, >3 = LOW
+   - **EU Regulations / other**: depth ≤2 = HIGH, ≤3 = MEDIUM, >3 = LOW
+   
+   Distribution: HIGH 33%, MEDIUM 35%, LOW 31%. HSWA s.2(1) now correctly HIGH.
+   
+   **v3 explored and rejected**: tried per-law average depth baseline and per-law depth-thirds. Both failed — relative approaches normalise away useful signal (MEDIUM swallows 75%), and HSWA s.2(1) drops back to LOW/MEDIUM because its depth ≈ law average. The fundamental problem: depth doesn't correlate with importance in UK legislation. General duties (s.2) and procedural duties (s.28) live at the same depth. Section number within a Part matters but isn't in the metadata.
+   
+   **v2.1 (Combined Weighted Scoring — current)**: Gemini suggested extracting primary section number from section_id. Composite score:
+   - 0.4 × (1 - section_number / max_section_in_law) — lower sections score higher
+   - 0.3 × (1 / depth) — shallower provisions score higher
+   - 0.3 × section_type_weight — section/article=1.0, sub_section=0.8, paragraph=0.4, sub_paragraph=0.2
+   
+   Percentile-based thresholds: top 33% = HIGH, middle 34% = MEDIUM, bottom 33% = LOW.
+   
+   Results: HSWA s.2(1)=HIGH ✅, s.3(1)=HIGH ✅, s.7=HIGH ✅, s.2(2)(c)=MEDIUM ✅, s.59(1)(b)=LOW ✅. Section number extraction was the missing signal.
    - Map section_type + depth to HIGH/MEDIUM/LOW
    - HIGH: section_type in (section, article) AND depth <= 3 (general duties, Part I)
    - MEDIUM: section_type in (section, sub_section, article, sub_article, regulation) AND depth 4-6
    - LOW: section_type in (paragraph, sub_paragraph, schedule_paragraph) OR depth > 6
    - Store as `significance_hierarchy` on provision_actors or legislation_text
    - Validate against benchmark laws (HSWA Part I = HIGH, Schedule provisions = LOW)
-9. ⬜ Publish significance signal to sertantai
+9. ⬜ Experiment: overall significance measure per provision — formulate from the 4 dimensions (weighted sum, rule-based, or ML). Data exists in Postgres for all 40K provisions. Test combinations, validate against human intuition on benchmark laws (HSWA s.2(1) = HIGH overall, s.20(2) = LOW). Don't persist — exploratory.
+10. ⬜ Aggregation models for compliance officer use:
+    - **Provision level**: filter within a law — "which duties in HSWA need my attention?" Per-provision significance already computed.
+    - **Law level**: rank laws against each other — "which of my 274 laws need attention first?" Aggregation from provision significance: max, count-weighted, or distribution profile (3 HIGH, 12 MEDIUM, 45 LOW).
+    - Fractalaw publishes per-provision significance; sertantai aggregates for display.
+11. ⬜ Investigate strength skew — SLM predicts 71% HIGH vs Gemini training data 39%. Distillation bias or definition needs further refinement for SLM training.
+12. ⬜ Publish significance signal to sertantai
 
 ## Option E: Dedicated fine-tuned SLM (2026-06-30)
 

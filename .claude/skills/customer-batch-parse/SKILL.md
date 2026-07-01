@@ -138,6 +138,18 @@ LAWS=$(cat data/<customer>-applicable-laws.csv)
 cargo run -p fractalaw-cli -- taxa reconcile --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw --laws "$LAWS"
 ```
 
+### Step 8b: Significance (Obligation provisions only)
+
+Rate significance of Obligation provisions on RunPod. Requires separate GGUF model (gemma3-significance) and reverse SSH tunnel.
+
+See `/runpod-finetune` skill for pod setup. Run `runpod_significance_batch.py` on pod with tunnel open.
+
+After significance SLM completes, derive hierarchy from metadata locally:
+
+```bash
+/usr/bin/python3 .claude/skills/customer-batch-parse/scripts/derive_hierarchy.py --law-file data/<customer>-applicable-laws.csv
+```
+
 ### Step 9: Backfill
 
 Aggregate provision_actors → legislation_text for sertantai publish.
