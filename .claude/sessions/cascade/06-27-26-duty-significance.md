@@ -150,10 +150,10 @@ This helps prioritise compliance effort.
 
 1. ✅ Gemini benchmark ratings generated (2,592 provisions — original 4-dimension model)
 2. ✅ Web research (2026-07-01): no direct equivalent found. See below.
-3. ⬜ Re-run Gemini with revised dimensions (scope split, strength refined, hierarchy dropped)
-4. ⬜ Human review 10-20% sample of revised ratings
-5. ⬜ Fine-tune dedicated significance SLM on RunPod
-6. ⬜ Add significance columns to provision_actors
+3. ✅ Re-run Gemini with revised dimensions — v0.2: 2,592 rated, strength 63%→39% HIGH, scope split working
+4. ⏸️ Human review 10-20% sample (deferred — POC user feedback will provide this)
+5. ✅ Fine-tuned significance SLM on RunPod (gemma3-significance-q4.gguf, 2.4GB)
+6. ✅ Added significance columns to legislation_text (per-provision, not per-actor)
 7. ⬜ Run across QQ corpus Obligation provisions
 8. ⬜ Derive hierarchy signal from metadata (NOT SLM):
    - Map section_type + depth to HIGH/MEDIUM/LOW
