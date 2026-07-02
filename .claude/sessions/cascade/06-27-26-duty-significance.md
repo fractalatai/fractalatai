@@ -1,4 +1,89 @@
-# Session: Duty Significance / Importance Rating (ACTIVE)
+---
+session: Duty Significance / Importance Rating
+status: closed
+opened: 2026-06-27
+closed: 2026-07-01
+outcome: success
+
+summary: >
+  Built and deployed a novel duty significance rating system for UK statutory Obligation provisions.
+  40,468 provisions rated across 4 SLM dimensions (scope_duty_bearer, scope_protected_class, gravity, strength)
+  plus metadata-derived hierarchy, using a fine-tuned gemma-3-4b-it on RunPod (~$5 total cost).
+  No equivalent model exists — this fills a gap between obligation extraction and compliance risk assessment.
+
+decisions:
+  - what: 4 decomposed SLM dimensions + 1 metadata dimension (not single overall rating)
+    why: Sertantai can re-weight per customer without re-running the model. Gemini review confirmed right decomposition.
+    result: 40,468 provisions rated with per-dimension granularity
+  - what: Dedicated significance SLM, not extending position/DRRP model
+    why: Different task (how important vs who bears it), different training data, independent retraining
+    result: gemma3-significance-q4.gguf (2.4GB), ~65 min full corpus on RunPod
+  - what: Hierarchy derived from metadata, not SLM-rated
+    why: Gemini review found 1% HIGH — structural metadata, not semantic. SLM adds no value here.
+    result: v2.1 combined weighted scoring (section number + depth + section_type) with percentile thresholds
+  - what: Strength refined — SFARP-qualified → MEDIUM, absolute unqualified → HIGH
+    why: "shall ensure" is standard legislative drafting (63% HIGH was meaningless). HIGH reserved for truly absolute duties.
+    result: Training data improved to 39% HIGH, but SLM still predicts 71% HIGH (distillation bias — deferred)
+  - what: Scope split into duty_bearer and protected_class sub-dimensions
+    why: AND condition for single scope too strict (5% HIGH). Both matter independently.
+    result: Better distribution, separate signals for filtering
+
+metrics:
+  corpus_rated: { provisions: 40468, time_minutes: 65, cost_usd: 1 }
+  training_data: { provisions: 2592, source: "gemini-2.5-flash", versions: 2 }
+  training_cost: { runpod_usd: 2, gemini_usd: 2, total_usd: 5 }
+  hierarchy_v2_1: { high_pct: 33, medium_pct: 35, low_pct: 31 }
+  strength_skew: { training_high_pct: 39, slm_high_pct: 71, note: "distillation bias" }
+
+lessons:
+  - title: Nobody rates inherent duty significance at provision level
+    detail: >
+      Web research found compliance risk frameworks (likelihood × impact), obligation extraction,
+      and contract scoring — but nobody rates the statutory duty itself. This is genuinely novel.
+      Closest is Sirion's contract obligation criticality scoring.
+    tag: methodology
+  - title: Gemini self-reported confidence is useless
+    detail: >
+      Gemini 2.5 Flash returns 0.9-1.0 confidence on everything — not discriminating.
+      Logprobs only available on Vertex AI, not AI Studio. SLM logprobs (proven at 0.9 threshold)
+      provide the quality signal instead. Gemini generates training labels, not production predictions.
+    tag: models
+  - title: Depth doesn't correlate with importance in UK legislation
+    detail: >
+      General duties (s.2) and procedural duties (s.28) live at the same depth in HSWA.
+      Relative approaches (per-law average, depth-thirds) normalise away useful signal.
+      Section number extraction from section_id was the missing signal for hierarchy.
+    tag: data
+  - title: Distillation bias amplifies skewed training data
+    detail: >
+      Strength dimension had 39% HIGH in Gemini training data but SLM predicts 71% HIGH.
+      The model amplifies the majority class. Needs either more balanced training data or
+      post-hoc calibration. Future SLM retrain should address this.
+    tag: models
+  - title: Per-provision significance, not per-actor
+    detail: >
+      Significance lives on legislation_text (the provision), not provision_actors (the actor).
+      A provision's gravity and scope are properties of the duty itself, not the actor bearing it.
+      Different from DRRP/position which are per-actor.
+    tag: architecture
+
+artifacts:
+  - scripts/gemini_significance.py
+  - scripts/export_significance_training.py
+  - scripts/runpod_significance_batch.py
+  - .claude/skills/customer-batch-parse/scripts/derive_hierarchy.py
+  - data/significance_benchmark.json
+  - data/significance_v02_benchmark.json
+
+depends_on:
+  - 06-24-26-slm-finetune.md
+
+enables:
+  - 07-01-26-significance-aggregation.md
+  - 07-01-26-significance-publish.md
+---
+
+# Session: Duty Significance / Importance Rating (CLOSED)
 
 ## Problem
 
@@ -182,13 +267,10 @@ This helps prioritise compliance effort.
    - LOW: section_type in (paragraph, sub_paragraph, schedule_paragraph) OR depth > 6
    - Store as `significance_hierarchy` on provision_actors or legislation_text
    - Validate against benchmark laws (HSWA Part I = HIGH, Schedule provisions = LOW)
-9. ⬜ Experiment: overall significance measure per provision — formulate from the 4 dimensions (weighted sum, rule-based, or ML). Data exists in Postgres for all 40K provisions. Test combinations, validate against human intuition on benchmark laws (HSWA s.2(1) = HIGH overall, s.20(2) = LOW). Don't persist — exploratory.
-10. ⬜ Aggregation models for compliance officer use:
-    - **Provision level**: filter within a law — "which duties in HSWA need my attention?" Per-provision significance already computed.
-    - **Law level**: rank laws against each other — "which of my 274 laws need attention first?" Aggregation from provision significance: max, count-weighted, or distribution profile (3 HIGH, 12 MEDIUM, 45 LOW).
-    - Fractalaw publishes per-provision significance; sertantai aggregates for display.
-11. ⬜ Investigate strength skew — SLM predicts 71% HIGH vs Gemini training data 39%. Distillation bias or definition needs further refinement for SLM training.
-12. ⬜ Publish significance signal to sertantai
+9. ⏸️ Experiment: overall significance measure per provision (deferred — 07-01-26-significance-aggregation session)
+10. ⏸️ Aggregation models for compliance officer use (deferred — 07-01-26-significance-aggregation session)
+11. ⏸️ Investigate strength skew — SLM 71% HIGH vs training 39% (deferred — future SLM retrain)
+12. ⏸️ Publish significance signal to sertantai (deferred — 07-01-26-significance-publish session)
 
 ## Option E: Dedicated fine-tuned SLM (2026-06-30)
 

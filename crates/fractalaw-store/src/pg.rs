@@ -88,7 +88,10 @@ impl PgStore {
              clause_refined, taxa_confidence, taxa_classified_at, \
              fitness_polarity, fitness_person, fitness_process, fitness_place, \
              fitness_plant, fitness_property, fitness_sector, \
-             extraction_method, holder_inferred_from, ancestor_distance, actors \
+             extraction_method, holder_inferred_from, ancestor_distance, actors, \
+             significance_scope_duty_bearer, significance_scope_protected_class, \
+             significance_gravity, significance_strength, significance_hierarchy, \
+             significance_confidence, significance_overall \
              FROM legislation_text \
              WHERE law_name = $1 AND extraction_method IS NOT NULL"
         )
@@ -420,6 +423,120 @@ impl PgStore {
         .await
         .map_err(|e| StoreError::Other(format!("backfill_from_actors: {e}")))?;
         Ok(result.rows_affected() as usize)
+    }
+
+    /// Compute significance_overall from the 5 dimension columns (Approach B formula).
+    /// Idempotent — safe to re-run after SLM retrain or formula change.
+    pub async fn backfill_significance(&self, law_name: &str) -> Result<usize, StoreError> {
+        let result = sqlx::query(
+            "UPDATE legislation_text SET significance_overall = \
+             CASE \
+               WHEN significance_gravity IS NULL THEN NULL \
+               WHEN significance_hierarchy IS NULL THEN NULL \
+               ELSE ( \
+                 SELECT CASE \
+                   WHEN score >= 2.5 THEN 'HIGH' \
+                   WHEN score >= 1.75 THEN 'MEDIUM' \
+                   ELSE 'LOW' \
+                 END \
+                 FROM ( \
+                   SELECT \
+                     0.35 * (CASE significance_gravity WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 ELSE 1 END) + \
+                     0.20 * (CASE significance_scope_duty_bearer WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 ELSE 1 END) + \
+                     0.20 * (CASE significance_scope_protected_class WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 ELSE 1 END) + \
+                     0.15 * (CASE significance_strength WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 ELSE 1 END) + \
+                     0.10 * (CASE significance_hierarchy WHEN 'HIGH' THEN 3 WHEN 'MEDIUM' THEN 2 ELSE 1 END) \
+                   AS score \
+                 ) sub \
+               ) \
+             END \
+             WHERE law_name = $1 AND significance_gravity IS NOT NULL",
+        )
+        .bind(law_name)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("backfill_significance: {e}")))?;
+        Ok(result.rows_affected() as usize)
+    }
+
+    /// Query law-level significance profile (K+L) for a law.
+    pub async fn query_significance_profile(
+        &self,
+        law_name: &str,
+    ) -> Result<(i64, i64, i64, i64), StoreError> {
+        let row = sqlx::query_as::<_, (i64, i64, i64, i64)>(
+            "SELECT \
+               COALESCE(count(*) FILTER (WHERE significance_overall = 'HIGH'), 0), \
+               COALESCE(count(*) FILTER (WHERE significance_overall = 'MEDIUM'), 0), \
+               COALESCE(count(*) FILTER (WHERE significance_overall = 'LOW'), 0), \
+               COALESCE(count(*) FILTER (WHERE significance_overall IS NOT NULL), 0) \
+             FROM legislation_text WHERE law_name = $1",
+        )
+        .bind(law_name)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_significance_profile: {e}")))?;
+        Ok(row)
+    }
+
+    /// Query Part-level significance breakdown for large Acts.
+    /// Returns JSON string: `[{"part":"pt.I","high":31,"medium":35,"low":69,"total":135}, ...]`
+    /// Returns None if the law has no Part structural rows or <50 rated provisions.
+    pub async fn query_significance_parts(
+        &self,
+        law_name: &str,
+    ) -> Result<Option<String>, StoreError> {
+        // Check if this law has enough rated provisions to warrant Part breakdown
+        let (_, _, _, total) = self.query_significance_profile(law_name).await?;
+        if total < 50 {
+            return Ok(None);
+        }
+
+        let rows = sqlx::query_as::<_, (String, i64, i64, i64, i64)>(
+            "WITH parts AS ( \
+               SELECT section_id, sort_key \
+               FROM legislation_text \
+               WHERE law_name = $1 AND section_type = 'part' \
+               ORDER BY sort_key \
+             ), \
+             provision_parts AS ( \
+               SELECT lt.significance_overall, \
+                 (SELECT p.section_id FROM parts p \
+                  WHERE p.sort_key < lt.sort_key \
+                  ORDER BY p.sort_key DESC LIMIT 1) as part_id \
+               FROM legislation_text lt \
+               WHERE lt.law_name = $1 AND lt.significance_overall IS NOT NULL \
+             ) \
+             SELECT \
+               COALESCE(split_part(part_id, ':', 2), 'preamble') as part, \
+               COALESCE(count(*) FILTER (WHERE significance_overall = 'HIGH'), 0), \
+               COALESCE(count(*) FILTER (WHERE significance_overall = 'MEDIUM'), 0), \
+               COALESCE(count(*) FILTER (WHERE significance_overall = 'LOW'), 0), \
+               count(*) as total \
+             FROM provision_parts \
+             GROUP BY part_id \
+             ORDER BY part_id",
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_significance_parts: {e}")))?;
+
+        if rows.is_empty() {
+            return Ok(None);
+        }
+
+        // Build JSON array
+        let parts: Vec<String> = rows
+            .iter()
+            .map(|(part, high, med, low, total)| {
+                format!(
+                    r#"{{"part":"{}","high":{},"medium":{},"low":{},"total":{}}}"#,
+                    part, high, med, low, total
+                )
+            })
+            .collect();
+        Ok(Some(format!("[{}]", parts.join(","))))
     }
 
     /// Delete provisions for a law.
@@ -870,6 +987,24 @@ impl crate::ProvisionStore for PgStore {
 
     async fn backfill_from_actors(&self, law_name: &str) -> Result<usize, StoreError> {
         self.backfill_from_actors(law_name).await
+    }
+
+    async fn backfill_significance(&self, law_name: &str) -> Result<usize, StoreError> {
+        self.backfill_significance(law_name).await
+    }
+
+    async fn query_significance_profile(
+        &self,
+        law_name: &str,
+    ) -> Result<(i64, i64, i64, i64), StoreError> {
+        self.query_significance_profile(law_name).await
+    }
+
+    async fn query_significance_parts(
+        &self,
+        law_name: &str,
+    ) -> Result<Option<String>, StoreError> {
+        self.query_significance_parts(law_name).await
     }
 
     async fn query_pending_slm_actors(

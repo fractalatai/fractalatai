@@ -56,6 +56,27 @@ pub trait ProvisionStore: Send + Sync {
         Ok(0)
     }
 
+    /// Compute significance_overall from dimension columns.
+    async fn backfill_significance(&self, _law_name: &str) -> Result<usize, StoreError> {
+        Ok(0)
+    }
+
+    /// Query law-level significance profile {high, medium, low, total}.
+    async fn query_significance_profile(
+        &self,
+        _law_name: &str,
+    ) -> Result<(i64, i64, i64, i64), StoreError> {
+        Ok((0, 0, 0, 0))
+    }
+
+    /// Query Part-level significance breakdown (JSON blob) for large Acts.
+    async fn query_significance_parts(
+        &self,
+        _law_name: &str,
+    ) -> Result<Option<String>, StoreError> {
+        Ok(None)
+    }
+
     /// Delete provisions for a law.
     async fn delete_law_lat(&self, law_name: &str) -> Result<usize, StoreError>;
 

@@ -781,16 +781,37 @@ async fn main() -> anyhow::Result<()> {
                 cmd_taxa_reconcile(lance.as_ref(), &law_names).await
             }
             TaxaAction::Backfill { laws } => {
+                let store = open_duck(&data_dir)?;
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
                 let mut total = 0usize;
+                let mut sig_total = 0usize;
+                let mut parts_total = 0usize;
                 for law_name in &law_names {
                     let updated = lance.backfill_from_actors(law_name).await?;
-                    eprintln!("  {law_name}: {updated} provisions backfilled");
+                    let sig = lance.backfill_significance(law_name).await?;
+
+                    // Part-level significance breakdown for large Acts
+                    if let Some(parts_json) = lance.query_significance_parts(law_name).await? {
+                        store.execute(&format!(
+                            "UPDATE legislation SET significance_parts = '{}' WHERE name = '{}'",
+                            parts_json.replace('\'', "''"),
+                            law_name.replace('\'', "''")
+                        ))?;
+                        parts_total += 1;
+                        eprintln!("  {law_name}: {updated} backfilled, {sig} significance, parts breakdown computed");
+                    } else {
+                        eprintln!("  {law_name}: {updated} backfilled, {sig} significance");
+                    }
+
                     total += updated;
+                    sig_total += sig;
                 }
-                println!("Backfilled {total} provisions across {} laws", law_names.len());
+                println!(
+                    "Backfilled {total} provisions, {sig_total} significance, {parts_total} Part breakdowns across {} laws",
+                    law_names.len()
+                );
                 Ok(())
             }
             TaxaAction::Slm { laws } => {

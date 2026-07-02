@@ -60,6 +60,8 @@ CREATE TABLE IF NOT EXISTS legislation_text (
     significance_gravity TEXT,
     significance_strength TEXT,
     significance_confidence REAL,
+    significance_hierarchy TEXT,
+    significance_overall TEXT,
     extraction_method    TEXT,
     ancestor_distance    INTEGER,
     holder_inferred_from TEXT,

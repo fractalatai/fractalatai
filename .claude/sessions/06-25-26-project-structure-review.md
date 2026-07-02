@@ -179,4 +179,100 @@ Each binary only compiles its deps. A `fractalaw-sync` build wouldn't touch ONNX
 
 ## Scope
 
-This session is a review + plan, not an execution. Output: a proposed structure and decisions on the architectural questions above.
+~~This session is a review + plan, not an execution. Output: a proposed structure and decisions on the architectural questions above.~~
+
+Updated 2026-07-02: promoted to execution session.
+
+## Build Plan
+
+### Phase 1: Folder restructure (file moves + documentation)
+
+No Rust code changes. All `git mv` for history preservation. `cargo check` must pass after every step.
+
+#### 1.1 Clean up dead directories
+- ⬜ Delete empty `apps/` directory
+
+#### 1.2 Reorganise `data/`
+- ⬜ Create `data/sertantai/` — move all CSV law lists (`AMD-*.csv`, `LAT-*.csv`, `qq-applicable-laws.csv`)
+- ⬜ Create `data/seed/` — move Parquet seed files (`amendment_annotations.parquet`, `annotation_totals.parquet`)
+- ⬜ Create `data/audit/` — move `data/llm-audit/` contents (per Gemini suggestion — distinct retention from runtime DBs)
+- ⬜ Move stray markdown docs out of `data/` into `docs/`: `LAT-SCHEMA-FOR-SERTANTAI.md`, `LAT-TRANSFORMS-FOR-SERTANTAI.md`, `EU-LAW-SUPPORT-BRIEFING.md`, `clause_eyeball.md`, `gemini-briefing-gguf-export.md`
+- ⬜ Update `.gitignore` — ensure runtime files (DuckDB, LanceDB, Modelfile, slm-adapter) stay gitignored at their current paths
+- ⬜ Verify: no broken references in Rust code or scripts to moved files
+
+#### 1.3 Reorganise `scripts/`
+- ⬜ Create `scripts/migrations/` — move one-off migration scripts: `migrate_*.py`, `rebuild_lance_actors.py`
+- ⬜ Create `scripts/maintenance/` — move active maintenance: `compact_lance.py`, `compact_lance_no_backup.py`, `backup_lancedb.py`, `corpus_stats.py`
+- ⬜ Create `scripts/ml/` — move ML training + eval: `train_*.py`, `finetune_*.py`, `export_*.py`, `eval_*.py`, `retrain_*.py`, `runpod_*.py`
+- ⬜ Create `scripts/benchmarks/` — move benchmark scripts: `benchmark_*.py`, `generate_benchmarks*.py`, `correct_gold_standard.py`
+- ⬜ Create `scripts/experiments/` — move significance experiments: `significance_approach_*.py`, `significance_part_breakdown.py`
+- ⬜ Keep in `scripts/` root: `gemini_*.py`, `actor_aliases.py`, `compute_dep_features.py` (active operational scripts)
+- ⬜ Update any hardcoded script paths in skills or session docs
+
+#### 1.4 Reorganise `docs/`
+- ⬜ Create `docs/architecture/` — move: `SCHEMA.md`, `SCHEMA-2.0.md`, `SCHEMA-DIAGRAM.md`, `ZENOH-SYNC.md`, `PAGEINDEX-RESEARCH.md`, `GAP-C-AGENTIC-EXTRACTION-PLAN.md`
+- ⬜ Create `docs/operations/` — move: `TAXA-PATTERN-RUNBOOK.md`, `FITNESS-DICTIONARY-RUNBOOK.md`, `CLASSIFICATION-CASCADE-STRATEGY*.md`
+- ⬜ Create `docs/dictionaries/` — move: `actor-dictionary.yaml`, `ACTOR-DICTIONARY.md`, `correlative-rules.yaml`, `drrp_classifier_v*.json`, `position_classifier_v*.json`
+- ⬜ Keep `docs/manual/` as-is (significance docs, customer-facing)
+- ⬜ Keep `docs/reviews/` and `docs/howto/` as-is
+- ⬜ Verify: Rust code loads `actor-dictionary.yaml` and `correlative-rules.yaml` — update paths if hardcoded
+
+#### 1.5 CLAUDE.md refresh
+- ⬜ Slim top-level `CLAUDE.md` to architecture overview + pointers to crate docs
+- ⬜ Create `crates/fractalaw-core/CLAUDE.md` — taxa pipeline, parsing rules, DRRP model, Arrow schemas
+- ⬜ Create `crates/fractalaw-cli/CLAUDE.md` — CLI operations guide (enrichment, publish, QA, backfill commands)
+- ⬜ Update `.claude/skills/` — fix any paths broken by moves
+
+#### 1.6 Verify
+- ⬜ `cargo check --workspace` passes
+- ⬜ `cargo test --workspace` passes
+- ⬜ All skills reference correct paths
+- ⬜ Commit: "Restructure project: organise data/, scripts/, docs/"
+
+---
+
+### Phase 2: CLI binary split
+
+Rust code changes. Split the monolithic `fractalaw` binary into focused binaries with minimal deps.
+
+#### 2.1 Analyse command → dependency mapping
+- ⬜ Map each CLI subcommand to its crate dependencies:
+  - `taxa *` (parse, classify, reconcile, infer, enrich, backfill, qa, eyeball, status) → core + store + ai
+  - `sync *` (publish, watch, pull-lat) → core + store + sync
+  - `embed`, `validate` → core + store + ai
+  - `law`, `query`, `stats` → core + store
+  - `host run` → core + host
+- ⬜ Decide binary names: `fractalaw` (taxa + query), `fractalaw-sync`, `fractalaw-host`
+
+#### 2.2 Extract shared CLI scaffolding
+- ⬜ Factor out common CLI setup (tracing, clap styles, store opening) into a shared module or thin lib in fractalaw-cli
+- ⬜ Keep `commands/` module structure — each binary picks the commands it needs
+
+#### 2.3 Create `fractalaw-sync` binary
+- ⬜ New `[[bin]]` in `fractalaw-cli/Cargo.toml` or new crate `crates/fractalaw-sync-cli/`
+- ⬜ Dependencies: `core + store(duckdb, pg) + sync(zenoh)` — no ONNX, no wasmtime, no DataFusion
+- ⬜ Commands: `sync publish`, `sync watch`, `sync pull-lat`
+- ⬜ Verify: `cargo build --bin fractalaw-sync` compiles without ONNX/wasmtime
+
+#### 2.4 Create `fractalaw-host` binary
+- ⬜ New `[[bin]]` or crate for WASM host
+- ⬜ Dependencies: `core + host` — no store, no ai, no sync
+- ⬜ Commands: `host run`
+- ⬜ Verify: `cargo build --bin fractalaw-host` compiles without DuckDB/ONNX/Zenoh
+
+#### 2.5 Slim the main `fractalaw` binary
+- ⬜ Remove sync and host deps from the main binary's feature set
+- ⬜ Dependencies: `core + store(full) + ai(onnx)` — no Zenoh, no wasmtime
+- ⬜ Commands: `taxa *`, `embed`, `validate`, `law`, `query`, `stats`
+- ⬜ Verify: `cargo build --bin fractalaw` no longer pulls Zenoh or wasmtime
+
+#### 2.6 Measure impact
+- ⬜ Compare build times: full workspace before vs after
+- ⬜ Compare `target/` size after clean build
+- ⬜ Document results in session
+
+#### 2.7 Verify + commit
+- ⬜ `cargo check --workspace` passes
+- ⬜ `cargo test --workspace` passes
+- ⬜ All three binaries run their `--help` correctly
+- ⬜ Commit: "Split CLI into fractalaw + fractalaw-sync + fractalaw-host"

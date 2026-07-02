@@ -176,7 +176,11 @@ pub(crate) async fn cmd_sync_publish(
                     duty_type, role, role_gvt, \
                     duties, rights, responsibilities, powers, \
                     fitness_person, fitness_process, fitness_place, \
-                    fitness_plant, fitness_property, fitness_sector, fitness \
+                    fitness_plant, fitness_property, fitness_sector, fitness, \
+                    significance_rating, significance_score, \
+                    significance_high_count, significance_medium_count, \
+                    significance_low_count, significance_total_obligations, \
+                    significance_parts \
              FROM legislation WHERE name = '{}'",
             law_name.replace('\'', "''")
         );
