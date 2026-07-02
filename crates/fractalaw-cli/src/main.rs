@@ -418,7 +418,7 @@ enum TaxaAction {
         #[arg(long)]
         laws: String,
         /// Output file path
-        #[arg(long, default_value = "./data/clause_eyeball.md")]
+        #[arg(long, default_value = "./docs/clause_eyeball.md")]
         output: PathBuf,
         /// Maximum text sections per law
         #[arg(long, default_value_t = 200)]
@@ -525,8 +525,8 @@ enum TaxaAction {
         /// Specific laws (comma-separated)
         #[arg(long)]
         laws: String,
-        /// Directory for audit log JSON files (e.g. data/llm-audit)
-        #[arg(long, default_value = "data/llm-audit")]
+        /// Directory for audit log JSON files (e.g. data/audit)
+        #[arg(long, default_value = "data/audit")]
         audit_dir: String,
         /// Dry run: build prompts and show token estimates without calling LLM
         #[arg(long)]

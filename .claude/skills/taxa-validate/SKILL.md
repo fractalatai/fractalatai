@@ -41,7 +41,7 @@ Laws with **0 targets** are skipped — no API calls needed.
 fractalaw taxa validate --pg postgres://... --laws UK_uksi_2015_627
 ```
 
-Calls Gemini for each section batch. Writes audit log JSON to `data/llm-audit/<law_name>.json` but does NOT write corrections back to the store.
+Calls Gemini for each section batch. Writes audit log JSON to `data/audit/<law_name>.json` but does NOT write corrections back to the store.
 
 ### 3. Execute with apply: write corrections back
 
@@ -59,7 +59,7 @@ The validate command uses **targeted section-based** validation (schema_version 
 2. **Group by section**: targets are batched with their section siblings for context
 3. **Send to Gemini 2.5 Flash**: each section batch gets a structured prompt asking for DRRP classification
 4. **Compare**: LLM response compared against existing regex/classifier result
-5. **Audit log**: all results (including no-ops) written to `data/llm-audit/`
+5. **Audit log**: all results (including no-ops) written to `data/audit/`
 6. **Apply** (optional): corrections written to store as `extraction_method = "agentic"`
 
 ## Checking Results
@@ -68,10 +68,10 @@ The validate command uses **targeted section-based** validation (schema_version 
 
 ```bash
 # List recent audit logs
-ls -lt data/llm-audit/ | head 10
+ls -lt data/audit/ | head 10
 
 # Check a specific law's results
-cat data/llm-audit/UK_uksi_2015_627.json | python3 -m json.tool
+cat data/audit/UK_uksi_2015_627.json | python3 -m json.tool
 ```
 
 ### Audit log schema (v2, section_targeted)
@@ -100,7 +100,7 @@ cat data/llm-audit/UK_uksi_2015_627.json | python3 -m json.tool
 
 ```bash
 # Count corrections across all validated laws
-for f in data/llm-audit/*.json; do
+for f in data/audit/*.json; do
   law=$(basename "$f" .json)
   corr=$(python3 -c "import json; print(json.load(open('$f'))['corrections_count'])")
   [ "$corr" -gt 0 ] && echo "$law: $corr corrections"
@@ -109,8 +109,8 @@ done
 # Total corrections
 python3 -c "
 import json, glob
-total = sum(json.load(open(f))['corrections_count'] for f in glob.glob('data/llm-audit/*.json'))
-laws = len(glob.glob('data/llm-audit/*.json'))
+total = sum(json.load(open(f))['corrections_count'] for f in glob.glob('data/audit/*.json'))
+laws = len(glob.glob('data/audit/*.json'))
 print(f'{total} corrections across {laws} validated laws')
 "
 ```
@@ -140,6 +140,6 @@ PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -c "
 
 - **Never validate gold benchmark laws with --force parse first** — this overwrites agentic-tier with regex
 - Audit logs accumulate — each run overwrites the log for that law
-- The `--audit-dir` flag changes the output directory (default: `data/llm-audit`)
+- The `--audit-dir` flag changes the output directory (default: `data/audit`)
 - `integrity_hash` in the audit log can verify the result wasn't tampered with
 - Corrections with `delta: "drrp_override"` mean the LLM disagreed with regex/classifier

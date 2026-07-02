@@ -112,7 +112,7 @@ PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -c "SEL
 If LanceDB has grown large due to merge_insert fragment bloat, compact first to reduce backup size:
 
 ```bash
-/usr/bin/python3 scripts/compact_lance.py
+/usr/bin/python3 scripts/maintenance/compact_lance.py
 ```
 
 ## Restore

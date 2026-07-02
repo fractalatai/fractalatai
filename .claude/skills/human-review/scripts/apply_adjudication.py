@@ -6,7 +6,7 @@ with extraction_method="adjudicated", and appends to drrp_history.
 
 Usage:
     /usr/bin/python3 .claude/skills/human-review/scripts/apply_adjudication.py \
-        --adjudication data/llm-audit/UK_uksi_2002_2788_adjudicated.json
+        --adjudication data/audit/UK_uksi_2002_2788_adjudicated.json
 """
 
 import argparse

@@ -48,7 +48,7 @@ source ~/.bashrc && GEMINI_API_KEY="$GEMINI_API_KEY" \
 1. **Report** — generate markdown table of all DRRP provisions for a law
 2. **Human review** — read the report, identify provisions that look wrong
 3. **QA with write-back** — run Gemini QA on the full law (or flagged provisions) with `--write-back`
-4. **Compact** — ALWAYS compact LanceDB after write-back batches. Each correction creates fragments that bloat the table (8 GB+ from 120 corrections). Run: `/usr/bin/python3 scripts/compact_lance_no_backup.py`
+4. **Compact** — ALWAYS compact LanceDB after write-back batches. Each correction creates fragments that bloat the table (8 GB+ from 120 corrections). Run: `/usr/bin/python3 scripts/maintenance/compact_lance_no_backup.py`
 5. **Re-report** — verify corrections landed
 
 **WARNING**: QA write-back creates ~70 MB of LanceDB fragments per 100 corrections. A batch of 120 corrections can bloat the table from 450 MB to 8+ GB. Always compact after write-back to prevent disk full.

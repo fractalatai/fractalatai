@@ -50,7 +50,7 @@ def main():
     parser.add_argument("--law", help="Law name to review")
     parser.add_argument("--all", action="store_true", help="List all pending audit logs")
     parser.add_argument(
-        "--audit-dir", default="data/llm-audit", help="Directory with audit JSON files"
+        "--audit-dir", default="data/audit", help="Directory with audit JSON files"
     )
     args = parser.parse_args()
 

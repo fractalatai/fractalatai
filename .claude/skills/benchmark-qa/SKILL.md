@@ -22,10 +22,10 @@ Comparison is a simple SQL JOIN — no JSONB parsing, no Python extraction.
 
 ```bash
 # Full benchmark report — per-tier accuracy + disagreement analysis
-/usr/bin/python3 scripts/benchmark_report.py
+/usr/bin/python3 scripts/benchmarks/benchmark_report.py
 
 # Filter by actor category
-/usr/bin/python3 scripts/benchmark_report.py --category Gvt
+/usr/bin/python3 scripts/benchmarks/benchmark_report.py --category Gvt
 ```
 
 ## What It Reports

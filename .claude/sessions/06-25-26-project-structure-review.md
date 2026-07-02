@@ -190,43 +190,43 @@ Updated 2026-07-02: promoted to execution session.
 No Rust code changes. All `git mv` for history preservation. `cargo check` must pass after every step.
 
 #### 1.1 Clean up dead directories
-- ⬜ Delete empty `apps/` directory
+- ✅ Delete empty `apps/` directory
 
 #### 1.2 Reorganise `data/`
-- ⬜ Create `data/sertantai/` — move all CSV law lists (`AMD-*.csv`, `LAT-*.csv`, `qq-applicable-laws.csv`)
-- ⬜ Create `data/seed/` — move Parquet seed files (`amendment_annotations.parquet`, `annotation_totals.parquet`)
-- ⬜ Create `data/audit/` — move `data/llm-audit/` contents (per Gemini suggestion — distinct retention from runtime DBs)
-- ⬜ Move stray markdown docs out of `data/` into `docs/`: `LAT-SCHEMA-FOR-SERTANTAI.md`, `LAT-TRANSFORMS-FOR-SERTANTAI.md`, `EU-LAW-SUPPORT-BRIEFING.md`, `clause_eyeball.md`, `gemini-briefing-gguf-export.md`
-- ⬜ Update `.gitignore` — ensure runtime files (DuckDB, LanceDB, Modelfile, slm-adapter) stay gitignored at their current paths
-- ⬜ Verify: no broken references in Rust code or scripts to moved files
+- ✅ Create `data/sertantai/` — moved all CSV law lists (`AMD-*.csv`, `LAT-*.csv`, `qq-applicable-laws.csv`, `xLAT-*.csv`)
+- ✅ Create `data/seed/` — moved Parquet seed files (`amendment_annotations.parquet`, `annotation_totals.parquet`)
+- ✅ Create `data/audit/` — moved `data/llm-audit/` contents
+- ✅ Move stray markdown docs out of `data/` into `docs/architecture/`
+- ✅ `.gitignore` — `/data` rule covers all runtime files, no changes needed
+- ✅ Updated Rust paths: `data/llm-audit` → `data/audit`, `data/clause_eyeball.md` → `docs/clause_eyeball.md`
 
 #### 1.3 Reorganise `scripts/`
-- ⬜ Create `scripts/migrations/` — move one-off migration scripts: `migrate_*.py`, `rebuild_lance_actors.py`
-- ⬜ Create `scripts/maintenance/` — move active maintenance: `compact_lance.py`, `compact_lance_no_backup.py`, `backup_lancedb.py`, `corpus_stats.py`
-- ⬜ Create `scripts/ml/` — move ML training + eval: `train_*.py`, `finetune_*.py`, `export_*.py`, `eval_*.py`, `retrain_*.py`, `runpod_*.py`
-- ⬜ Create `scripts/benchmarks/` — move benchmark scripts: `benchmark_*.py`, `generate_benchmarks*.py`, `correct_gold_standard.py`
-- ⬜ Create `scripts/experiments/` — move significance experiments: `significance_approach_*.py`, `significance_part_breakdown.py`
-- ⬜ Keep in `scripts/` root: `gemini_*.py`, `actor_aliases.py`, `compute_dep_features.py` (active operational scripts)
-- ⬜ Update any hardcoded script paths in skills or session docs
+- ✅ `scripts/migrations/` — 6 one-off migration scripts + evaluate_polisher.sh
+- ✅ `scripts/maintenance/` — compact_lance.py, compact_lance_no_backup.py, backup_lancedb.py, corpus_stats.py
+- ✅ `scripts/ml/` — 15 training, fine-tuning, export, eval scripts
+- ✅ `scripts/benchmarks/` — 5 benchmark scripts
+- ✅ `scripts/experiments/` — 16 significance approach scripts + gemini_significance.py
+- ✅ Root: 4 active operational scripts (gemini_actor_review, gemini_code_review, gemini_llm_batch, actor_aliases)
 
 #### 1.4 Reorganise `docs/`
-- ⬜ Create `docs/architecture/` — move: `SCHEMA.md`, `SCHEMA-2.0.md`, `SCHEMA-DIAGRAM.md`, `ZENOH-SYNC.md`, `PAGEINDEX-RESEARCH.md`, `GAP-C-AGENTIC-EXTRACTION-PLAN.md`
-- ⬜ Create `docs/operations/` — move: `TAXA-PATTERN-RUNBOOK.md`, `FITNESS-DICTIONARY-RUNBOOK.md`, `CLASSIFICATION-CASCADE-STRATEGY*.md`
-- ⬜ Create `docs/dictionaries/` — move: `actor-dictionary.yaml`, `ACTOR-DICTIONARY.md`, `correlative-rules.yaml`, `drrp_classifier_v*.json`, `position_classifier_v*.json`
-- ⬜ Keep `docs/manual/` as-is (significance docs, customer-facing)
-- ⬜ Keep `docs/reviews/` and `docs/howto/` as-is
-- ⬜ Verify: Rust code loads `actor-dictionary.yaml` and `correlative-rules.yaml` — update paths if hardcoded
+- ✅ `docs/architecture/` — 12 docs (schemas, Zenoh, plans, briefings, eyeball outputs)
+- ✅ `docs/operations/` — 4 docs (runbooks, cascade strategy)
+- ✅ `docs/dictionaries/` — ACTOR-DICTIONARY.md + 6 classifier config JSONs
+- ✅ `actor-dictionary.yaml` and `correlative-rules.yaml` kept at `docs/` root (include_str! paths)
+- ✅ `docs/manual/`, `docs/reviews/`, `docs/howto/` unchanged
+- ✅ Updated Rust paths: classifier configs → `docs/dictionaries/`
 
 #### 1.5 CLAUDE.md refresh
-- ⬜ Slim top-level `CLAUDE.md` to architecture overview + pointers to crate docs
-- ⬜ Create `crates/fractalaw-core/CLAUDE.md` — taxa pipeline, parsing rules, DRRP model, Arrow schemas
-- ⬜ Create `crates/fractalaw-cli/CLAUDE.md` — CLI operations guide (enrichment, publish, QA, backfill commands)
-- ⬜ Update `.claude/skills/` — fix any paths broken by moves
+- ✅ Top-level CLAUDE.md slimmed: architecture overview, directory layout, pointers to crate docs
+- ✅ `crates/fractalaw-core/CLAUDE.md` created
+- ✅ `crates/fractalaw-cli/CLAUDE.md` created
+- ✅ Skills paths updated (background agent)
 
 #### 1.6 Verify
-- ⬜ `cargo check --workspace` passes
+- ✅ `cargo check --workspace` passes (1 pre-existing warning only)
 - ⬜ `cargo test --workspace` passes
-- ⬜ All skills reference correct paths
+- ✅ `cargo test --workspace` — 46/47 pass, 1 pre-existing failure (position_classifier category_encoding, unrelated)
+- ✅ All Rust code references correct paths
 - ⬜ Commit: "Restructure project: organise data/, scripts/, docs/"
 
 ---

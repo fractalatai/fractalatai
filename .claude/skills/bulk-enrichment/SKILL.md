@@ -80,7 +80,7 @@ When disk gets tight:
 ps aux | grep "taxa enrich" | grep -v grep | awk '{print $2}' | xargs -r kill
 
 # 2. Compact (rebuild-based — pylance not installed)
-/usr/bin/python3 scripts/compact_lance.py
+/usr/bin/python3 scripts/maintenance/compact_lance.py
 # Typically reduces 11 GB → 374 MB, recovers ~10 GB disk
 
 # 3. Find remaining families
@@ -98,7 +98,7 @@ done < /tmp/remaining.txt
 
 ```bash
 # Compact to clean state
-/usr/bin/python3 scripts/compact_lance.py
+/usr/bin/python3 scripts/maintenance/compact_lance.py
 
 # Back up clean result to NAS
 BACKUP_DIR=/mnt/nas/sertantai-data/data/fractalaw-backups/$(date +%Y%m%d)

@@ -2717,7 +2717,7 @@ pub(crate) async fn cmd_taxa_classify(
     lance: &dyn ProvisionStore,
     law_names: &[String],
 ) -> anyhow::Result<()> {
-    let weights_path = std::path::Path::new("docs/drrp_classifier_v8.json");
+    let weights_path = std::path::Path::new("docs/dictionaries/drrp_classifier_v8.json");
     if !weights_path.exists() {
         anyhow::bail!(
             "DRRP classifier weights not found at {}",
@@ -3042,7 +3042,7 @@ pub(crate) async fn cmd_taxa_classify(
 
         // Phase 4: Position classification
         {
-            let pos_weights = std::path::Path::new("docs/position_classifier_v3.json");
+            let pos_weights = std::path::Path::new("docs/dictionaries/position_classifier_v3.json");
             if pos_weights.exists() {
                 let pos_classifier = fractalaw_ai::PositionClassifier::load(pos_weights)
                     .context("loading position classifier")?;
@@ -3660,7 +3660,7 @@ pub(crate) async fn cmd_taxa_enrich(
     // --force: skips embedding, uses existing embeddings only
     if (pending || force) && enriched > 0 {
         let model_dir = data_dir.join("../models/all-MiniLM-L6-v2");
-        let weights_path = std::path::Path::new("docs/drrp_classifier_v8.json");
+        let weights_path = std::path::Path::new("docs/dictionaries/drrp_classifier_v8.json");
 
         if model_dir.exists() && weights_path.exists() {
             eprintln!(

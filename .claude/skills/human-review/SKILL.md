@@ -6,7 +6,7 @@ description: Claude-mediated human adjudication of LLM validation corrections â€
 
 ## When This Applies
 
-After running `taxa validate` on one or more laws. The validate command produces audit log JSON files in `data/llm-audit/` with corrections proposed by the LLM. This skill steps through each correction with the human, captures their accept/reject decision, writes accepted corrections to LanceDB with `extraction_method="adjudicated"`, and logs the full adjudication trail.
+After running `taxa validate` on one or more laws. The validate command produces audit log JSON files in `data/audit/` with corrections proposed by the LLM. This skill steps through each correction with the human, captures their accept/reject decision, writes accepted corrections to LanceDB with `extraction_method="adjudicated"`, and logs the full adjudication trail.
 
 **Trigger**: User says "review corrections", "adjudicate", "human review", or references the LLM audit log.
 
@@ -51,13 +51,13 @@ For each accepted correction:
 
 ### Step 4: Write adjudication trail
 
-Write a JSON file to `data/llm-audit/{law_name}_adjudicated.json`:
+Write a JSON file to `data/audit/{law_name}_adjudicated.json`:
 
 ```json
 {
   "schema_version": 1,
   "law_name": "UK_uksi_2002_2788",
-  "source_audit": "data/llm-audit/UK_uksi_2002_2788.json",
+  "source_audit": "data/audit/UK_uksi_2002_2788.json",
   "adjudicator": "human via Claude",
   "timestamp": "2026-06-23T...",
   "decisions": [

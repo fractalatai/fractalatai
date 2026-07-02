@@ -248,7 +248,7 @@ impl LanceStore {
         if schema.field_with_name("drrp_history").is_err() {
             tracing::warn!(
                 "drrp_history column missing from legislation_text — \
-                 run scripts/migrate_drrp_history.py to add it"
+                 run scripts/migrations/migrate_drrp_history.py to add it"
             );
         }
 

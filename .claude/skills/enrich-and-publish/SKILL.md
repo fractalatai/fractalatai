@@ -46,7 +46,7 @@ cargo run -p fractalaw-cli -- taxa enrich --gap-c --force --skip-recent [--famil
 source ~/.bashrc && GEMINI_API_KEY="$GEMINI_API_KEY" cargo run -p fractalaw-cli -- ...
 ```
 
-**Disk warning:** Enrichment creates LanceDB fragment bloat via merge_insert. Monitor disk with `du -sh data/lancedb/` and `df -h /var/home`. If LanceDB exceeds 8 GB or free disk drops below 3.5 GB, kill the process, compact with `scripts/compact_lance.py`, and resume. See `bulk-enrichment` skill for full procedure.
+**Disk warning:** Enrichment creates LanceDB fragment bloat via merge_insert. Monitor disk with `du -sh data/lancedb/` and `df -h /var/home`. If LanceDB exceeds 8 GB or free disk drops below 3.5 GB, kill the process, compact with `scripts/maintenance/compact_lance.py`, and resume. See `bulk-enrichment` skill for full procedure.
 
 ### Step 3: Offer publish
 
