@@ -1,4 +1,70 @@
-# Gap C Agentic Extraction — Design Document
+---
+session: "Gap C Agentic Extraction — Design Document"
+status: closed
+opened: 2026-06-05
+closed: 2026-06-06
+outcome: success
+
+summary: >
+  Design document for resolving ~3,275 Gap C provisions (implicit duty holders)
+  via a four-tier pipeline. Superseded the fine-tuned classifier approach after
+  identifying Gap C as a reasoning problem with document context, not a classification
+  problem. Two rounds of Gemini + ChatGPT review. Drove the entire cascade pipeline.
+
+decisions:
+  - what: "Gap C is a reasoning problem with document context, not a classification problem"
+    why: "The information needed to resolve the duty holder is not in the provision text — it's in surrounding provisions. A classifier seeing 'record the assessment' in isolation cannot know the duty holder."
+    result: "Four-tier pipeline: regex → parent inheritance → cross-ref → LLM"
+  - what: "Track C2/C4/C6 sub-types separately from day one"
+    why: "ChatGPT review insight — these are not one problem. C2 is deterministic, C4 needs citation infrastructure, C6 needs LLM. Different success rates expected."
+    result: "C2 ~80-90%, C4 ~60-70%, C6 ~40-50% expected resolution"
+  - what: "Deepest-first parent walk for Tier 1 inheritance"
+    why: "Intermediate children may override root actors. s.12(3)(a) should inherit 'tenant' from s.12(3), not 'employer' from s.12."
+    result: "Nearest ancestor with actor wins, not root"
+  - what: "Unified actors struct column (not flat governed_actors/government_actors)"
+    why: "Flat columns lose the edges between actors and their roles. The struct is naturally extensible as a per-provision RACI model."
+    result: "List<Struct(label, role, recipient_type)> — holder, recipient, beneficiary, mentioned"
+  - what: "Externally-derived confidence (not LLM self-reported)"
+    why: "Gemini review — LLM confidence scores are unreliable. Use signal strength (how many tiers contributed, how deep the context)."
+    result: "confidence_source enum with per-tier signals"
+  - what: "Supersede the ModernBERT fine-tuning approach"
+    why: "A classifier cannot resolve the duty holder when the information is not in the provision text"
+    result: "Fine-tuned classifier research (gap-c-ai-research) abandoned in favour of context assembly + LLM"
+
+metrics:
+  gap_c_provisions: 3275
+  gap_c_pct_of_fn: 78
+  c2_parent_inheritance: 1500
+  c4_cross_reference: 800
+  c6_truly_actorless: 900
+  gemini_reviews: 2
+  chatgpt_reviews: 2
+
+lessons:
+  - title: "A provision without an actor is not ambiguous — a human reading in context always knows"
+    detail: "The information exists in LanceDB. The problem is assembling the right context window, not classifying the provision in isolation."
+    tag: methodology
+  - title: "Most Gap C provisions resolve early — the LLM is reserved for the genuinely ambiguous minority"
+    detail: "Tier 1 (parent inheritance) handles ~1,500 provisions deterministically. Tier 2 (cross-ref) handles ~800. Only ~900 truly need LLM reasoning."
+    tag: architecture
+  - title: "Track sub-types separately or you'll measure aggregate accuracy that hides failures"
+    detail: "ChatGPT review caught this — C2 at 90% and C6 at 40% average to 65%, but the approaches are completely different. Separate tracking reveals which tier needs work."
+    tag: methodology
+
+artifacts:
+  - docs/architecture/GAP-C-AGENTIC-EXTRACTION-PLAN.md
+
+depends_on:
+  - 04-15-26-gap-c-ai-research.md
+  - 04-14-26-ohs-occupational-safety.md
+
+enables:
+  - 06-05-26-gap-c-tiered-resolution.md
+  - 06-05-26-gap-c-phase-1a.md
+  - 06-08-26-cascade-v03-implementation.md
+---
+
+# Gap C Agentic Extraction — Design Document (CLOSED)
 
 **Status**: Draft v0.4 — incorporates Gemini + ChatGPT reviews (two rounds each)
 **Date**: 2026-06-05
