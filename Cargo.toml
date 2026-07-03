@@ -14,7 +14,7 @@ members = [
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/fractalaw/fractalaw"
+repository = "https://github.com/fractalatai/fractalatai"
 
 [workspace.dependencies]
 # Arrow ecosystem (pure Rust)
