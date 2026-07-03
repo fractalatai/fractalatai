@@ -428,3 +428,58 @@ When Gap A is near zero, remaining recall gap is Gap C (passive voice, no actor)
 | `crates/fractalaw-store/src/lance.rs` | `query_legislation_text()`, `update_taxa()` |
 | `.claude/skills/lancedb-validation/SKILL.md` | LanceDB query patterns and pyarrow recipes |
 | `.claude/skills/actors-boundary-analysis/SKILL.md` | Gap B: actor boundary matching failures |
+
+## Fitness Dictionary Expansion
+
+When `taxa audit-fitness` shows low tagged% or vocabulary gaps, expand the p-dimension dictionaries:
+
+### Audit
+
+```bash
+fractalaw taxa audit-fitness --family "FAMILY_NAME"
+fractalaw taxa audit-fitness --family "FAMILY_NAME" --limit 0  # show all gaps
+```
+
+Reports: coverage by family, gap provisions (polarity but zero tags), candidate terms (n-gram frequency), dictionary utilisation.
+
+### Adding entries
+
+**Core dictionaries** (always applied) — edit the relevant `*_DICT` static in `crates/fractalaw-core/src/taxa/fitness.rs`:
+
+```rust
+static PERSON_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("new\\s+term\\s+pattern", "canonical term"),
+    ])
+});
+```
+
+**Family specialist dictionaries** — add to existing family dict or create new:
+
+```rust
+static FOOD_PERSON_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("food\\s+business\\s+operator", "food business operator"),
+    ])
+});
+```
+
+Register in `specialist_dicts_for()`:
+
+```rust
+fn specialist_dicts_for(family: &str) -> Vec<(PDimension, &'static [DictEntry])> {
+    if family.starts_with("OH&S") {
+        vec![/* ... */]
+    } else if family.starts_with("FOOD") {
+        vec![(PDimension::Person, &FOOD_PERSON_DICT)]
+    } else {
+        vec![]
+    }
+}
+```
+
+### Regex tips
+
+- Use `\b` word boundaries, `\s+` for spaces, `(?:s)?` for plurals
+- Compound terms first (longer before shorter)
+- Test with family: `extract(text, Some("FAMILY"))` and without: `extract(text, None)`
