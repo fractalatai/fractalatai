@@ -11,7 +11,7 @@ Classes: active / counterparty / beneficiary / mentioned
 
 Usage:
     /usr/bin/python3 scripts/train_position_classifier.py
-    /usr/bin/python3 scripts/train_position_classifier.py --output docs/position_classifier_v2.json
+    /usr/bin/python3 scripts/ml/train_position_classifier.py --output crates/fractalaw-cli/config/position_classifier_v4.json
 """
 
 import argparse
@@ -264,7 +264,7 @@ def train(X, y, output_path):
 
 def main():
     parser = argparse.ArgumentParser(description="Train position classifier v2")
-    parser.add_argument("--output", default="docs/position_classifier_v2.json")
+    parser.add_argument("--output", default="crates/fractalaw-cli/config/position_classifier_v3.json")
     args = parser.parse_args()
 
     X, y = load_training_data()

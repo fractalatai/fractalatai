@@ -28,7 +28,7 @@ import numpy as np
 import pyarrow.parquet as pq
 
 BENCHMARK_DIR = "/mnt/nas/sertantai-data/data/fractalaw-benchmarks"
-WEIGHTS_PATH = "docs/position_classifier_v1.json"
+WEIGHTS_PATH = "crates/fractalaw-cli/config/position_classifier_v3.json"
 
 # Must match Rust: position_classifier.rs CATEGORIES
 CATEGORIES = ["Org", "Ind", "Gvt", "SC", "Spc", "EU", "Svc", "Public", "Offshore", "other"]

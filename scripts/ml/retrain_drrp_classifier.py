@@ -7,7 +7,7 @@ the v6 classifier lacks, causing over-prediction of DRRP.
 
 Usage:
     /usr/bin/python3 scripts/retrain_drrp_classifier.py
-    /usr/bin/python3 scripts/retrain_drrp_classifier.py --output docs/drrp_classifier_v7.json
+    /usr/bin/python3 scripts/ml/retrain_drrp_classifier.py --output crates/fractalaw-cli/config/drrp_classifier_v9.json
 """
 
 import argparse
@@ -126,7 +126,7 @@ def main():
     parser = argparse.ArgumentParser(description="Retrain DRRP classifier")
     parser.add_argument(
         "--output",
-        default="docs/drrp_classifier_v7.json",
+        default="crates/fractalaw-cli/config/drrp_classifier_v8.json",
         help="Output weights path",
     )
     args = parser.parse_args()
