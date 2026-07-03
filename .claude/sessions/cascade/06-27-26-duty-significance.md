@@ -22,7 +22,7 @@ decisions:
     why: Gemini review found 1% HIGH — structural metadata, not semantic. SLM adds no value here.
     result: v2.1 combined weighted scoring (section number + depth + section_type) with percentile thresholds
   - what: Strength refined — SFARP-qualified → MEDIUM, absolute unqualified → HIGH
-    why: "shall ensure" is standard legislative drafting (63% HIGH was meaningless). HIGH reserved for truly absolute duties.
+    why: "\"shall ensure\" is standard legislative drafting (63% HIGH was meaningless). HIGH reserved for truly absolute duties."
     result: Training data improved to 39% HIGH, but SLM still predicts 71% HIGH (distillation bias — deferred)
   - what: Scope split into duty_bearer and protected_class sub-dimensions
     why: AND condition for single scope too strict (5% HIGH). Both matter independently.

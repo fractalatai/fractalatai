@@ -22,7 +22,7 @@ decisions:
 
   - what: SLM classifies DRRP as well as position in single call
     why: SLM DRRP 92.5% vs regex 87.7%. One inference call replaces both regex DRRP and position classification.
-    result: Dual output {"drrp": "...", "position": "..."} with confidence score
+    result: "Dual output {\"drrp\": \"...\", \"position\": \"...\"} with confidence score"
 
   - what: DRRP and position are independent classifications
     why: Gold benchmarks show none+active (56 actors — offence provisions) and Obligation+mentioned (302 actors). Neither derives from the other.
@@ -51,7 +51,7 @@ lessons:
     tag: methodology
 
   - title: DRRP and position are independent — offence provisions prove it
-    detail: "A person who contravenes... is guilty" has drrp=none but position=active. The actor is active in the offence consequence but no new duty is created. Gold labelling is correct — the provision is a consequence, not an obligation.
+    detail: "\"A person who contravenes... is guilty\" has drrp=none but position=active. The actor is active in the offence consequence but no new duty is created. Gold labelling is correct — the provision is a consequence, not an obligation."
     tag: data
 
   - title: Clearing and re-running SLM is cheap enough to not worry about

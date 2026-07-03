@@ -31,7 +31,7 @@ metrics:
 
 lessons:
   - title: Define the base case before building pipeline stats
-    detail: "42% classifier coverage" was meaningless because the denominator included provisions that should never have been classified. Base case defines the denominator. All coverage stats are relative to it.
+    detail: "\"42% classifier coverage\" was meaningless because the denominator included provisions that should never have been classified. Base case defines the denominator. All coverage stats are relative to it."
     tag: methodology
 
   - title: Scattered filtering is invisible filtering
