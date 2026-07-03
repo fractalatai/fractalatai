@@ -199,7 +199,7 @@ enum TaxaAction {
         #[arg(long)]
         laws: String,
         /// Output file path
-        #[arg(long, default_value = "./docs/clause_eyeball.md")]
+        #[arg(long, default_value = "./data/clause_eyeball.md")]
         output: PathBuf,
         /// Maximum text sections per law
         #[arg(long, default_value_t = 200)]
