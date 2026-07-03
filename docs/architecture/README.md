@@ -32,12 +32,19 @@ The script queries `information_schema.columns` and `pg_indexes` for Postgres, a
 
 The original hand-written schema documents (SCHEMA.md v0.8, SCHEMA-DIAGRAM.md v0.6, LAT-SCHEMA-FOR-SERTANTAI.md, LAT-TRANSFORMS-FOR-SERTANTAI.md) are archived in `.claude/sessions/archive/`. They contain design rationale and migration history that the auto-generated reference does not capture.
 
+## Zenoh Protocol
+
+The Zenoh contract between fractalaw and sertantai is documented in **sertantai's repo**:
+
+- **Spec**: `sertantai-legal/docs/ZENOH-SPEC.md` (v2.0) — the single source of truth for channels, payloads, Arrow types
+- **Key expressions**: `crates/fractalaw-sync/src/zenoh_sync.rs::keys` module — all key builders with examples in doc comments
+
+Do not duplicate the spec here — it will go stale. If you need to know the wire format, read ZENOH-SPEC.md in sertantai or the `keys` module in the Rust code.
+
+Historical Zenoh design docs (ZENOH-SYNC.md, LAT wire format, deletion signal, subscriber handoff) are archived in `.claude/sessions/archive/`.
+
 ## Contents
 
 | File | Description |
 |------|-------------|
 | `SCHEMA-REFERENCE.md` | Auto-generated schema for Postgres + DuckDB tables |
-| `ZENOH-SYNC.md` | Zenoh sync spec — data flow, published schema, CLI reference |
-| `ZENOH-LAT-ARROW-IPC.md` | Arrow IPC wire format for LAT over Zenoh |
-| `ZENOH-LAT-DELETION-SIGNAL.md` | LAT deletion signal specification |
-| `sertantai-zenoh-subscriber.md` | Design handoff for sertantai Zenoh integration |
