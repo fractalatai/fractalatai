@@ -6,7 +6,7 @@ description: Surface missing actors from benchmark or LanceDB QA cycles. Identif
 
 ## When This Applies
 
-After any benchmark run, QA cycle, or enrichment that shows provisions with gold DRRP but empty pipeline `drrp_types`. The cause is often a duty-bearer entity that isn't in `docs/actor-dictionary.yaml`.
+After any benchmark run, QA cycle, or enrichment that shows provisions with gold DRRP but empty pipeline `drrp_types`. The cause is often a duty-bearer entity that isn't in `crates/fractalaw-core/data/actor-dictionary.yaml`.
 
 **Trigger**: User asks to check for missing actors, fix actor drift, expand the dictionary, or investigate why provisions have no DRRP despite having modal verbs.
 
@@ -43,7 +43,7 @@ After any benchmark run, QA cycle, or enrichment that shows provisions with gold
    - Exercises penalty/enforcement/approval powers → government
    - Private company/individual/worker bearing duties → governed
 4. **Decide family gating** — does this entity only appear in one family? Use `families:` field. Appears in 3+ families → core dictionary
-5. **Add to YAML** — edit `docs/actor-dictionary.yaml` with label, type, regex_patterns, triggers
+5. **Add to YAML** — edit `crates/fractalaw-core/data/actor-dictionary.yaml` with label, type, regex_patterns, triggers
 6. **Test** — `cargo test -p fractalaw-core` (the YAML is embedded at compile time)
 7. **Re-benchmark** — measure improvement
 
@@ -63,7 +63,7 @@ After any benchmark run, QA cycle, or enrichment that shows provisions with gold
 - `/usr/bin/python3` (system Python)
 - Dependencies: `lancedb`, `pyarrow`, `pyyaml`
 - LanceDB at `data/lancedb`
-- Actor dictionary at `docs/actor-dictionary.yaml`
+- Actor dictionary at `crates/fractalaw-core/data/actor-dictionary.yaml`
 - Benchmarks at `/mnt/nas/sertantai-data/data/fractalaw-benchmarks/` (optional)
 
 ## Limitations

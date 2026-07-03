@@ -50,7 +50,7 @@ impl DictEntry {
 
 /// Matches LLM natural-language actor names to canonical dictionary labels.
 ///
-/// Loads `docs/actor-dictionary.yaml` — the single source of truth.
+/// Loads `crates/fractalaw-core/data/actor-dictionary.yaml` — the single source of truth.
 /// Two-pass matching: exact trigger → substring containment (longest first).
 pub(crate) struct ActorMatcher {
     entries: Vec<DictEntry>,
@@ -203,9 +203,9 @@ mod tests {
     use super::*;
 
     fn test_matcher() -> ActorMatcher {
-        // CARGO_MANIFEST_DIR points to the crate dir; dictionary is at workspace root
+        // CARGO_MANIFEST_DIR points to the crate dir; dictionary is in fractalaw-core/data
         let manifest = env!("CARGO_MANIFEST_DIR");
-        let dict_path = format!("{manifest}/../../docs/actor-dictionary.yaml");
+        let dict_path = format!("{manifest}/../fractalaw-core/data/actor-dictionary.yaml");
         ActorMatcher::load(&dict_path).expect("actor dictionary must exist for tests")
     }
 

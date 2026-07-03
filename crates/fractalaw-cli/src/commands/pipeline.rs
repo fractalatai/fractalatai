@@ -814,7 +814,7 @@ async fn apply_escalation(
 
             if provider_available {
                 let provider_label = if use_gemini { "Gemini" } else { "Gemma" };
-                let matcher = ActorMatcher::load("docs/actor-dictionary.yaml")
+                let matcher = ActorMatcher::load("crates/fractalaw-core/data/actor-dictionary.yaml")
                     .context("loading actor dictionary for Tier 2")?;
                 let client = reqwest::Client::builder()
                     .timeout(std::time::Duration::from_secs(if use_gemini {
@@ -1077,7 +1077,7 @@ Respond in JSON only:
                 }
             }
 
-            let matcher = ActorMatcher::load("docs/actor-dictionary.yaml")
+            let matcher = ActorMatcher::load("crates/fractalaw-core/data/actor-dictionary.yaml")
                 .context("loading actor dictionary for Tier 3")?;
             let client = reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(30))

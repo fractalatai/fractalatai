@@ -204,7 +204,7 @@ def main():
     tbl = db.open_table("legislation_text")
 
     import yaml
-    with open("docs/actor-dictionary.yaml") as f:
+    with open("crates/fractalaw-core/data/actor-dictionary.yaml") as f:
         lines = [l for l in f if not l.startswith("#")]
         actors_yaml = yaml.safe_load("".join(lines))
     govt_labels = set(a["label"] for a in actors_yaml if a.get("type") == "government")

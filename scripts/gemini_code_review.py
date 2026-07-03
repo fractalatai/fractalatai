@@ -100,7 +100,7 @@ def build_code_context():
     sections.append(f"## main.rs — enrichment pipeline (extracted sections)\n\n```rust\n{main_sections}\n```\n")
 
     # Actor dictionary for reference
-    dict_content = read_file("docs/actor-dictionary.yaml")
+    dict_content = read_file("crates/fractalaw-core/data/actor-dictionary.yaml")
     sections.append(f"## Actor dictionary (YAML)\n\n```yaml\n{dict_content}\n```\n")
 
     return "\n\n".join(sections)

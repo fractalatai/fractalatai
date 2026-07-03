@@ -45,6 +45,6 @@ fractalaw validate                                     # Schema validation
 
 ## Key Paths
 
-- Classifier weights: `docs/dictionaries/drrp_classifier_v8.json`, `docs/dictionaries/position_classifier_v3.json`
-- Actor dictionary: `docs/actor-dictionary.yaml` (also compiled into fractalaw-core)
+- Classifier weights: `config/drrp_classifier_v8.json`, `config/position_classifier_v3.json` (within this crate)
+- Actor dictionary: `crates/fractalaw-core/data/actor-dictionary.yaml` (compiled into fractalaw-core, runtime-loaded here)
 - LLM audit logs: `data/audit/`

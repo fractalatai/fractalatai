@@ -13,7 +13,7 @@ After an LLM (Gemini or Gemma) names actors in natural language, this matcher re
 ```python
 from actor_match import ActorMatcher
 
-matcher = ActorMatcher("docs/actor-dictionary.yaml")
+matcher = ActorMatcher("crates/fractalaw-core/data/actor-dictionary.yaml")
 
 # Match a single name
 label, confidence = matcher.match("enforcing authority")
@@ -30,11 +30,11 @@ category = matcher.category("Org: Employer")
 
 ## How It Works
 
-1. Loads `docs/actor-dictionary.yaml` — the single source of truth
+1. Loads `crates/fractalaw-core/data/actor-dictionary.yaml` — the single source of truth
 2. Pass 1: exact trigger match (order-sensitive, specific before generic)
 3. Pass 2: substring containment (longest trigger first for specificity)
 4. Unmatched → discovery (confidence 0.0)
 
 ## Dictionary location
 
-`docs/actor-dictionary.yaml` — tracked in git, shared with sertantai.
+`crates/fractalaw-core/data/actor-dictionary.yaml` — tracked in git, shared with sertantai.

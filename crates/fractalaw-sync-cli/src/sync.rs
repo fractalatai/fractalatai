@@ -155,7 +155,7 @@ pub(crate) async fn cmd_sync_publish(
         println!(" {peers} peer(s) connected.");
     }
 
-    if let Ok(dict_yaml) = std::fs::read("docs/actor-dictionary.yaml") {
+    if let Ok(dict_yaml) = std::fs::read("crates/fractalaw-core/data/actor-dictionary.yaml") {
         sync.publish_dictionary(&dict_yaml)
             .await
             .map_err(|e| anyhow::anyhow!("failed to publish actor dictionary: {e}"))?;
@@ -332,7 +332,7 @@ pub(crate) async fn cmd_sync_publish_provisions(
         println!(" {peers} peer(s) connected.");
     }
 
-    if let Ok(dict_yaml) = std::fs::read("docs/actor-dictionary.yaml") {
+    if let Ok(dict_yaml) = std::fs::read("crates/fractalaw-core/data/actor-dictionary.yaml") {
         sync.publish_dictionary(&dict_yaml)
             .await
             .map_err(|e| anyhow::anyhow!("failed to publish actor dictionary: {e}"))?;
@@ -452,7 +452,7 @@ pub(crate) async fn cmd_sync_watch(
 
     let timeout = std::time::Duration::from_secs(timeout_secs);
 
-    let _dict_handle = if let Ok(dict_yaml) = std::fs::read("docs/actor-dictionary.yaml") {
+    let _dict_handle = if let Ok(dict_yaml) = std::fs::read("crates/fractalaw-core/data/actor-dictionary.yaml") {
         println!(
             "Serving actor dictionary via queryable ({} bytes)",
             dict_yaml.len()
@@ -464,7 +464,7 @@ pub(crate) async fn cmd_sync_watch(
         )
     } else {
         eprintln!(
-            "Warning: docs/actor-dictionary.yaml not found, dictionary queryable not started"
+            "Warning: crates/fractalaw-core/data/actor-dictionary.yaml not found, dictionary queryable not started"
         );
         None
     };

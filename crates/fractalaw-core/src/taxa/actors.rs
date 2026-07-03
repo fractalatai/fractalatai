@@ -4,7 +4,7 @@
 //! - **Government actors**: Crown, authorities, agencies, ministers, devolved admins, EU institutions
 //! - **Governed actors**: Businesses, individuals, specialists, supply-chain actors
 //!
-//! Actor definitions are loaded from `docs/actor-dictionary.yaml` (embedded at
+//! Actor definitions are loaded from `crates/fractalaw-core/data/actor-dictionary.yaml` (embedded at
 //! compile time) and compiled into regex patterns on first use via `LazyLock`.
 //!
 //! Ported from `Taxa.ActorDefinitions`, `Taxa.ActorLib`, and `Taxa.DutyActor`.
@@ -78,7 +78,7 @@ fn apply_blacklist(text: &str) -> String {
 
 // ── YAML-driven actor dictionary ────────────────────────────────────
 
-/// Raw YAML actor definition (deserialized from docs/actor-dictionary.yaml).
+/// Raw YAML actor definition (deserialized from crates/fractalaw-core/data/actor-dictionary.yaml).
 #[derive(serde::Deserialize)]
 #[allow(dead_code)]
 struct ActorDef {
@@ -113,7 +113,7 @@ struct CompiledDictionary {
 }
 
 /// The YAML file, embedded at compile time.
-static ACTOR_YAML: &str = include_str!("../../../../docs/actor-dictionary.yaml");
+static ACTOR_YAML: &str = include_str!("../../data/actor-dictionary.yaml");
 
 /// The single compiled dictionary, built on first access.
 static DICTIONARY: LazyLock<CompiledDictionary> = LazyLock::new(|| {

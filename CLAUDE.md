@@ -17,13 +17,13 @@ Rust workspace monorepo with 6 crates:
 
 ```
 crates/           # Rust workspace crates
+  fractalaw-core/data/     # Pipeline data compiled into binary (actor-dictionary.yaml, correlative-rules.yaml)
+  fractalaw-cli/config/    # Runtime classifier weights (drrp_classifier_v8.json, position_classifier_v3.json)
 docs/
   architecture/   # Schema docs, Zenoh protocol, design plans
   operations/     # Runbooks, cascade strategy
-  dictionaries/   # Classifier configs, dictionary docs
+  dictionaries/   # Dictionary docs + archived classifier configs
   manual/         # Customer-facing docs (significance methodology etc.)
-  actor-dictionary.yaml    # Actor definitions (compiled into binary via include_str!)
-  correlative-rules.yaml   # Hohfeldian correlative rules (compiled into binary)
 scripts/
   migrations/     # Historical one-off migration scripts
   maintenance/    # Active: compact_lance, backup_lancedb, corpus_stats

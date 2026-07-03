@@ -46,7 +46,7 @@ def load_actor_dictionary():
     """Load known actor labels from the unified YAML dictionary."""
     import yaml
 
-    with open("docs/actor-dictionary.yaml") as f:
+    with open("crates/fractalaw-core/data/actor-dictionary.yaml") as f:
         lines = [l for l in f if not l.startswith("#")]
         actors = yaml.safe_load("".join(lines))
 

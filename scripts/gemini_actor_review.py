@@ -10,7 +10,7 @@ import sys
 # Load the three source files
 with open("crates/fractalaw-core/src/taxa/actors.rs") as f:
     actors_rs = f.read()
-with open("docs/actor-dictionary.yaml") as f:
+with open("crates/fractalaw-core/data/actor-dictionary.yaml") as f:
     actor_yaml = f.read()
 with open("crates/fractalaw-core/src/taxa/duty_patterns.rs") as f:
     duty_patterns = f.read()

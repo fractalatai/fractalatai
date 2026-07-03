@@ -3,7 +3,7 @@
 
 Usage as module:
     from actor_match import ActorMatcher
-    matcher = ActorMatcher("docs/actor-dictionary.yaml")
+    matcher = ActorMatcher("crates/fractalaw-core/data/actor-dictionary.yaml")
     label, conf = matcher.match("employer")  # → ("Org: Employer", 1.0)
 
 Usage as CLI:
@@ -20,7 +20,7 @@ import yaml
 class ActorMatcher:
     """Match LLM actor names to canonical dictionary labels."""
 
-    def __init__(self, dictionary_path: str = "docs/actor-dictionary.yaml"):
+    def __init__(self, dictionary_path: str = "crates/fractalaw-core/data/actor-dictionary.yaml"):
         with open(dictionary_path) as f:
             self.entries = yaml.safe_load(f)
 
@@ -79,7 +79,7 @@ def main():
     )
     parser.add_argument(
         "--dictionary",
-        default="docs/actor-dictionary.yaml",
+        default="crates/fractalaw-core/data/actor-dictionary.yaml",
         help="Path to dictionary YAML",
     )
     args = parser.parse_args()
