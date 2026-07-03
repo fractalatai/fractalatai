@@ -1,4 +1,41 @@
-# Plan: Build DuckDB Ingestion in fractalaw-store (Task 3)
+---
+session: "DuckDB Ingestion Plan (Task 3)"
+status: closed
+opened: 2026-02-17
+closed: 2026-02-17
+outcome: success
+
+summary: >
+  Planning session for Task 3 of Phase 1: implementing DuckDB storage layer in fractalaw-store. Defined DuckStore API surface (open, load, hot path queries, analytical path queries, escape hatch), error handling, and test strategy. All planned work was subsequently implemented in the parent session.
+
+decisions:
+  - what: "DuckStore struct with Connection wrapping in-memory DuckDB"
+    why: "Simple API for loading Parquet and querying via Arrow RecordBatch -- DuckDB handles Parquet natively with read_parquet()"
+    result: "11 tests passing, 32s with real data"
+  - what: "Recursive CTE for multi-hop graph traversal"
+    why: "laws_within_hops needs to traverse the edge table bidirectionally with configurable depth"
+    result: "2-hop traversal of COSHH returns 1,942 reachable laws"
+  - what: "Module named duck.rs not duckdb.rs"
+    why: "mod duckdb shadows the duckdb crate name -- renamed to avoid conflicts"
+    result: "Clean compilation without extern crate workarounds"
+
+lessons:
+  - title: "Module naming must not shadow crate names"
+    detail: "Rust mod duckdb conflicts with the duckdb crate import. Use duck.rs or a crate rename."
+    tag: rust
+
+artifacts:
+  - crates/fractalaw-store/src/duck.rs
+  - crates/fractalaw-store/src/error.rs
+  - crates/fractalaw-store/src/lib.rs
+
+depends_on:
+  - 02-12-26-begin.md
+
+enables: []
+---
+
+# Plan: Build DuckDB Ingestion in fractalaw-store (Task 3) (CLOSED)
 
 ## Context
 

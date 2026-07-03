@@ -1,4 +1,54 @@
-# Session: 2026-02-20 — Phase 2: LanceDB Ingestion and ONNX Embeddings
+---
+session: "Phase 2: LanceDB Ingestion and ONNX Embeddings"
+status: closed
+opened: 2026-02-20
+closed: 2026-02-20
+outcome: success
+
+summary: >
+  Implemented the semantic path: LanceDB ingestion of 97,522 LAT rows, ONNX embedding pipeline using all-MiniLM-L6-v2 (384-dim), and three new CLI commands (text, search, validate). Achieved 100% embedding coverage with cross-store DataFusion queries spanning DuckDB and LanceDB.
+
+decisions:
+  - what: "Direct Parquet read for LanceDB ingestion, not DuckDB bridge"
+    why: "LanceDB natively accepts RecordBatch streams from any Arrow source -- simpler and avoids coupling ingestion to DuckDB"
+    result: "Clean ingestion path; DuckDB is for queries, not ETL"
+  - what: "all-MiniLM-L6-v2 embedding model (384-dim)"
+    why: "Matches schema's FixedSizeList<Float32, 384>, good speed/quality balance, ~22M params, runs on CPU"
+    result: "97,522 rows embedded; L2 norms approximately 1.0; semantic search returns relevant results"
+  - what: "MemTable bridge for FusionStore LanceDB integration"
+    why: "Consistent with existing DuckDB pattern; 97K rows x 28 cols fits in memory (~50MB)"
+    result: "Cross-store JOINs verified; 4-table DataFusion context works"
+
+lessons:
+  - title: "Cross-store join gap reveals data provenance issues"
+    detail: "47 of 452 law_names in legislation_text had no match in the legislation table -- laws present in LAT export but absent from LRT export. Validate reports this as PASS with a note."
+    tag: data-quality
+  - title: "Semantic search needs broader keywords than exact terms"
+    detail: "\"chemical exposure limits\" returns COSHH NI regs because the word COSHH never appears in legislation text -- it is a colloquial abbreviation. Query design must account for formal legislative language."
+    tag: domain
+
+metrics:
+  legislation_text_rows: 97522
+  embedding_dimensions: 384
+  embedding_coverage_pct: 100
+  lance_table_size_mb: 195
+  cross_store_match_rate: "405/452"
+  tests_passing: 83
+
+artifacts:
+  - crates/fractalaw-store/src/lance.rs
+  - crates/fractalaw-ai/src/embedder.rs
+  - crates/fractalaw-cli/src/main.rs
+
+depends_on:
+  - 02-12-26-begin.md
+  - 02-19-26-LAT-schema.md
+
+enables:
+  - 02-20-26-pre-tokenized-text.md
+---
+
+# Session: 2026-02-20 — Phase 2: LanceDB Ingestion and ONNX Embeddings (CLOSED)
 
 ## Context
 

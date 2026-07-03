@@ -1,4 +1,34 @@
-# Plan: Resolve Arrow Version Split
+---
+session: "Resolve Arrow Version Split"
+status: closed
+opened: 2026-02-19
+closed: 2026-02-19
+outcome: success
+
+summary: >
+  Resolved the arrow 56 vs arrow 57 version split caused by duckdb 1.4.4 bundling arrow 56 while the rest of the stack uses arrow 57. Pinned duckdb to git main (commit a2639608) which includes the arrow 57 upgrade, achieving a single arrow version across the entire workspace.
+
+decisions:
+  - what: "Pin duckdb to git main rev a2639608"
+    why: "duckdb-rs main branch already has arrow 57 upgrade (commit 60fcab76) but it has not been released to crates.io yet"
+    result: "Single arrow version (57.3.0) across duckdb, DataFusion 52, LanceDB 0.26, and arrow-flight"
+
+lessons:
+  - title: "Git dependencies are acceptable for unpublished projects"
+    detail: "Pinning to a specific git rev gives reproducible builds. Switch back to crates.io version when duckdb 1.4.5 ships with arrow 57."
+    tag: dependencies
+
+artifacts:
+  - Cargo.toml
+
+depends_on:
+  - 02-12-26-begin.md
+
+enables:
+  - 02-19-26-plan-wire-up-datafusion.md
+---
+
+# Plan: Resolve Arrow Version Split (CLOSED)
 
 ## Context
 

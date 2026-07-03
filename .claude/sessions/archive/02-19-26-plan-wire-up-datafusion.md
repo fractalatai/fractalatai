@@ -1,4 +1,48 @@
-# Plan: Task 5 — DataFusion Unified Query Layer
+---
+session: "DataFusion Unified Query Layer (Task 5)"
+status: closed
+opened: 2026-02-19
+closed: 2026-02-19
+outcome: success
+
+summary: >
+  Planning and implementation of DataFusion as the unified SQL query layer over DuckDB tables. Built a custom DuckTableProvider with projection and limit pushdown that delegates to DuckDB on every scan. Created FusionStore with two UDFs (law_status, edge_type_label) and verified cross-table JOINs.
+
+decisions:
+  - what: "Custom DuckTableProvider delegating to DuckDB per scan"
+    why: "Avoids doubling memory by snapshotting into MemTable; keeps DuckDB as single source of truth"
+    result: "10 DataFusion tests passing (49s with real data); projection + limit pushdown verified"
+  - what: "Mutex<Connection> for Send + Sync on TableProvider"
+    why: "DuckDB Connection wraps RefCell<InnerConnection> -- it is Send but NOT Sync; TableProvider requires both"
+    result: "Each DuckTableProvider gets its own cloned connection via try_clone()"
+  - what: "Feature gate fusion behind both duckdb + datafusion features"
+    why: "FusionStore wraps DuckStore -- needs both backends"
+    result: "Clean feature composition; build with --features duckdb,datafusion or --features full"
+  - what: "Skip filter pushdown for v1"
+    why: "DataFusion applies filters post-scan; adding filter pushdown adds complexity for marginal benefit at current data sizes"
+    result: "Simpler implementation; can be added later if needed"
+
+lessons:
+  - title: "MemorySourceConfig accepts owned batches directly"
+    detail: "No futures or streaming adapter needed -- collect Vec<RecordBatch> synchronously from DuckDB, wrap in MemorySourceConfig, return DataSourceExec. Same pattern as MemTable."
+    tag: rust
+  - title: "Introspect real schema from DuckDB, not canonical schema"
+    detail: "DuckDB infers Parquet types which may differ from the fractalaw-core canonical schema. Using the introspected schema avoids type mismatches."
+    tag: architecture
+
+artifacts:
+  - crates/fractalaw-store/src/fusion.rs
+  - crates/fractalaw-store/src/lib.rs
+  - crates/fractalaw-store/src/error.rs
+
+depends_on:
+  - 02-12-26-begin.md
+  - 02-19-26-arrow-versioning.md
+
+enables: []
+---
+
+# Plan: Task 5 — DataFusion Unified Query Layer (CLOSED)
 
 ## Context
 

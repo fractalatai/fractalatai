@@ -1,4 +1,44 @@
-# Session: 2026-06-03 — Taxa & Fitness on LAT Records
+---
+session: "Taxa & Fitness on LAT Records"
+status: closed
+opened: 2026-06-03
+closed: 2026-06-03
+outcome: success
+
+summary: >
+  Designed and implemented provision-level taxa/fitness publishing from LanceDB to sertantai via Zenoh. Provision-level DRRP data already existed in LanceDB but was never published -- only law-level aggregates went to sertantai. Added publish_provision_taxa() to zenoh_sync, LanceDB query projection for 18 taxa columns, and a --provisions flag on sync publish.
+
+decisions:
+  - what: "Publish provision-level taxa directly from LanceDB, not mirrored through DuckDB"
+    why: "Data already exists in LanceDB with the right columns; mirroring 97K rows into DuckDB just to publish adds complexity for no analytical benefit"
+    result: "Controlled exception to the \"LanceDB never publishes\" rule -- publishing classification metadata only, not raw text or embeddings"
+  - what: "Batch by law for zenoh messages"
+    why: "All provisions for one law as a unit is cleanest for the subscriber; matches existing law-level pattern"
+    result: "One Arrow IPC message per law on topic fractalaw/@{tenant}/taxa/provisions/{law_name}"
+  - what: "Change tracking via taxa_classified_at vs provisions_published_at"
+    why: "Need incremental delta publishing for 97K rows; same pattern as law-level taxa_hash/published_hash"
+    result: "provisions_published_at column added to DuckDB legislation table (field count 99 to 100)"
+
+lessons:
+  - title: "Provision-level data unlocks filtering that law-level aggregates cannot"
+    detail: "Sertantai cannot filter by actor or DRRP type at the provision level with law-level data only. Each provision carrying its own taxa enables queries like \"show duties on employers in this law\"."
+    tag: architecture
+
+artifacts:
+  - crates/fractalaw-sync/src/zenoh_sync.rs
+  - crates/fractalaw-store/src/lance.rs
+  - crates/fractalaw-store/src/duck.rs
+  - crates/fractalaw-core/src/schema.rs
+  - crates/fractalaw-cli/src/main.rs
+
+depends_on:
+  - 02-20-26-phase2-lancedb-embeddings.md
+
+enables:
+  - 06-05-26-eu-retained-law-support.md
+---
+
+# Session: 2026-06-03 — Taxa & Fitness on LAT Records (CLOSED)
 
 ## Context
 

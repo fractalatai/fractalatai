@@ -1,4 +1,53 @@
-# Session: 2026-06-05 — EU Retained Law Support
+---
+session: "EU Retained Law Support"
+status: closed
+opened: 2026-06-05
+closed: 2026-06-05
+outcome: success
+
+summary: >
+  Enabled fractalaw to correctly enrich EU retained laws (Regulations, Directives, Decisions) arriving via Zenoh. Expanded actor dictionaries with 11 EU-specific actors, fixed the APPLICATION_SCOPE classifier for EU structural references, and added EU-specific fitness terms. DRRP extraction rates for focused directives reached 34-49%, on par with UK domestic OH&S laws.
+
+decisions:
+  - what: "Add EU actors to core dictionaries, not family-gated"
+    why: "Terms like Member State, ECHA, Downstream User are unambiguous -- no risk of false positives in UK domestic text"
+    result: "11 new actors; ordering matters (more specific patterns before generic ones to avoid partial matches)"
+  - what: "No changes needed for section_id prefix handling"
+    why: "art. citations flow through the pipeline without problems -- initial concern about pattern-matching was unfounded"
+    result: "EU structural hierarchy (EUTitle/EUChapter) handled without code changes"
+
+lessons:
+  - title: "Actor extraction is the gate for DRRP classification"
+    detail: "Initial REACH test showed only 11.7% DRRP extraction. Root cause was missing EU actors in dictionaries -- no actor match means no DRRP classification. After adding actors, focused directives hit 34-49%."
+    tag: pipeline
+  - title: "Large regulations have inherently lower DRRP density"
+    detail: "REACH at 13.4% DRRP is not a bug -- bulk procedural and definitional content legitimately lacks duty/right/responsibility/power language."
+    tag: domain
+  - title: "Scope classifier must handle diverse structural references"
+    detail: "EU scope provisions use \"provisions\", \"Directive\", plural references (\"Articles 21, 22\"), \"Paragraphs 1 to 5\" -- UK-only regex missed these patterns."
+    tag: pipeline
+
+metrics:
+  new_actors: 11
+  eu_laws_tested: 5
+  reach_drrp_pct: 13.4
+  focused_directive_drrp_pct: "34-49"
+  eu_laws_with_fitness: 27
+  core_tests_passing: 424
+
+artifacts:
+  - crates/fractalaw-core/src/taxa/actors.rs
+  - crates/fractalaw-core/src/taxa/purpose.rs
+  - crates/fractalaw-core/src/taxa/fitness.rs
+  - docs/ACTOR-DICTIONARY.md
+
+depends_on:
+  - 06-03-26-lat-taxa-fitness-columns.md
+
+enables: []
+---
+
+# Session: 2026-06-05 — EU Retained Law Support (CLOSED)
 
 ## Context
 

@@ -1,4 +1,67 @@
-# Session: 2026-02-19 — LAT Schema Revision and Baseline Data
+---
+session: "LAT Schema Revision and Baseline Data"
+status: closed
+opened: 2026-02-19
+closed: 2026-02-19
+outcome: success
+
+summary: >
+  Designed and implemented the three-column identity system for LAT records (section_id as structural citation, sort_key as normalised sort encoding, position as snapshot integer). Rewrote the LAT export pipeline end-to-end, resolving all critical data quality issues including 1.5% section_id collisions and non-generalisable encoding. Validated cross-jurisdiction applicability across 8 legal systems.
+
+decisions:
+  - what: "Three-column identity design: section_id + sort_key + position"
+    why: "Integer position breaks on amendment insertion; structural citation is parliament's canonical permanent address that accommodates insertions without renumbering"
+    result: "97,522 rows with zero duplicate section_ids; sort_key correctly orders inserted sections (s.41, 41A, 41B, 41C, 42)"
+  - what: "Citation-based section_id format: {law_name}:{citation}[{extent}]"
+    why: "Stable across amendments, human-readable, CRDT-friendly, cross-version consistent"
+    result: "Validated against UK, DE, NO, TUR, AUT, DK, FIN, SWE naming conventions -- all use letter-suffix insertion"
+  - what: "Exclude UK_uksi_2016_1091 from baseline"
+    why: "606 duplicate annotation IDs from post-Brexit territorial duplication; parser cannot handle parallel E+W+S and N.I. texts correctly"
+    result: "All annotation ID duplicates eliminated; data quality issue isolated to one law"
+  - what: "Rename heading to heading_group, merge section/article to provision"
+    why: "heading is a group membership label (lead section number), not heading text; section/article are the same data with different labels by instrument type"
+    result: "Schema columns reduced from 8 to 7 hierarchy fields; clearer semantics"
+  - what: "Extent qualifier only for parallel territorial provisions"
+    why: "29 laws have same section number with different text for different regions (e.g., HSWA s.23(4) has E+W, NI, S versions)"
+    result: "719 section-level rows get [extent] qualifier; single-extent sections (common case) have no qualifier"
+
+lessons:
+  - title: "Parliamentary numbering is a solved insertion problem"
+    detail: "Every jurisdiction uses letter-suffix insertion (s.41A, Madde 27/A, paragraph 13h) for amendments. This universal pattern makes structural citations stable permanent identifiers."
+    tag: domain
+  - title: "Sort key normalisation is jurisdiction-specific but structurally identical"
+    detail: "Zero-padded numeric base + letter suffix range works across all surveyed jurisdictions. Only the citation prefix mapping varies."
+    tag: architecture
+  - title: "DuckDB macros can implement sort key normalisation in SQL"
+    detail: "Five helper macros (prov_base, prov_suffix, suffix_val, suffix_len, normalize_provision) replicate the Rust sort_key.rs logic for the export pipeline."
+    tag: data-engineering
+
+metrics:
+  legislation_text_rows: 97522
+  amendment_annotations_rows: 19451
+  laws_covered: 452
+  section_id_duplicates: 0
+  annotation_id_duplicates: 0
+  disambiguation_rows: 2206
+  jurisdictions_validated: 8
+
+artifacts:
+  - crates/fractalaw-core/src/schema.rs
+  - crates/fractalaw-core/src/taxa/sort_key.rs
+  - data/export_lat.sql
+  - data/legislation_text.parquet
+  - data/amendment_annotations.parquet
+  - data/annotation_totals.parquet
+  - docs/SCHEMA.md
+
+depends_on:
+  - 02-12-26-begin.md
+
+enables:
+  - 02-20-26-phase2-lancedb-embeddings.md
+---
+
+# Session: 2026-02-19 — LAT Schema Revision and Baseline Data (CLOSED)
 
 ## Context
 

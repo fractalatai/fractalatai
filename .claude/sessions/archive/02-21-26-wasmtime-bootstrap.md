@@ -1,4 +1,62 @@
-# Session: 2026-02-21 — Phase 3, Session 1: Wasmtime Bootstrap
+---
+session: "Phase 3, Session 1: Wasmtime Bootstrap"
+status: closed
+opened: 2026-02-21
+closed: 2026-02-21
+outcome: success
+
+summary: >
+  Bootstrapped the WASM micro-app runtime in fractalaw-host. Defined the micro-app WIT world with audit/log import and run export, implemented host state with Wasmtime engine (pooling allocator, fuel metering, epoch interruption), built a hello-world guest component, and verified end-to-end execution with audit trail capture. 112 workspace tests pass.
+
+decisions:
+  - what: "Single-package WIT layout (fractal:app@0.1.0)"
+    why: "wasm-tools 1.245 multi-package deps are broken; consolidated all interfaces into one file"
+    result: "Clean bindgen generation; all 8 interfaces in one package"
+  - what: "Per-function async config for wasmtime 41 bindgen"
+    why: "wasmtime 41 changed async config syntax from global to per-function: imports: { default: async }"
+    result: "Host trait methods are async; guest calls are async"
+  - what: "HasSelf<T> linker pattern for simple host state"
+    why: "HostState directly implements the Host trait; no indirection needed"
+    result: "Clean linker setup without wrapper types"
+  - what: "Pooling allocator with 16 instances, 32 memories, 64 MiB per instance"
+    why: "Pre-allocated slots for deterministic resource usage; aligns with fractal-plan architecture"
+    result: "Engine configured with fuel metering + epoch interruption for wall-clock timeout"
+  - what: "Guest targets wasm32-wasip1 via cargo-component"
+    why: "WASI imports are added by the wasip1 adapter; standard Bytecode Alliance workflow"
+    result: "64K .wasm file; host needs wasmtime-wasi for WASI p2 imports"
+
+lessons:
+  - title: "Epoch interruption needs both set_epoch_deadline and a background ticker"
+    detail: "Setting epoch_deadline on the store alone does nothing. A background thread must call engine.increment_epoch() periodically for wall-clock timeout to work."
+    tag: wasmtime
+  - title: "WASI imports are added by the wasip1 adapter"
+    detail: "Guest components built with cargo-component get WASI imports via the wasip1 adapter. The host must provide wasmtime-wasi p2 to satisfy these imports."
+    tag: wasmtime
+  - title: "resource is a WIT keyword"
+    detail: "Use %resource to escape when using 'resource' as a field name in WIT interfaces."
+    tag: wit
+
+metrics:
+  tests_passing: 112
+  guest_wasm_size_kb: 64
+  fuel_budget: 1000000000
+
+artifacts:
+  - wit/world.wit
+  - crates/fractalaw-host/src/lib.rs
+  - crates/fractalaw-host/Cargo.toml
+  - crates/fractalaw-cli/src/main.rs
+  - guests/hello-world/src/lib.rs
+  - guests/hello-world/Cargo.toml
+
+depends_on:
+  - 02-12-26-begin.md
+  - 02-20-26-phase2-lancedb-embeddings.md
+
+enables: []
+---
+
+# Session: 2026-02-21 — Phase 3, Session 1: Wasmtime Bootstrap (CLOSED)
 
 ## Context
 

@@ -1,4 +1,50 @@
-# Session: 2026-02-20 — Issue #3: Pre-tokenized text column in LAT
+---
+session: "Pre-tokenized Text Column in LAT (Issue #3)"
+status: closed
+opened: 2026-02-20
+closed: 2026-02-20
+outcome: success
+
+summary: >
+  Added pre-tokenized text storage to LAT records. Extended the Embedder with tokenize/tokenize_batch methods, added token_ids (List<UInt32>) and tokenizer_model columns to the LAT schema, and integrated tokenization into the embed pipeline. Added CLI tokenize command for inspection.
+
+decisions:
+  - what: "List<UInt32> for token_ids, not FixedSizeList"
+    why: "Token sequences are variable-length (1-256 tokens depending on text length), unlike embeddings which are always 384-dim"
+    result: "Natural Arrow type for variable-length lists; compressed Lance/Parquet handles storage efficiently"
+  - what: "UInt32 not UInt16 for token IDs"
+    why: "Current vocab is 30,522 (fits UInt16) but future models may use 50K+ BPE vocabularies"
+    result: "Forward-compatible with minimal storage overhead"
+  - what: "Include special tokens ([CLS], [SEP]) in stored token_ids"
+    why: "Matches what the ONNX model expects as input so pre-tokenized data can be fed directly without re-adding specials"
+    result: "Zero preprocessing needed when using stored tokens"
+  - what: "Tokenize during embed pipeline, not as separate pass"
+    why: "Tokenizer is already loaded and configured; adding tokenization alongside embedding costs ~0.1ms per text vs ~1ms for ONNX inference"
+    result: "Negligible performance impact; 100% token coverage matches embedding coverage"
+
+lessons:
+  - title: "Pre-tokenization is essentially free alongside embedding"
+    detail: "Tokenize step adds ~0.1ms per text compared to ~1ms for ONNX inference. Trading storage for compute eliminates redundant tokenization on every search/classify call."
+    tag: performance
+
+metrics:
+  schema_fields: 30
+  token_coverage_pct: 100
+  tests_passing: 83
+
+artifacts:
+  - crates/fractalaw-ai/src/embedder.rs
+  - crates/fractalaw-core/src/schema.rs
+  - crates/fractalaw-cli/src/embed.rs
+  - crates/fractalaw-cli/src/main.rs
+
+depends_on:
+  - 02-20-26-phase2-lancedb-embeddings.md
+
+enables: []
+---
+
+# Session: 2026-02-20 — Issue #3: Pre-tokenized Text Column in LAT (CLOSED)
 
 ## Context
 

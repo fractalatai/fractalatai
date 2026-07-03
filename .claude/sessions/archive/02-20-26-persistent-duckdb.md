@@ -1,4 +1,52 @@
-# Session: 2026-02-20 — Issue #9: Eliminate CLI cold-start latency
+---
+session: "Eliminate CLI Cold-Start Latency (Issue #9)"
+status: closed
+opened: 2026-02-20
+closed: 2026-02-20
+outcome: success
+
+summary: >
+  Eliminated CLI cold-start latency by switching from in-memory DuckDB with Parquet cold-load to a persistent .duckdb file. Added lazy DuckDB loading so LanceDB-only commands skip DuckDB entirely. Achieved 5-9x speedup across all commands.
+
+decisions:
+  - what: "Persistent DuckDB file at {data_dir}/fractalaw.duckdb"
+    why: "Every CLI invocation was cold-loading two Parquet files (4.4s) for sub-ms queries"
+    result: "query command dropped from 4.4s to 0.53s (8x); law command from 4.6s to 0.9s (5x)"
+  - what: "Auto-import on first run with explicit import command for refresh"
+    why: "Good UX -- fractalaw stats just works on first run; explicit import exists for schema changes and data refreshes"
+    result: "has_tables() check is cheap metadata-only query; skips load_all() when tables exist"
+  - what: "Lazy DuckDB loading via open_duck() helper"
+    why: "LanceDB-only commands (text, search, embed) were paying the 4s Parquet tax for no reason"
+    result: "LanceDB commands went from ~4.5s to 0.5s even on first run"
+
+lessons:
+  - title: "Persistent DuckDB is trivially easy"
+    detail: "Connection::open(path) instead of Connection::open_in_memory() -- same Connection type, all downstream code works unchanged."
+    tag: performance
+  - title: "Lazy resource loading pays off immediately"
+    detail: "Not all CLI commands need all stores. The open_duck() helper pattern avoids paying for resources a command does not use."
+    tag: architecture
+
+metrics:
+  query_latency_before_s: 4.4
+  query_latency_after_s: 0.53
+  law_latency_before_s: 4.6
+  law_latency_after_s: 0.9
+  text_latency_before_s: 4.5
+  text_latency_after_s: 0.5
+  tests_passing: 77
+
+artifacts:
+  - crates/fractalaw-store/src/duck.rs
+  - crates/fractalaw-cli/src/main.rs
+
+depends_on:
+  - 02-12-26-begin.md
+
+enables: []
+---
+
+# Session: 2026-02-20 — Issue #9: Eliminate CLI Cold-Start Latency (CLOSED)
 
 ## Context
 
