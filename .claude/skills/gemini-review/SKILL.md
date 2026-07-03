@@ -124,6 +124,14 @@ data/code-review/
 ## Troubleshooting
 
 - **403 Permission denied**: API key not set or invalid. Check `echo $GEMINI_API_KEY`.
-- **Truncated response**: Increase `maxOutputTokens`.
+- **Truncated response**: Increase `maxOutputTokens`. Gemini 2.5 Flash is a "thinking" model — without `thinkingConfig`, it may use 400+ tokens thinking and only 100 for actual output. Set `thinkingBudget` to cap thinking and `maxOutputTokens` for headroom.
 - **Generic/unhelpful feedback**: Make the review prompt more specific. Include context about what you're worried about.
 - **Response too long / noisy**: Add "Max N words" or "Bullet points only" to the prompt.
+- **JSON in response has markdown fences**: Gemini sometimes wraps JSON in ` ```json ` fences. Strip with: `text.split("```json")[1].split("```")[0].strip()`.
+
+## Python SDK (for scripts, not this skill)
+
+If calling Gemini from Python scripts (not via this skill's curl approach):
+- **Package**: `google-genai` (the new SDK), NOT `google-generativeai` (deprecated)
+- **Timeout**: Set `config={"http_options": {"timeout": 30_000}}` (milliseconds)
+- The SDK handles thinkingBudget transparently; the REST API needs explicit `generationConfig`
