@@ -236,43 +236,167 @@ No Rust code changes. All `git mv` for history preservation. `cargo check` must 
 Rust code changes. Split the monolithic `fractalaw` binary into focused binaries with minimal deps.
 
 #### 2.1 Analyse command → dependency mapping
-- ⬜ Map each CLI subcommand to its crate dependencies:
-  - `taxa *` (parse, classify, reconcile, infer, enrich, backfill, qa, eyeball, status) → core + store + ai
-  - `sync *` (publish, watch, pull-lat) → core + store + sync
-  - `embed`, `validate` → core + store + ai
-  - `law`, `query`, `stats` → core + store
-  - `host run` → core + host
-- ⬜ Decide binary names: `fractalaw` (taxa + query), `fractalaw-sync`, `fractalaw-host`
+- ✅ Mapped all subcommands to crate deps
+- ✅ Decision: split `fractalaw-sync` (big win — drops ONNX, wasmtime, DataFusion, LanceDB). Skip `fractalaw-host` split (marginal gain — host needs store + ai + wasmtime anyway).
 
 #### 2.2 Extract shared CLI scaffolding
-- ⬜ Factor out common CLI setup (tracing, clap styles, store opening) into a shared module or thin lib in fractalaw-cli
-- ⬜ Keep `commands/` module structure — each binary picks the commands it needs
+- ✅ Shared utilities (open_duck, ZenohArgs, laws_in_family, get_string_value) duplicated into sync-cli — ~150 lines, simpler than extracting a shared crate
 
 #### 2.3 Create `fractalaw-sync` binary
-- ⬜ New `[[bin]]` in `fractalaw-cli/Cargo.toml` or new crate `crates/fractalaw-sync-cli/`
-- ⬜ Dependencies: `core + store(duckdb, pg) + sync(zenoh)` — no ONNX, no wasmtime, no DataFusion
-- ⬜ Commands: `sync publish`, `sync watch`, `sync pull-lat`
-- ⬜ Verify: `cargo build --bin fractalaw-sync` compiles without ONNX/wasmtime
+- ✅ New crate `crates/fractalaw-sync-cli/` with own Cargo.toml
+- ✅ Dependencies: `core + store(duckdb, pg) + sync(zenoh, http)` — no ONNX, no wasmtime, no DataFusion, no LanceDB
+- ✅ Commands: publish, pull, push, pull-lat, watch, crdt
+- ✅ `cargo check` passes, `fractalaw-sync --help` runs correctly
 
-#### 2.4 Create `fractalaw-host` binary
-- ⬜ New `[[bin]]` or crate for WASM host
-- ⬜ Dependencies: `core + host` — no store, no ai, no sync
-- ⬜ Commands: `host run`
-- ⬜ Verify: `cargo build --bin fractalaw-host` compiles without DuckDB/ONNX/Zenoh
+#### 2.4 Skip `fractalaw-host` split
+- ✅ Host binary still needs DuckDB + ONNX + wasmtime (provides data store and AI as host capabilities to WASM guests). Marginal gain from splitting. `run` command stays in main binary.
 
 #### 2.5 Slim the main `fractalaw` binary
-- ⬜ Remove sync and host deps from the main binary's feature set
-- ⬜ Dependencies: `core + store(full) + ai(onnx)` — no Zenoh, no wasmtime
-- ⬜ Commands: `taxa *`, `embed`, `validate`, `law`, `query`, `stats`
-- ⬜ Verify: `cargo build --bin fractalaw` no longer pulls Zenoh or wasmtime
+- ✅ Removed `fractalaw-sync` and `zenoh` deps from fractalaw-cli/Cargo.toml
+- ✅ Removed `Sync` command enum, `ZenohArgs`, `SyncAction`, `CrdtAction` from main.rs
+- ✅ Removed `--customer` zenoh flag from `taxa status`
+- ✅ Excluded `commands/sync.rs` from module tree
+- ✅ `fractalaw --help` confirms no `sync` subcommand
 
-#### 2.6 Measure impact
-- ⬜ Compare build times: full workspace before vs after
-- ⬜ Compare `target/` size after clean build
-- ⬜ Document results in session
+#### 2.6 Verify
+- ✅ `cargo check --workspace` passes (3m31s clean build, 1 pre-existing warning)
+- ✅ `fractalaw-sync --help` runs — 6 commands (publish, pull, push, pull-lat, watch, crdt)
+- ✅ `fractalaw --help` runs — 14 commands (no sync)
+- ⬜ `cargo test --workspace` — deferred (disk space, pre-existing ai test failure unrelated)
+- ⬜ Commit: "Split CLI: fractalaw-sync binary for Zenoh sync commands"
 
-#### 2.7 Verify + commit
-- ⬜ `cargo check --workspace` passes
-- ⬜ `cargo test --workspace` passes
-- ⬜ All three binaries run their `--help` correctly
-- ⬜ Commit: "Split CLI into fractalaw + fractalaw-sync + fractalaw-host"
+---
+
+### Phase 3: Session frontmatter index + archival
+
+Session docs accumulate YAML frontmatter with decisions, metrics, lessons, and dependency graphs. Extract this into a queryable SQLite database so the frontmatter survives archival and is searchable without reading 100+ markdown files.
+
+#### Design
+
+**SQLite at `.claude/sessions/sessions.db`** — regenerable from source markdown at any time.
+
+**Schema** (normalised, not JSON blobs):
+
+```sql
+CREATE TABLE sessions (
+    id TEXT PRIMARY KEY,           -- filename without extension (e.g. '07-01-26-significance-publish')
+    path TEXT NOT NULL,            -- relative path from repo root
+    subdir TEXT,                   -- cascade, store, fitness, etc. or NULL for top-level
+    title TEXT NOT NULL,           -- session field from frontmatter
+    status TEXT NOT NULL,          -- closed, suspended, active, pending
+    outcome TEXT,                  -- success, partial, failed, deferred
+    opened DATE,
+    closed DATE,
+    summary TEXT
+);
+
+CREATE TABLE decisions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL REFERENCES sessions(id),
+    what TEXT NOT NULL,
+    why TEXT,
+    result TEXT
+);
+
+CREATE TABLE lessons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL REFERENCES sessions(id),
+    title TEXT NOT NULL,
+    detail TEXT,
+    tag TEXT                       -- infrastructure, models, methodology, data, architecture, tooling
+);
+
+CREATE TABLE metrics (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL REFERENCES sessions(id),
+    key TEXT NOT NULL,
+    value TEXT NOT NULL             -- JSON string for nested values
+);
+
+CREATE TABLE artifacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL REFERENCES sessions(id),
+    path TEXT NOT NULL
+);
+
+CREATE TABLE dependencies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL REFERENCES sessions(id),
+    direction TEXT NOT NULL,        -- 'depends_on' or 'enables'
+    target TEXT NOT NULL            -- filename or description
+);
+```
+
+**Python script: `scripts/maintenance/session_index.py`**
+
+- Scans `.claude/sessions/**/*.md` for YAML frontmatter (between `---` fences)
+- Parses with `pyyaml` (stdlib `yaml` not available — use `pip install pyyaml` or a simple regex parser)
+- Drops and recreates all tables on each run (idempotent rebuild from source)
+- Flags: `--db` (default `.claude/sessions/sessions.db`), `--archive` (run archival after indexing)
+
+**Example queries:**
+
+```sql
+-- All decisions about persistence/storage
+SELECT s.title, d.what, d.result
+FROM decisions d JOIN sessions s ON d.session_id = s.id
+WHERE d.what LIKE '%persist%' OR d.what LIKE '%store%';
+
+-- Lessons by tag
+SELECT s.title, l.title, l.detail
+FROM lessons l JOIN sessions s ON l.session_id = s.id
+WHERE l.tag = 'architecture';
+
+-- Session dependency graph
+SELECT s.title, d.direction, d.target
+FROM dependencies d JOIN sessions s ON d.session_id = s.id
+ORDER BY s.opened;
+
+-- Find archived sessions about significance
+SELECT id, title, summary, path
+FROM sessions
+WHERE summary LIKE '%significance%';
+```
+
+#### Archival
+
+Sessions closed >30 days ago move to `.claude/sessions/archive/{subdir}/`:
+
+```
+.claude/sessions/
+├── archive/
+│   ├── cascade/          # archived cascade sessions
+│   └── ...
+├── cascade/              # active/recent cascade sessions
+├── sessions.db           # SQLite index (covers all sessions, active + archived)
+└── 06-25-26-project-structure-review.md
+```
+
+- `git mv` preserves history — `git log --follow` recovers full content
+- SQLite retains complete frontmatter for discovery
+- The index script scans both active and archive directories
+
+#### Work items
+
+##### 3.1 Build the index script
+- ⬜ Create `scripts/maintenance/session_index.py`
+- ⬜ Parse YAML frontmatter from all session docs
+- ⬜ Create SQLite schema (sessions, decisions, lessons, metrics, artifacts, dependencies)
+- ⬜ Populate from parsed frontmatter
+- ⬜ Test: index 29 frontmatter sessions, verify row counts
+
+##### 3.2 Add frontmatter to remaining closed sessions
+- ⬜ Identify closed sessions without frontmatter (status in heading but no YAML block)
+- ⬜ Add YAML frontmatter to historical closed sessions (batch — extract from content)
+- ⬜ Re-run index script, verify all closed sessions indexed
+
+##### 3.3 Archive old sessions
+- ⬜ Create `.claude/sessions/archive/` subdirectories
+- ⬜ `git mv` sessions closed >30 days ago into archive
+- ⬜ Re-run index script — verify archived sessions still indexed
+- ⬜ Update `.claude/skills/session-close/SKILL.md` with archive note
+
+##### 3.4 Add session-index skill
+- ⬜ Create `.claude/skills/session-index/SKILL.md` — when to rebuild, how to query
+- ⬜ Add `.claude/sessions/sessions.db` to `.gitignore` (regenerable)
+- ⬜ Commit: "Session frontmatter index + archive old sessions"

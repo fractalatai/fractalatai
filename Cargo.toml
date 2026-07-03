@@ -7,6 +7,7 @@ members = [
     "crates/fractalaw-sync",
     "crates/fractalaw-host",
     "crates/fractalaw-cli",
+    "crates/fractalaw-sync-cli",
 ]
 
 [workspace.package]

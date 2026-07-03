@@ -1,0 +1,26 @@
+[package]
+name = "fractalaw-sync-cli"
+description = "Zenoh sync CLI — publish, watch, pull-lat"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "fractalaw-sync"
+path = "src/main.rs"
+
+[dependencies]
+fractalaw-core = { path = "../fractalaw-core" }
+fractalaw-store = { path = "../fractalaw-store", features = ["duckdb", "pg"] }
+fractalaw-sync = { path = "../fractalaw-sync", features = ["http", "zenoh"] }
+zenoh = { workspace = true }
+arrow = { workspace = true, features = ["prettyprint"] }
+chrono = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+futures = { workspace = true }
+serde_json = { workspace = true }

@@ -3444,7 +3444,6 @@ dependencies = [
  "fractalaw-core",
  "fractalaw-host",
  "fractalaw-store",
- "fractalaw-sync",
  "futures",
  "lancedb",
  "parquet",
@@ -3455,7 +3454,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
- "zenoh",
 ]
 
 [[package]]
@@ -3530,6 +3528,25 @@ dependencies = [
  "tokio",
  "tonic 0.13.1",
  "tracing",
+ "zenoh",
+]
+
+[[package]]
+name = "fractalaw-sync-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "chrono",
+ "clap",
+ "fractalaw-core",
+ "fractalaw-store",
+ "fractalaw-sync",
+ "futures",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
  "zenoh",
 ]
 

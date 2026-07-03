@@ -11,7 +11,11 @@
       "Bash(*DROP TABLE*legislation*)",
       "Bash(*rm*fractalaw.duckdb*)",
       "Bash(*taxa enrich --force)",
-      "Bash(*rm*legislation_text.lance*)"
+      "Bash(*rm*legislation_text.lance*)",
+      "Bash(*cargo sweep --time 0*)",
+      "Bash(*cargo sweep --time 1*)",
+      "Bash(*rm -rf*target*)",
+      "Bash(*cargo clean*)"
     ]
   }
 }
