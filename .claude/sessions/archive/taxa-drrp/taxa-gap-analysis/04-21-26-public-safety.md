@@ -1,4 +1,77 @@
-# Session: 2026-04-21 — Taxa DRRP Gap Analysis: PUBLIC
+---
+session: "Taxa DRRP Gap Analysis: PUBLIC"
+status: closed
+opened: 2026-04-21
+closed: 2026-04-25
+outcome: success
+
+summary: >
+  Gap analysis for PUBLIC family (52 laws, 7,740 provisions). Discovered enrichment
+  truncation bug (#33, 80 laws affected corpus-wide). Found 3 domain-specific actors
+  (provider, keeper, dealer) and OFCOM gov pattern gap. Recall 19.4%→59.1% (+39.7pp),
+  Online Safety Act from 0.4%→64.7%. Discovered offence-as-duty pattern tier (953
+  corpus-wide provisions).
+
+decisions:
+  - what: "Family-gated PUBLIC_GOVERNED_DEFS with provider, keeper, dealer"
+    why: "\"Provider\" is OSA's primary duty-holder but too generic for core GOVERNED_DEFS (would match healthcare, employment law)"
+    result: "Family-gated on PUBLIC, same pattern as offshore licensee"
+  - what: Add OFCOM + 6 other keywords to GOVERNMENT_ACTORS gate
+    why: "Gate was built for OH&S law \u2014 missing OFCOM, chief officer, constable, sheriff, procurator fiscal"
+    result: "292 OFCOM provisions recovered, dominant addressable gap"
+  - what: "\"Ind: Person\" compound predicate expansion is at diminishing returns"
+    why: "89% of 219 Person Gap A provisions have person in object/beneficiary/passive position \u2014 correctly not getting DRRP"
+    result: "No code change, documented analysis"
+  - what: Offence-as-duty is a new pattern tier (logged for separate session)
+    why: "\"It shall be unlawful for any person to keep a dog\" expresses a duty without any modal verb \u2014 953 provisions corpus-wide, 76% have no DRRP"
+    result: fractalaw/fractalaw#34 logged
+
+metrics:
+  laws: 52
+  provisions: 7740
+  recall_start: 19.4
+  recall_end: 59.1
+  f1_start: 32.0
+  f1_end: 68.1
+  osa_recall_start: 0.4
+  osa_recall_end: 64.7
+  offence_as_duty_corpus: 953
+  enrichment_truncation_laws_affected: 80
+
+lessons:
+  - title: Enrichment truncation bug silently dropped provisions beyond limit=500
+    detail: "enrich_single_law() queried LanceDB with limit=500. Laws with >500 provisions silently truncated. 80 laws, 52,846 provisions affected corpus-wide. Fixed in #33 (d72a702)."
+    tag: infrastructure
+  - title: Gap profile changes fundamentally after fixing data pipeline bugs
+    detail: Before truncation fix, Gap C was 82% of FN. After, Gap A became 61%. Many former Gap C were actually truncated provisions with no data at all.
+    tag: methodology
+  - title: "Precision drop from gate bypass is mostly false — ground truth heuristic too conservative"
+    detail: 134 of 216 FP are Interpretation-primary provisions that DO contain genuine duties. Real-world precision likely >85%, not 75.8%.
+    tag: methodology
+  - title: "Offence-creating language is a fundamentally new pattern class"
+    detail: "\"It is an offence for...\" expresses duties without modal verbs. 922 of 953 provisions have no modal at all — completely invisible to the current pipeline. Needs its own tier."
+    tag: architecture
+  - title: "'Ind: User' in Online Safety Act is false actor extraction — user means service user (beneficiary)"
+    detail: "53 Gap A provisions, 0 have user as duty-holder. The v2 matcher correctly rejects. Inflates Gap A count but no DRRP impact."
+    tag: data
+
+artifacts:
+  - crates/fractalaw-core/src/taxa/actors.rs
+  - crates/fractalaw-core/src/taxa/duty_patterns.rs
+  - crates/fractalaw-cli/src/main.rs
+  - .claude/skills/lat-qa/SKILL.md
+
+depends_on:
+  - 03-28-26-ohs-offshore-safety.md
+  - 04-14-26-ohs-occupational-safety.md
+
+enables:
+  - "Offence-as-duty pattern tier (fractalaw/fractalaw#34)"
+  - Gap C AI/LLM session
+  - LAT QA skill for upstream data quality checks
+---
+
+# Session: 2026-04-21 — Taxa DRRP Gap Analysis: PUBLIC (CLOSED)
 
 ## Context
 

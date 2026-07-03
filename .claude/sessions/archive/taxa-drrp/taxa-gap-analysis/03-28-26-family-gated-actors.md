@@ -1,4 +1,45 @@
-# Session: 2026-03-28 — Family-Gated Specialist Actors (#31) ✓ CLOSED
+---
+session: Family-Gated Specialist Actors
+status: closed
+opened: 2026-03-28
+closed: 2026-03-28
+outcome: success
+
+summary: >
+  Added family-gated specialist actor extraction to actors.rs, mirroring the fitness.rs
+  pattern. First specialist: OFFSHORE_GOVERNED_DEFS with "licensee". 7 tests added, 301 pass.
+  Wired family through parse_v2() and CLI taxa show commands.
+
+decisions:
+  - what: Family-gated specialist actors (not flat GOVERNED_DEFS expansion)
+    why: Adding domain-specific actors to the flat list causes O(actors × provisions) scaling across irrelevant families
+    result: extract_actors_for_family() runs core + specialist patterns, gated by family prefix
+  - what: specialist_governed_for() returns compiled regex slices (not raw defs)
+    why: Avoids recompilation per call, matches how GOVERNED_COMPILED works
+    result: LazyLock<Vec<(&str, Regex)>> compiled once on first use
+  - what: "Label format \"Offshore: Licensee\" with hierarchical prefix"
+    why: "Mirrors existing \"SC: C: Contractor\" convention"
+    result: Consistent label hierarchy across all actor categories
+
+metrics:
+  tests_added: 7
+  tests_passing: 301
+
+lessons:
+  - title: parse_v2() already accepted family parameter for fitness — no signature change needed
+    detail: The family parameter was threaded through for fitness extraction. Reusing it for actor extraction required zero API changes.
+    tag: architecture
+
+artifacts:
+  - crates/fractalaw-core/src/taxa/actors.rs
+  - crates/fractalaw-core/src/taxa/mod.rs
+  - crates/fractalaw-cli/src/main.rs
+
+depends_on:
+  - 03-28-26-ohs-offshore-safety.md
+---
+
+# Session: 2026-03-28 — Family-Gated Specialist Actors (#31) (CLOSED)
 
 ## Context
 

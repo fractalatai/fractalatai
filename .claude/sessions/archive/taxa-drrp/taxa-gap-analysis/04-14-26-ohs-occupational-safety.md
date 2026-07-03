@@ -1,4 +1,68 @@
-# Session: 2026-04-14 — Taxa DRRP Gap Analysis: OH&S: Occupational / Personal Safety
+---
+session: "Taxa DRRP Gap Analysis: OH&S Occupational Safety"
+status: closed
+opened: 2026-04-14
+closed: 2026-04-15
+outcome: success
+
+summary: >
+  Gap analysis for OH&S Occupational Safety (451 laws, 20,192 provisions). Found
+  mixed-content provision gate problem — Interpretation-primary gate suppresses real
+  duties in long provisions mixing definitions with obligations. Fix: restructured
+  parse_v2() to extract actors before the gate, use actor presence as gate-override.
+  Recall 48.6%→53.4% (+4.8pp), 400 false negatives recovered.
+
+decisions:
+  - what: Move actor extraction above the purpose gate in parse_v2()
+    why: "Actor extraction happened AFTER the gate — real duties buried after definitions in long provisions were invisible"
+    result: Interpretation-primary gate now bypassed when governed actor is present
+  - what: Interpretation-primary + governed actor = proceed to DRRP extraction
+    why: v2 anchored matcher has its own false-positive guards (subordinate clause check, modal window) that prevent bad classifications from definition fragments
+    result: Product safety SIs jumped from 0.7-1.4% to 12-50% DRRP
+  - what: Diminishing returns on Fix 2 (v2 matcher Gap A) — no code change
+    why: 50 provisions = 0.25% of corpus. Subordinate/pronoun and epistemic-may issues documented but 2,688 Gap C is 54x larger
+    result: Documented for future reference, Gap C is the priority
+
+metrics:
+  laws: 451
+  provisions: 20192
+  precision: 96.4
+  recall_before: 48.6
+  recall_after: 53.4
+  f1_before: 64.6
+  f1_after: 66.2
+  false_negatives_recovered: 400
+  gap_a_remaining: 747
+  gap_c_remaining: 2688
+  tests_passing: 384
+
+lessons:
+  - title: Mixed-content provisions are a systematic problem in EU-derived product safety SIs
+    detail: Sertantai text parsing produces very long multi-section provisions. Definitions at the start trigger Interpretation-primary gate, suppressing genuine duties buried later.
+    tag: data
+  - title: 0-DRRP anomalies are almost always genuinely non-making
+    detail: All 5 laws with 0 DRRP and >10 provisions were amendment SIs, offence acts, or revoked instruments. The pipeline is correctly classifying them.
+    tag: methodology
+  - title: "The gate bypass is safe because v2 matcher has 99%+ precision"
+    detail: In a pure definition, the modal appears inside a quote or after 'means' — the actor won't be in subject position relative to it. The v2 matcher rejects these.
+    tag: architecture
+  - title: "extract_clause() panicked on begin <= end when span overlap occurs"
+    detail: Regex overlap in mixed-content provisions caused actor_start > modal_end. Added guard to swap bounds.
+    tag: infrastructure
+
+artifacts:
+  - crates/fractalaw-core/src/taxa/mod.rs
+  - crates/fractalaw-cli/src/main.rs
+
+depends_on:
+  - 03-28-26-ohs-offshore-safety.md
+
+enables:
+  - PUBLIC family gap analysis (gate bypass enables OSA mixed-content provisions)
+  - Gap C AI/LLM session (passive-voice provisions — 71% of remaining FN)
+---
+
+# Session: 2026-04-14 — Taxa DRRP Gap Analysis: OH&S: Occupational / Personal Safety (CLOSED)
 
 ## Context
 

@@ -1,4 +1,68 @@
-# Session: 2026-03-28 — Taxa DRRP Gap Analysis: OH&S: Offshore Safety ✓ CLOSED
+---
+session: "Taxa DRRP Gap Analysis: OH&S Offshore Safety"
+status: closed
+opened: 2026-03-28
+closed: 2026-03-28
+outcome: success
+
+summary: >
+  Comprehensive DRRP gap analysis for OH&S Offshore Safety (58 laws, 2,737 provisions).
+  Identified licensee as key missing actor (Gap B), implemented as family-gated specialist.
+  Found and fixed subordinate clause retry bug in v2 matcher. Precision 99.1%, recall
+  69.1%→72.6%, F1 81.4%→83.8%. Gap C (passive voice, 58% of FN) at diminishing returns.
+
+decisions:
+  - what: "SKIP operator as specialist actor \u2014 it's the object/beneficiary, not duty-holder"
+    why: "\"The licensee shall ensure that any operator appointed by him...\" \u2014 operator is never the subject"
+    result: 0 genuine duty misses where operator is obligation subject
+  - what: "SKIP owner and manager \u2014 audited, zero genuine duty gaps"
+    why: Owner (101 provisions) and manager (62 provisions) already have DRRP via other actors
+    result: "Owner 0 genuine misses, manager 0 genuine misses"
+  - what: ADD licensee as family-gated specialist actor
+    why: "Key offshore duty-holder in clear duty provisions (\"The licensee shall ensure...\")"
+    result: 8 new DRRP classifications from licensee-only provisions
+  - what: FIX subordinate clause retry in v2 matcher
+    why: "\"Where the duty holder..., the duty holder shall...\" \u2014 first occurrence rejected, code never tried second"
+    result: Common UK drafting pattern now correctly handled across all families
+
+metrics:
+  laws: 58
+  provisions: 2737
+  precision: 99.1
+  recall_before: 69.1
+  recall_after: 72.6
+  f1_before: 81.4
+  f1_after: 83.8
+  gap_a_remaining: 108
+  gap_c_remaining: 169
+  tests_passing: 308
+
+lessons:
+  - title: "Gap A audit: most 'missed' actors are correctly gated by purpose classification"
+    detail: Provisions showing Employer/Duty Holder as missed are almost all interpretation/amendment text. The purpose gate is working correctly — they look like misses but are true negatives.
+    tag: methodology
+  - title: Subordinate clause retry is a common UK legislative drafting pattern
+    detail: "\"Where the employer..., the employer shall...\" — the same actor appears in both subordinate and main clause. The v2 matcher must retry from later occurrences when a match is rejected."
+    tag: methodology
+  - title: "68% of misses are Gap C (no actor) — this is the ceiling for regex"
+    detail: Passive constructions where no duty-holder subject is present are fundamentally beyond regex actor extraction. Realistic improvements can only address the 32% that are Gap A/B.
+    tag: methodology
+  - title: Python POSIX character classes not supported — false alarm in gap analysis
+    detail: "Rust regex [:punct:] works fine but Python re module doesn't support POSIX classes. Cross-language testing can produce false alerts."
+    tag: tooling
+
+artifacts:
+  - crates/fractalaw-core/src/taxa/actors.rs
+  - crates/fractalaw-core/src/taxa/duty_patterns_v2.rs
+  - crates/fractalaw-core/src/taxa/mod.rs
+  - crates/fractalaw-cli/src/main.rs
+
+enables:
+  - Family-gated specialist actor pattern for other families
+  - PUBLIC family gap analysis (reuses same architecture)
+---
+
+# Session: 2026-03-28 — Taxa DRRP Gap Analysis: OH&S: Offshore Safety (CLOSED)
 
 ## Context
 
