@@ -1,3 +1,28 @@
+---
+session: "Legal-BERT Embedding Upgrade"
+status: pending
+opened: 2026-06-27
+closed:
+outcome:
+
+summary: >
+  Planning session for replacing all-MiniLM-L6-v2 (384-dim general-purpose embedding)
+  with a domain-specific legal embedding model. Embedding accounts for 79.9% of classifier
+  feature importance. Candidates identified: nlpaueb/legal-bert-base-uncased,
+  pile-of-law/legalbert-large-1.7M-2, or fine-tuned MiniLM. Sequenced after v3 classifier
+  ships with dep features. Would require v4 retrain with 768-dim embedding.
+
+decisions:
+  - what: "Sequence Legal-BERT after v3 classifier is in production"
+    why: "v3 ships with MiniLM + dep features (428 dims). Legal-BERT would change embedding dimension to 768, requiring a separate v4 retrain."
+    result: "v3 is the baseline to beat. Legal-BERT evaluation deferred until v3 is measured in production."
+
+lessons:
+  - title: "Domain-specific embeddings are independent of feature engineering"
+    detail: "Legal-BERT improves semantic understanding (model swap). Dep parsing adds structural features (new features). Both improve the classifier through different mechanisms and are additive."
+    tag: architecture
+---
+
 # Session: Legal-BERT Embedding Upgrade (PENDING)
 
 ## Problem

@@ -1,3 +1,39 @@
+---
+session: "Position Classifier — Actor Role Prediction"
+status: closed
+opened: 2026-06-11
+closed: 2026-06-11
+outcome: success
+
+summary: >
+  Built 3-class position classifier (active/counterparty/other) trained on 3,258 actor-position
+  pairs from Gemini gold-standard data. Achieved 68% overall accuracy, 74% precision and 70% recall
+  on active class. Wired into enrichment pipeline with dual-write pattern: regex position stays as
+  source of truth, classifier disagreements recorded in reason field for QA signal.
+
+decisions:
+  - what: "Use existing reason field for classifier disagreements instead of new LanceDB columns"
+    why: "Avoids schema migration. reason is already nullable Utf8 in the actors struct."
+    result: "No schema change needed. Sertantai detects disagreements via reason.startsWith(\"classifier:\")."
+  - what: "Detection-only first, write-back second"
+    why: "Don't auto-override regex positions. Record disagreements for human review."
+    result: "HSWA test showed 346/899 provisions have at least one actor disagreement (39%)"
+  - what: "Binary is-active classifier over 4-class"
+    why: "The main signal sertantai needs is who bears the obligation. Counterparty/beneficiary/mentioned are secondary."
+    result: "3-class (active/counterparty/other) pragmatic classifier with clear primary signal"
+
+lessons:
+  - title: "Disagreements are the QA signal"
+    detail: "Where regex and classifier disagree, flag for review. The difference itself is more valuable than either prediction alone."
+    tag: architecture
+  - title: "Dual-write preserves provenance"
+    detail: "Regex position stays in position field, classifier prediction in reason field. Both views available for downstream consumers."
+    tag: engineering
+  - title: "39% disagreement rate is expected for v1"
+    detail: "High disagreement rate on actor positions reflects the difficulty of the task. Iterate with human-validated corrections."
+    tag: data-quality
+---
+
 # Session: Position Classifier — Actor Role Prediction (CLOSED)
 
 ## Context

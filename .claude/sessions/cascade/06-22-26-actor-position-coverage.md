@@ -1,3 +1,30 @@
+---
+session: "Actor Position Coverage"
+status: closed
+opened: 2026-06-22
+closed: 2026-06-23
+outcome: success
+
+summary: >
+  Fixed two actor position gaps: extended inheritance to orphan provisions (DRRP but no
+  actors), and mapped classifier \"other\" predictions to \"mentioned\" instead of keeping
+  regex position. 4,237 orphans identified corpus-wide. Position classifier confirmed as
+  3-class (active/counterparty/other) with \"other\" never written before this fix.
+
+decisions:
+  - what: "Extend inheritance to orphaned provisions"
+    why: "138 provisions had DRRP but zero actors because inheritance only ran on provisions with no DRRP AND no actors"
+    result: "Orphans now inherit actors from parent clause during taxa escalate, keeping existing DRRP."
+  - what: "Map classifier \"other\" to \"mentioned\""
+    why: "Classifier had 3 classes but \"other\" was never written. When classifier disagrees and predicts other, the position should reflect that."
+    result: "Position written as mentioned when classifier predicts other and disagrees with regex."
+
+lessons:
+  - title: "Check what the classifier actually produces, not what it was designed for"
+    detail: "The position classifier was trained with 3 classes but only 2 were ever used. The other class was discovered to be silently discarded."
+    tag: debugging
+---
+
 # Session: Actor Position Coverage (CLOSED)
 
 ## Problem

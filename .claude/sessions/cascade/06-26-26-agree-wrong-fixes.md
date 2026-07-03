@@ -1,3 +1,38 @@
+---
+session: "Agree+Wrong Pattern Fixes"
+status: closed
+opened: 2026-06-26
+closed: 2026-06-27
+outcome: success
+
+summary: >
+  Fixed 82 of 325 agree+wrong position errors using deterministic rules. Three patterns
+  identified: mentioned-to-active (183 cases from structural provisions), counterparty-to-active
+  (62 cases needing grammatical role), beneficiary-to-active (24 cases needing section_type
+  feature). Fixed default purpose from Process+Rule to Unclassified, removed flawed
+  has_any_actor override, added position gating via should_default_to_mentioned(). Regex
+  position improved 51.3% to 53.8%.
+
+decisions:
+  - what: "Replace Process+Rule default with Unclassified"
+    why: "148 of 183 errors had the default purpose label. Process+Rule was assumed duty-bearing but these were genuinely unclassified provisions."
+    result: "Structural provisions no longer falsely treated as duty-bearing."
+  - what: "Remove has_any_actor override for structural purposes"
+    why: "Actors appear in definitions too. Presence of an actor in a structural provision does not make it duty-bearing."
+    result: "Changed to has_government_actor for structural purposes. 82 errors fixed."
+  - what: "Defer grammatical role to dependency parsing session"
+    why: "62 counterparty-to-active errors need subject/object distinction from parse trees. Different infrastructure."
+    result: "Carried to 06-26-26-dependency-parsing.md"
+
+lessons:
+  - title: "Purpose classifier defaults matter more than patterns"
+    detail: "148 of 183 errors came from the default label. The patterns were fine; the fallback was wrong."
+    tag: data-quality
+  - title: "Gate must cover both DRRP and position"
+    detail: "should_skip_drrp gated DRRP extraction but not position assignment. Actors in gated provisions still got active/counterparty positions."
+    tag: architecture
+---
+
 # Session: Agree+Wrong Pattern Fixes (CLOSED)
 
 ## Problem

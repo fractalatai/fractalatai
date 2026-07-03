@@ -1,4 +1,40 @@
-# Session: Production v0.1 — Publish QQ Corpus to Sertantai
+---
+session: "Production v0.1 — Publish QQ Corpus to Sertantai"
+status: closed
+opened: 2026-06-09
+closed: 2026-06-09
+outcome: success
+
+summary: >
+  Wired v6 DRRP classifier (86.4% accuracy, 3-class) into enrichment pipeline. Classified 40,272
+  provisions in 400 seconds with zero API calls. Established development/production interface rules
+  with confidence-based coexistence. Published MHR to sertantai with struct richer than flat format.
+  Full QQ publish deferred pending actor label strategy.
+
+decisions:
+  - what: "Decompose DRRP at classification time, not publish time"
+    why: "LanceDB should speak DRRP types (Duty/Right/Responsibility/Power), not internal hierarchy (Obligation/Liberty)"
+    result: "Sertantai gets familiar DRRP types. No taxonomy migration needed at publish."
+  - what: "Gate classifier by extraction_method, not confidence threshold"
+    why: "Eliminates regex 0.85/0.90 overlap problem. Agentic and agentic_unvalidated always skip."
+    result: "Simpler logic, no confidence arithmetic needed"
+  - what: "Defer full QQ publish pending actor label strategy"
+    why: "24 agentic_unvalidated provisions with invented labels need resolution first"
+    result: "Led to actor-labels session which solved the dictionary matching problem"
+
+lessons:
+  - title: "Classifier in production works at scale"
+    detail: "40,272 provisions in 400 seconds (101/s), no API calls. Pure classifier inference is viable."
+    tag: architecture
+  - title: "Development/production coexistence proven"
+    detail: "Agentic gold at 0.90 survives production runs at 0.85. The confidence ratchet works in both directions."
+    tag: process
+  - title: "Invented labels are discoveries"
+    detail: "Water undertaker, liquidator, special negotiating body are real actors the LLM found. Not format bugs."
+    tag: data-quality
+---
+
+# Session: Production v0.1 — Publish QQ Corpus to Sertantai (CLOSED)
 
 ## Context
 

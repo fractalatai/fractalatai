@@ -1,3 +1,37 @@
+---
+session: "Dependency Parsing Features"
+status: closed
+opened: 2026-06-26
+closed: 2026-06-27
+outcome: success
+
+summary: >
+  Added 7 dependency parsing features per (provision, actor) pair using spaCy. Position
+  classifier v3 (428 dims) improved from 61.0% to 64.8% CV accuracy. Counterparty F1
+  got biggest boost (+0.068) from subject/object distinction. Live benchmark: classifier
+  position 57.4% to 65.2%, agree+wrong errors 243 to 188. Gemini recommended batch
+  Python job with precomputed features stored in provision_actors.
+
+decisions:
+  - what: "Python batch job for dep features, Rust reads precomputed"
+    why: "No mature Rust dep parser with spaCy quality. Clean separation: Python for NLP, Rust for classification."
+    result: "Batch script parses all provisions with spaCy, stores 7 features in provision_actors. Incremental via text_hash."
+  - what: "Use en_core_web_md over en_core_web_sm"
+    why: "Medium model gave +0.9% additional accuracy over small model. en_core_web_trf deferred to GPU availability."
+    result: "64.8% CV with md model vs 63.9% with sm. v3 classifier exported."
+  - what: "section_type feature included but no additional gain"
+    why: "Dependency parsing already captures the structural information that section_type would provide."
+    result: "10 one-hot features included in v3 weights for completeness but no measurable accuracy improvement."
+
+lessons:
+  - title: "Per-actor features break the embedding ceiling"
+    detail: "Embedding is per-provision (same for all actors). Dep features are per-actor (subject vs object). This is why counterparty F1 improved most."
+    tag: pipeline
+  - title: "Dep parsing can also indicate DRRP severity"
+    detail: "Verb strength (ensure vs allow), subject breadth (every employer vs an inspector), and qualification presence could rank duties within a law."
+    tag: domain
+---
+
 # Session: Dependency Parsing Features (CLOSED)
 
 ## Problem

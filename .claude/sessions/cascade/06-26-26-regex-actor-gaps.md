@@ -1,3 +1,34 @@
+---
+session: "Regex Actor Pattern Gaps"
+status: closed
+opened: 2026-06-26
+closed: 2026-06-26
+outcome: success
+
+summary: >
+  Improved regex actor recall from 24% to 46% of gold benchmark actors (986 to 1,743
+  matched). 80+ alias mappings added, 135 non-actor gold entries removed, label
+  remapping for category mismatches, dictionary patterns widened for authority and
+  undertaking. Remaining ~2,000 unmatched are mostly implied actors requiring correlative
+  inference or LLM extraction.
+
+decisions:
+  - what: "Fix actor recall through aliases, gold cleanup, and dictionary widening"
+    why: "Regex only found 35% of gold actors. Label mismatches and missing trigger words accounted for most gaps."
+    result: "Matched actors 986 to 1,743. Three categories of remaining gaps identified: trigger present but regex misses, implied actors, genuine LLM-only."
+  - what: "Separate implied actors into correlative inference session"
+    why: "~200 implied actors follow deterministic Hohfeldian patterns (Employee implies Employer). Different from trigger-word regex gaps."
+    result: "Correlative inference carried to 06-26-26-correlative-inference.md"
+
+lessons:
+  - title: "Gold standard quality affects benchmark reliability"
+    detail: "135 entries were non-actors (electrical equipment, civil explosive). Gold cleanup is prerequisite to meaningful accuracy measurement."
+    tag: data-quality
+  - title: "Alias mappings provide high ROI"
+    detail: "80+ label normalisation mappings recovered 442 actors with zero pipeline code changes."
+    tag: pipeline
+---
+
 # Session: Regex Actor Pattern Gaps (CLOSED)
 
 ## Problem

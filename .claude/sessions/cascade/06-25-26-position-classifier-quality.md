@@ -1,3 +1,41 @@
+---
+session: "Position Classifier Quality"
+status: closed
+opened: 2026-06-25
+closed: 2026-06-26
+outcome: success
+
+summary: >
+  Discovered position classifier v1 was systemically wrong — 51,523 active actors
+  overridden to mentioned, causing sertantai to show 0 duties for most laws. Three layers
+  of failure: DRRP features always zero (label mismatch), 3-class output conflating
+  beneficiary and mentioned, and design violation (detection-only became override).
+  Built provision_actors normalised table for per-tier per-actor benchmarking. Removed
+  override logic, archived v1 classifier. Spawned three daughter sessions.
+
+decisions:
+  - what: "Build normalised provision_actors table"
+    why: "Per-provision JSONB columns cannot represent per-actor signals. Unit of classification is (provision, actor), not provision."
+    result: "One row per (section_id, actor_label) with separate regex/cls/llm/inferred columns. SQL-queryable benchmarking."
+  - what: "Remove classifier position override (Option A)"
+    why: "51,523 false-mentioned from classifier overriding correct regex signals. Classifier was worse than useless."
+    result: "Regex positions restored. Override code removed. v1 classifier archived."
+  - what: "Fix the cascade design violation"
+    why: "Original design said \"detection only, don't auto-override\" but implementation overrode to mentioned. Proximate cause of 51K errors."
+    result: "Classifier writes to cls_position as a signal. Reconcile (future) picks winners."
+
+lessons:
+  - title: "Benchmark measured DRRP type but not position"
+    detail: "84% DRRP accuracy masked the position disaster. The benchmark never tested whether actors had correct roles, only whether provisions had correct DRRP types."
+    tag: testing
+  - title: "Three layers of failure compound silently"
+    detail: "Dead features + coarse classes + design violation. Each alone might have been caught. Together they created 51K false-mentioned that only showed up when sertantai filtered on active."
+    tag: debugging
+  - title: "Per-actor normalised table is the correct data model"
+    detail: "Flat provision-level columns cannot represent the (provision, actor, tier) dimensionality. provision_actors table enables per-tier per-actor SQL benchmarking."
+    tag: architecture
+---
+
 # Session: Position Classifier Quality (CLOSED)
 
 ## Problem

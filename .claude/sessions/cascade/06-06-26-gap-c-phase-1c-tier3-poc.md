@@ -1,4 +1,37 @@
-# Session: 2026-06-06 — Gap C Phase 1C: Tier 3 LLM Proof of Concept
+---
+session: "Gap C Phase 1C: Tier 3 LLM Proof of Concept"
+status: closed
+opened: 2026-06-06
+closed: 2026-06-06
+outcome: success
+
+summary: >
+  Proved that Gemini 2.5 Flash can correctly distinguish duty holders from recipients
+  in provisions where Tier 1 inheritance produced false positives. Tested on 9 INCORRECT
+  cases from Tier 1 QA -- 8/9 correctly resolved. Discovered that recipient/beneficiary
+  role data is a valuable byproduct, leading to the recipient model design extension.
+
+decisions:
+  - what: "Use Gemini 2.5 Flash for Tier 3 holder/recipient classification"
+    why: "8/9 correct on the exact failure cases from Tier 1, with no prompt tuning needed"
+    result: "POC validated, ready for integration into enrich_single_law()"
+  - what: "Add recipient model as a data extension"
+    why: "The RECIPIENT/BENEFICIARY roles the LLM produces are valuable data previously discarded"
+    result: "Design doc updated with recipient column, recipient_type taxonomy, and dual-population model"
+
+lessons:
+  - title: "LLM can infer holders not in the actor list"
+    detail: "Cases 5, 6, 8 correctly identified Employer even though only Worker was inherited from Tier 1."
+    tag: architecture
+  - title: "Null detection works cleanly"
+    detail: "Case 2 correctly identified a definition (not a duty) and returned no holder, avoiding a false positive."
+    tag: quality
+  - title: "Tier 3 provisions self-select for recipient data"
+    detail: "They failed Tier 1 because of multi-actor ambiguity, making them ideal candidates for role classification."
+    tag: design
+---
+
+# Session: 2026-06-06 — Gap C Phase 1C: Tier 3 LLM Proof of Concept (CLOSED)
 
 ## Context
 

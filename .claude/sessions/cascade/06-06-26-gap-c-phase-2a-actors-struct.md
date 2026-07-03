@@ -1,4 +1,41 @@
-# Session: Next — Gap C Phase 2A: Actors Struct + Tier 3 Integration
+---
+session: "Gap C Phase 2A: Actors Struct + Tier 3 Integration"
+status: closed
+opened: 2026-06-06
+closed: 2026-06-06
+outcome: success
+
+summary: >
+  Integrated the unified actors JSON struct into the enrichment pipeline. Added actors column
+  to LanceDB legislation_text as Utf8 JSON (native Arrow struct deferred to table rebuild).
+  Populated for all provisions: regex and inherited actors get role=holder. Shipped dual-write
+  to flat columns for backward compatibility. Also shipped Phase 1B deferral, distance-0 fix,
+  Pattern 1 heading exclusion, Tier 1 QA skill, Tier 3 POC validation, and recipient model design.
+
+decisions:
+  - what: "Store actors as JSON string (Utf8) initially"
+    why: "LanceDB add_columns() cannot create List<Struct> -- native Arrow struct requires table rebuild"
+    result: "Working actors column shipped immediately, table rebuild planned as next session"
+  - what: "Non-breaking migration with dual-write"
+    why: "Sertantai reads flat columns (governed_actors, government_actors) until it migrates"
+    result: "Both new struct and existing flat columns populated, zero sertantai breakage"
+  - what: "Unified actors struct over flat columns as architectural direction"
+    why: "Flat columns lose actor role information -- struct captures holder, recipient, beneficiary, mentioned"
+    result: "Confirmed as long-term direction, flat columns to be deprecated after sertantai migration"
+
+lessons:
+  - title: "LanceDB add_columns limitation forces workaround"
+    detail: "Cannot create List<Struct> via add_columns(). Must rebuild the entire table to get native Arrow struct. JSON Utf8 works as interim solution."
+    tag: infrastructure
+  - title: "Dual-write enables incremental migration"
+    detail: "Populating both the new struct and existing flat columns means sertantai can migrate at its own pace."
+    tag: architecture
+  - title: "Table rebuild needed before Tier 3 integration"
+    detail: "Building Tier 3 on a JSON column we know we will migrate is technical debt from day one. Rebuild first."
+    tag: architecture
+---
+
+# Session: 2026-06-06 — Gap C Phase 2A: Actors Struct + Tier 3 Integration (CLOSED)
 
 ## Context
 

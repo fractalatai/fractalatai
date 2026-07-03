@@ -1,3 +1,36 @@
+---
+session: "Cascade Transition Rules — Codify in Code"
+status: closed
+opened: 2026-06-18
+closed: 2026-06-21
+outcome: success
+
+summary: >
+  Restructured the DRRP pipeline from tangled two-pass architecture to loosely coupled
+  cascade: taxa parse, taxa classify, taxa escalate. Each tier runs independently via CLI
+  subcommands. drrp_history records provenance. Disagreements flagged for LLM. Cryptic
+  flags renamed (gap-c to escalate, TIER2_PROVIDER to LLM_PROVIDER). Five stages completed.
+
+decisions:
+  - what: "Option B — Multi-pass pipeline restructure"
+    why: "Code didn't match mental model of regex->classifier->LLM cascade. LLM ran before classifier, making disagreement detection impossible."
+    result: "Pipeline decomposed into parse/embed/classify/escalate subcommands with correct cascade ordering."
+  - what: "drrp_history JSON field for provenance"
+    why: "Need to track what each tier predicted, not just who won, for auditability and disagreement detection"
+    result: "List<Struct> schema added to LanceDB. 134K provisions migrated. Each tier appends its prediction."
+  - what: "Loose coupling via separate CLI subcommands"
+    why: "Each tier must be independently testable and runnable for development and debugging"
+    result: "taxa parse, taxa embed, taxa classify, taxa escalate as standalone commands plus taxa enrich orchestrator"
+
+lessons:
+  - title: "Architecture should match the mental model"
+    detail: "Every conversation described a cascade that didn't exist in code. Fixing the architecture eliminated an entire class of confusion in discussions."
+    tag: architecture
+  - title: "Stage the refactor, don't rewrite"
+    detail: "Five stages over 3 days with tests passing at each stage. No big-bang refactor risk."
+    tag: process
+---
+
 # Session: Cascade Transition Rules — Codify in Code (CLOSED)
 
 ## Outcome

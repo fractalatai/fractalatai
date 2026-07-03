@@ -1,4 +1,35 @@
-# Session: QQ Corpus Parse & Publish (SUSPENDED — blocked on LanceDB disk issues)
+---
+session: "QQ Corpus Parse & Publish"
+status: suspended
+opened: 2026-06-23
+closed: 2026-06-24
+outcome: blocked
+
+summary: >
+  Full QQ corpus pipeline walk-through. 174 QQ laws parsed, classified, and LLM-validated
+  (3,808 corrections in 310 audit logs). 89 QQ laws still need embeddings but LanceDB
+  fragment bloat keeps exhausting disk during batch operations. Suspended pending DB
+  migration to pgvector hub + LanceDB edge hybrid. Human adjudication and publish steps
+  deferred.
+
+decisions:
+  - what: "Suspend and migrate to pgvector hybrid store"
+    why: "LanceDB merge_insert write amplification exhausts 116GB disk repeatedly during embedding. Compaction every 5 laws is a band-aid."
+    result: "Session suspended. DB migration required before resume. 174 of 274 QQ laws (60%) complete."
+  - what: "Share 20 in-force laws missing LAT with sertantai team"
+    why: "109 QQ laws have no provision text in LanceDB. 18-20 are fully commenced and duty-making."
+    result: "Priority list created for sertantai LAT publication. Not a hard blocker for publishing the 165 complete laws."
+
+lessons:
+  - title: "LanceDB fragment bloat is a fundamental architectural problem"
+    detail: "merge_insert creates ~25x write amplification. Even with compaction every 5 laws, 116GB disk fills during batch operations. Cannot scale batch processing on LanceDB alone."
+    tag: data-store
+  - title: "Pipeline stages validated end-to-end"
+    detail: "parse -> classify -> validate -> (human review) -> publish chain works. The bottleneck is storage, not pipeline logic."
+    tag: pipeline
+---
+
+# Session: QQ Corpus Parse & Publish (SUSPENDED)
 
 ## Plan
 

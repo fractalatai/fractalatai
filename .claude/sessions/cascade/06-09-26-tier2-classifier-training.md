@@ -1,4 +1,44 @@
-# Session: Tier 2 Embedding Classifier Training
+---
+session: "Tier 2 Embedding Classifier Training"
+status: closed
+opened: 2026-06-09
+closed: 2026-06-09
+outcome: success
+
+summary: >
+  Trained DRRP classifier from 51.2% (v1) to 86.4% (v6) through four phases: embedding backfill
+  (397 to 1,514 examples), class balance via targeted Gemini QA, modal feature engineering (13
+  indicators that beat embeddings alone at 72.7% vs 67.9%), and DRRP hierarchy simplification
+  from 5-class to 3-class (Obligation/Liberty/none). Modal verbs are more predictive than
+  semantic embeddings for legal classification.
+
+decisions:
+  - what: "Fix the data before the model"
+    why: "Only 397 of 1,515 agentic provisions had embeddings. Class imbalance (Right 6%, Responsibility 6%) prevented learning."
+    result: "Backfill + balance moved accuracy from 51.2% to 67.9% before any model change"
+  - what: "Simplify from 5-class to 3-class (Obligation/Liberty/none)"
+    why: "Duty vs Responsibility and Right vs Power distinction is derivable from actor label prefix, not text content"
+    result: "86.4% accuracy with clean Hohfeldian hierarchy. Consumer decomposes at display time."
+  - what: "Add modal features alongside embeddings"
+    why: "Legal modals (shall/must/may) determine DRRP type. Embeddings capture topic similarity but not obligation type."
+    result: "Modal features alone (72.7%) beat embeddings alone (67.9%). Combined: 75.3%."
+
+lessons:
+  - title: "Modal features beat embeddings for DRRP classification"
+    detail: "The legal modal verb (shall/must/may) is the primary signal for obligation type. Embeddings capture topic, not obligation."
+    tag: data-quality
+  - title: "Simplify the problem before tuning the model"
+    detail: "5 classes to 3 classes by recognising the actor label already carries the governed/government distinction."
+    tag: architecture
+  - title: "Regex DRRP classification is deeply unreliable"
+    detail: "Right provisions: 10% correct (12/120). Responsibility: 2.5% correct (3/120). Regex is a sieve, not a classifier."
+    tag: data-quality
+  - title: "Compact after every QA write-back"
+    detail: "Fragment bloat from 452 MB to 8.2 GB with 698 MB free. Auto-compaction added to QA workflow."
+    tag: operations
+---
+
+# Session: Tier 2 Embedding Classifier Training (CLOSED)
 
 ## Context
 

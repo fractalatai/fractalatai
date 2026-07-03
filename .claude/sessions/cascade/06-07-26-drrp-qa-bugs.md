@@ -1,4 +1,43 @@
-# Session: DRRP QA Bug Investigation
+---
+session: "DRRP QA Bug Investigation"
+status: closed
+opened: 2026-06-07
+closed: 2026-06-07
+outcome: partial
+
+summary: >
+  Investigated two bugs found during DRRP QA (33% precision). Bug 1: DRRP type = none on
+  duty-bearing provisions -- fixed participial person patterns and sub-paragraph separated
+  patterns. Bug 2: all regex actors marked active -- fixed with position heuristic deriving
+  Hohfeldian positions from match span (actor before modal = active, after = counterparty).
+  QA precision remained at 33% after fixes because remaining failures are parser coverage
+  gaps (schedule fragments, passive voice, thing-subject obligations). Confirmed regex ceiling
+  reached. Wrote Classification Cascade Strategy v0.2 documenting the Regex-SLM-LLM architecture.
+
+decisions:
+  - what: "Regex position heuristic: derive position from match span"
+    why: "Actor before modal verb = active, actor after modal = counterparty. Eliminates need for LLM calls on multi-actor regex provisions."
+    result: "28 Tier 3 LLM calls for OH&S instead of 244 without heuristic"
+  - what: "Accept regex ceiling and move to tiered cascade"
+    why: "Regex cannot solve thing-subject obligations, passive voice, narrative duty references, or schedule fragments"
+    result: "Classification Cascade Strategy v0.2: Regex (free) then own model (cheap) then LLM (expensive)"
+  - what: "\"Done\" stamping at high confidence"
+    why: "Never re-parse provisions that have been confidently classified -- saves compute and prevents regression"
+    result: "Documented in cascade strategy, implementation deferred to next phase"
+
+lessons:
+  - title: "Regex parser has a hard ceiling"
+    detail: "Clear cases handled well, but thing-subject obligations, passive voice, narrative duty refs, and schedule fragments are beyond regex capability."
+    tag: architecture
+  - title: "Position heuristic is a cheap proxy for LLM"
+    detail: "Match span position (before vs after modal) correctly classifies most multi-actor regex provisions without any API calls."
+    tag: optimization
+  - title: "QA precision can be misleading"
+    detail: "33% precision across the whole pipeline obscures that position classification is working correctly -- failures are DRRP=none coverage gaps, not position bugs."
+    tag: quality
+---
+
+# Session: 2026-06-07 — DRRP QA Bug Investigation (CLOSED)
 
 ## Context
 

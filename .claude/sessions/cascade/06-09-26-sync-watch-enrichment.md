@@ -1,3 +1,43 @@
+---
+session: "Sync Watch Enrichment — Decoupled Ingest + Batch Enrich"
+status: closed
+opened: 2026-06-09
+closed: 2026-06-10
+outcome: success
+
+summary: >
+  Decoupled sync watch into three phases: fast ingest with ack (~2s/law), batched embed+classify
+  enrichment, and batched publish. Ported DRRP classifier from Python/sklearn to pure Rust using
+  exported JSON weights (softmax(X @ W + b), 100/100 match with sklearn). Built full production
+  pipeline in Rust: regex + embed + classify with observability, confidence protection, and
+  dev/production coexistence. Fixed actor position heuristic (+3,369 actors reclassified).
+
+decisions:
+  - what: "Decouple ingestion from enrichment (three-phase architecture)"
+    why: "Inline embedding (~15s/law) would create unacceptable backpressure on sequential sync watch loop"
+    result: "Ingest+ack in ~2s/law, enrichment runs at fractalaw's pace, no blocking"
+  - what: "Implement classifier in Rust from JSON weights instead of ONNX export"
+    why: "ort 2.0-rc.11 output parsing for string labels + probability maps is complex for a trivial logistic regression model"
+    result: "25 KB JSON weights, softmax(X @ W + b), 50/50 random + 100/100 real provisions match sklearn exactly"
+  - what: "Always re-embed for --pending laws (stale embedding fix)"
+    why: "When sertantai re-parses a law, upsert_lat overwrites text but old embedding remains stale"
+    result: "Production path always re-embeds, dev path skips existing embeddings"
+
+lessons:
+  - title: "LogisticRegression is just sigmoid(X @ W + b)"
+    detail: "No need for ONNX/Python runtime for trivial models. Export weights as JSON, implement directly in Rust."
+    tag: engineering
+  - title: "Decouple ingest from enrich"
+    detail: "Fast ack lets sertantai show 'Enrichment Pending' immediately. Batch enrichment is more efficient for compaction and disk."
+    tag: architecture
+  - title: "Stale embeddings are invisible"
+    detail: "When text changes but embedding is non-null, the is_none() check misses the staleness. Production must always re-embed."
+    tag: data-quality
+  - title: "Periodic compaction prevents fragment bloat"
+    detail: "LanceDB optimize API called every 20 laws during batch enrichment. Prevents 8+ GB fragment bloat on 274-law runs."
+    tag: operations
+---
+
 # Session: Sync Watch Enrichment — Decoupled Ingest + Batch Enrich (CLOSED)
 
 ## Context

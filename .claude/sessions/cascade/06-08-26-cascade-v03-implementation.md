@@ -1,4 +1,43 @@
-# Session: Cascade v0.3 Implementation — Regex as Sieve
+---
+session: "Cascade v0.3 Implementation — Regex as Sieve"
+status: closed
+opened: 2026-06-08
+closed: 2026-06-08
+outcome: success
+
+summary: >
+  Demoted regex from classifier to sieve based on QA data proving confidence is not predictive.
+  Implemented actor-count routing, extended Tier 2 for DRRP classification, revised confidence scoring,
+  and built golden dataset of 1,515 confirmed examples (303% of 500 target). DRRP type accuracy
+  reached 100% for single-actor provisions. Enriched 50+ laws across 21 families.
+
+decisions:
+  - what: "Demote regex to sieve, route by actor count instead of confidence"
+    why: "QA data (53 samples) proved regex confidence is not predictive of classification correctness"
+    result: "Actor-count routing correctly separates reliable single-actor from unreliable multi-actor"
+  - what: "Classify at regulation level only, not fragments"
+    why: "Sub-paragraphs lack sufficient text for model reasoning (0/4 QA failures were on fragments)"
+    result: "Gemma 4B achieves 10/11 validated on full regulation-level text"
+  - what: "Spread golden dataset across 21 families rather than deep on one"
+    why: "More representative training data for future classifier"
+    result: "1,515 examples across 99 laws and 21+ regulatory families"
+
+lessons:
+  - title: "Fragments are the enemy"
+    detail: "Sub-paragraphs cannot be classified independently. Classify at regulation level where the model has enough context."
+    tag: architecture
+  - title: "DRRP type is the reliable signal"
+    detail: "100% accuracy for single-actor regex provisions. Counterparty detection is secondary and improving."
+    tag: data-quality
+  - title: "Tier 2 enrichment builds the golden dataset as a byproduct"
+    detail: "Every Gemini Tier 2 call is a labelled example. Exceeded 500 target without a dedicated labelling effort."
+    tag: process
+  - title: "Don't publish multi-actor regex below 0.80"
+    detail: "Position classification is unreliable for multi-actor provisions. Wait for re-enrichment through v0.3 pipeline."
+    tag: data-quality
+---
+
+# Session: Cascade v0.3 Implementation — Regex as Sieve (CLOSED)
 
 ## Context
 

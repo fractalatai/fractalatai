@@ -1,3 +1,35 @@
+---
+session: "Position Classifier Training"
+status: closed
+opened: 2026-06-26
+closed: 2026-06-26
+outcome: partial
+
+summary: >
+  Trained position classifier v2 with correct features (Obligation/Liberty instead of
+  DRPP, 4 classes instead of 3) but only achieved 59.8% CV accuracy. GBT comparison
+  showed identical ceiling — bottleneck is feature quality, not model architecture.
+  Embedding dominates at 79.9% feature importance. Actor recall identified as the real
+  #1 problem (only 35% of gold actors found by regex). Matched actors improved from
+  986 to 1,758 through aliases, gold cleanup, and dictionary fixes.
+
+decisions:
+  - what: "Feature quality, not model architecture, is the bottleneck"
+    why: "LR and LightGBM produce identical 60% accuracy. GBT feature importance shows embedding at 79.9% with other features barely contributing."
+    result: "Deferred model changes. Focused on richer features (dependency parsing) and actor recall."
+  - what: "Actor recall is the #1 problem"
+    why: "Only 35% of gold actors found by regex. Classifier accuracy is misleadingly measured on the 35% that are found."
+    result: "Actor recall improved to 46% via aliases, gold cleanup, and dictionary widening. Correlative inference added 615 actors at 86.7% position accuracy."
+
+lessons:
+  - title: "65% actor recall makes classifier accuracy misleading"
+    detail: "Optimising the classifier on 35% of gold actors ignores the 65% it never sees. Solving recall is prerequisite to meaningful accuracy work."
+    tag: data-quality
+  - title: "Embedding dominance means per-provision, not per-actor, signal"
+    detail: "The 384-dim embedding is the same for all actors in a provision. Need per-actor features (dep parsing, grammatical role) to break past 60%."
+    tag: pipeline
+---
+
 # Session: Position Classifier Training (CLOSED)
 
 ## Context

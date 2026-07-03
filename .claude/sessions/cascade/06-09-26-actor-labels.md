@@ -1,3 +1,39 @@
+---
+session: "Actor Labels — Let the LLM Name, Dictionary Match"
+status: closed
+opened: 2026-06-09
+closed: 2026-06-09
+outcome: success
+
+summary: >
+  Replaced constrained LLM actor labelling with unconstrained natural language output plus
+  post-hoc dictionary matching. Built actor dictionary YAML (92 to 105 entries), Python and Rust
+  matchers with 2-pass matching, Zenoh dictionary stream for sertantai, and published 76,315
+  provisions across 165 QQ laws. Invented labels are now genuine discoveries, not format bugs.
+
+decisions:
+  - what: "Let the LLM name actors freely, match to dictionary post-hoc"
+    why: "Forcing exact label format caused LLM to focus on matching format instead of understanding provisions"
+    result: "Gemini outputs clean natural language, matcher resolves. Invented labels are genuine discoveries."
+  - what: "Create actor dictionary YAML as single source of truth"
+    why: "Need version-controlled dictionary with canonical labels and trigger phrases for matching"
+    result: "105 entries with 2-pass matching (exact trigger then substring containment)"
+  - what: "Publish dictionary alongside provisions via Zenoh"
+    why: "Sertantai needs the dictionary for client-side actor matching"
+    result: "Put on publish (fires subscriber), queryable on watch (startup query)"
+
+lessons:
+  - title: "Unconstrained prompts work better than constrained"
+    detail: "Removing exact label constraints improved quality. The LLM understands provisions better when not fighting format requirements."
+    tag: architecture
+  - title: "Invented labels are discoveries, not errors"
+    detail: "Water undertaker, liquidator, special negotiating body are real legal actors not in the dictionary. The corpus teaches what actors exist."
+    tag: data-quality
+  - title: "Dictionary will always lag behind the corpus"
+    detail: "EU retained law introduces actors not anticipated from UK domestic law. Systematic discovery pipeline needed."
+    tag: process
+---
+
 # Session: Actor Labels — Let the LLM Name, Dictionary Match (CLOSED)
 
 ## Context

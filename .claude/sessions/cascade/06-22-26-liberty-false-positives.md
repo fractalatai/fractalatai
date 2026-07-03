@@ -1,3 +1,37 @@
+---
+session: "Liberty False Positives"
+status: closed
+opened: 2026-06-22
+closed: 2026-06-22
+outcome: success
+
+summary: >
+  Fixed Liberty recall drop from 81.8% to 64.1% after Rule remap. Root cause was
+  government v1/v2 patterns matching on semantic keywords without checking modal type.
+  Added modal awareness (first_modal_is_enabling), immunity exemptions, and gate overrides.
+  Regex-only benchmark reached 85.6%. Identified regex ceiling at ~95 remaining mismatches
+  requiring classifier/LLM.
+
+decisions:
+  - what: "Add modal context awareness to government patterns"
+    why: "Government enforcement/direction patterns returned Obligation even when the first modal was enabling (may/power to)"
+    result: "first_modal_is_enabling() + apply_modal_context() wrapper. Liberty recall 64.1% to 69.2%."
+  - what: "Add immunity exemptions to legal fiction rejection"
+    why: "13 gold=Liberty provisions rejected as legal fiction (\"Nothing in... taken to compel\", \"shall not affect entitlement\")"
+    result: "IMMUNITY_RE exemption added. 2 provisions recovered."
+  - what: "Government actor overrides for offence and repeal gates"
+    why: "Government actors in offence/repeal provisions still had genuine Liberty classifications being gated"
+    result: "+14 provisions recovered. Liberty recall to 73.4%."
+
+lessons:
+  - title: "Regex has a ceiling around 85-86%"
+    detail: "Remaining 95 mismatches require semantic understanding (mixed modals, implied actors) beyond regex capability. Classifier and LLM are the path forward."
+    tag: architecture
+  - title: "Traceability is essential for systematic debugging"
+    detail: "The --trace flag and benchmark_trace.json enabled systematic profiling of all 68 Liberty-to-none errors by root cause category."
+    tag: debugging
+---
+
 # Session: Liberty False Positives (CLOSED)
 
 ## Problem

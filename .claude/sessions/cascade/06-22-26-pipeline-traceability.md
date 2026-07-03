@@ -1,3 +1,37 @@
+---
+session: "Pipeline Traceability & Refactor — Meta Plan"
+status: closed
+opened: 2026-06-22
+closed: 2026-06-22
+outcome: success
+
+summary: >
+  Separated signal detection from decision logic in the DRRP regex pipeline. Introduced
+  SignalSet, PatternSignal, RejectedSignal, and DecisionTrail types. All 5 tiers now
+  extract all matches and rejections via extract_*_signals(). parse_v2 delegates to
+  parse_v2_with_trail. taxa show displays decision trail. taxa parse --trace persists
+  trail to JSON. 492 tests pass including shadow-mode verification.
+
+decisions:
+  - what: "Separate signal detection from decision logic"
+    why: "102+ interleaved decision branches made debugging impossible. Tracing required seeing what all tiers would have said, not just the winner."
+    result: "extract_all() returns SignalSet with all matches and rejections. decide() picks the best classification. Tracing is trivial."
+  - what: "Implement all 5 stages in a single session"
+    why: "Gemini review approved the plan. Shadow-mode test in Stage 4 provided regression safety net."
+    result: "5 commits, types through to CLI exposure, 492 tests passing."
+  - what: "Typed DecisionReason enum over string reasons"
+    why: "Gemini feedback: typed enums are safer and more queryable than string reasons"
+    result: "TierPriority(SignalTier), NoSignals, PurposeGated etc. implemented with shadow test on 54 hard provisions."
+
+lessons:
+  - title: "Signal/decision separation is industry-standard NLP"
+    detail: "Gemini review confirmed this is the annotation pipeline pattern. Sets up future ML integration where signals from different sources are collected then resolved."
+    tag: architecture
+  - title: "Shadow-mode testing enables safe refactoring"
+    detail: "Running old and new paths in parallel on 54 hard provisions caught tie-breaking differences before they became regressions."
+    tag: testing
+---
+
 # Session: Pipeline Traceability & Refactor — Meta Plan (CLOSED)
 
 ## Motivation

@@ -1,3 +1,32 @@
+---
+session: "Benchmark Post-Restructure"
+status: closed
+opened: 2026-06-18
+closed: 2026-06-22
+outcome: success
+
+summary: >
+  Ran benchmark against the restructured 3-class pipeline (parse/classify/escalate).
+  DRRP accuracy 84.4% (down from 86.3% pre-restructure). Actor position accuracy 34.3%.
+  Liberty false positives and actor position gaps identified as follow-on sessions.
+
+decisions:
+  - what: "Use local data/benchmarks/ instead of NAS benchmarks"
+    why: "NAS benchmark files were corrupted"
+    result: "Benchmark report pointed to local copy. Results consistent."
+  - what: "Spawn focused follow-on sessions for each error pattern"
+    why: "Liberty FPs, actor position, and Rule class each need separate investigation"
+    result: "Three daughter sessions created for liberty-false-positives, actor-position-coverage, rule-class-cleanup"
+
+lessons:
+  - title: "Lance panic on drrp_history blocked benchmark for 3 days"
+    detail: "List<Struct> column in LanceDB caused panics. Migrated to JSON string column (Utf8) to unblock. Simpler schemas are more robust for complex nested data."
+    tag: data-store
+  - title: "Restructure preserved accuracy within 2pp"
+    detail: "84.4% vs 86.3% pre-restructure is acceptable. The 1.9pp drop is from Rule class reclassification, not a regression in the core pipeline."
+    tag: pipeline
+---
+
 # Session: Benchmark Post-Restructure (CLOSED)
 
 ## Progress

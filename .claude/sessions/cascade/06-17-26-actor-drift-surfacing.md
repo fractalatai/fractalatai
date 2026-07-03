@@ -1,3 +1,40 @@
+---
+session: "Actor Drift Surfacing"
+status: closed
+opened: 2026-06-17
+closed: 2026-06-17
+outcome: success
+
+summary: >
+  Systematised actor dictionary expansion from benchmark analysis. Created actor-drift skill with
+  automated gap surfacing script. Added 9 new actors (GEMA, Conformity Assessment Body, Approved
+  Body, Responsible Officer, Participant, Licensee, Appellant, Hirer, Notifying Authority).
+  Reclassified 7 Spc actors from government back to governed based on the principle that
+  delegated function does not equal government.
+
+decisions:
+  - what: "Create systematic actor-drift skill for dictionary expansion"
+    why: "Each QA cycle surfaces missing entities. Need repeatable workflow, not ad-hoc fixes."
+    result: "Skill with surface_missing_actors.py script, governed/government decision rules, family gating"
+  - what: "Reclassify delegated-function bodies from government to governed"
+    why: "A private body performing a public function (certification, compliance) bears Duties, not Responsibilities"
+    result: "7 Spc actors reclassified: Administrator, Compliance Body, Certification Body, Approval Body, Appeal Body, Conformity Assessment Body, Approved Body"
+  - what: "Gate family-specific actors to prevent false positives"
+    why: "Some entities (e.g. Licensee in Offshore context) would cause false matches in other families"
+    result: "families field in YAML dictionary for family-specific actors"
+
+lessons:
+  - title: "Exercises regulatory functions does not equal government"
+    detail: "A certification body issuing certificates is performing a delegated function. It bears Duties (governed), not Responsibilities (government)."
+    tag: data-quality
+  - title: "Actor dictionary must grow with the corpus"
+    detail: "31 Duty provisions missed because duty-bearer entity not in dictionary. Systematic surfacing needed after every benchmark run."
+    tag: process
+  - title: "Family gating prevents false positives"
+    detail: "Entities appearing in fewer than 3 families should be gated to those families in the YAML dictionary."
+    tag: architecture
+---
+
 # Session: Actor Drift Surfacing (CLOSED)
 
 ## Context

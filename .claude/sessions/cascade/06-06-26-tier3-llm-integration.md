@@ -1,4 +1,52 @@
-# Session: Next — Tier 3 LLM Integration
+---
+session: "Tier 3 LLM Integration"
+status: closed
+opened: 2026-06-06
+closed: 2026-06-07
+outcome: success
+
+summary: >
+  Wired Gemini 2.5 Flash into enrich_single_law() after Tier 1 pass for inherited provisions
+  with multiple actors. Solved thinking-token budget issue (thinkingBudget: 256, maxOutputTokens: 2048).
+  Added label validation (canonical vs invented), finalized actors struct with reason field and
+  primary-holder role. Built 12-test unit suite. Enriched and published OH&S corpus to sertantai
+  (14,100 provisions, 37% more actors per provision than flat columns). Discovered that flat columns
+  were silently dropping ~30% of holder actors. Designed Hohfeldian role taxonomy (active/counterparty/
+  beneficiary/mentioned) aligned with DRRP types, validated by Gemini review and LKIF-Core research.
+
+decisions:
+  - what: "thinkingBudget: 256 + maxOutputTokens: 2048 for Gemini REST API"
+    why: "Thinking tokens consume the maxOutputTokens budget in REST API (Python SDK handles this transparently)"
+    result: "Eliminated MAX_TOKENS truncation that was cutting off JSON responses"
+  - what: "label_source field: canonical vs invented"
+    why: "LLM may generate actor labels not in the dictionary -- need to distinguish for downstream filtering"
+    result: "extraction_method = agentic_unvalidated when any actor has invented label"
+  - what: "Hohfeldian position taxonomy: active/counterparty/beneficiary/mentioned"
+    why: "Previous role=holder was doing all the lifting -- a duty-bearing employer and power-wielding inspector both got holder"
+    result: "Position + DRRP type gives full Hohfeldian relation (active on DUTY = duty-holder, active on POWER = power-holder)"
+  - what: "Remove flat actor columns from zenoh provision payload"
+    why: "Struct captures all information; flat columns were silently dropping ~30% of holder actors"
+    result: "1,409 provisions gained actor data that flat columns missed entirely"
+  - what: "Use counterparty instead of correlative for the opposing position"
+    why: "Gemini review agreed counterparty is clearer for non-Hohfeldian readers"
+    result: "Agreed schema: active/counterparty/beneficiary/mentioned with optional relates_to field"
+
+lessons:
+  - title: "Gemini REST API thinking budget differs from Python SDK"
+    detail: "REST API needs explicit thinkingBudget config or thinking tokens eat the output budget. Python SDK handles this transparently."
+    tag: integration
+  - title: "Flat columns were silently lossy"
+    detail: "37% more actors per provision in the struct vs flat columns. 1,409 provisions had struct data but no flat column data at all."
+    tag: data-quality
+  - title: "Crown and HM Forces are dual-natured"
+    detail: "Crown acts as authority in some provisions and duty holder in others (HSWA s.48). The per-provision position field handles this naturally."
+    tag: domain
+  - title: "LKIF-Core validates the approach"
+    detail: "LKIF-Core norm.owl models the same Hohfeldian concepts. Our position field is a pragmatic projection of their richer ontology onto Arrow/LanceDB."
+    tag: architecture
+---
+
+# Session: 2026-06-06 — Tier 3 LLM Integration (CLOSED)
 
 ## Context
 

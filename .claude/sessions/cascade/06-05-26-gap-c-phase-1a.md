@@ -1,4 +1,37 @@
-# Session: 2026-06-05 — Gap C Phase 1A: Deterministic Parent Inheritance
+---
+session: "Gap C Phase 1A: Deterministic Parent Inheritance"
+status: closed
+opened: 2026-06-05
+closed: 2026-06-05
+outcome: success
+
+summary: >
+  Built Tier 1 of the Gap C resolution pipeline: deterministic parent-clause inheritance.
+  When a provision has no DRRP but has a duty-bearing purpose, walks up the document hierarchy
+  to find the nearest ancestor with actors and inherits them. Achieved +13.7% uplift across
+  the customer corpus (8,648 provisions inherited across 141 of 274 laws).
+
+decisions:
+  - what: "In-memory parent lookup instead of extra LanceDB queries"
+    why: "All provisions already loaded in batches, avoids I/O overhead"
+    result: "Fast hierarchy walk with no additional database round-trips"
+  - what: "Deepest-first walk order for inheritance"
+    why: "Prevents override trap where intermediate child redefines actor"
+    result: "74.1% of inheritance at distance 1 (immediate parent), confirming nearest-parent resolves the majority"
+  - what: "Store holder_inferred_from as Utf8 (comma-joined) instead of List"
+    why: "LanceDB SQL type limitation on List columns"
+    result: "Working schema migration via ensure_gap_c_columns()"
+
+lessons:
+  - title: "Parent inheritance resolves most Gap C"
+    detail: "ChatGPT predicted nearest-parent would resolve the vast majority of gaps. Confirmed: 74.1% at distance 1."
+    tag: architecture
+  - title: "Only fill gaps, never override"
+    detail: "If regex found any actor, Tier 1 does not override. Prevents regression on the 63,260 regex-extracted provisions."
+    tag: design
+---
+
+# Session: 2026-06-05 — Gap C Phase 1A: Deterministic Parent Inheritance (CLOSED)
 
 ## Context
 

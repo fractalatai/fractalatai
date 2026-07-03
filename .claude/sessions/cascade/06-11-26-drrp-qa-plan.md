@@ -1,3 +1,44 @@
+---
+session: "DRRP QA Plan — Polishing Results, Models, Code, Testing"
+status: closed
+opened: 2026-06-11
+closed: 2026-06-17
+outcome: success
+
+summary: >
+  Comprehensive QA session covering code review, golden benchmarks, and classifier analysis. Fixed
+  P1-P4 code issues (government pattern spans, confidence hierarchy, purpose gate, penalty false
+  positives). Built 2,250-provision golden benchmark across 16 families. Achieved POC Duty detection
+  82.7% (up from 67.1% baseline). Identified regex ceiling at ~71%, classifier adds ~8pp, and
+  remaining ~13% gap requires LLM. Designed unified YAML actor dictionary to replace three
+  disconnected sources of truth.
+
+decisions:
+  - what: "Fix code before optimising models (P1-P4 priority)"
+    why: "Gemini code review found government patterns had no span (all positions defaulted to active)"
+    result: "P1-P4 fixes moved DRRP accuracy from 67.1% to 70.7%. Responsibility recall 49% to 76.6%."
+  - what: "Replace numeric confidence with source_tier() based on extraction_method"
+    why: "Routing confidence (0.30/0.80/0.90) conflated with classification confidence. A structural 0.90 blocked classifier 0.85."
+    result: "Clean tier hierarchy: agentic > classifier > regex. No more confidence arithmetic."
+  - what: "Unify three actor sources into single YAML dictionary"
+    why: "actors.rs (92 hardcoded tuples), actor-dictionary.yaml (105 entries), duty_patterns.rs (27 keywords) diverge. Adding an actor requires updating all three."
+    result: "Design for single YAML with regex_patterns, llm_triggers, drrp_keywords, and type field"
+
+lessons:
+  - title: "Regex ceiling confirmed at ~71%"
+    detail: "~200 provisions unreachable by regex (no actors, no modal, or structural mismatch). Classifier + LLM needed for remaining 29%."
+    tag: architecture
+  - title: "POC Duty detection is 82.7% when counting stale gold"
+    detail: "95 'Duty to Responsibility misclassifications' were the pipeline being correct and the gold standard being stale."
+    tag: data-quality
+  - title: "Three mismatch patterns drive most errors"
+    detail: "EU directive subordinate clauses, inverted duty phrasing, and counterparty detection. Each needs a different fix layer."
+    tag: data-quality
+  - title: "Classifier beats regex on non-DRRP, regex beats classifier on DRRP"
+    detail: "Ensemble approach: trust regex positions for DRRP provisions, trust classifier for non-DRRP provisions."
+    tag: architecture
+---
+
 # Session: DRRP QA Plan — Polishing Results, Models, Code, Testing (CLOSED)
 
 ## Closed: 2026-06-17

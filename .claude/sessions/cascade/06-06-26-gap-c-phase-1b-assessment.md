@@ -1,4 +1,41 @@
-# Session: 2026-06-06 — Gap C Phase 1B Assessment: Cross-Reference Resolver
+---
+session: "Gap C Phase 1B Assessment: Cross-Reference Resolver"
+status: closed
+opened: 2026-06-06
+closed: 2026-06-06
+outcome: success
+
+summary: >
+  Assessed whether Phase 1B (cross-reference resolver) was needed. Found zero C4 candidates
+  remain after Tier 1 inheritance -- all 78,169 remaining no-DRRP provisions have no purposes
+  assigned. Deferred Phase 1B to issue #36. Fixed distance-0 sibling bug, applied Pattern 1
+  heading exclusion fix, built Tier 1 QA skill. QA precision: 76.2% -- ceiling reached due to
+  recipient-vs-holder confusion (Pattern 2), which is Tier 3 territory not a Tier 1 fix.
+
+decisions:
+  - what: "Defer Phase 1B (cross-reference resolver)"
+    why: "Zero C4 candidates remain in the customer corpus after Tier 1 inheritance"
+    result: "Tracked as fractalaw/fractalaw#36, will revisit when making classifier refresh brings new laws"
+  - what: "Exclude part, chapter, heading, title section_types as inheritance sources"
+    why: "Pattern 1 failures: provisions inheriting from structural headings like \"Part V: Rights of Owners\""
+    result: "7,375 to 6,175 inherited (1,200 false structural matches removed)"
+  - what: "Accept 76% precision as Tier 1 ceiling"
+    why: "Remaining errors are actor extraction problems (recipient vs holder) not inheritance logic problems"
+    result: "Pattern 2 deferred to Tier 3 LLM classification"
+
+lessons:
+  - title: "Pre-implementation assessment saves work"
+    detail: "Surveying the remaining Gap C provisions before building the cross-reference resolver revealed zero candidates, avoiding an unnecessary build."
+    tag: process
+  - title: "76% is the deterministic inheritance ceiling"
+    detail: "Recipient-vs-holder confusion requires semantic understanding. Fixing it in Tier 1 would risk regressions on 63,260 regex-extracted provisions."
+    tag: architecture
+  - title: "Distance-0 false matches from sibling prefix"
+    detail: "388 provisions had ancestor_distance=0 due to false sibling prefix match in hierarchy walk. Fixed in commit 5fc161e."
+    tag: bugfix
+---
+
+# Session: 2026-06-06 — Gap C Phase 1B Assessment: Cross-Reference Resolver (CLOSED)
 
 ## Context
 

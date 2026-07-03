@@ -1,4 +1,42 @@
-# Session: Hohfeldian Position Model Build
+---
+session: "Hohfeldian Position Model Build"
+status: closed
+opened: 2026-06-07
+closed: 2026-06-07
+outcome: success
+
+summary: >
+  Implemented the Hohfeldian position model replacing the role field with position
+  (active/counterparty/beneficiary/mentioned). Position derives meaning from the provision's
+  DRRP type -- active on DUTY = duty-holder, active on POWER = power-holder, counterparty on
+  DUTY = claim-holder. Removed recipient_type field (redundant with position + DRRP). Added
+  relates_to field for pairwise actor-to-actor linkage. Moved HM Forces from government to
+  governed definitions. Implemented in commit 4a1e544.
+
+decisions:
+  - what: "Replace role field with position (active/counterparty/beneficiary/mentioned)"
+    why: "Previous role=holder collapsed all DRRP types -- duty-bearing employer and power-wielding inspector both got holder"
+    result: "Position + DRRP type gives full Hohfeldian relation without explicit role proliferation"
+  - what: "Remove recipient_type field"
+    why: "Redundant when position + DRRP tells the full story (counterparty on DUTY = claim-holder)"
+    result: "Simpler schema with no information loss"
+  - what: "Add relates_to field for pairwise actor linkage"
+    why: "Flat actor lists cannot express which active actor's duty maps to which counterparty's claim (e.g., CDM multi-contractor sites)"
+    result: "Optional field, null when relation is provision-wide (most cases)"
+  - what: "Move HM Forces from government to governed definitions"
+    why: "HM Forces act as duty holders in many provisions (HSWA s.48 binds the Crown including HM Forces)"
+    result: "Agreed in Gemini review, Crown stays government but HM Forces moved to governed"
+
+lessons:
+  - title: "Position is a projection, not an enumeration"
+    detail: "Four position values times four DRRP types gives 16 legal relations from a simple flat schema. Richer than enumerating all roles explicitly."
+    tag: architecture
+  - title: "LKIF-Core validates the Hohfeldian approach"
+    detail: "The LKIF-Core norm.owl models the same Hohfeldian concepts with more granularity. Our position field is a pragmatic simplification suitable for Arrow storage."
+    tag: research
+---
+
+# Session: 2026-06-07 — Hohfeldian Position Model Build (CLOSED)
 
 ## Context
 

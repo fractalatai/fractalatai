@@ -1,3 +1,30 @@
+---
+session: "Rule Class Cleanup"
+status: closed
+opened: 2026-06-22
+closed: 2026-06-22
+outcome: success
+
+summary: >
+  Remapped DutyFamily::Rule to Obligation in the regex tier. Rule had 0 gold support
+  but 23 pipeline predictions (all false positives). Rule regex tier still runs for
+  thing-subject detection but outputs Obligation. 138 orphaned provisions (DRRP but no
+  actors) identified for follow-on work.
+
+decisions:
+  - what: "Remap Rule to Obligation instead of removing Rule detection"
+    why: "Thing-subject detection is a useful signal (equipment shall be suitable). The DRRP type should be Obligation with an implied duty-holder."
+    result: "Rule FPs eliminated. Liberty precision improved 66.7% to 81.8%. Liberty recall dropped to 64.1% (addressed in liberty-false-positives session)."
+
+lessons:
+  - title: "Legacy classes with 0 gold support are noise"
+    detail: "Rule was producing only false positives. Remapping to a supported class eliminated an entire error category."
+    tag: data-quality
+  - title: "Orphaned provisions (DRRP but no actors) are a systemic gap"
+    detail: "138 thing-subject provisions have Obligation but no duty-holder. Position classifier skips empty-actor provisions entirely."
+    tag: pipeline
+---
+
 # Session: Rule Class Cleanup (CLOSED)
 
 ## Problem

@@ -1,3 +1,38 @@
+---
+session: "LLM Batch Strategy"
+status: closed
+opened: 2026-06-23
+closed: 2026-06-23
+outcome: success
+
+summary: >
+  Built taxa validate command for whole-law and section-targeted LLM validation with
+  full audit logging. Whole-law costs 1.4x more tokens but catches 170 hard-floor errors
+  that per-provision escalation cannot reach. Over-correction confirmed as primary risk
+  (8 hurt vs 3 helped on first test). Added exemption guidance to prompt, reducing false
+  corrections to 0. Tiered batching strategy validated across full QQ corpus: 3,808
+  corrections in 301 audit logs.
+
+decisions:
+  - what: "Audit-only by default, require --apply flag to write corrections"
+    why: "First test showed LLM over-correction: 8 provisions made worse, only 3 improved. Auto-applying is unsafe."
+    result: "taxa validate logs corrections to JSON audit files. Human review required before application."
+  - what: "Tiered batching based on law size"
+    why: "Section clustering is weak (mostly singletons). Whole-law is viable for small laws. Section-targeted for large laws."
+    result: "214 small laws whole-law, 95 medium/large section-targeted. $0.18 + $1-3 cost. Half the API calls."
+  - what: "Add exemption guidance to validate prompt"
+    why: "7 of 8 LLM disagreements with gold were on exemption provisions. Prompt lacked exemption instruction from benchmark system prompt."
+    result: "Retested: 25 corrections reduced to 0 false corrections on the test law."
+
+lessons:
+  - title: "LLM validation value is the review list, not auto-correction"
+    detail: "Human reviewer looks at 34 corrections (5 minutes) instead of reading 361 provisions. The audit log surfaces exactly the borderline cases."
+    tag: pipeline
+  - title: "Full audit chain enables regulated compliance"
+    detail: "regex (--trace) -> classifier (drrp_history) -> LLM (audit JSON) -> human (adjudicated JSON). Complete provenance for every classification decision."
+    tag: compliance
+---
+
 # Session: LLM Batch Strategy (CLOSED)
 
 ## Problem

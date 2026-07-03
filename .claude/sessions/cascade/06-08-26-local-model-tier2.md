@@ -1,4 +1,43 @@
-# Session: Local Model Installation — Tier 2 Classifier
+---
+session: "Local Model Installation — Tier 2 Classifier"
+status: closed
+opened: 2026-06-08
+closed: 2026-06-08
+outcome: success
+
+summary: >
+  Installed Ollama with Gemma 3 4B for local Tier 2 inference. Wired into enrichment pipeline with
+  confidence protection, QA correction write-back, and friendly label mapping. Discovered regex
+  confidence is not predictive through 53-sample QA analysis, leading to cascade strategy v0.3
+  with actor-count routing replacing confidence-based routing.
+
+decisions:
+  - what: "Install Gemma 3 4B via Ollama for CPU-only local inference"
+    why: "CPU-only hardware (Intel UHD 630), need local Tier 2 model to avoid API costs for 30% of provisions"
+    result: "5.6 tok/s on CPU, correct employer/employee classification on first test"
+  - what: "Implement confidence protection ratchet (data quality only goes up)"
+    why: "QA corrections at 0.90 must survive re-enrichment runs"
+    result: "Gemini 0.90 correction verified to survive --force re-enrichment"
+  - what: "Demote regex to sieve based on QA data analysis"
+    why: "53-sample analysis showed regex INCORRECT avg confidence (0.76) > CORRECT avg (0.68)"
+    result: "Cascade strategy v0.3 with actor-count routing instead of confidence-based routing"
+
+lessons:
+  - title: "Regex confidence is not predictive"
+    detail: "Measures match quality, not classification correctness. Multi-actor provisions at 12% precision vs single-actor at 80%."
+    tag: data-quality
+  - title: "Actor count is the discriminator"
+    detail: "Single-actor provisions are reliable, multi-actor provisions are not. This is the routing signal."
+    tag: architecture
+  - title: "Data quality ratchet works"
+    detail: "QA corrections at 0.90 survive re-enrichment. Each QA pass incrementally improves the dataset."
+    tag: process
+  - title: "Friendly labels fix 4B truncation"
+    detail: "Mapping Org_Employer to Org: Employer on response prevents label format issues with small models."
+    tag: engineering
+---
+
+# Session: Local Model Installation — Tier 2 Classifier (CLOSED)
 
 ## Context
 

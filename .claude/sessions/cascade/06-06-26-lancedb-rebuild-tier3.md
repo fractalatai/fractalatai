@@ -1,4 +1,41 @@
-# Session: Next — LanceDB Table Rebuild + Tier 3 Integration
+---
+session: "LanceDB Table Rebuild + Tier 3 Integration"
+status: closed
+opened: 2026-06-06
+closed: 2026-06-06
+outcome: partial
+
+summary: >
+  Rebuilt the LanceDB legislation_text table with native Arrow List<Struct> for the actors
+  column, eliminating the JSON Utf8 workaround. Fragment bloat reduced from 8.6 GB to 401 MB.
+  All 162,104 rows verified with embeddings intact. Full corpus re-enriched with --gap-c --force
+  in per-family batches (67,303 provisions with native actors struct). Tier 3 LLM integration
+  deferred to next session.
+
+decisions:
+  - what: "Export-to-Parquet rebuild approach instead of in-place migration"
+    why: "LanceDB cannot alter struct columns in place -- full rebuild preserves embeddings via Parquet export"
+    result: "162,104 rows rebuilt, embeddings intact, 8.6 GB to 401 MB (25x bloat eliminated)"
+  - what: "Per-family batch re-enrichment instead of full corpus at once"
+    why: "LanceDB merge_insert creates ~25x write amplification, full pass would bloat to ~8 GB again"
+    result: "80 named families enriched with 2 mid-run compactions needed"
+  - what: "Create rebuild-based compaction script"
+    why: "pylance not installed, so optimize()/cleanup_old_versions() unavailable"
+    result: "scripts/compact_lance.py -- export to Parquet, drop, recreate from Parquet"
+
+lessons:
+  - title: "LanceDB fragment bloat is dramatic"
+    detail: "97K rows times merge_insert creates ~8 GB of new fragments per full pass. Rebuild-based compaction is the only option without pylance."
+    tag: infrastructure
+  - title: "NAS backup before rebuild is essential"
+    detail: "9 hours of CPU time for embeddings makes the backup-before-rebuild pattern non-negotiable."
+    tag: operations
+  - title: "Family naming drift discovered"
+    detail: "DuckDB has emoji-prefixed (150) and plain (13,322) family names -- needs reconciliation."
+    tag: data-quality
+---
+
+# Session: 2026-06-06 — LanceDB Table Rebuild + Tier 3 Integration (CLOSED)
 
 ## Context
 

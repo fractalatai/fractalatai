@@ -1,3 +1,29 @@
+---
+session: "Offence Provision Gating"
+status: closed
+opened: 2026-06-17
+closed: 2026-06-17
+outcome: success
+
+summary: >
+  Added offence provision gating and legal fiction rejection to the DRRP pipeline.
+  Benchmark accuracy improved from 83.4% to 86.3%. False positives halved from 211
+  to 128. Remaining issues raised as GH issues #39, #40, #41.
+
+decisions:
+  - what: "Gate offence-primary provisions like Enactment/Amendment"
+    why: "Offence provisions describe consequences, not obligations. The duty is in the parent/sibling section."
+    result: "Option A implemented. Offence provisions skip DRRP unless strong canonical actor+modal pattern present."
+  - what: "Tighten Process+Rule gate for legal fiction language"
+    why: "52 false positives from \"shall be treated/deemed/construed as\" provisions using shall in interpretive sense"
+    result: "Legal fiction rejection added. Provisions require governed v2 anchor match before producing DRRP."
+
+lessons:
+  - title: "Purpose gate is a scalable FP reduction mechanism"
+    detail: "Gating structural provision types at the purpose level is cleaner than pattern-level fixes. Offence gate follows the same pattern as Enactment/Amendment gates."
+    tag: architecture
+---
+
 # Session: Offence Provision Gating (CLOSED)
 
 ## Outcome

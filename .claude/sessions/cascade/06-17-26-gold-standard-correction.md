@@ -1,3 +1,43 @@
+---
+session: "Gold Standard Correction + 3-Class Model Migration"
+status: closed
+opened: 2026-06-17
+closed: 2026-06-18
+outcome: success
+
+summary: >
+  Migrated entire pipeline and gold standard from 5-class DRRP to 3-class (Obligation/Liberty/none).
+  Corrected ~160 stale gold labels in benchmark Parquet files. Migrated 30,970 LanceDB provisions
+  including 1,636 agentic. Codified 5 cascade transition rules. Achieved 81.6% overall accuracy
+  with Obligation recall at 90.4% (target hit). Identified remaining gaps: 139 classifier FPs on
+  none, 50 Liberty misses, and 60 Liberty-to-Obligation misclassifications.
+
+decisions:
+  - what: "Switch entire pipeline to 3-class (Obligation/Liberty/none)"
+    why: "5-class creates decomposition errors whenever actor type is wrong. Duty vs Responsibility is derivable from actor labels."
+    result: "81.6% accuracy, Obligation recall 90.4%. Consumer decomposes at display time."
+  - what: "Keep Rule provisions as Obligation in gold standard"
+    why: "LLM correctly identifies implied duty-bearer from context. Pipeline's Rule classification is the gap, not the gold."
+    result: "28 Rule provisions remain as Obligation targets for future classifier/LLM improvement"
+  - what: "Codify cascade transition rules (5 rules)"
+    why: "Pipeline is a cascade where each tier ADDS signal. Need clear rules for how tiers interact."
+    result: "Regex always first, classifier always second, disagreements are LLM candidates, drrp_types reflects highest tier"
+
+lessons:
+  - title: "Stale gold is worse than no gold"
+    detail: "95 provisions marked gold=Duty were actually Responsibility. The pipeline was correct, the benchmark was wrong."
+    tag: data-quality
+  - title: "3-class eliminates a whole category of errors"
+    detail: "Duty vs Responsibility confusion disappears. The governed/government distinction belongs in actor labels, not DRRP types."
+    tag: architecture
+  - title: "Legal fictions use shall in the interpretive sense"
+    detail: "52 false positives from 'shall be treated/deemed/construed as' and 'Nothing in this section shall'. Not obligations."
+    tag: data-quality
+  - title: "Arrow IPC backup needed for compact"
+    detail: "Parquet cannot handle null list components in the actors struct. Arrow IPC preserves the full schema."
+    tag: engineering
+---
+
 # Session: Gold Standard Correction + 3-Class Model Migration (CLOSED)
 
 ## Context

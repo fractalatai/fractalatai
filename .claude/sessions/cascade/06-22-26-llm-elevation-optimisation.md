@@ -1,3 +1,31 @@
+---
+session: "LLM Elevation Optimisation"
+status: closed
+opened: 2026-06-22
+closed: 2026-06-22
+outcome: success
+
+summary: >
+  Fixed disagreement check bug that elevated 76% false positives to LLM. Added
+  regex_drrp != cls_drrp check. Tuned disagreement threshold from 0.9 to 0.75
+  (precision optimum). Benchmark 85.6% to 86.0%. LLM-elevated from 398 to 134
+  provisions. Profiled 239 unflagged errors — 170 are hard floor where both tiers
+  agree on the wrong answer.
+
+decisions:
+  - what: "Add disagreement check before flagging as pending_llm"
+    why: "76% of LLM-elevated provisions were already correct — regex and classifier agreed on the right answer"
+    result: "LLM-elevated reduced from 398 to 125. FP rate from 76% to 32%."
+  - what: "Lower disagreement threshold from 0.9 to 0.75"
+    why: "54 provisions had correct classifier answer below 0.9 threshold. Sweep showed 0.75 is precision optimum."
+    result: "Benchmark 85.6% to 86.0%. Perfect LLM ceiling 89.4% to 89.8%."
+
+lessons:
+  - title: "170 hard-floor errors need better models, not better thresholds"
+    detail: "When both regex and classifier confidently agree on the wrong answer, no threshold tuning can help. These need either more training data, a larger model, or the LLM tier."
+    tag: pipeline
+---
+
 # Session: LLM Elevation Optimisation (CLOSED)
 
 ## Problem

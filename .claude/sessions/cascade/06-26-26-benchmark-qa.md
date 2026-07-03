@@ -1,3 +1,31 @@
+---
+session: "Benchmark QA"
+status: closed
+opened: 2026-06-26
+closed: 2026-06-26
+outcome: success
+
+summary: >
+  Rewrote benchmark_report.py to query provision_actors + gold_benchmarks tables.
+  Established per-tier baselines: regex 51.2% position / 84.6% DRRP, classifier 57.7%
+  position / 84.6% DRRP across 986 matched actors from 4,062 gold entries. Disagreement
+  analysis shows classifier is right 60% of the time when tiers disagree. 18.5% of
+  matched actors have both tiers agreeing on the wrong answer.
+
+decisions:
+  - what: "Benchmark from provision_actors + gold_benchmarks SQL"
+    why: "Per-actor per-tier benchmarking requires normalised tables, not JSONB parsing"
+    result: "Simple SQL joins for accuracy, confusion matrices, and per-category breakdowns"
+
+lessons:
+  - title: "Classifier adds value despite low absolute accuracy"
+    detail: "When regex and classifier disagree, classifier is right 60% of the time (195 vs 131). The signal is valuable for LLM elevation targeting."
+    tag: pipeline
+  - title: "Per-category accuracy varies widely"
+    detail: "Classifier better on Ind/Spc/other/EU actors. Regex better on Gvt/Org. Different actor categories need different tier strategies."
+    tag: data-quality
+---
+
 # Session: Benchmark QA (CLOSED)
 
 ## Context
