@@ -1,6 +1,6 @@
 Close the current session and add a YAML frontmatter learning block.
 
-1. **Identify the active session**: The user will specify which session doc to close, or it will be obvious from the current conversation context. Session docs live in `.claude/sessions/cascade/`.
+1. **Identify the active session**: The user will specify which session doc to close, or it will be obvious from the current conversation context. Session docs live in `.claude/sessions/` (any subdirectory).
 
 2. **Check for incomplete work**: Read the session file and find any unchecked items (`⬜`). If there are incomplete items:
    - List them clearly
@@ -56,6 +56,12 @@ enables:
 6. **Mark deferred items**: Any incomplete work items should be changed from `⬜` to `⏸️` with a note like `(deferred — reason)`.
 
 7. **Present the draft** to the user for review before writing. The frontmatter is a learning document — the user may want to add lessons or correct the narrative.
+
+8. **Rebuild the session index**: After writing the frontmatter, rebuild the SQLite index so the new session is queryable:
+   ```bash
+   /usr/bin/python3 scripts/maintenance/session_index.py --root /var/home/jason/fractalaw
+   ```
+   This is idempotent — it drops and recreates all tables from the markdown source. The `--archive` flag can be added to also move sessions closed >30 days ago to `archive/`.
 
 ## Guidelines
 
