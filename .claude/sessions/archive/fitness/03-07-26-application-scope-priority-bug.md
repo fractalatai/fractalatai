@@ -1,4 +1,42 @@
-# Session: APPLICATION_SCOPE Priority Bug (#26)
+---
+session: APPLICATION_SCOPE Priority Bug
+status: closed
+opened: 2026-03-07
+closed: 2026-03-07
+outcome: success
+
+summary: >
+  Fixed bug where fitness extraction only ran when APPLICATION_SCOPE was the primary
+  purpose. Changed purposes.first() to purposes.contains() in both early-return and
+  DRRP paths. Polarity match 81.4% to 99.0%, 95 provisions recovered.
+
+decisions:
+  - what: "Use purposes.contains() instead of purposes.first() for fitness gate"
+    why: Compound-purpose provisions like Interpretation+Application_Scope were skipped entirely
+    result: "Polarity 81.4%→99.0%, Tagged 58.5%→79.6%, 95 provisions recovered"
+
+metrics:
+  polarity_before: 81.4
+  polarity_after: 99.0
+  tagged_before: 58.5
+  tagged_after: 79.6
+  provisions_recovered: 95
+  tests_passing: 349
+
+lessons:
+  - title: "Per-provision vs per-rule counting matters for compound provisions"
+    detail: polarity_matched was incremented per-rule, so compound provisions (split into 2 rules) counted twice, inflating Polarity% above 100%. Fixed to per-provision counting.
+    tag: methodology
+
+artifacts:
+  - crates/fractalaw-core/src/taxa/mod.rs
+  - crates/fractalaw-cli/src/main.rs
+
+depends_on:
+  - 03-07-26-cross-reference-resolution.md
+---
+
+# Session: APPLICATION_SCOPE Priority Bug (#26) (CLOSED)
 
 **Date**: 2026-03-07
 **Issue**: [#26 — Fitness: APPLICATION_SCOPE as secondary purpose skips fitness extraction](https://github.com/fractalaw/fractalaw/issues/26)

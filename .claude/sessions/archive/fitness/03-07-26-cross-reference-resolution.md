@@ -1,4 +1,49 @@
-# Session: Cross-Reference Provision Resolution (#22)
+---
+session: Cross-Reference Provision Resolution
+status: closed
+opened: 2026-03-07
+closed: 2026-03-07
+outcome: success
+
+summary: >
+  Added cross-reference detection to fitness extraction (Phase 1) and expanded
+  dictionaries (Phase 2). Gap provisions split into vocabulary gaps (actionable)
+  vs cross-reference provisions (need intra-law resolution). Tagged% 52.3%→58.5%,
+  vocabulary gaps 31→10.
+
+decisions:
+  - what: Split gap provisions into vocabulary gaps vs cross-reference provisions
+    why: Cross-ref provisions need different treatment (intra-law resolution) than vocabulary gaps (dictionary expansion)
+    result: "94 gaps split into 31 vocabulary + 63 cross-reference — cleaner candidate term extraction"
+  - what: Phase 3 intra-law resolution deferred
+    why: Requires two-pass enrichment and provision reference parsing, higher complexity for lower ROI
+    result: 57 cross-ref provisions remain unresolved
+
+metrics:
+  tagged_before: 52.3
+  tagged_after: 58.5
+  vocabulary_gaps_before: 31
+  vocabulary_gaps_after: 10
+  cross_refs: 57
+  tests_passing: 347
+
+lessons:
+  - title: "Word-boundary regex breaks on plurals"
+    detail: "\\bfumigation\\b won't match \"fumigations\" because \"n\" is followed by \"s\". Fixed by adding s? in patterns."
+    tag: methodology
+  - title: Cross-ref plural forms need explicit handling
+    detail: "\"regulations 3 and 4\" needs regulations? in the regex, not just regulation."
+    tag: methodology
+
+artifacts:
+  - crates/fractalaw-core/src/taxa/fitness.rs
+  - crates/fractalaw-cli/src/main.rs
+
+depends_on:
+  - 03-01-26-fitness-index-design.md
+---
+
+# Session: Cross-Reference Provision Resolution (#22) (CLOSED)
 
 **Date**: 2026-03-07
 **Issue**: [#22 — Fitness: resolve cross-reference provisions to extract p-dimensions](https://github.com/fractalaw/fractalaw/issues/22)

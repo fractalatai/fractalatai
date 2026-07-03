@@ -1,4 +1,58 @@
-# Session: P-Dimension Dictionary Expansion (#23)
+---
+session: P-Dimension Dictionary Expansion
+status: closed
+opened: 2026-03-07
+closed: 2026-03-07
+outcome: success
+
+summary: >
+  Built corpus audit tooling (taxa audit-fitness) and family-specialist dictionary
+  architecture. OH&S specialist dictionaries (3 dicts, 19 entries) improved tagged%
+  from 46.2% to 52.3%. Two-tier architecture (core + specialist) scales to new families.
+
+decisions:
+  - what: "Option A: runtime family lookup via extract(text, family) parameter"
+    why: Simplest approach — core dict always runs, specialist dicts gated by family prefix at runtime
+    result: "specialist_dicts_for(family) returns specialist dicts when family starts with OH&S"
+  - what: Two-tier dictionary architecture (core universal + family specialist)
+    why: Different law families use fundamentally different vocabulary — universal dicts miss domain terms
+    result: "Adding a new family specialist is ~30 lines of code + a branch in specialist_dicts_for()"
+  - what: Repeatable workflow over one-off expansion
+    why: New families will keep arriving — dictionary expansion must be systematic and auditable
+    result: "7-step runbook in docs/FITNESS-DICTIONARY-RUNBOOK.md"
+
+metrics:
+  core_patterns: 94
+  ohs_specialist_entries: 19
+  tagged_before: 46.2
+  tagged_after: 52.3
+  gap_provisions_before: 118
+  gap_provisions_after: 94
+  tests_passing: 342
+
+lessons:
+  - title: Non-OH&S families have zero APPLICATION_SCOPE because LAT data is missing, not classifier bias
+    detail: CLIMATE CHANGE proves the classifier works universally (150 provisions, 90% polarity). FOOD and Maritime have zero because text not synced from sertantai.
+    tag: data
+  - title: "The two-tier architecture scales well — ~30 lines per new family"
+    detail: Adding OH&S specialist dicts required no structural changes to fitness.rs. New families follow the same pattern.
+    tag: architecture
+
+artifacts:
+  - crates/fractalaw-core/src/taxa/fitness.rs
+  - crates/fractalaw-core/src/taxa/mod.rs
+  - crates/fractalaw-cli/src/main.rs
+  - docs/operations/FITNESS-DICTIONARY-RUNBOOK.md
+
+depends_on:
+  - 03-01-26-fitness-index-design.md
+
+enables:
+  - Fitness expansion to non-OH&S families (once LAT populated)
+  - Purpose classifier investigation (#24)
+---
+
+# Session: P-Dimension Dictionary Expansion (#23) (CLOSED)
 
 **Date**: 2026-03-07
 **Issue**: [#23 — Fitness: expand p-dimension dictionaries to close vocabulary gaps](https://github.com/fractalaw/fractalaw/issues/23)

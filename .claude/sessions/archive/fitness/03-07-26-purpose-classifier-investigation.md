@@ -1,4 +1,38 @@
-# Session: Purpose Classifier Investigation (#24)
+---
+session: Purpose Classifier Investigation
+status: closed
+opened: 2026-03-07
+closed: 2026-03-07
+outcome: success
+
+summary: >
+  Investigated whether purpose classifier was OH&S-biased (it was not). CLIMATE CHANGE
+  audit proved classifier works universally (150 provisions, 90% polarity). Zero results
+  for FOOD/Maritime caused by missing LAT data, not classifier bias. #24 closed as not planned.
+
+decisions:
+  - what: "#24 closed as not planned — no code changes needed"
+    why: Purpose classifier APPLICATION_SCOPE regex is universal (no family-specific logic). Missing results caused by missing LAT data.
+    result: Real blocker for non-OH&S fitness expansion is LAT population from sertantai
+
+metrics:
+  climate_change_provisions: 150
+  climate_change_polarity: 90.0
+  climate_change_tagged: 20.0
+
+lessons:
+  - title: Always verify the root cause before assuming classifier bias
+    detail: Zero results for FOOD/Maritime looked like classifier bias but was actually missing input data. CLIMATE CHANGE disproved the hypothesis immediately.
+    tag: methodology
+
+artifacts:
+  - crates/fractalaw-core/src/taxa/purpose.rs
+
+depends_on:
+  - 03-07-26-p-dimension-dictionary-expansion.md
+---
+
+# Session: Purpose Classifier Investigation (#24) (CLOSED)
 
 **Date**: 2026-03-07
 **Issue**: [#24 — Extend purpose classifier beyond OH&S for APPLICATION_SCOPE detection](https://github.com/fractalaw/fractalaw/issues/24)

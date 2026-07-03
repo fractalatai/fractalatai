@@ -1,4 +1,62 @@
-# Session: Fitness Index Design
+---
+session: Fitness Index Design
+status: closed
+opened: 2026-03-01
+closed: 2026-03-01
+outcome: success
+
+summary: >
+  Designed and implemented the fitness (law applicability) extraction pipeline.
+  5P model (Person, Process, Place, Plant, Property) + Sector. Built fitness.rs
+  module with polarity detection, p-dimension dictionaries, compound provision
+  splitting. Tightened APPLICATION_SCOPE regex from 44.5% to 95.5% polarity match.
+
+decisions:
+  - what: Adopt 5P model with 6th Sector dimension
+    why: Legacy legl 5P model maps well to UK ESH law applicability patterns, but industry/sector needs its own dimension
+    result: 6 p-dimension dictionaries with word-boundary regex matching
+  - what: Two-tier rule structure (law-level + provision-level)
+    why: Law-level rules determine whether law applies at all, provision-level conditions narrow within applicable laws
+    result: Phase 1 targets law-level (regs 1-3), provision-level deferred
+  - what: Regex extraction polished with AI (quality metric TBD)
+    why: Regex handles 95%+ of polarity detection, AI needed only for vocabulary gaps
+    result: fitness.rs module with 23 unit tests
+  - what: Fitness rules live in LanceDB (not DuckDB)
+    why: LanceDB exists to leverage AI for polishing, and fitness rules are per-provision data
+    result: fitness_rules field on TaxaRecord
+
+metrics:
+  polarity_match_before: 44.5
+  polarity_match_after: 95.5
+  tests_passing: 335
+  dictionary_patterns: 94
+  application_scope_provisions: 3130
+  genuine_after_heading_filter: 645
+
+lessons:
+  - title: "55.6% of APPLICATION_SCOPE provisions were upstream false positives"
+    detail: "purpose.rs APPLICATION_SCOPE regex conflated \"application\" (filing/submitting) with \"application\" (scope of law). Tightening the regex removed 2,539 false positives."
+    tag: methodology
+  - title: Heading-only provisions are structural markers with no legal obligation text
+    detail: "Bare \"Application\" headings triggered APPLICATION_SCOPE. Added section_type filter in enrichment to skip heading rows."
+    tag: data
+  - title: Compound provision splitting handles dual-polarity provisions
+    detail: "\"shall not apply... but shall apply...\" correctly splits into separate AppliesTo + DisappliesTo rules. 42 compound provisions handled."
+    tag: architecture
+
+artifacts:
+  - crates/fractalaw-core/src/taxa/fitness.rs
+  - crates/fractalaw-core/src/taxa/mod.rs
+  - crates/fractalaw-core/src/taxa/purpose.rs
+  - crates/fractalaw-cli/src/main.rs
+
+enables:
+  - P-dimension dictionary expansion (#23)
+  - Cross-reference resolution (#22)
+  - Fitness denormalization for publish
+---
+
+# Session: Fitness Index Design (CLOSED)
 
 **Date**: 2026-03-01
 **Objective**: Design an index of law applicability rules ("fitness") that users can be evaluated against. Research existing assets and recommend an architecture.
