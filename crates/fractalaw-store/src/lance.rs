@@ -658,7 +658,7 @@ mod tests {
         let ann = dir.join("amendment_annotations.parquet");
         if !lat.exists() || !ann.exists() {
             panic!(
-                "LAT data not found. Run: duckdb < data/export_lat.sql\n  Expected: {:?}",
+                "LAT data not found. Run: duckdb < data/seed/export_lat.sql\n  Expected: {:?}",
                 dir
             );
         }

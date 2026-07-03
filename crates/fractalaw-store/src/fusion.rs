@@ -374,7 +374,7 @@ mod tests {
         let edges = dir.join("law_edges.parquet");
         if !leg.exists() || !edges.exists() {
             panic!(
-                "Test data not found. Run: duckdb < data/export_legislation.sql\n  Expected: {:?}",
+                "Test data not found. Run: duckdb < data/seed/export_legislation.sql\n  Expected: {:?}",
                 dir
             );
         }

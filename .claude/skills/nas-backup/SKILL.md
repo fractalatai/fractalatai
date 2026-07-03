@@ -24,7 +24,7 @@ Backs up everything. Takes ~5 minutes.
 | Postgres (pg_dump) | ~400 MB | Every pipeline run |
 | DuckDB | ~200 MB | Every enrich/publish |
 | LanceDB | 370 MB–1.4 GB | New law ingestion, re-embed |
-| Classifiers | ~60 KB | Retrain classifier |
+| Classifiers | ~60 KB (JSON in crates/fractalaw-cli/config/) | Retrain classifier |
 | SLM adapter | ~125 MB | Retrain SLM on RunPod |
 | GGUF model | ~2.4 GB | Retrain SLM on RunPod |
 
@@ -85,14 +85,15 @@ cp data/fractalaw.duckdb "$BACKUP_DIR/"
 # LanceDB (copy entire directory — binary fragments, not individual files)
 cp -r data/lancedb/ "$BACKUP_DIR/lancedb/"
 
-# Classifier models (gitignored — only live in data/)
-cp data/drrp_classifier_v*.pkl "$BACKUP_DIR/" 2>/dev/null
+# Classifier models (now JSON in crates/fractalaw-cli/config/)
+# Active versions: drrp_classifier_v8.json, position_classifier_v3.json
+# No longer shipped as .pkl — skip classifier backup
 
 # SLM adapter (only if exists)
 [ -d data/slm-adapter ] && cp -r data/slm-adapter/ "$BACKUP_DIR/slm-adapter/"
 
 # GGUF model (only if exists)
-[ -f data/gemma3-position-q4.gguf ] && cp data/gemma3-position-q4.gguf "$BACKUP_DIR/"
+[ -f models/gemma3-position-q4.gguf ] && cp models/gemma3-position-q4.gguf "$BACKUP_DIR/"
 ```
 
 ### 3. Verify
@@ -128,7 +129,7 @@ PGPASSWORD=fractalaw pg_restore -h localhost -p 5433 -U fractalaw -d fractalaw -
 
 # Restore SLM adapter + GGUF (if needed)
 [ -d "$BACKUP_DIR/slm-adapter" ] && cp -r "$BACKUP_DIR/slm-adapter/" data/slm-adapter/
-[ -f "$BACKUP_DIR/gemma3-position-q4.gguf" ] && cp "$BACKUP_DIR/gemma3-position-q4.gguf" data/
+[ -f "$BACKUP_DIR/gemma3-position-q4.gguf" ] && cp "$BACKUP_DIR/gemma3-position-q4.gguf" models/
 
 # From Parquet backup (if LanceDB is corrupted)
 /usr/bin/python3 -c "

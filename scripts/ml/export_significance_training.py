@@ -109,13 +109,13 @@ def main():
     random.shuffle(test)
 
     # Write JSONL
-    train_path = "data/significance_train.jsonl"
+    train_path = "data/ml/significance_train.jsonl"
     with open(train_path, "w") as f:
         for ex in train:
             out = {"messages": ex["messages"]}
             f.write(json.dumps(out) + "\n")
 
-    test_path = "data/significance_test.jsonl"
+    test_path = "data/ml/significance_test.jsonl"
     with open(test_path, "w") as f:
         for ex in test:
             out = {"messages": ex["messages"]}

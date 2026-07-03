@@ -129,14 +129,14 @@ def main():
     train_rows, test_rows = stratified_split(rows, args.test_fraction)
 
     # Write training JSONL
-    train_path = "data/slm_train.jsonl"
+    train_path = "data/ml/slm_train.jsonl"
     with open(train_path, "w") as f:
         for sid, actor, position, drrp, text in train_rows:
             example = format_example(sid, actor, position, drrp, text, fmt=args.format)
             f.write(json.dumps(example) + "\n")
 
     # Write test JSONL
-    test_path = "data/slm_test.jsonl"
+    test_path = "data/ml/slm_test.jsonl"
     with open(test_path, "w") as f:
         for sid, actor, position, drrp, text in test_rows:
             example = format_example(sid, actor, position, drrp, text, fmt=args.format)
@@ -165,7 +165,7 @@ def main():
     print(f"\nSystem instruction → {system_path}")
 
     # Also write a simple CSV for manual inspection
-    csv_path = "data/slm_training_summary.csv"
+    csv_path = "data/ml/slm_training_summary.csv"
     with open(csv_path, "w") as f:
         f.write("split,section_id,actor_label,position,drrp,text_length\n")
         for sid, actor, position, drrp, text in train_rows:

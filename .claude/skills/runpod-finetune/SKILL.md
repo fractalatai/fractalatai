@@ -56,8 +56,8 @@ If SSH asks for a password, the key isn't registered. Inject via Jupyter termina
 ```bash
 scp -P <PORT> -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no \
   scripts/finetune_runpod_16bit.py \
-  data/slm_train.jsonl \
-  data/slm_test.jsonl \
+  data/ml/slm_train.jsonl \
+  data/ml/slm_test.jsonl \
   root@<IP>:/workspace/
 ```
 
@@ -143,7 +143,7 @@ runpodctl send /tmp/model-q4.gguf
 # Shows a code like: 1234-word-word-word-5
 
 # On local machine:
-cd /var/home/jason/fractalaw/data
+cd /var/home/jason/fractalaw/models
 /tmp/runpodctl receive 1234-word-word-word-5
 ```
 
@@ -156,7 +156,7 @@ scp -P <PORT> -i ~/.ssh/id_ed25519 root@<IP>:/workspace/output/file ./
 ### Verify downloaded GGUF:
 
 ```bash
-xxd data/model-q4.gguf | head -2
+xxd models/model-q4.gguf | head -2
 # First bytes must be: 4747 5546 (GGUF magic)
 # If all zeros → corrupt download, retry with runpodctl
 ```
@@ -164,7 +164,7 @@ xxd data/model-q4.gguf | head -2
 ## Load into Ollama
 
 ```bash
-cd /var/home/jason/fractalaw/data
+cd /var/home/jason/fractalaw/models
 
 # Create Modelfile (no system prompt — fine-tuned model has it baked in from training)
 cat > Modelfile << 'EOF'
@@ -180,7 +180,7 @@ ollama create gemma3-position -f Modelfile
 
 1. **Stop the pod** immediately after downloading outputs
 2. **Terminate the pod** if you don't need to re-run (volume disk costs $0.13/day idle)
-3. **Back up to NAS**: `cp data/gemma3-position-q4.gguf /mnt/nas/sertantai-data/data/fractalaw-backups/YYYYMMDD/`
+3. **Back up to NAS**: `cp models/gemma3-position-q4.gguf /mnt/nas/sertantai-data/data/fractalaw-backups/YYYYMMDD/`
 4. **Back up adapter**: `cp -r data/slm-adapter/ /mnt/nas/sertantai-data/data/fractalaw-backups/YYYYMMDD/slm-adapter/`
 
 ## Critical Lessons

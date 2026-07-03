@@ -25,7 +25,7 @@ This is the **production** Tier 2 — no API calls, no Ollama, microsecond infer
 
 ## How It Works
 
-1. Loads v6 classifier from `data/drrp_classifier_v6.pkl`
+1. Loads classifier from `crates/fractalaw-cli/config/drrp_classifier_v8.json`
 2. Queries LanceDB for regulation-level provisions needing classification
 3. Skips provisions with existing confidence ≥ 0.85 (protects agentic gold data at 0.90)
 4. Computes 384-dim embedding + 13 modal features per provision
@@ -52,6 +52,6 @@ Structural provision types (title, heading, schedule, etc.) are always skipped �
 ## Notes
 
 - Requires `scikit-learn`, `onnxruntime`, `tokenizers`, `lancedb`, `pyarrow`
-- Model file: `data/drrp_classifier_v6.pkl`
+- Model file: `crates/fractalaw-cli/config/drrp_classifier_v8.json` (old .pkl versions deleted)
 - ONNX model: `models/all-MiniLM-L6-v2/`
 - Always compact after classification to prevent fragment bloat

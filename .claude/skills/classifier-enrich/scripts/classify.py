@@ -12,7 +12,7 @@ Usage:
 """
 
 import argparse
-import pickle
+import json as json_mod
 import re
 import sys
 import time
@@ -113,8 +113,8 @@ def main():
     parser = argparse.ArgumentParser(description="Production Tier 2 DRRP classifier")
     parser.add_argument("--laws", type=str, required=True,
                         help="Comma-separated law names")
-    parser.add_argument("--model", type=str, default="data/drrp_classifier_v6.pkl",
-                        help="Path to classifier pickle")
+    parser.add_argument("--model", type=str, default="crates/fractalaw-cli/config/drrp_classifier_v8.json",
+                        help="Path to classifier JSON (old .pkl versions deleted)")
     parser.add_argument("--confidence", type=float, default=0.85,
                         help="Confidence to assign classified provisions (default: 0.85)")
     parser.add_argument("--dry-run", action="store_true",
@@ -125,8 +125,8 @@ def main():
     REG_TYPES = {"article", "sub_article", "section", "sub_section"}
 
     # Load classifier
-    with open(args.model, "rb") as f:
-        model_data = pickle.load(f)
+    with open(args.model, "r") as f:
+        model_data = json_mod.load(f)
     clf = model_data["model"]
     print(f"Loaded classifier: {args.model}")
 

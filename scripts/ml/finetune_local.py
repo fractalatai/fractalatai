@@ -25,8 +25,8 @@ from collections import Counter
 # ── Config ──────────────────────────────────────────────────────────────
 
 MODEL_NAME = "google/gemma-3-1b-it"
-TRAIN_FILE = "data/slm_train.jsonl"
-TEST_FILE = "data/slm_test.jsonl"
+TRAIN_FILE = "data/ml/slm_train.jsonl"
+TEST_FILE = "data/ml/slm_test.jsonl"
 OUTPUT_DIR = "data/slm-adapter"
 GGUF_DIR = "data/slm-gguf"
 MAX_SEQ_LENGTH = 768  # shorter = less RAM, faster training

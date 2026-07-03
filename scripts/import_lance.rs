@@ -10,7 +10,7 @@ use fractalaw_core::schema::legislation_text_schema;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Read existing Parquet (30 columns)
-    let parquet_path = std::path::Path::new("data/legislation_text.parquet");
+    let parquet_path = std::path::Path::new("data/seed/legislation_text.parquet");
     let batches = fractalaw_store::read_parquet(parquet_path)?;
 
     println!("Read {} rows from Parquet", batches.iter().map(|b| b.num_rows()).sum::<usize>());
