@@ -1,4 +1,51 @@
-# Session: Zenoh WAN Sync (#25)
+---
+session: Zenoh WAN Sync
+status: closed
+opened: 2026-03-07
+closed: 2026-03-07
+outcome: partial
+
+summary: >
+  Implemented CLI config plumbing (Phase 1) and TLS transport flags (Phase 2) for
+  Zenoh WAN sync. fractalaw can now connect to a remote zenoh endpoint with TLS/mTLS.
+  Phase 3 (router deployment on Hetzner) and Phase 4 (resilience) remain pending.
+
+decisions:
+  - what: "Option A: zenohd router on Hetzner VPS, fractalaw connects as client"
+    why: NAT-friendly — fractalaw initiates all connections outbound. Simpler than embedding router in sertantai.
+    result: Architecture chosen but not yet deployed
+  - what: ZenohArgs struct with --connect, --zenoh-config, --tls-ca/cert/key flags
+    why: Simple cases use CLI flags, complex setups use JSON5 config file. Mutually exclusive via clap.
+    result: 7 handler functions updated, all tests pass
+  - what: Default (no flags) preserves LAN peer mode with multicast scouting
+    why: Backward compatible — existing LAN workflow unchanged
+    result: Zero-arg usage identical to before
+
+metrics:
+  tests_passing: 519
+  cli_flags_added: 6
+  handler_functions_updated: 7
+
+lessons:
+  - title: "zenoh::Config uses from_json5()/insert_json5() API, not struct field access"
+    detail: Config fields aren't directly exposed. Must build JSON5 strings and parse them. Slightly awkward but well-documented.
+    tag: architecture
+  - title: Clap requires/conflicts_with elegantly handles TLS flag interdependencies
+    detail: "--tls-cert requires tls_key, --tls-ca requires connect. Runtime validation for tls endpoint without --tls-ca. Clean user-facing errors."
+    tag: tooling
+
+artifacts:
+  - crates/fractalaw-cli/src/main.rs
+
+depends_on:
+  - 02-27-26-zenoh-sync.md
+
+enables:
+  - Hetzner VPS deployment (Phase 3 — zenohd router + TLS certs)
+  - Production WAN sync between fractalaw and sertantai
+---
+
+# Session: Zenoh WAN Sync (#25) (CLOSED)
 
 **Date**: 2026-03-07
 **Issue**: [#25 — Zenoh WAN sync: enable cross-network publish/subscribe](https://github.com/fractalaw/fractalaw/issues/25)

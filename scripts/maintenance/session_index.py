@@ -109,7 +109,7 @@ def index_session(conn: sqlite3.Connection, filepath: Path, sessions_dir: Path):
         return False
 
     sid = session_id_from_path(filepath, sessions_dir)
-    rel_path = str(filepath.relative_to(sessions_dir.parent.parent.parent))  # relative to repo root
+    rel_path = str(filepath.relative_to(sessions_dir.parent.parent))  # relative to repo root
 
     # Determine subdirectory (cascade, store, etc.)
     parts = filepath.relative_to(sessions_dir).parts
@@ -255,7 +255,7 @@ def archive_old_sessions(sessions_dir: Path, days: int = 30):
                 ["git", "mv", str(filepath), str(target)],
                 check=True,
                 capture_output=True,
-                cwd=sessions_dir.parent.parent.parent,  # repo root
+                cwd=sessions_dir.parent.parent,  # repo root
             )
             moved.append((str(rel), str(target.relative_to(sessions_dir))))
         except subprocess.CalledProcessError as e:

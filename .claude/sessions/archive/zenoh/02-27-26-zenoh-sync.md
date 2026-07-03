@@ -1,4 +1,65 @@
-# Session: Zenoh pub/sub sync
+---
+session: Zenoh pub/sub sync
+status: closed
+opened: 2026-02-27
+closed: 2026-02-27
+outcome: success
+
+summary: >
+  Built the full Zenoh sync stack from scratch: pub/sub with Arrow IPC (Phase A),
+  Loro CRDT sync (Phase B), Hive router lifecycle (Phase C), and sertantai integration
+  with reactive round-trip pipeline (Phase D). Published 2,606 laws to sertantai over LAN.
+
+decisions:
+  - what: Publish is decoupled from parse/enrich — explicit manual CLI action
+    why: Taxa parser still maturing, automatic publish would propagate buggy results needing retraction
+    result: Manual workflow — enrich locally, validate, then explicitly publish when satisfied
+  - what: Micro-apps (WASM guests) have no network access
+    why: Zenoh is a host-level concern, micro-apps talk only through WIT interfaces
+    result: Sync lives in fractalaw-sync crate, wired at CLI layer
+  - what: LanceDB never publishes — only DuckDB taxa data goes out over Zenoh
+    why: LanceDB is local working store for per-provision text; DuckDB holds law-level metadata for sertantai
+    result: Clear data flow — sertantai→LanceDB (inbound), DuckDB→sertantai (outbound)
+  - what: Event-driven sync watch pipeline (Phase D)
+    why: Replaces polling — sertantai publishes change events, fractalaw reacts
+    result: "Full round-trip: event → pull LRT → pull LAT → enrich → publish taxa back"
+
+metrics:
+  phases_completed: 4
+  tests_passing: 36
+  laws_published: 2606
+
+lessons:
+  - title: Zenoh requires multi-thread tokio runtime
+    detail: Default current_thread runtime causes zenoh session to hang. Must use flavor = "multi_thread".
+    tag: infrastructure
+  - title: Zenoh subscriber type is Subscriber<FifoChannelHandler<Sample>> not Subscriber<()>
+    detail: The generic parameter determines the channel handler type. FifoChannel is the default for recv/recv_async patterns.
+    tag: architecture
+  - title: Loro ExportMode has a lifetime — use updates_owned(vv) for decoded version vectors
+    detail: ExportMode<'a> borrows the VV bytes. For async contexts where the borrow can't live long enough, use the owned variant.
+    tag: architecture
+  - title: Loro LocalUpdateCallback is sync (not async) — needs sync-to-async bridge via tokio::spawn
+    detail: "Callback signature: Box<dyn Fn(&Vec<u8>) -> bool + Send + Sync>. Use channel to bridge to async zenoh put."
+    tag: architecture
+  - title: Zenoh tests need --test-threads=1 to avoid multicast scouting contention
+    detail: Parallel zenoh sessions on the same machine fight over multicast ports. Serialize tests.
+    tag: infrastructure
+
+artifacts:
+  - crates/fractalaw-sync/src/zenoh_sync.rs
+  - crates/fractalaw-sync/src/crdt_sync.rs
+  - crates/fractalaw-sync/src/hive.rs
+  - crates/fractalaw-cli/src/main.rs
+  - docs/ZENOH-SYNC.md
+
+enables:
+  - WAN sync (Phase E — mTLS, router deployment)
+  - Taxa hash change tracking
+  - Sertantai compliance register with live enrichment
+---
+
+# Session: Zenoh pub/sub sync (CLOSED)
 
 **Date**: 2026-02-27
 **Depends on**: OHS enrichment session (taxa-drrp/02-27-26-ohs-enrichment-zenoh.md, closed)

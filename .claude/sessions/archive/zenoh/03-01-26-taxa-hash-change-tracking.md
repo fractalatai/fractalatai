@@ -1,4 +1,49 @@
-# Session: Taxa Hash Change Tracking (#21)
+---
+session: Taxa Hash Change Tracking
+status: closed
+opened: 2026-03-01
+closed: 2026-03-01
+outcome: success
+
+summary: >
+  Added content hashing to detect which laws actually changed during enrichment,
+  so sync publish only publishes deltas. taxa_hash computed on enrich, published_hash
+  set after successful publish. --changed flag selects only dirty laws.
+
+decisions:
+  - what: SipHash (std DefaultHasher) over 11 taxa columns for content identity
+    why: Fast non-crypto hash sufficient — comparing content identity, not protecting against tampering
+    result: 16-char hex string, deterministic with sorted BTreeSets and column separators
+  - what: Two columns (taxa_hash + published_hash) rather than a single dirty flag
+    why: Enables precise delta detection — a law needs publishing when taxa_hash != published_hash
+    result: Idempotent — re-enrich with identical output produces same hash, no spurious publish
+
+metrics:
+  tests_passing: 337
+  columns_hashed: 11
+
+lessons:
+  - title: BTreeSets provide free deterministic iteration for hashing
+    detail: Using BTreeSet for actor/role collections means hash input is always sorted without explicit sort step. Vec entries need explicit sort.
+    tag: methodology
+  - title: Column separators (0xFF bytes) prevent cross-column hash collisions
+    detail: Without separators, moving an actor from duty_holder to rights_holder could produce the same hash. The 0xFF byte between each column prevents this.
+    tag: methodology
+
+artifacts:
+  - crates/fractalaw-cli/src/main.rs
+  - crates/fractalaw-store/src/duck.rs
+  - crates/fractalaw-core/src/schema.rs
+
+depends_on:
+  - 02-27-26-zenoh-sync.md
+
+enables:
+  - Delta-only publish (sync publish --changed)
+  - Efficient re-enrichment without full corpus republish
+---
+
+# Session: Taxa Hash Change Tracking (#21) (CLOSED)
 
 **Date**: 2026-03-01
 **Issue**: [#21 — Add taxa_hash for change-tracking between enrich and publish](https://github.com/fractalaw/fractalaw/issues/21)
