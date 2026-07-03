@@ -1,4 +1,64 @@
-# Session: 2026-02-26 — Taxa Regex Pattern Improvement
+---
+session: Taxa Regex Pattern Improvement
+status: closed
+opened: 2026-02-26
+closed: 2026-02-26
+outcome: success
+summary: 'Test-driven iteration across 6 rounds reduced the DRRP miss rate from 43.5% to 37.8% and increased DRRP count from
+  424 to 486 (+14.6%) across 7 UK ESH laws. Added contractor, client, and "a person must" to GOVERNED_ACTORS, fixed agency
+  worker false positive and actor boundary matching. Gap C analysis identified 42 thing-subject "Rule" provisions as a new
+  classifier type (GH #16).
+
+  '
+decisions:
+- what: Add contractor and client to GOVERNED_ACTORS but skip worker and competent person
+  why: Worker is almost always beneficiary not duty-holder (0/13 as subject); competent person only 1 remaining miss with
+    misattributed duty
+  result: 26 provisions fixed (contractor 22, client 4), zero false positives
+- what: '"a person must" compound predicate instead of bare "a person"'
+  why: Bare "a person" has 62% false positive rate (8/13 affected provisions); compound form is 100% precise
+  result: 3 CDM prohibition provisions correctly classified
+- what: 'Raise GH #16 for thing-subject "Rule" classifier'
+  why: 42 provisions have modal verbs with things as subjects ("Steps must be taken"); needs separate pattern without person/org
+    actor
+  result: Gap C properly categorised; remaining work scoped for future session
+- what: Test-driven iteration with true-negative regression tests first
+  why: Foundation test suite was mostly happy-path; adding true negatives before changes catches regressions
+  result: Test suite grew from 132 to 159 with zero regressions across all iterations
+lessons:
+- title: Step 1b (true-negative regression tests) is critical before expanding patterns
+  detail: Without tests confirming that provisions mentioning an actor in a non-duty context correctly return no DRRP, regressions
+    are invisible
+  tag: testing
+- title: Actor label presence does not mean actor is duty-holder
+  detail: Worker, competent person, and CDM co-ordinator appear in text as beneficiaries/conditions, not as obligation subjects
+  tag: data-quality
+- title: Agency worker is an employment term, not a government agency
+  detail: 'Generic [Aa]gency pattern matched "agency worker" as Gvt: Agency; added to blacklist'
+  tag: regex
+metrics:
+  baseline_miss_rate: 43.5%
+  final_miss_rate: 37.8%
+  baseline_drrp_count: 424
+  final_drrp_count: 486
+  improvement_pct: 14.6%
+  iterations: 6
+  tests_baseline: 132
+  tests_final: 159
+  gap_c_rules_identified: 42
+artifacts:
+- crates/fractalaw-core/src/taxa/duty_patterns.rs
+- crates/fractalaw-core/src/taxa/actors.rs
+- crates/fractalaw-core/src/taxa/duty_type.rs
+- crates/fractalaw-core/src/taxa/mod.rs
+depends_on:
+- 02-26-26-taxa-refinement
+enables:
+- 02-26-26-drrp-parser-v2
+---
+
+
+# Session: 2026-02-26 — Taxa Regex Pattern Improvement (CLOSED)
 
 ## Context
 

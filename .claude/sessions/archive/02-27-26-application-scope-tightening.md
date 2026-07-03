@@ -1,4 +1,47 @@
-# Session: Tighten Application+Scope purpose classifier (issue #20)
+---
+session: 'Tighten Application+Scope Purpose Classifier (GH #20)'
+status: closed
+opened: 2026-02-27
+closed: 2026-02-27
+outcome: success
+summary: 'Replaced broad Application+Scope regex with 10 constrained branches targeting specific legal constructions. Added
+  APPLICATION_SCOPE-primary as a DRRP skip gate. Eliminated 18 false positive provisions with zero genuine duty regressions.
+  Created reusable taxa eyeball CLI subcommand.
+
+  '
+decisions:
+- what: 10-branch constrained regex replacing broad Application+Scope pattern
+  why: Broad regex fired on genuine duty provisions mentioning "shall apply" or "Regulations apply"
+  result: Each branch targets a specific legal construction (scope extension, transitional non-application, etc.)
+- what: APPLICATION_SCOPE-primary as DRRP skip gate
+  why: Same pattern as existing Interpretation-primary and Enactment-primary gates
+  result: Provisions tagged Application+Scope primary excluded from DRRP classification
+lessons:
+- title: Eyeball review should be a repeatable CLI command
+  detail: Ad-hoc manual QA was replaced with taxa eyeball subcommand generating markdown with per-provision DRRP details
+  tag: tooling
+- title: Self-referencing subject constraint prevents false matches
+  detail: Requiring "these/this Regulations" as subject prevents matching relative clauses like "to whom this regulation applies"
+  tag: regex-design
+metrics:
+  drrp_provisions_before: 272
+  drrp_provisions_after: 254
+  false_positives_eliminated: 18
+  regressions: 0
+  tests_before: 204
+  tests_after: 217
+artifacts:
+- crates/fractalaw-core/src/taxa/purpose.rs
+- crates/fractalaw-core/src/taxa/mod.rs
+- crates/fractalaw-cli/src/main.rs
+- data/clause_eyeball.md
+depends_on: []
+enables:
+- 02-27-26-ohs-enrichment-zenoh.md
+---
+
+
+# Session: Tighten Application+Scope Purpose Classifier (GH #20) (CLOSED)
 
 **Date**: 2026-02-27
 **Issue**: https://github.com/fractalaw/fractalaw/issues/20

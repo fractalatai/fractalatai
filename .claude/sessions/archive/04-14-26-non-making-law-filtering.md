@@ -1,4 +1,38 @@
-# Session: Prune LAT for Non-Making Laws
+---
+session: Prune LAT for Non-Making Laws
+status: closed
+opened: 2026-04-14
+closed: 2026-04-14
+outcome: success
+summary: 'Added post-enrichment pruning of LanceDB LAT rows for laws that produce no duties or responsibilities. Changed enrich_single_law
+  return type to a three-variant enum (Making/NonMaking/NoTaxa) and wired pruning into both single-law and bulk enrichment
+  paths. 329 LAT rows pruned across 5 test laws with DuckDB LRT metadata verified intact.
+
+  '
+decisions:
+- what: Return EnrichResult enum instead of bool from enrich_single_law
+  why: Need to distinguish Making, NonMaking, and NoTaxa outcomes to decide LAT pruning
+  result: Clean separation of enrichment outcomes drives pruning logic
+- what: Keep DuckDB LRT metadata for all laws regardless of making status
+  why: LRT contains useful metadata even for non-making laws and is always published to sertantai
+  result: Only LAT rows pruned; LRT rows retained with taxa_hash set
+lessons:
+- title: Non-making laws accumulate unnecessary LAT
+  detail: Laws with zero duties and zero responsibilities still had full provision text stored in LanceDB after enrichment,
+    inflating storage
+  tag: data-hygiene
+metrics:
+  lat_rows_pruned: 329
+  non_making_laws_tested: 5
+  lrt_rows_intact: true
+artifacts:
+- crates/fractalaw-cli/src/main.rs
+depends_on: []
+enables:
+- 'Bulk prune non-making LAT across all families (GH #32)'
+---
+
+# Session: Prune LAT for Non-Making Laws (CLOSED)
 
 **Date**: 2026-04-14
 

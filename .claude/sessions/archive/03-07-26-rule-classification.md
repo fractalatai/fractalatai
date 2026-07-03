@@ -1,4 +1,50 @@
-# Session: Rule Classification with Actor Back-Linking (#16)
+---
+session: Rule Classification with Actor Back-Linking (#16)
+status: closed
+opened: 2026-03-07
+closed: 2026-03-07
+outcome: success
+summary: 'Added Rule as Tier 4 in the classify cascade for thing-subject obligations (~8% of provisions). Implemented duty_patterns_rule.rs
+  with 45 thing keywords and 29 person guard keywords. Actor back-linking infers the dominant governed actor for Rule provisions.
+  CDM 2015 gained 26 Rule provisions (+41%). Also migrated 7 fitness columns onto LanceDB schema.
+
+  '
+decisions:
+- what: Rule as Tier 4 after Government v2 in classify cascade
+  why: Thing-subject obligations ("Traffic routes must be suitable") have modal verbs but no person subject, falling through
+    to Unknown
+  result: Rule type with ThingObligation sub-type at confidence 0.55
+- what: Actor back-linking via frequency-based inference
+  why: Rule provisions have no actor subject but the law typically has a dominant governed actor from non-Rule DRRP entries
+  result: Most frequent governed actor assigned as "{actor} (inferred)" to Rule holder fields
+lessons:
+- title: Thing-keyword negative guard prevents person provisions from being misclassified as Rule
+  detail: 29 person keywords checked closer to modal than the thing keyword, ensuring person-subject provisions stay in earlier
+    tiers
+  tag: parser-design
+- title: LanceDB schema migration requires add_columns() before enrichment
+  detail: Fitness columns added to schema.rs but not to the live LanceDB table caused merge_insert to fail with schema mismatch
+  tag: migration
+metrics:
+  thing_keywords: 45
+  person_guard_keywords: 29
+  cdm_rule_provisions: 26
+  cdm_drrp_improvement_pct: 41
+  tests_passing: 361
+  tests_added: 12
+artifacts:
+- crates/fractalaw-core/src/taxa/duty_patterns_rule.rs
+- crates/fractalaw-core/src/taxa/duty_type.rs
+- crates/fractalaw-core/src/taxa/duty_patterns.rs
+- crates/fractalaw-core/src/taxa/mod.rs
+- crates/fractalaw-cli/src/main.rs
+depends_on:
+- 03-05-26-denormalize-fitness-lrt.md
+enables: []
+---
+
+
+# Session: Rule Classification with Actor Back-Linking (#16) (CLOSED)
 
 **Date**: 2026-03-07
 **Issue**: [#16 — Add 'Rule' classification for thing-subject obligations](https://github.com/fractalaw/fractalaw/issues/16)

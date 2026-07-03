@@ -1,4 +1,74 @@
-# Gap C — AI-assisted DRRP detection research
+---
+session: Gap C — AI-assisted DRRP detection research
+status: closed
+opened: 2026-04-15
+closed: 2026-04-15
+outcome: success
+summary: 'Research and decision record for solving Gap C (implicit-actor DRRP provisions, 78% of false negatives). Established
+  quality-first lens separating the parsing service from local-first constraints, selected ModernBERT-large as primary backbone
+  with remote serverless-GPU inference, designed holder_inferred_from provenance schema, two-vocabulary model for regex-to-AI
+  transition, and a 9-stage phased plan across three sessions and two repos.
+
+  '
+decisions:
+- what: Quality-first lens for parsing service
+  why: Parsing service feeds sertantai on server hardware; local-first constraints do not apply
+  result: Unlocked ModernBERT-large, full fine-tune fp16, remote GPU serving
+- what: ModernBERT-large as primary backbone, DeBERTa-v3-large as comparison baseline
+  why: 8192 native context eliminates truncation; modern pretraining gives better fine-tune results
+  result: Train both, pick winner on held-out laws
+- what: Remote serverless-GPU inference via RunPod/Modal/HF Endpoints
+  why: Scale-to-zero economics (<$500/year), server-side model updates, no client redeployment
+  result: fractalaw-ai extended with remote provider alongside existing local ONNX
+- what: No meta-labels in holder vocabulary
+  why: Users search by concrete role; Passive/Inherited are not user-facing concepts
+  result: Below-threshold detections suppressed rather than escape-hatched
+- what: Separate training repo for Python/GPU work
+  why: Different hardware, stack, lifecycle, licence, and reproducibility requirements
+  result: Only training pipeline forks out; fractalaw unchanged
+- what: Deprecated existing DistilBERT artefact at models/deberta-v3-drrp/
+  why: Misnamed directory, 200 training examples, best_clause_acc 0.0, not functional
+  result: New model trained from scratch; no weights, tokenizer, or heads reused
+- what: holder_inferred_from provenance field on DrrpExtraction
+  why: Audit trail and user-facing explainability for implicit-actor inferences
+  result: Nullable citation string; tracked in Rust integration layer, not model head
+- what: Two-vocabulary model for regex actors vs model holders
+  why: 'Regex path needs placeholders (e.g. ": He") during transition; model vocabulary is user-facing only'
+  result: Regex placeholders route through AI for resolution; suppressed if unresolved
+lessons:
+- title: Gap C is not one problem
+  detail: Six sub-types (C1-C6) with different tractability; must scope AI to specific sub-types not the monolith
+  tag: architecture
+- title: External AI advice was under-informed about the repo
+  detail: ChatGPT and Gemini advice was broadly sound but conflated model identity, assumed runtime LLM, and missed the local-first
+    vs quality-first distinction
+  tag: process
+- title: Detection not polishing is the real gap
+  detail: Gap C provisions produce no DRRP entry at all from regex, so even a working polisher would never be invoked on them
+  tag: architecture
+metrics:
+  gap_c_provisions: 3275
+  gap_c_share_of_fn: 78%
+  holder_labels_current: 27
+  holder_labels_needed: ~60+
+  annual_cost_estimate: <$500
+artifacts:
+- .claude/plans/gap-c-research.md
+- crates/fractalaw-ai/src/extractor.rs
+- crates/fractalaw-core/src/taxa/actors.rs
+- models/deberta-v3-drrp/holder_labels.json
+depends_on:
+- 02-26-26-taxa-regex-patterns
+- 02-26-26-taxa-refinement
+- 02-26-26-v2-promotion-enrichment
+- taxa-gap-analysis/04-14-26-ohs-occupational-safety
+enables:
+- 04-15-26-gap-c-session-1-main-prep
+- 04-15-26-gap-c-session-2-training-repo-todo
+- 04-15-26-gap-c-session-3-main-integration
+---
+
+# Gap C \u2014 AI-assisted DRRP detection research (CLOSED)
 
 **Date**: 2026-04-15
 **Inputs**: `.claude/plans/gap-c-research.md` (ChatGPT + Gemini advice)

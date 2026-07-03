@@ -1,4 +1,42 @@
-# Session: Taxa QA Report (#15)
+---
+session: Taxa QA Report (#15)
+status: closed
+opened: 2026-03-05
+closed: 2026-03-05
+outcome: success
+summary: 'Built fractalaw taxa qa CLI command producing 4-section validation reports: Coverage Summary, Purpose Distribution
+  with anomaly flags, Gate Analysis (skip_drrp sub-gates and descriptive_summary), and Anomaly Detection. Supports --laws
+  and --family filters. Replaces ad-hoc Python/LanceDB validation that previously caught 3 real bugs.
+
+  '
+decisions:
+- what: 4-section report structure with anomaly thresholds
+  why: Ad-hoc validation during taxa refinement caught real bugs (Enactment FPs, Enforcement FPs, enrichment skip bug) but
+    was not repeatable
+  result: Anomaly thresholds at Enactment >10%, Enforcement >15%, 0 DRRP with >10 provisions, any purpose >2x corpus average
+- what: Live re-run of parse_v2() per provision rather than reading stored taxa
+  why: QA should validate current pipeline behaviour, not cached results
+  result: Report reflects live classification including any recent regex changes
+lessons:
+- title: Ad-hoc validation should become first-class CLI features
+  detail: Three bugs found via manual Python/LanceDB queries proved the value of repeatable QA. Automating it as taxa qa makes
+    validation sustainable
+  tag: tooling
+metrics:
+  report_sections: 4
+  tests_passing: 337
+  single_law_test_provisions: 93
+  family_test_provisions: 9608
+artifacts:
+- crates/fractalaw-cli/src/main.rs
+- crates/fractalaw-core/src/taxa/mod.rs
+- crates/fractalaw-core/src/taxa/purpose.rs
+depends_on: []
+enables: []
+---
+
+
+# Session: Taxa QA Report (#15) (CLOSED)
 
 **Date**: 2026-03-05
 **Issue**: [#15 — Taxa QA report: purpose classification quality assurance command](https://github.com/fractalaw/fractalaw/issues/15)

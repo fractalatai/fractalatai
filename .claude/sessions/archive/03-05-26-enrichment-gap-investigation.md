@@ -1,4 +1,47 @@
-# Session: Enrichment Gap Investigation (#17)
+---
+session: Enrichment Gap Investigation (#17)
+status: closed
+opened: 2026-03-05
+closed: 2026-03-05
+outcome: success
+summary: 'Investigated reported 193-law enrichment gap and found it mostly illusory. Fixed two bugs: a panic in clause_structure
+  find_modal() from out-of-bounds span indexing, and an enrichment skip check using duty_holder instead of duty_type (missing
+  108 laws with Responsibility/Power but no Duty). Real coverage jumped from 60% to 83%.
+
+  '
+decisions:
+- what: Change enrichment skip check from duty_holder to duty_type
+  why: 108 laws have DRRP data (Responsibilities, Powers) without Duties, so duty_holder check miscounted them as unenriched
+  result: duty_type IS NULL correctly identifies truly unenriched laws
+- what: 33 genuinely no-DRRP laws are correctly excluded
+  why: Safety zone orders, pure amendment SIs, commencement orders, and revocation orders create no duties/rights/responsibilities/powers
+  result: No further action needed for these non-regulatory instruments
+lessons:
+- title: Enrichment bugs can mask real coverage numbers
+  detail: A panic crashing mid-batch left subsequent laws unenriched, and the wrong skip-check column made 108 already-enriched
+    laws appear unenriched
+  tag: debugging
+- title: Always use duty_type (set by enrichment regardless of DRRP type) for enrichment status checks
+  detail: duty_holder is only populated when Duty type is found, not for Responsibility-only or Power-only laws
+  tag: data-model
+metrics:
+  reported_gap: 193
+  actual_gap: 80
+  false_gap_enriched_no_duty: 108
+  missing_lrt_no_duckdb_row: 47
+  blocked_by_panic: 5
+  genuinely_no_drrp: 33
+  coverage_before: 60%
+  coverage_after: 83%
+artifacts:
+- crates/fractalaw-core/src/taxa/clause_structure.rs
+- crates/fractalaw-cli/src/main.rs
+depends_on: []
+enables: []
+---
+
+
+# Session: Enrichment Gap Investigation (#17) (CLOSED)
 
 **Date**: 2026-03-05
 **Issue**: [#17 — Investigate 270/452 enrichment gap — 182 laws with text but no DRRP matches](https://github.com/fractalaw/fractalaw/issues/17)

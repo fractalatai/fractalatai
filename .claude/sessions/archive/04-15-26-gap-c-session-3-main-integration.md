@@ -1,4 +1,53 @@
-# Gap C — Session 3: main-repo integration
+---
+session: 'Gap C — Session 3: main-repo integration'
+status: closed
+opened: 2026-04-15
+closed: 2026-04-15
+outcome: success
+summary: 'Scoping document for Session 3 of the Gap C work, blocked on Session 2 hand-off. Defined four deliverables: S7 (detector
+  integration with remote-inference provider, holder_inferred_from schema, deprecated polisher disabling, and placeholder
+  routing), S8 (validation against OHS gap analysis with precision >= 96% guard), S8b (Phase 2 C4+C6 head-swap evaluation),
+  and S9 (final cleanup removing deprecated DistilBERT artefact). S7 is the largest single deliverable with a natural split
+  seam defined.
+
+  '
+decisions:
+- what: S7 absorbs holder_inferred_from, remote provider, polisher disabling, and placeholder routing
+  why: Shipping schema alongside its producer avoids dead columns; consolidation is natural
+  result: Largest deliverable with S7a/S7b split seam defined if needed
+- what: Confidence threshold starts high (0.85)
+  why: Precision is the constraint; below-threshold detections suppressed not emitted
+  result: Config value, not magic number; lower only with eval evidence
+- what: Offline fallback to regex-only
+  why: If endpoint unreachable, enrichment must proceed without blocking
+  result: Detector error treated as below-threshold; logged at WARN level
+- what: 50 Fix-2 provisions tracked as expected pickups
+  why: These are genuine v2 matcher bugs the detector was designed to cover, not surprise detections
+  result: Counted in recall improvement, not treated as novel detections requiring review
+lessons:
+- title: Define split seams for large deliverables upfront
+  detail: S7 consolidates five pieces of work; defining the S7a/S7b boundary in advance prevents scope paralysis at execution
+    time
+  tag: process
+metrics:
+  deliverables_planned: 4
+  precision_floor: 96%
+  recall_baseline: 48.6%
+  fix2_provisions: 50
+  confidence_threshold: 0.85
+artifacts:
+- crates/fractalaw-ai/src/extractor.rs
+- crates/fractalaw-core/src/taxa/
+- crates/fractalaw-cli/src/main.rs
+depends_on:
+- 04-15-26-gap-c-session-2-training-repo-todo
+- 04-15-26-gap-c-orchestration
+enables:
+- Gap C project completion
+- Deprecated artefact removal (S9)
+---
+
+# Gap C \u2014 Session 3: main-repo integration (CLOSED)
 
 **Date**: 2026-04-15
 **Status**: Not started — blocked on Session 2 hand-off

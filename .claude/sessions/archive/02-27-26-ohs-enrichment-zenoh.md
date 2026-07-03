@@ -1,4 +1,52 @@
-# Session: OHS family enrichment
+---
+session: OHS Family Enrichment + Application+Scope Gate Fix
+status: closed
+opened: 2026-02-27
+closed: 2026-02-27
+outcome: success
+summary: 'Enriched all 451 OH&S Occupational/Personal Safety laws using v5 taxa pipeline with new --family flag. Discovered
+  and fixed 2.6% false positive rate in Application+Scope gate caused by relative clause over-matching. Post-fix re-enrichment
+  recovered 58 genuine DRRP provisions with zero actor-led false positives remaining. Removed Anthropic/Claude inference backend
+  from codebase.
+
+  '
+decisions:
+- what: Add --family flag to taxa enrich instead of scripting or --force
+  why: 314 OHS laws too many for --laws, --force re-enriches entire corpus wastefully
+  result: Clean family-scoped enrichment via DuckDB query for law names
+- what: Tighten Application+Scope regex branch 2 with sentence-start prefix
+  why: 15 actor-led false positives (2.6%) where relative clause "to whom this regulation applies" triggered the gate
+  result: Prefix requires text-start, sentence boundary, or paragraph number before "these/this"
+lessons:
+- title: Making vs non-Making law distinction matters for enrichment coverage
+  detail: Only Making laws get full text in LanceDB. The 314 "with body text" count from DuckDB metadata was misleading because
+    many are non-Making instruments
+  tag: data-model
+- title: Post-fix validation catches collateral improvements
+  detail: The regex tightening recovered 58 provisions (not just the 15 identified false positives) because the relative-clause
+    pattern was over-triggering beyond actor-led cases
+  tag: qa-methodology
+metrics:
+  ohs_laws_total: 451
+  making_laws: 156
+  making_with_lancedb_text: 67
+  enriched_provisions_before_fix: 2237
+  enriched_provisions_after_fix: 2295
+  false_positives_recovered: 15
+  gate_reduced_from: 582
+  gate_reduced_to: 395
+  tests_passing: 300
+artifacts:
+- crates/fractalaw-cli/src/main.rs
+- crates/fractalaw-core/src/taxa/purpose.rs
+- crates/fractalaw-core/src/taxa/mod.rs
+depends_on:
+- 02-27-26-application-scope-tightening.md
+enables: []
+---
+
+
+# Session: OHS Family Enrichment + Application+Scope Gate Fix (CLOSED)
 
 **Date**: 2026-02-27
 **Depends on**: 02-27-26-application-scope-tightening (GH #20, closed)

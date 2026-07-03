@@ -1,4 +1,47 @@
-# Gap C — orchestration
+---
+session: Gap C — orchestration
+status: closed
+opened: 2026-04-15
+closed: 2026-04-15
+outcome: success
+summary: 'Cross-session coordination document for the Gap C (implicit-actor DRRP) work. Defined sequencing, hand-off artefacts,
+  and go/no-go gates across three child sessions (main-repo prep, training-repo bootstrap, main-repo integration) spanning
+  two repos. Established Phase 1 (C2 pilot) and Phase 2 (C4+C6 expansion) milestones with cost envelope under $500/year steady-state.
+
+  '
+decisions:
+- what: Three-session structure with explicit hand-off packages
+  why: Gap C is too large for one session and spans two repos with different stacks
+  result: Session 1 (main prep), Session 2 (training), Session 3 (integration) with clear gate criteria
+- what: Go/no-go gates between sessions
+  why: Prevent downstream sessions from starting on unstable foundations
+  result: Four gates defined with specific pass criteria including precision thresholds
+- what: C2 count as critical number for Session 1 exit
+  why: Phase 1 trains on C2 sub-type only; insufficient C2 data blocks training
+  result: Gap C parquet must report C2 count before Session 2 starts
+lessons:
+- title: Orchestration docs prevent scope drift across sessions
+  detail: Explicit hand-off artefacts and gate criteria keep three sessions aligned despite different repos and stacks
+  tag: process
+metrics:
+  child_sessions: 3
+  go_no_go_gates: 4
+  annual_cost_envelope: <$500
+artifacts:
+- .claude/sessions/taxa-drrp/04-15-26-gap-c-session-1-main-prep.md
+- .claude/sessions/taxa-drrp/04-15-26-gap-c-session-2-training-repo-todo.md
+- .claude/sessions/taxa-drrp/04-15-26-gap-c-session-3-main-integration.md
+- .claude/sessions/taxa-drrp/04-15-26-gap-c-ai-research.md
+depends_on:
+- 04-15-26-gap-c-ai-research
+- 04-15-26-gap-c-critical-review
+enables:
+- 04-15-26-gap-c-session-1-main-prep
+- 04-15-26-gap-c-session-2-training-repo-todo
+- 04-15-26-gap-c-session-3-main-integration
+---
+
+# Gap C \u2014 orchestration (CLOSED)
 
 **Date**: 2026-04-15
 **Status**: Active

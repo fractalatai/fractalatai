@@ -1,4 +1,56 @@
-# Session: 2026-02-26 — DRRP Parser v2: Actor-Anchored Classification
+---
+session: 'DRRP Parser v2: Actor-Anchored Classification'
+status: closed
+opened: 2026-02-26
+closed: 2026-02-26
+outcome: success
+summary: 'Replaced the v1 blunt boolean gate (has_actor AND has_obligation) with actor-anchored regex patterns requiring the
+  actor keyword to appear before the modal verb within a 120-char window. Eliminated 33 false positives (scope exclusions,
+  thing-subject rules, saving clauses) while retaining 92.8% of v1 matches across 7 ESH laws.
+
+  '
+decisions:
+- what: Actor-anchored patterns with 120-char forward window
+  why: Disconnected actor+obligation checks produced false positives when actor was object, not subject
+  result: 33 v1-only false positives removed; 4 v2-only new detections (2 legitimate)
+- what: Reverse anchor for HSWA "shall be the duty of" formulation
+  why: HSWA uses inverted syntax where modal precedes actor; needs backward 40-char window
+  result: HSWA s.2/s.3/s.4 duties correctly classified
+- what: '"person" requires compound predicates (person who/must/shall)'
+  why: Bare "person" is too frequent; 62% false positive rate. Compound form is specific enough
+  result: 3 CDM prohibition provisions correctly classified with zero false positives
+- what: Preserve v1 code for side-by-side comparison
+  why: Both parsers run simultaneously via parse_compare(); validate v2 before retiring v1
+  result: taxa show --compare flag with diff display and summary stats
+lessons:
+- title: Syntactic anchoring dramatically reduces false positives
+  detail: Actor-as-object provisions ("apply to the employer", "require the employer") correctly rejected by position check
+  tag: regex
+- title: Window size P90=132 chars covers 88.6% of actor-to-modal distances
+  detail: Measured empirically across 237 provisions in 7 ESH laws; 200-char extended window adds 5.5%
+  tag: empirical
+metrics:
+  v1_matches: 405
+  v2_matches: 376
+  false_positives_removed: 33
+  new_detections: 4
+  retention_rate: 92.8%
+  tests_passing: 197
+  new_tests: 35
+artifacts:
+- crates/fractalaw-core/src/taxa/duty_patterns_v2.rs
+- crates/fractalaw-core/src/taxa/duty_type.rs
+- crates/fractalaw-core/src/taxa/actors.rs
+- crates/fractalaw-core/src/taxa/mod.rs
+- crates/fractalaw-cli/src/main.rs
+depends_on:
+- 02-26-26-taxa-regex-patterns
+enables:
+- 02-26-26-v2-promotion-enrichment
+---
+
+
+# Session: 2026-02-26 — DRRP Parser v2: Actor-Anchored Classification (CLOSED)
 
 **Parent session**: [02-26-26-taxa-regex-patterns.md](02-26-26-taxa-regex-patterns.md)
 **Status**: Complete

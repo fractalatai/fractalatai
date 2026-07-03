@@ -1,4 +1,50 @@
-# Session: Denormalize Fitness/Scope onto LRT (#7)
+---
+session: Denormalize Fitness/Scope onto LRT (#7)
+status: closed
+opened: 2026-03-05
+closed: 2026-03-05
+outcome: success
+summary: 'Shipped fitness extraction data from in-memory-only to both LanceDB (7 per-provision columns) and DuckDB (6 tag
+  columns + 1 FitnessEntry detail column). Wired fitness into compute_taxa_hash() and sync publish payload (12 to 19 columns).
+  Schema grew from 91 to 98 LRT columns and 28 to 35 LAT columns.
+
+  '
+decisions:
+- what: Tag columns union both polarities for filtering
+  why: A law exempting self-employed workers is still relevant when filtering for self-employed laws
+  result: 6 tag columns answer "is this concept mentioned?" while polarity context lives in the detail column
+- what: FitnessEntry struct fields as scalar Utf8 with comma-separated multi-values
+  why: Avoids nested List<List<Utf8>> which is painful in DuckDB and impossible in Airtable
+  result: Matches DRRPEntry pattern, practical for rendering in sertantai UI
+- what: Follow established DRRP two-tier pattern for schema
+  why: Tag columns for filtering/grouping + detail column for UI rendering and hot-path matching
+  result: Consistent with duty_holder/duties pattern, maps to multi-select facets in Baserow/Airtable
+lessons:
+- title: Computed data silently discarded when not persisted
+  detail: fitness.rs was fully implemented and wired into parse_v2() but enrich_single_law() never read record.fitness_rules,
+    silently dropping computed values
+  tag: pipeline-wiring
+metrics:
+  lat_columns_before: 28
+  lat_columns_after: 35
+  lrt_columns_before: 91
+  lrt_columns_after: 98
+  publish_columns_before: 12
+  publish_columns_after: 19
+  tests_passing: 494
+artifacts:
+- crates/fractalaw-core/src/taxa/fitness.rs
+- crates/fractalaw-core/src/taxa/mod.rs
+- crates/fractalaw-core/src/schema.rs
+- crates/fractalaw-store/src/duck.rs
+- crates/fractalaw-cli/src/main.rs
+- docs/SCHEMA.md
+depends_on: []
+enables: []
+---
+
+
+# Session: Denormalize Fitness/Scope onto LRT (#7) (CLOSED)
 
 **Date**: 2026-03-05
 **Issue**: [#7 — Denormalize fitness/scope and penalty provisions onto LRT hot path](https://github.com/fractalaw/fractalaw/issues/7)

@@ -1,4 +1,46 @@
-# Gap C — Session 2: training repo (scoping / todo)
+---
+session: 'Gap C — Session 2: training repo (scoping / todo)'
+status: closed
+opened: 2026-04-15
+closed: 2026-04-15
+outcome: success
+summary: 'Scoping and todo document for the Gap C training repo that does not yet exist. Defined the Python stack (transformers,
+  datasets, accelerate), repository layout, and six-phase work plan: repo bootstrap (A), teacher labelling (B), human review
+  (C), detector training (D), hand-off back to main (E), and ongoing retraining (F). Phased as C2-only pilot first, then C4+C6
+  expansion via head-swap retrain.
+
+  '
+decisions:
+- what: Python as training language
+  why: HuggingFace ecosystem is Python-native with no serious competitor for fine-tuning
+  result: Separate repo keeps Python out of the Rust-first fractalaw workspace
+- what: Full fine-tune as default, LoRA as fallback only
+  why: Quality-first lens; full fine-tune is affordable at ModernBERT-large scale on A100
+  result: LoRA/QLoRA only if cost grows unexpectedly
+- what: Training repo is a long-lived asset, not one-off
+  why: Holder ontology grows over time; QA surfaces new roles requiring head-swap retrains
+  result: Phase F formalises ongoing retrain recipe, model versioning, and endpoint update workflow
+- what: Claude as first-choice teacher model
+  why: Already integrated via CLI, handles UK legal text well
+  result: GPT-4o as fallback for specific sub-types if needed
+lessons:
+- title: Scope training repos as living infrastructure
+  detail: One-off bootstrap thinking leads to unmaintained models; the retrain workflow must be designed from day one
+  tag: architecture
+metrics:
+  phases_planned: 6
+  estimated_teacher_labelling_cost: $50-150
+  estimated_gpu_cost_per_run: $5-20
+artifacts:
+- fractalaw-taxa-training/ (planned, does not yet exist)
+depends_on:
+- 04-15-26-gap-c-session-1-main-prep
+- 04-15-26-gap-c-orchestration
+enables:
+- 04-15-26-gap-c-session-3-main-integration
+---
+
+# Gap C \u2014 Session 2: training repo (scoping / todo) (CLOSED)
 
 **Date**: 2026-04-15
 **Status**: Not started — repo does not yet exist

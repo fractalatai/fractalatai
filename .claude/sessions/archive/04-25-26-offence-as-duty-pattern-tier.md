@@ -1,4 +1,62 @@
-# Session: 2026-04-25 — Offence-as-Duty Pattern Tier (#34)
+---
+session: Offence-as-Duty Pattern Tier (#34)
+status: closed
+opened: 2026-04-25
+closed: 2026-04-25
+outcome: success
+summary: 'Added a new DRRP pattern tier detecting duties expressed as offence-creating language (953 missed provisions corpus-wide).
+  Implemented four sub-patterns with penalty exclusion heuristic and actor extraction. PUBLIC family saw +82 TP, recall +1.8pp
+  to 60.9%. Corpus re-enrichment hit char boundary panics (fixed) and LanceDB disk space crisis from write amplification (recovered
+  from Parquet backup).
+
+  '
+decisions:
+- what: Classify offence-creating provisions as Duty (Prohibitive)
+  why: The offence language is the enforcement mechanism but the underlying obligation is a prohibition
+  result: New tier 4 in duty_type.rs classify(), after gov v2 and before rule
+- what: Two-layer penalty exclusion
+  why: Not all offence provisions are duties; penalty/sentencing provisions must be excluded
+  result: PENALTY_PRIMARY rejects sentence-start penalties; is_penalty_dominant rejects when penalty language precedes offence
+    pattern
+- what: Confidence scores 0.65-0.70 for offence patterns
+  why: Lower than governed patterns (0.85) due to more ambiguous language
+  result: GUILTY_IF at 0.65; others at 0.70
+lessons:
+- title: Never force re-enrich full corpus without monitoring disk
+  detail: Lance merge_insert creates ~25x write amplification; full --force grew LanceDB from 300MB to 39GB and filled disk
+    to 0
+  tag: operations
+- title: Never manually delete Lance data fragments
+  detail: Binary manifest grep is unreliable and corrupted the table; always restore from Parquet backup instead
+  tag: operations
+- title: Keep Parquet backups before bulk operations
+  detail: Recovery from the disk crisis was only possible because a prior Parquet backup existed
+  tag: operations
+- title: Char boundary panics on multi-byte chars
+  detail: saturating_sub on byte offsets can land inside 4-byte UTF-8 chars like emoji; fixed with char boundary snapping
+  tag: bug-fix
+metrics:
+  corpus_missed_provisions: 953
+  corpus_miss_rate: 76%
+  public_tp_delta: 82
+  public_precision_after: 81.4%
+  public_recall_after: 60.9%
+  public_f1_after: 69.7%
+  tests_passed: 341
+  tests_failed: 0
+artifacts:
+- crates/fractalaw-core/src/taxa/duty_patterns_offence.rs
+- crates/fractalaw-core/src/taxa/duty_type.rs
+- crates/fractalaw-core/src/taxa/duty_patterns_v2.rs
+- crates/fractalaw-core/src/taxa/duty_patterns_rule.rs
+depends_on:
+- taxa-gap-analysis/04-21-26-public-safety
+enables:
+- Corpus-wide re-enrichment for offence-as-duty coverage
+- taxa-gap-analysis/SKILL.md confusion matrix heuristic update
+---
+
+# Session: Offence-as-Duty Pattern Tier (#34) (CLOSED)
 
 ## Context
 

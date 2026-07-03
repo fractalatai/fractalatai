@@ -1,4 +1,59 @@
-# Session: 2026-02-26 — Clause Quality Improvement
+---
+session: Clause Quality Improvement
+status: closed
+opened: 2026-02-26
+closed: 2026-02-26
+outcome: success
+summary: 'Improved regex clause_refined quality from 75.9% to 100% clean starts and 97.8% to 99.6% clean ends across 4 iterations
+  on 7 safety laws. Replaced artificial window constants with full-text sentence scanning, added purpose-based filters for
+  enactment/interpretation/descriptive text, and fixed epistemic "may" false positives.
+
+  '
+decisions:
+- what: Remove all artificial window constants (SUBJECT_WINDOW, ACTION_WINDOW, MAX_CLAUSE_LEN)
+  why: Fixed-size windows caused mid-sentence truncation; full-text sentence scan finds natural boundaries
+  result: Clean start rate jumped from 75.9% to 98.7% in v2
+- what: Run governed v2 (actor-anchored) before government v1/v2 (unanchored)
+  why: Unanchored government patterns were misclassifying governed Responsibility as Duty
+  result: Correct duty family assignment for actor-bearing provisions
+- what: Filter epistemic "may" (may be/need/have/require)
+  why: These mean "might", not "is permitted to" -- false Enabling classifications
+  result: Eliminated spurious Enabling/Power detections
+- what: Add is_descriptive_summary() filter
+  why: Meta-regulatory text like "The Regulations impose duties on employers" describes duties without creating them
+  result: v3 reached 100% clean starts
+lessons:
+- title: Sentence boundary detection beats fixed windows for clause extraction
+  detail: Semicolons followed by sub-paragraph markers (a), (b) are list separators, not sentence ends
+  tag: regex
+- title: Application+Scope purpose is too broad for DRRP gating
+  detail: 'Many false positive DRRP provisions have Application+Scope as primary purpose; logged as GH #20'
+  tag: data-quality
+metrics:
+  iterations: 4
+  clean_start_v1: 75.9%
+  clean_start_v4: 100%
+  clean_end_v1: 97.8%
+  clean_end_v4: 99.6%
+  drrp_count_v1: 324
+  drrp_count_v4: 272
+  tests_passing: 204
+artifacts:
+- crates/fractalaw-core/src/taxa/mod.rs
+- crates/fractalaw-core/src/taxa/clause_refiner.rs
+- crates/fractalaw-core/src/taxa/purpose.rs
+- crates/fractalaw-core/src/taxa/duty_patterns_v2.rs
+- crates/fractalaw-core/src/taxa/duty_type.rs
+- crates/fractalaw-core/src/taxa/text_cleaner.rs
+- crates/fractalaw-core/src/taxa/confidence.rs
+depends_on:
+- 02-26-26-phase-c-lancedb-polisher
+enables:
+- 02-26-26-v2-promotion-enrichment
+---
+
+
+# Session: 2026-02-26 — Clause Quality Improvement (CLOSED)
 
 **Parent session**: [02-26-26-phase-c-lancedb-polisher.md](02-26-26-phase-c-lancedb-polisher.md)
 **Status**: Complete

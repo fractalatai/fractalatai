@@ -1,4 +1,61 @@
-# Session: 2026-02-26 — Taxa Parser Refinement
+---
+session: Taxa Parser Refinement
+status: closed
+opened: 2026-02-26
+closed: 2026-02-26
+outcome: success
+summary: 'Implemented purpose-based pre-filtering gate in the taxa parser, moving purpose classification before DRRP to skip
+  Interpretation/Amendment/Repeal provisions. Fixed critical enrichment bug where provisions with purposes but no DRRP were
+  silently dropped. Gate achieves 9.9% skip rate with 0 false negatives under ALL-purposes strategy.
+
+  '
+decisions:
+- what: 'Reorder pipeline: purpose runs before DRRP classification as early gate'
+  why: Interpretation/Amendment/Repeal sections structurally cannot contain DRRP; saves expensive regex processing
+  result: 104/1,046 provisions (9.9%) correctly skipped; 0 false negatives
+- what: ALL strategy for skip gate, not ANY
+  why: ANY strategy had 58 false negatives (30.7%) on multi-purpose provisions; ALL ensures only pure skip-purpose provisions
+    are gated
+  result: 100% gate precision with zero false negatives
+- what: Skip Interpretation, Amendment, Repeal only -- not Liability or Offence
+  why: Initial n=11 sample showed 18.2% DRRP rate for Liability/Offence; at scale (n=20/24) rates were 55% and 58% -- both
+    DRRP-bearing
+  result: Conservative skip list avoids false negatives
+- what: Write provisions with purposes even if no DRRP content
+  why: 'Bug: enrichment skip logic dropped purposes-only provisions, so LanceDB had NULL purposes and gate never triggered'
+  result: 100% purpose coverage after fix (was 49.6% for MHSWR)
+lessons:
+- title: Two skip points with different logic create silent bugs
+  detail: Parser-level gate and enrichment-level gate had misaligned criteria; purposes-only provisions fell through the crack
+  tag: architecture
+- title: Small sample statistics mislead at scale
+  detail: Liability/Offence at n=11 showed 18.2% DRRP rate; at n=20-24 the true rate was 55-58%
+  tag: data-quality
+- title: Purpose gate value is precision, not performance
+  detail: Gate saves 22.3us/provision (68.7%) on skipped provisions but only 4.9% overall; real value is preventing false
+    DRRP classifications
+  tag: performance
+metrics:
+  provisions_enriched: 1046
+  skip_gate_triggered: 104
+  skip_rate: 9.9%
+  false_negatives: 0
+  gate_precision: 100%
+  purpose_coverage: 100%
+  tests_passing: 194
+artifacts:
+- crates/fractalaw-core/src/taxa/mod.rs
+- crates/fractalaw-core/src/taxa/purpose.rs
+- crates/fractalaw-cli/src/main.rs
+depends_on:
+- 02-24-26-drrp-parsing
+enables:
+- 02-26-26-taxa-regex-patterns
+- 02-26-26-drrp-parser-v2
+---
+
+
+# Session: 2026-02-26 — Taxa Parser Refinement (CLOSED)
 
 ## Context
 

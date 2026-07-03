@@ -1,4 +1,56 @@
-# Gap C Sessions — Critical Review
+---
+session: Gap C Sessions — Critical Review
+status: closed
+opened: 2026-04-15
+closed: 2026-04-15
+outcome: success
+summary: 'Critical review of all five Gap C session docs. Identified that the existing model artefact is DistilBERT (not DeBERTa-v3
+  as claimed), the polisher is non-functional (best_clause_acc 0.0), holder labels are broken, and max_length 128 is too short
+  for context retrieval. All 9 review items were subsequently addressed in revisions, with the quality-first reframing, remote
+  serverless-GPU architecture, and iterative taxonomy design as significant improvements beyond what was requested.
+
+  '
+decisions:
+- what: Flagged model identity mismatch as critical
+  why: All five docs assumed DeBERTa-v3 backbone but the artefact is DistilBERT
+  result: Revision deprecated the artefact entirely and planned training from scratch
+- what: Recommended C2 sub-type as focused pilot
+  why: Highest frequency, simplest context (just parent paragraph), validates full pipeline cheaply
+  result: Accepted; training phased as C2-only Phase 1, then C4+C6 Phase 2
+- what: Recommended deferring holder_inferred_from to Session 3
+  why: Provenance field threads through every storage layer but is not needed for detector to work
+  result: Accepted; S7 absorbs the schema work alongside the code that populates it
+- what: Flagged holder vocabulary must be expanded before training
+  why: 27-class vocabulary missing Contractor, Manufacturer, Importer, Installer, Designer, Worker, User
+  result: Session 1 S1b added as dedicated vocabulary reconciliation deliverable with hard exit gate
+lessons:
+- title: Audit artefacts before planning around them
+  detail: The directory was named deberta-v3-drrp but contained DistilBERT; every architectural decision built on a wrong
+    assumption
+  tag: process
+- title: Critical review surfaced a deeper architectural tension
+  detail: Review flagged model identity; author diagnosed the real issue was applying local-first constraints to a quality-first
+    subsystem
+  tag: architecture
+metrics:
+  review_items_total: 9
+  review_items_critical: 4
+  review_items_should_fix: 3
+  review_items_consider: 2
+  all_items_addressed: true
+artifacts:
+- .claude/sessions/taxa-drrp/04-15-26-gap-c-ai-research.md
+- .claude/sessions/taxa-drrp/04-15-26-gap-c-orchestration.md
+- .claude/sessions/taxa-drrp/04-15-26-gap-c-session-1-main-prep.md
+- .claude/sessions/taxa-drrp/04-15-26-gap-c-session-2-training-repo-todo.md
+- .claude/sessions/taxa-drrp/04-15-26-gap-c-session-3-main-integration.md
+depends_on:
+- 04-15-26-gap-c-ai-research
+enables:
+- Revised Gap C session docs ready for execution
+---
+
+# Gap C Sessions \u2014 Critical Review (CLOSED)
 
 **Date**: 2026-04-15
 **Reviewer**: Claude (continuation of OH&S gap-analysis session)

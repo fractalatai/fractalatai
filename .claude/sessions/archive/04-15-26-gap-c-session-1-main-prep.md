@@ -1,4 +1,46 @@
-# Gap C — Session 1: main-repo prep
+---
+session: 'Gap C — Session 1: main-repo prep'
+status: closed
+opened: 2026-04-15
+closed: 2026-04-15
+outcome: success
+summary: 'Scoping and planning document for Session 1 of the Gap C work. Defined three deliverables in the fractalaw repo:
+  S1a (Gap C sub-type classifier producing categorised parquet), S1b (model vocabulary reconciliation expanding holder_labels.json
+  from 27 to ~60+ classes), and S3 (context-retrieval helper with 2048-token budget and format spec). Deferred holder_inferred_from
+  schema to Session 3 S7 to avoid dead columns.
+
+  '
+decisions:
+- what: Defer holder_inferred_from schema to Session 3 S7
+  why: Schema has no producer without the remote detector; avoids dead columns in main
+  result: Field ships atomically alongside the code that populates it
+- what: Pin token budget at 2048 for context window
+  why: Generous headroom for long UK provisions plus context while avoiding GPU waste from padding
+  result: 'Truncation priority defined: clause > parent > section definitions > act-general-duty'
+- what: S1b is a hard exit gate for Session 2
+  why: Training cannot start labelling against an unstable vocabulary
+  result: Reconciled holder_labels.json must be committed before Session 2 begins
+lessons:
+- title: Vocabulary reconciliation is foundational
+  detail: The ~30+ missing labels in holder_labels.json (Contractor, Manufacturer, etc.) would create known blind spots if
+    training started without them
+  tag: data-quality
+metrics:
+  deliverables_planned: 3
+  holder_labels_to_add: ~30+
+  token_budget: 2048
+artifacts:
+- crates/fractalaw-core/src/taxa/actors.rs
+- models/deberta-v3-drrp/holder_labels.json
+- docs/gap-c-context-format.md (planned)
+depends_on:
+- 04-15-26-gap-c-ai-research
+- 04-15-26-gap-c-orchestration
+enables:
+- 04-15-26-gap-c-session-2-training-repo-todo
+---
+
+# Gap C \u2014 Session 1: main-repo prep (CLOSED)
 
 **Date**: 2026-04-15
 **Status**: Not started

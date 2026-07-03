@@ -1,4 +1,45 @@
-# Session: 2026-04-21 — Fix Enrichment Truncation (#33)
+---
+session: Fix Enrichment Truncation (#33)
+status: closed
+opened: 2026-04-21
+closed: 2026-04-24
+outcome: success
+summary: 'Fixed hardcoded limit=500 in LanceDB queries that silently truncated 80 laws (52,846 provisions). Raised all four
+  affected call sites to 100,000 and added warning logs for laws with >2,000 provisions. PUBLIC family re-enriched with corrected
+  data. Commit d72a702.
+
+  '
+decisions:
+- what: Raise hardcoded limit from 500 to 100,000
+  why: Largest law has ~4,200 provisions; 100,000 is safe and future-proof
+  result: All four affected call sites fixed; three existing 200,000-limit sites were already fine
+- what: Add tracing::warn for laws with >2,000 provisions
+  why: Large laws should be visible in logs without manual checking
+  result: Warning log added to enrich_single_law
+- what: Defer Part blob filtering
+  why: Safety of skipping Part/Chapter/Schedule rows depends on sertantai re-sync
+  result: Deferred pending sertantai-legal#69 resolution
+lessons:
+- title: Stale assumptions become silent bugs
+  detail: The limit=500 was pragmatic when the corpus was small OH&S laws; it was never revisited as laws like the Online
+    Safety Act (4,181 provisions) entered
+  tag: data-quality
+- title: Always check for other instances of a hardcoded value
+  detail: The initial fix targeted one call site but grep found three more with similar limits
+  tag: process
+metrics:
+  laws_affected: 80
+  provisions_affected: 52846
+  call_sites_fixed: 4
+  largest_law_provisions: ~4,200
+artifacts:
+- crates/fractalaw-cli/src/main.rs
+depends_on: []
+enables:
+- taxa-gap-analysis/04-21-26-public-safety (resumed with corrected data)
+---
+
+# Session: Fix Enrichment Truncation (#33) (CLOSED)
 
 ## Context
 

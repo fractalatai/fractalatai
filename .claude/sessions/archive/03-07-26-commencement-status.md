@@ -1,4 +1,45 @@
-# Session: Denormalize Commencement Status onto LRT (#8)
+---
+session: Denormalize Commencement Status onto LRT (#8)
+status: closed
+opened: 2026-03-07
+closed: 2026-03-07
+outcome: success
+summary: 'Backfilled 4 annotation total columns from annotation_totals.parquet into LRT via SQL-level merge. Derived semantic
+  commencement_status enum (fully_commenced, not_commenced, partially_commenced) from law_edges.parquet commencement edges.
+  Schema grew from 98 to 99 columns with 361 tests passing.
+
+  '
+decisions:
+- what: SQL-level merge for annotation totals (Option A)
+  why: Fix at source in export_legislation.sql rather than runtime backfill
+  result: LEFT JOIN on annotation_totals.parquet populates 128 laws with annotation data
+- what: Derive commencement_status from edge-level applied_status
+  why: Users need at-a-glance "is this law in force" without parsing commencement edges
+  result: 3-value enum covering 2,267 laws (1,855 fully, 329 not, 83 partially commenced)
+lessons:
+- title: AT is a SQL reserved keyword
+  detail: Initial alias "at" for annotation_totals caused a parser error. Changed to "ann"
+  tag: sql
+metrics:
+  laws_with_annotation_data: 128
+  total_commencements: 3996
+  fully_commenced: 1855
+  not_commenced: 329
+  partially_commenced: 83
+  schema_columns: 99
+  tests_passing: 361
+artifacts:
+- data/export_legislation.sql
+- data/legislation.parquet
+- crates/fractalaw-core/src/schema.rs
+- crates/fractalaw-store/src/duck.rs
+- crates/fractalaw-cli/src/display.rs
+depends_on: []
+enables: []
+---
+
+
+# Session: Denormalize Commencement Status onto LRT (#8) (CLOSED)
 
 **Date**: 2026-03-07
 **Issue**: [#8 — Denormalize commencement status onto LRT hot path](https://github.com/fractalaw/fractalaw/issues/8)

@@ -1,4 +1,51 @@
-# Session: 2026-02-26 — v2 Parser Validation at Scale + Clause Extraction
+---
+session: v2 Parser Validation at Scale + Clause Extraction
+status: closed
+opened: 2026-02-26
+closed: 2026-02-26
+outcome: success
+summary: 'Validated v2 DRRP parser on 797 new provisions across 7 personal safety laws, confirming +13 net gain over v1. Implemented
+  miss analysis heat-scoring, fixed person-compound window and passive-by pattern bugs, and added span-based clause extraction
+  replacing full cleaned_text with focused DRRP snippets.
+
+  '
+decisions:
+- what: Only 12 of 132 hot misses are genuine v2 bugs
+  why: Most hot misses are thing-subject obligations, correct rejections, or elaboration sub-provisions better handled by
+    AI
+  result: Focused fix effort on 2 actionable patterns instead of broadening regex
+- what: Span-based clause extraction replacing clause_refiner fallback
+  why: v2 parser already knows exact match positions via find() but was discarding them with is_match()
+  result: MatchSpan struct captures actor/modal positions, extract_clause() produces 300-char focused snippets
+lessons:
+- title: v2 architecture strength on diverse actor vocabularies
+  detail: Laws with non-standard duty-holders (user, operator, competent person) showed v2 gains because it anchors any extracted
+    actor rather than checking a gatekeeper list
+  tag: parser-design
+- title: Heat-scoring prioritises miss investigation
+  detail: Scoring provisions by modal presence, actor extraction, and purpose classification surfaces genuine regressions
+    efficiently
+  tag: qa-methodology
+metrics:
+  v1_drrp_combined: 688
+  v2_drrp_combined: 672
+  false_positives_removed: 54
+  true_positives_added: 38
+  test_count: 282
+  test_pass: 282
+artifacts:
+- crates/fractalaw-core/src/taxa/duty_patterns_v2.rs
+- crates/fractalaw-core/src/taxa/mod.rs
+- crates/fractalaw-core/src/taxa/clause_refiner.rs
+- crates/fractalaw-cli/src/main.rs
+depends_on:
+- 02-26-26-drrp-parser-v2.md
+- 02-26-26-taxa-regex-patterns.md
+enables: []
+---
+
+
+# Session: 2026-02-26 — v2 Parser Validation at Scale + Clause Extraction (CLOSED)
 
 **Parent sessions**: [02-26-26-drrp-parser-v2.md](02-26-26-drrp-parser-v2.md), [02-26-26-taxa-regex-patterns.md](02-26-26-taxa-regex-patterns.md)
 **Status**: Complete

@@ -1,4 +1,56 @@
-# Session: 2026-02-20 — Issue #13: AI Classification Pipeline
+---
+session: 'Issue #13: AI Classification Pipeline'
+status: closed
+opened: 2026-02-20
+closed: 2026-02-20
+outcome: success
+summary: 'Built a centroid-based AI classification pipeline for domain, family, and subjects using mean-pooled per-law embeddings
+  from LanceDB. Achieved 74.6% agreement with ground truth on 452 classified laws, with predictions stored in separate classified_*
+  columns to preserve ground-truth labels.
+
+  '
+decisions:
+- what: Classification is per-law, not per-section
+  why: Domain/family/subjects are law-level metadata; section embeddings are mean-pooled to one 384-dim vector per law
+  result: 452 laws classified from 97,522 section embeddings
+- what: AI predictions stored in classified_* columns alongside ground-truth
+  why: Never overwrite curated domain/family/subjects; enable queryable diffs via classification_status
+  result: 302 confirmed, 103 conflicts, 47 predicted-only
+- what: family/sub_family single-select; domain/subjects multi-select
+  why: 'Matches real cardinality: a law has one family but can span multiple domains'
+  result: Clean schema with 7 new columns in legislation section 1.13
+- what: Labels from legislation table only, not CSV re-parsing
+  why: legislation table is the single source of truth; LAT CSVs already loaded into LanceDB
+  result: 13,322 labelled laws used for centroid training
+lessons:
+- title: Centroid approach is a strong baseline
+  detail: 74.6% agreement with just cosine similarity to mean-pooled centroids; no neural training required
+  tag: classification
+- title: Common confusion patterns are semantically adjacent families
+  detail: Climate Change vs Energy, Fire/Dangerous vs Consumer Product Safety, Planning vs Historic Environment
+  tag: data-quality
+metrics:
+  laws_classified: 452
+  confirmed: 302
+  conflicts: 103
+  predicted: 47
+  mean_family_confidence: 0.859
+  family_centroids: 24
+  ground_truth_agreement: 74.6%
+  tests_passing: 9
+artifacts:
+- crates/fractalaw-ai/src/labels.rs
+- crates/fractalaw-ai/src/classifier.rs
+- crates/fractalaw-core/src/schema.rs
+- crates/fractalaw-cli/src/main.rs
+- crates/fractalaw-store/src/duck.rs
+depends_on: []
+enables:
+- 02-21-26-drrp-polisher
+---
+
+
+# Session: 2026-02-20 — Issue #13: AI Classification Pipeline (CLOSED)
 
 ## Context
 

@@ -1,4 +1,53 @@
-# Session: 2026-02-26 — Promote v2 + Run Enrichment + Clause Quality Evaluation
+---
+session: Promote v2 + Run Enrichment + Clause Quality Evaluation
+status: closed
+opened: 2026-02-26
+closed: 2026-02-26
+outcome: success
+summary: 'Promoted parse_v2() as the default taxa enrichment pipeline, retired v1 governed tier (~300 lines deleted), added
+  clause quality evaluation mode, and ran enrichment across all 452 LanceDB laws. Fixed 3 Unicode char boundary panics. Result:
+  270 of 452 laws have DRRP taxa data; 258 tests pass.
+
+  '
+decisions:
+- what: Switch taxa enrich from parse() to parse_v2()
+  why: v2 actor-anchored patterns produce fewer false positives and span-based clause extraction
+  result: All enrichment uses v2; v1 fully retired
+- what: Delete v1 GOVERNED_ACTORS, match_governed, parse_compare, and --compare CLI
+  why: v2 validated at scale; v1 code no longer needed; reduces maintenance burden
+  result: ~300 lines of dead code removed; ~24 tests deleted
+- what: Add --force flag to taxa enrich
+  why: Need to re-enrich all laws when parser changes; clears DuckDB taxa columns with UPDATE SET NULL, not DELETE
+  result: Safe re-enrichment with pre-fetch of distinct law_names from LanceDB (452 vs 19,318)
+lessons:
+- title: Unicode multi-byte characters cause panics in string slicing
+  detail: Multi-byte chars like the hyphen-minus and emoji caused panics in clause preview, span extraction, and modal window
+    arithmetic; fixed with snap_char_boundary helpers
+  tag: rust
+- title: Pre-fetch distinct law_names from LanceDB before enrichment
+  detail: Only 452 of 19,318 laws have text in LanceDB; iterating all 19K wastes time on empty queries
+  tag: performance
+metrics:
+  laws_processed: 452
+  laws_with_drrp: 270
+  laws_without_drrp: 182
+  v1_lines_deleted: 300
+  tests_passing: 258
+  unicode_panics_fixed: 3
+artifacts:
+- crates/fractalaw-core/src/taxa/duty_patterns.rs
+- crates/fractalaw-core/src/taxa/mod.rs
+- crates/fractalaw-cli/src/main.rs
+- crates/fractalaw-core/src/taxa/clause_refiner.rs
+depends_on:
+- 02-26-26-drrp-parser-v2
+- 02-26-26-clause-quality-improvement
+enables:
+- 02-26-26-phase-c-lancedb-polisher
+---
+
+
+# Session: 2026-02-26 — Promote v2 + Run Enrichment + Clause Quality Evaluation (CLOSED)
 
 **Parent sessions**: [02-26-26-v2-validation-at-scale.md](02-26-26-v2-validation-at-scale.md), [02-26-26-drrp-parser-v2.md](02-26-26-drrp-parser-v2.md)
 **Status**: Complete

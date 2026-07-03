@@ -1,4 +1,53 @@
-# Session: 2026-02-21 — DRRP Polisher Micro-App
+---
+session: DRRP Polisher Micro-App
+status: closed
+opened: 2026-02-21
+closed: 2026-02-21
+outcome: success
+summary: 'Designed and implemented the DRRP Polisher micro-app end-to-end: sync protocol (HTTP REST outbox/inbox), annotation
+  and polished output schemas, DuckDB table creation, data/query and data/mutate host functions, Claude-backed AI inference
+  host function, WASM guest component, and sync pull/push CLI commands.
+
+  '
+decisions:
+- what: HTTP REST with JSON for sync protocol
+  why: Hub is intermittently on; async outbox/inbox pattern avoids coordination; Elixir has native JSON support
+  result: GET /api/outbox/annotations and POST /api/inbox/polished endpoints designed
+- what: Claude API initially, migrate to local ONNX later
+  why: Prove the prompt with Claude, then distil to a fine-tuned small model for local-first deployment
+  result: ai-inference WIT interface is model-agnostic; host decides backend
+- what: Async outbox pattern with CLI-driven pull/push
+  why: Hub sleeps between runs; sertantai is always-on server; fully decoupled
+  result: 'Simple workflow: sync pull -> run polisher -> sync push'
+- what: Minimum viable annotation schema
+  why: Start small (law_name, provision, drrp_type, source_text, confidence, scraped_at) and evolve
+  result: 8-column drrp_annotations + 11-column polished_drrp tables
+lessons:
+- title: WIT host functions enable clean guest isolation
+  detail: Guest calls generic query/mutate/inference interfaces; host routes to DuckDB, LanceDB, or Claude as needed
+  tag: architecture
+- title: Outbox pattern fits intermittent-hub topology
+  detail: Each side maintains its outbox; the other pulls when ready; no always-on requirement for fractalaw
+  tag: sync
+metrics:
+  host_functions_implemented: 4
+  guest_tests_passing: 15
+  cli_commands_added: 2
+artifacts:
+- crates/fractalaw-core/src/schema.rs
+- crates/fractalaw-host/src/lib.rs
+- crates/fractalaw-host/src/inference.rs
+- guests/drrp-polisher/src/lib.rs
+- crates/fractalaw-cli/src/main.rs
+- wit/world.wit
+depends_on:
+- 02-20-26-ai-classification
+enables:
+- 02-24-26-drrp-parsing
+---
+
+
+# Session: 2026-02-21 — DRRP Polisher Micro-App (CLOSED)
 
 ## Context
 

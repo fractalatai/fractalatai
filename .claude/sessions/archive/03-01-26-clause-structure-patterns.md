@@ -1,4 +1,49 @@
-# Session: Clause Structure Pattern Extraction
+---
+session: Clause Structure Pattern Extraction
+status: closed
+opened: 2026-03-01
+closed: 2026-03-01
+outcome: success
+summary: 'Analysed 3,000 enriched clauses to identify 6 structural patterns in legal text, with Patterns 1-3 covering 95%
+  of clauses. Designed and implemented ClauseStructure decomposition (Modal enum, Qualifier enum, applicability, action) achieving
+  97.9% corpus coverage. Created clause_structure.rs with decompose() function and 12 tests.
+
+  '
+decisions:
+- what: ShallEnsure merged into Shall modal
+  why: '"ensure" is one of 30+ verbs pairing with shall. Modal expresses obligation strength, not the action'
+  result: 8-value Modal enum with action verbs in the action field
+- what: No separate clause_actor field
+  why: Same taxonomy as governed_actors/government_actors, would duplicate existing data
+  result: 4-field ClauseStructure (applicability, modal, qualifiers, action)
+- what: Run decomposition at enrichment time with standalone fallback
+  why: MatchSpan available during parse_v2() gives precise offsets without re-discovering modal
+  result: decompose() accepts optional span, falls back to regex when called standalone
+lessons:
+- title: Enum where membership is fixed, free text where provision-specific
+  detail: Modal (8 values) and Qualifier (~12 values) are closed sets suitable for enum. Applicability and action are inherently
+    provision-specific free text
+  tag: schema-design
+- title: Pattern 1 (direct actor+modal+action) dominates at 71%
+  detail: Initial estimates were 40% for direct pattern but corpus analysis showed 70.9%. Conditional lead was overestimated
+    at 30% vs actual 10.9%
+  tag: data-analysis
+metrics:
+  corpus_size: 3000
+  decomposition_coverage_pct: 97.9
+  decomposition_failures: 63
+  modal_values: 8
+  qualifier_values: 12
+  tests_added: 12
+artifacts:
+- crates/fractalaw-core/src/taxa/clause_structure.rs
+- crates/fractalaw-core/src/taxa/mod.rs
+depends_on: []
+enables: []
+---
+
+
+# Session: Clause Structure Pattern Extraction (CLOSED)
 
 **Date**: 2026-03-01
 **Objective**: Identify standard structural patterns in extracted `clause_refined` text, then build regex/functions to decompose clauses into structured components automatically.

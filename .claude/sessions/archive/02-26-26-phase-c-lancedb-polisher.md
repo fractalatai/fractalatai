@@ -1,4 +1,53 @@
-# Session: 2026-02-26 — Phase C: DRRP Map in LanceDB + LanceDB-Only Polisher
+---
+session: 'Phase C: DRRP Map in LanceDB + LanceDB-Only Polisher'
+status: closed
+opened: 2026-02-26
+closed: 2026-02-26
+outcome: success
+summary: 'Completed and validated Phase C pipeline end-to-end: rebuilt WASM guest for LanceDB-only operation, fixed host test
+  and epoch deadline, ran polisher with ONNX inference on 340 provisions. Concluded that ONNX adds no value for clause extraction
+  -- regex pipeline already produces better clauses (avg confidence 0.49 vs 0.37).
+
+  '
+decisions:
+- what: ONNX adds no value for polisher clause extraction
+  why: Head-to-head comparison showed ONNX worse 71.5% of the time; outputs are truncated stubs
+  result: Future improvements should focus on regex clause quality, not AI refinement
+- what: Increase WASM epoch deadline from 100s to 3600s
+  why: Long-running polisher guests processing hundreds of provisions exceeded the original timeout
+  result: 340 provisions processed without timeout
+- what: clause_refined should be null for non-DRRP provisions
+  why: Fallback to cleaned_text inflates taxa data count; 50k+ non-DRRP provisions get section headings as clause_refined
+  result: Observation logged for future fix
+lessons:
+- title: DeBERTa classifier trained for holder extraction, not clause extraction
+  detail: Model truncates instead of extracting meaningful text; 63.7MB model produces 3-20 char stubs
+  tag: ml
+- title: OFFSET pagination with shrinking result sets is fragile
+  detail: As rows get polished, WHERE ai_clause IS NULL shrinks, shifting offsets; works but inefficient
+  tag: architecture
+metrics:
+  provisions_with_taxa: 18139
+  provisions_polished: 340
+  provision_errors: 8
+  empty_drrp_skips: 1820
+  api_tokens_used: 0
+  regex_avg_confidence: 0.49
+  onnx_avg_confidence: 0.37
+  onnx_worse_pct: 71.5%
+artifacts:
+- guests/drrp-polisher/src/lib.rs
+- crates/fractalaw-host/src/lib.rs
+- crates/fractalaw-store/src/lance.rs
+- crates/fractalaw-cli/src/main.rs
+depends_on:
+- 02-26-26-v2-promotion-enrichment
+enables:
+- 02-26-26-clause-quality-improvement
+---
+
+
+# Session: 2026-02-26 — Phase C: DRRP Map in LanceDB + LanceDB-Only Polisher (CLOSED)
 
 **Parent sessions**: [02-26-26-v2-promotion-enrichment.md](02-26-26-v2-promotion-enrichment.md), [02-26-26-v2-validation-at-scale.md](02-26-26-v2-validation-at-scale.md)
 **GitHub issue**: [#19](https://github.com/fractalaw/fractalaw/issues/19)

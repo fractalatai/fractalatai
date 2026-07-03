@@ -1,4 +1,80 @@
-# Session: 2026-02-24 — DRRP Parsing Migration
+---
+session: DRRP Parsing Migration
+status: closed
+opened: 2026-02-24
+closed: 2026-02-26
+outcome: success
+summary: 'Migrated the 18-module sertantai DRRP/Taxa regex pipeline from Elixir to pure Rust in fractalaw-core, built an ONNX
+  training pipeline (DeBERTa 3-head model), rewrote the polisher for LanceDB-only operation, and validated 100% local inference
+  end-to-end. Critical finding: ONNX model truncates clauses due to underfitting (200 examples, 128 tokens) -- infrastructure
+  validated, model quality needs full dataset retraining.
+
+  '
+decisions:
+- what: Taxa pipeline lives in fractalaw-core/src/taxa/ as pure Rust
+  why: Regex-only logic, no DB/network/AI deps; usable by both CLI and WASM guests
+  result: 10 modules, 3,332 lines, 116 tests, zero additional deps beyond regex
+- what: LazyLock<Regex> for all compiled patterns
+  why: Stable in std since Rust 1.80; patterns compile once at first use; no once_cell dep needed
+  result: Zero-overhead pattern matching after first use
+- what: LanceDB as AI working store, not DuckDB
+  why: Per-provision text, taxa, and AI results co-located; polisher reads/writes one store
+  result: 17 new columns on legislation_text (10 taxa + 7 AI); no DuckDB in polisher path
+- what: Use ai-inference::generate as single WIT interface for ONNX routing
+  why: Guest code unchanged; host routes to ONNX or Claude based on config
+  result: DrrpExtractor in fractalaw-ai with automatic model discovery
+- what: '3-head DeBERTa model: clause span + qualifier span + holder classification'
+  why: Structured extraction task with three distinct outputs per DRRP entry
+  result: ONNX export working; INT8 quantised to 63.7MB; 27.5ms/inference on CPU
+lessons:
+- title: Rust regex crate has no lookahead/lookbehind
+  detail: 'Several Elixir patterns rewritten: lookahead -> capture group iteration; negative lookahead -> simplified character
+    classes'
+  tag: porting
+- title: LazyLock interior mutability prevents static borrows
+  detail: const RAW_PATTERNS + static COMPILED LazyLock<Vec> pattern avoids E0492
+  tag: rust
+- title: Pattern ordering matters for domain-specific vs generic fallbacks
+  detail: SFAIRP, risk, info, training must be checked before prescriptive/enabling to avoid false matches
+  tag: regex
+- title: Never drop LanceDB tables without explicit confirmation
+  detail: Accidentally dropped legislation_text table; lost 9 hours of embedding computation; added deny rules
+  tag: data-safety
+- title: 200 training examples insufficient for span extraction
+  detail: AI model produces 5-320 char fragments instead of 200-3000 char clauses; needs full 7K+ dataset
+  tag: ml
+metrics:
+  elixir_modules_migrated: 18
+  rust_lines_written: 5700
+  taxa_tests: 116
+  extractor_tests: 7
+  provisions_with_taxa: 676
+  provisions_with_ai_polish: 172
+  onnx_model_size_mb: 63.7
+  local_inference_pct: 100
+  commits: 11
+  session_duration_days: 3
+artifacts:
+- crates/fractalaw-core/src/taxa/
+- crates/fractalaw-ai/src/extractor.rs
+- crates/fractalaw-store/src/lance.rs
+- crates/fractalaw-host/src/lib.rs
+- crates/fractalaw-cli/src/main.rs
+- guests/drrp-polisher/src/lib.rs
+- scripts/train_drrp_model.py
+- scripts/export_onnx.py
+- crates/fractalaw-core/src/training.rs
+depends_on:
+- 02-21-26-drrp-polisher
+enables:
+- 02-26-26-taxa-refinement
+- 02-26-26-clause-quality-improvement
+- 02-26-26-drrp-parser-v2
+- 02-26-26-phase-c-lancedb-polisher
+---
+
+
+# Session: 2026-02-24 — DRRP Parsing Migration (CLOSED)
 
 ## Context
 
