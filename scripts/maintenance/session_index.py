@@ -238,17 +238,10 @@ def archive_old_sessions(sessions_dir: Path, days: int = 30):
         if closed_date >= cutoff:
             continue
 
-        # Determine target path
+        # Flat archive — all files go directly into archive/
         rel = filepath.relative_to(sessions_dir)
-        if len(rel.parts) > 1:
-            # Has a subdirectory (e.g. cascade/foo.md → archive/cascade/foo.md)
-            target_dir = archive_dir / rel.parent
-        else:
-            # Top-level session → archive/foo.md
-            target_dir = archive_dir
-
-        target_dir.mkdir(parents=True, exist_ok=True)
-        target = target_dir / filepath.name
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        target = archive_dir / filepath.name
 
         try:
             subprocess.run(
