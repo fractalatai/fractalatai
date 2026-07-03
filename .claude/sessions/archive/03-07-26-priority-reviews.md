@@ -1,4 +1,29 @@
-# Priority Reviews
+---
+session: Priority Reviews
+status: closed
+opened: 2026-03-07
+closed: 2026-03-07
+outcome: success
+
+summary: >
+  Periodic priority review log tracking how GitHub issue priorities shifted as
+  the project evolved. Captured two review snapshots: post-#8 (commencement status)
+  and post-#16 (rule classification). Zenoh WAN sync (#25) rose to P1 after all
+  LRT enrichment work completed.
+
+decisions:
+  - what: "#25 Zenoh WAN sync rises to P1"
+    why: "All LRT enrichment work (#7 fitness, #8 commencement, #16 Rule) complete — infrastructure is the next bottleneck"
+    result: "WAN sync implemented in zenoh/03-07-26-wan-sync.md session"
+  - what: "DRRP pipeline declared feature-complete after #16"
+    why: "All 5 classification types (Duty, Right, Responsibility, Power, Rule) implemented with actor extraction"
+    result: "Focus shifted from new features to quality (QA, gap analysis, precision)"
+
+artifacts:
+  - .claude/plans/priority-reviews.md
+---
+
+# Priority Reviews (CLOSED)
 
 Tracking how issue priorities shift as the project evolves.
 

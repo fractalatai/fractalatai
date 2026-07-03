@@ -1,4 +1,51 @@
-# Gap C Tiered Resolution — Session Coordination
+---
+session: "Gap C Tiered Resolution — Session Coordination"
+status: closed
+opened: 2026-06-05
+closed: 2026-06-08
+outcome: success
+
+summary: >
+  Meta-session coordinating the Gap C tiered resolution pipeline. Phase 1A (deterministic
+  parent inheritance) completed with +13.7% DRRP uplift (8,648 provisions inherited).
+  Phases 1B-4 planned but superseded by the cascade architecture pivot which absorbed
+  the tiered approach into the 4-tier cascade pipeline.
+
+decisions:
+  - what: "Four-tier pipeline: regex → inheritance → cross-ref → LLM"
+    why: "Each tier adds complexity and cost. Deterministic tiers first maximise coverage before expensive LLM calls."
+    result: "Tier 1 alone found 8,648 provisions — 2.6x the original Gap C estimate"
+  - what: "Cross-ref > parent inheritance precedence for conflict resolution"
+    why: Cross-reference is more specific than structural inheritance
+    result: Approved in design, implemented in cascade transition rules session
+  - what: "Haiku for Level 1-2 context, Sonnet for Level 3-4"
+    why: "Cost routing — simple contexts don't need expensive models"
+    result: "Later superseded by local SLM (gemma-3-4b) for all tiers"
+
+metrics:
+  tier1_inherited: 8648
+  tier1_uplift_pct: 13.7
+  laws_with_inheritance: 141
+  distance_1_pct: 74.1
+
+lessons:
+  - title: "Tier 1 inheritance alone exceeded all Gap C estimates by 2.6x"
+    detail: "Original estimate was ~3,275 Gap C provisions. Tier 1 found 8,648 — the full customer corpus has more deeply-nested SIs than the analysis corpus."
+    tag: methodology
+
+artifacts:
+  - docs/architecture/GAP-C-AGENTIC-EXTRACTION-PLAN.md
+
+depends_on:
+  - 04-14-26-ohs-occupational-safety.md
+  - 04-15-26-gap-c-orchestration.md
+
+enables:
+  - 06-05-26-gap-c-phase-1a.md
+  - 06-08-26-cascade-v03-implementation.md
+---
+
+# Gap C Tiered Resolution — Session Coordination (CLOSED)
 
 **Design doc**: `docs/GAP-C-AGENTIC-EXTRACTION-PLAN.md` (v0.4)
 **Created**: 2026-06-05
