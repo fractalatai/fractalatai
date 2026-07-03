@@ -1,3 +1,45 @@
+---
+session: Law Status Tracker
+status: closed
+opened: 2026-06-24
+closed: 2026-06-25
+outcome: success
+
+summary: >
+  Designed and implemented per-law pipeline status tracking. 6 timestamp columns
+  on DuckDB legislation table derive pipeline stage. CLI command (taxa status) with
+  --laws, --law-file, --summary, --stage filters. Zenoh queryable for sertantai
+  to query status on demand.
+
+decisions:
+  - what: Timestamps on existing legislation table, not a separate status table
+    why: Status is per-law metadata — adding columns is simpler than a new table with joins
+    result: 6 timestamp columns, derived stage from NULL/non-NULL progression
+  - what: "Fractalaw = engine, sertantai = customer record of which laws apply"
+    why: Customer-law membership lives in sertantai. Fractalaw processes whatever arrives and exposes status.
+    result: Separation of concerns confirmed by Gemini review
+  - what: Both Zenoh queryable + proactive events
+    why: Events for real-time dashboard reactivity, queryable for reliable current state
+    result: Queryable on @tenant/fractalaw/status, events post-stage
+
+metrics:
+  timestamp_columns: 6
+  pipeline_stages: 7
+
+lessons:
+  - title: Inferring status from published taxa is insufficient
+    detail: "Published taxa only shows the endpoint. Laws stuck in early stages (needs_embed, needs_parse) are invisible without per-stage timestamps."
+    tag: architecture
+
+artifacts:
+  - crates/fractalaw-cli/src/commands/taxa.rs
+  - crates/fractalaw-cli/src/commands/sync.rs
+  - crates/fractalaw-store/src/duck.rs
+
+depends_on:
+  - 06-24-26-pgstore-implementation.md
+---
+
 # Session: Law Status Tracker (CLOSED)
 
 ## Problem

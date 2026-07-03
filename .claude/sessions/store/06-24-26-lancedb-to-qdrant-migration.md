@@ -1,3 +1,49 @@
+---
+session: "Vector DB Migration: pgvector hub + LanceDB edge"
+status: closed
+opened: 2026-06-24
+closed: 2026-06-24
+outcome: success
+
+summary: >
+  Evaluated Qdrant, pgvector, and LanceDB for hub provision store. Gemini recommended
+  hybrid architecture: pgvector on hub (write-heavy, no fragment bloat), LanceDB on edge
+  (embedded, offline). Decision driven by micro-apps edge requirement — Qdrant/pgvector
+  need a server process incompatible with edge tablets.
+
+decisions:
+  - what: "Hybrid architecture: pgvector hub + LanceDB edge"
+    why: "LanceDB fragment bloat (25x write amplification, disk fills to 0%) is unsustainable on hub, but embedded architecture is essential for edge micro-apps"
+    result: pgvector eliminates hub operational pain while preserving edge story
+  - what: pgvector over Qdrant for hub
+    why: "Full SQL, JSONB for nested payloads, aligns with sertantai (already Postgres), mature Rust clients (sqlx)"
+    result: Qdrant rejected despite better embedding search — SQL and sertantai alignment won
+  - what: ProvisionStore trait abstraction for hub/edge polymorphism
+    why: Pipeline code should not know which backend is used — trait enables LanceStore on edge, PgStore on hub
+    result: Trait approach confirmed by Gemini review
+
+metrics:
+  lancedb_bloat_during_ops: "8-14 GB"
+  pgvector_stable_size: "715 MB"
+  disk_exhaustion_events: "5+ in 2 days"
+
+lessons:
+  - title: "LanceDB merge_insert creates 25x write amplification — fundamental architectural mismatch for update-heavy workloads"
+    detail: "167K rows with updates produces 14GB of fragments. No native compaction without pylance. The export→drop→recreate cycle is the only workaround."
+    tag: infrastructure
+  - title: "Edge micro-apps requirement kills server-based alternatives for edge"
+    detail: "Field Research Tool needs embedded DB on offline tablets. Qdrant and pgvector both need servers. LanceDB's embedded nature is the killer feature for edge, even though it's painful on hub."
+    tag: architecture
+
+artifacts:
+  - crates/fractalaw-store/src/lance.rs
+
+enables:
+  - pgvector feasibility spike
+  - PgStore implementation
+  - Hub-only Postgres operation
+---
+
 # Session: Vector DB Migration — pgvector hub + LanceDB edge (CLOSED)
 
 ## Meta-plan — daughter sessions for investigation + implementation

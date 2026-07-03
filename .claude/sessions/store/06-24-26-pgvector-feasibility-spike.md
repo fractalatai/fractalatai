@@ -1,3 +1,55 @@
+---
+session: pgvector Feasibility Spike
+status: closed
+opened: 2026-06-24
+closed: 2026-06-24
+outcome: success
+
+summary: >
+  Proved pgvector can replace LanceDB on hub. Postgres+pgvector via podman quadlet,
+  59-column schema mapped, 183,509 rows migrated in 223s. Upsert bloat: 1MB vs 500MB+
+  in LanceDB. HNSW vector search working with cosine similarity.
+
+decisions:
+  - what: Podman quadlet with systemd integration (not Docker Compose)
+    why: Fedora Bluefin is immutable — podman is native, quadlet integrates with user systemd
+    result: "fractalaw-pg.container on port 5433, ShmSize=2G for HNSW builds"
+  - what: actors column as JSONB (was List<Struct> in LanceDB)
+    why: JSONB is more powerful — GIN indexed, queryable, no nested Arrow type complexity
+    result: GIN index on actors for containment queries
+
+metrics:
+  rows_migrated: 183509
+  migration_time_seconds: 223
+  migration_rate: "821 rows/s"
+  lancedb_bloat_1k_upsert: "500 MB"
+  pgvector_bloat_1k_upsert: "1 MB"
+  total_size: "715 MB (231 data + 271 indexes + HNSW)"
+  embeddings_present: 143643
+
+lessons:
+  - title: "ShmSize=2G required for HNSW index builds on 143K+ vectors"
+    detail: Default shared memory is too small for pgvector HNSW construction. Without it, index build fails silently.
+    tag: infrastructure
+  - title: "Port 5433 avoids conflict with any system Postgres on 5432"
+    detail: Even on systems without Postgres, using a non-default port prevents future surprises.
+    tag: infrastructure
+  - title: "migrate_to_pg.py is re-runnable via ON CONFLICT upsert"
+    detail: The migration script can be safely re-run — existing rows are updated, new rows inserted. No manual cleanup needed.
+    tag: tooling
+
+artifacts:
+  - scripts/pg_schema.sql
+  - scripts/migrations/migrate_to_pg.py
+
+depends_on:
+  - 06-24-26-lancedb-to-qdrant-migration.md
+
+enables:
+  - PgStore Rust implementation
+  - Full pipeline on Postgres
+---
+
 # Session: pgvector Feasibility Spike (CLOSED)
 
 ## Goal

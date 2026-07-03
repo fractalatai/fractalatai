@@ -1,3 +1,36 @@
+---
+session: PgStore Hardening & Remaining Wiring
+status: suspended
+opened: 2026-06-25
+closed:
+outcome:
+
+summary: >
+  Hardened PgStore after initial implementation. Wired --pg for provisions publish
+  and pull-lat. Fixed query_provision_taxa filter, upsert_embeddings, Zenoh selector
+  params. Added is_benchmark column. Law status tracker implemented. 224 QQ laws published.
+  sync watch wiring and remaining trait coverage still pending.
+
+decisions:
+  - what: "query_provision_taxa filter: extraction_method IS NOT NULL (not drrp_types)"
+    why: drrp_types can be empty array for gated provisions, but extraction_method is always set when a provision has been through the pipeline
+    result: Fixes provisions publish showing 0 rows for laws with gated provisions
+  - what: Zenoh status queryable uses selector params (?laws=) not body payload
+    why: Zenoh GET queries have no body in practice — sertantai sends params
+    result: Both selector params and body payload supported as fallback
+
+metrics:
+  qq_laws_published: 224
+
+artifacts:
+  - crates/fractalaw-cli/src/commands/sync.rs
+  - crates/fractalaw-cli/src/commands/taxa.rs
+  - crates/fractalaw-store/src/pg.rs
+
+depends_on:
+  - 06-24-26-pgstore-implementation.md
+---
+
 # Session: PgStore Hardening & Remaining Wiring (SUSPENDED)
 
 ## Context

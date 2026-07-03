@@ -1,3 +1,72 @@
+---
+session: PgStore Implementation
+status: closed
+opened: 2026-06-24
+closed: 2026-06-24
+outcome: success
+
+summary: >
+  Built PgStore (Postgres+pgvector) as hub provision store replacement for LanceDB.
+  5-phase implementation: module split (8443→897 lines), enrich_single_law decomposition
+  (1440→76 lines), ProvisionStore trait, CLI --pg wiring, full pipeline validation.
+  All commands work against Postgres with zero disk exhaustion.
+
+decisions:
+  - what: "Module split before PgStore wiring (Gemini: refactor before/during, not after)"
+    why: main.rs at 8,443 lines with 1,442-line enrich_single_law was untestable and unwirable
+    result: "6 modules: main(897), utils(610), llm(443), pipeline(1573), taxa(3166), sync(758), misc(1055)"
+  - what: "ProvisionStore trait with Box<dyn ProvisionStore> dispatch"
+    why: Pipeline code should be backend-agnostic. async_trait enables trait objects.
+    result: Both LanceStore and PgStore implement the trait, CLI switches via --pg flag
+  - what: "UNNEST batch upserts for performance (Gemini recommendation)"
+    why: Row-by-row executemany is slow for bulk operations
+    result: INSERT ON CONFLICT with batch binding for upsert_lat, update_taxa
+  - what: "law_name parameter on trait (not raw SQL filter strings)"
+    why: "LanceStore used raw SQL filters — unsafe for Postgres. law_name is the universal query key."
+    result: LanceStore constructs filter internally, PgStore uses parameterised queries
+
+metrics:
+  main_rs_before: 8443
+  main_rs_after: 897
+  enrich_before: 1440
+  enrich_after: 76
+  postgres_rows: 183509
+  pipeline_commands_wired: 6
+
+lessons:
+  - title: "Split first, wire second — refactoring a monolith during integration is a recipe for bugs"
+    detail: "Gemini review confirmed: decompose enrich_single_law into pipeline stages before wiring PgStore. Each stage is independently testable."
+    tag: architecture
+  - title: "Arrow ↔ Postgres has no magic crate — manual column-by-column conversion"
+    detail: "PgRow → Arrow arrays → RecordBatch for reads. RecordBatch rows → sqlx bind for writes. Tedious but straightforward."
+    tag: infrastructure
+  - title: "FixedSizeList inner field nullability must match between Arrow and Postgres"
+    detail: Embedding column required nullable inner field to match pgvector Vector type. Mismatch caused silent data corruption.
+    tag: data
+  - title: "List<Struct> → JSONB is the right conversion for nested types"
+    detail: "actors column was List<Struct> in LanceDB. JSONB in Postgres is more powerful (GIN indexed, queryable) and maps cleanly."
+    tag: architecture
+
+artifacts:
+  - crates/fractalaw-store/src/pg.rs
+  - crates/fractalaw-store/src/provision_store.rs
+  - crates/fractalaw-cli/src/main.rs
+  - crates/fractalaw-cli/src/commands/pipeline.rs
+  - crates/fractalaw-cli/src/commands/taxa.rs
+  - crates/fractalaw-cli/src/commands/sync.rs
+  - crates/fractalaw-cli/src/commands/misc.rs
+  - crates/fractalaw-cli/src/utils.rs
+  - crates/fractalaw-cli/src/llm.rs
+
+depends_on:
+  - 06-24-26-pgvector-feasibility-spike.md
+
+enables:
+  - PgStore hardening
+  - Law status tracker
+  - Hub-only Postgres operation (no LanceDB dependency)
+---
+
 # Session: PgStore Implementation (CLOSED)
 
 Daughter session 2 of DB migration. Builds the Rust `PgStore` struct to replace `LanceStore` for hub operations.
