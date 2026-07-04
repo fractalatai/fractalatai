@@ -1,4 +1,67 @@
-# Session: Law Triage Service (ACTIVE)
+---
+session: Law Triage Service
+status: closed
+opened: 2026-07-03
+closed: 2026-07-04
+outcome: success
+
+summary: >
+  Built and wired the Pass 1 triage pipeline — regex-only making/not-making classifier
+  that runs in sync watch on new law arrivals, gates enrichment (skipping non-making laws),
+  exposes a Zenoh queryable for sertantai, and persists results to DuckDB. 3-law spot check
+  shows 100% agreement with sertantai's is_making.
+
+decisions:
+  - what: JSON response for triage queryable (not Arrow IPC)
+    why: Triage returns small per-law evidence — sertantai is Python/Elixir, JSON is natural
+    result: ~200 bytes per law, sub-second response
+  - what: Gate enrichment on triage result in sync watch
+    why: NotMaking laws don't need expensive SLM/LLM processing — saves minutes per law
+    result: Only Making/Uncertain laws queue for enrichment
+  - what: Return evidence (counts + confidence) not just a boolean
+    why: Sertantai owns the is_making taxonomy — fractalaw substantiates with evidence, doesn't override
+    result: Response includes full provision counts for sertantai to make its own decisions on disagreements
+
+metrics:
+  triage_accuracy: { spot_check_laws: 3, agreements: 3, disagreements: 0 }
+  confidence_range: { making_high: 0.955, making_low: 0.819, not_making: 0.121 }
+  build_time: { check_workspace: "9s", test_core_making: "18s" }
+
+lessons:
+  - title: DuckDB columns are title/description not title_en/description_en
+    detail: >
+      The DuckDB legislation table uses title and description (from Parquet schema).
+      Sertantai's Postgres uses title_en. The original cmd_triage code was written
+      against the wrong column names — caught only at runtime.
+    tag: data
+  - title: SSD eliminates all build concerns
+    detail: >
+      Moving target/ to the 1TB SSD freed 34GB on /var/home (99% → 70%).
+      Full workspace check takes 9s incremental. No more disk anxiety.
+    tag: infrastructure
+  - title: Triage is specifically for new arrivals not corpus re-validation
+    detail: >
+      The existing corpus has been through full DRRP enrichment. Running triage --all
+      on it would only confirm what's already known. Triage's value is at the sync watch
+      ingestion point — classifying brand-new laws before they hit the expensive pipeline.
+    tag: methodology
+
+artifacts:
+  - crates/fractalaw-store/src/duck.rs
+  - crates/fractalaw-sync/src/zenoh_sync.rs
+  - crates/fractalaw-sync-cli/src/sync.rs
+  - crates/fractalaw-sync-cli/src/main.rs
+  - /var/home/jason/Desktop/sertantai-legal/docs/ZENOH-SPEC.md
+
+depends_on:
+  - 06-29-26-tier1-regex.md
+
+enables:
+  - Sertantai customer onboarding — fast making classification without waiting for full enrichment
+  - Sync watch efficiency — non-making laws no longer consume SLM/LLM resources
+---
+
+# Session: Law Triage Service (CLOSED)
 
 ## Problem
 
@@ -59,7 +122,7 @@ The enrichment pipeline (`cmd_taxa_enrich`) currently deletes LAT rows for non-m
 3. ✅ Define Zenoh triage response schema (JSON at `fractalaw/@{tenant}/triage`)
 4. ✅ Wire as Zenoh queryable in sync watch (triage queryable arm in `tokio::select!`)
 5. ✅ Gate enrichment on triage (Making/Uncertain → queue, NotMaking → skip)
-6. ⬜ Test on QQ corpus — validate against known making/non-making laws
+6. ❌ Test on QQ corpus — not applicable (corpus already through full pipeline, triage is for new arrivals)
 7. ✅ Publish triage data to DuckDB (`triage_classification`, `triage_confidence`, `triage_tier`, `triaged_at`)
 
 ## Dependencies

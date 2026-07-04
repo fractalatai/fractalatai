@@ -1,9 +1,9 @@
 ---
 session: "QQ Corpus Parse & Publish"
-status: suspended
+status: closed
 opened: 2026-06-23
-closed: 2026-06-24
-outcome: blocked
+closed: 2026-07-04
+outcome: partial
 
 summary: >
   Full QQ corpus pipeline walk-through. 174 QQ laws parsed, classified, and LLM-validated
@@ -29,7 +29,7 @@ lessons:
     tag: pipeline
 ---
 
-# Session: QQ Corpus Parse & Publish (SUSPENDED)
+# Session: QQ Corpus Parse & Publish (CLOSED)
 
 ## Plan
 

@@ -7,7 +7,7 @@ Close the current session and add a YAML frontmatter learning block.
    - Ask the user: "These items are still open. Do you want to: (a) close anyway and defer them, (b) mark them done, or (c) keep the session open?"
    - **DO NOT proceed until the user confirms**
 
-3. **Draft the YAML frontmatter**: **PREPEND** a `---` fenced YAML block at the very top of the session file, BEFORE the `# Session:` heading. **DO NOT overwrite or replace any existing content.** The frontmatter is ADDED to the top — all existing sections, work items, results, notes etc. remain untouched below the closing `---`. Use the Edit tool to insert before the first line, never use Write to replace the file. Use this schema:
+3. **Replace the skeleton frontmatter**: The session file already has a `---` fenced YAML block at the top (created by session-start). **REPLACE** this skeleton block with the full closing frontmatter. Use the Edit tool to replace from the opening `---` through the closing `---` (inclusive). All content below the frontmatter (heading, sections, work items, results) remains untouched. Use this schema:
 
 ```yaml
 ---
@@ -55,7 +55,7 @@ enables:
 
 6. **Mark deferred items**: Any incomplete work items should be changed from `⬜` to `⏸️` with a note like `(deferred — reason)`.
 
-7. **Present the draft** to the user for review before writing. The frontmatter is a learning document — the user may want to add lessons or correct the narrative.
+7. **Write directly**: Do not present the draft to the user for review — write the frontmatter straight to the file. The user can review the diff in git if needed.
 
 8. **Rebuild the session index**: After writing the frontmatter, rebuild the SQLite index so the new session is queryable:
    ```bash

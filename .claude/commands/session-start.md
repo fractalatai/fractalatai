@@ -11,9 +11,15 @@ Open a new session or resume a PENDING/SUSPENDED session.
 
 3. **Create the session file** at `.claude/sessions/cascade/MM-DD-YY-<slug>.md` using today's date and a kebab-case slug from the title. Use the Write tool.
 
-4. **Structure the document** following this template:
+4. **Structure the document** with skeleton frontmatter followed by the session body:
 
 ```markdown
+---
+session: <Title>
+status: active
+opened: <YYYY-MM-DD>
+---
+
 # Session: <Title> (ACTIVE)
 
 ## Problem
@@ -31,6 +37,8 @@ Numbered checklist of items to complete. Use ⬜ for pending:
 - ✅ or ⬜ for each prerequisite — what must exist before this work can proceed
 ```
 
+For PENDING sessions (scoped but not starting now), use `status: pending` in the frontmatter and `(PENDING)` in the heading.
+
 5. **Keep it lean at creation**. The session doc grows during the session as decisions, results, and findings are added. Don't front-load with speculative sections. The following sections get **added as work progresses**, not at creation:
    - Architecture decisions (when a choice is made)
    - Results / metrics (when measured)
@@ -40,7 +48,7 @@ Numbered checklist of items to complete. Use ⬜ for pending:
 ## Resume a PENDING or SUSPENDED session
 
 1. **Read the existing session file** thoroughly — understand what was done, what's outstanding, what's deferred.
-2. **Change the status** in the heading from `(PENDING)` or `(SUSPENDED)` to `(ACTIVE)`.
+2. **Change the status** in both the frontmatter (`status: active`) and the heading (`(ACTIVE)`).
 3. **Review the work items** — confirm which are still relevant. Remove or update stale items.
 4. **Check dependencies** — have they been resolved since the session was paused?
 5. **Brief the user** on the current state: what's done, what's next, any blockers resolved.
