@@ -126,14 +126,14 @@ static GOV_PARL_REPORTING: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\breport\b.*\bparliament\b|\blaid? before parliament\b").unwrap()
 });
 
-// Shared helpers
-static OBLIGATION: LazyLock<Regex> = LazyLock::new(|| {
+// Shared helpers — pub(crate) so making.rs triage can use them
+pub(crate) static OBLIGATION: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\bshall\b|\bmust\b|\bis required to\b|\bhas a duty\b").unwrap()
 });
-static PROHIBITION: LazyLock<Regex> = LazyLock::new(|| {
+pub(crate) static PROHIBITION: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)\bshall not\b|\bmust not\b|\bno person shall\b|\bprohibit").unwrap()
 });
-static ENABLING: LazyLock<Regex> =
+pub(crate) static ENABLING: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?i)\bmay\b|\bpower to\b|\bauthori[sz]e|\benable|\bentitled\b").unwrap());
 
 // ── Actor fragment lists (downcased) ─────────────────────────────────

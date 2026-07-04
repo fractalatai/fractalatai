@@ -1,6 +1,6 @@
 ---
 session: PgStore Hardening & Remaining Wiring
-status: suspended
+status: active
 opened: 2026-06-25
 closed:
 outcome:
@@ -31,7 +31,7 @@ depends_on:
   - 06-24-26-pgstore-implementation.md
 ---
 
-# Session: PgStore Hardening & Remaining Wiring (SUSPENDED)
+# Session: PgStore Hardening & Remaining Wiring (ACTIVE)
 
 ## Context
 
@@ -50,34 +50,42 @@ PgStore is live — full pipeline (parse → embed → classify → validate →
 - ✅ 224 QQ laws published (enrichment + provisions)
 - ✅ Build warnings cleaned (zero warnings)
 
-## Remaining (not blocking, carry forward as needed)
+## Reframing: Two-Pass Architecture (2026-07-03)
 
-### sync watch → PgStore wiring
+The project has evolved from a single enrichment pipeline to a two-pass model:
 
-`cmd_sync_watch` is 250 lines (440-689) with 3 `lance.` calls:
-- `lance.delete_law_lat(law_name)` — LAT deletion handler
-- `lance.upsert_lat(batches)` — LAT ingestion (the main one)
-- `lance.delete_law_annotations(law_name)` — annotation cleanup
+**Pass 1 — Triage (fast, automated, event-driven)**
+Regex scans provisions for actors + modals → determines if the law is "making" (sets obligations) vs non-making (amending, commencement, etc.) → publishes triage result back to sertantai. This is what `sync watch` should do. Light, reactive, near-real-time.
 
-The function also:
-- Opens `LanceStore` at line 445 (hardcoded)
-- Runs the DuckDB status queryable (already works)
-- Handles Zenoh events in a `tokio::select!` loop
+**Pass 2 — Deep parse (batch, manual, customer-scoped)**
+SLM/LLM/human adjudication on a customer's specific law register. RunPod for SLM inference, 4-tier cascade (regex → classifier → SLM → LLM), QA, corrections. Triggered per-customer, not per-event. The `taxa parse → classify → reconcile → backfill → publish` pipeline.
 
-#### Assessment
+**Why this matters for sync watch:**
+The current `cmd_sync_watch` (now in `fractalaw-sync-cli`) was built during the LanceDB era when enrichment happened at the edge. It pulls LAT, queues for enrichment, and tries to run the full pipeline reactively. That made sense when LanceDB was the AI-at-the-edge store. With Postgres as the hub store, enrichment is a batch operation — standing up a pod, running SLM, QA. sync watch shouldn't trigger it.
 
-The wiring change itself is simple — replace `LanceStore::open(...)` with `open_provision_store(data_dir, pg_url)` and change `lance` type. But this function has broader quality issues:
+**Sync watch should:**
+1. Pull LAT from sertantai → store in Postgres
+2. Ensure LRT exists in DuckDB
+3. Run Pass 1 regex triage (quick — actors, modals, purpose classification)
+4. Publish triage signal back to sertantai (is this a making law? what families?)
+5. Ack receipt
+6. Handle LAT deletion signals
+7. **Stop.** No enrichment queue, no classifier, no SLM.
 
-1. **250 lines in one function** — the event handler loop mixes LAT ingestion, LRT upsert, ack, enrichment queue, status queryable, and deletion. Similar to the old `enrich_single_law` before decomposition.
-2. **`delete_law_annotations` not on the trait** — `ProvisionStore` doesn't have this method. Need to add it or handle differently.
-3. **Event handler logic is inline** — each event type (lat, lrt, lat_deleted) is handled inline in the select loop rather than dispatched to functions.
+**What to remove from sync watch:**
+- `enrichment_pending` queue logic
+- `--pending` flag on publish
+- Any LanceDB dependency (sync watch is Postgres + DuckDB only)
+- The `enrich_single_law` call path
 
-#### Plan
+## Remaining work
 
-1. Check if `delete_law_annotations` exists on PgStore / needs adding to trait
-2. Add `pg_url` parameter, swap `LanceStore::open` → `open_provision_store`
-3. Optionally: decompose the event handler into smaller functions (same pattern as enrich_single_law decomposition)
-4. Get Gemini review on sync.rs shape before/after
+### sync watch refactor
+- ⬜ Strip enrichment queue logic from `cmd_sync_watch` (in `fractalaw-sync-cli`)
+- ⬜ Wire to PgStore via `--pg` (swap `LanceStore::open` → `open_provision_store`)
+- ⬜ Add Pass 1 regex triage: run `parse_v2()` on ingested provisions, publish making/non-making signal
+- ⬜ Remove LanceDB dependency from sync-cli (it currently needs it for `upsert_lat`)
+- ⬜ Decompose 250-line event handler into smaller functions
 
 ### Remaining trait wiring (lower priority)
 - `cmd_taxa_show`, `cmd_taxa_qa`, `cmd_taxa_eyeball`, `cmd_taxa_audit_fitness` — read-only diagnostic commands
