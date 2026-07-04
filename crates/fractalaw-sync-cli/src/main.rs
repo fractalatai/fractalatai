@@ -86,6 +86,21 @@ enum Command {
         #[command(subcommand)]
         action: CrdtAction,
     },
+    /// Triage laws: scan provisions to substantiate making/not-making classification
+    Triage {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Triage all laws in a DuckDB family
+        #[arg(long)]
+        family: Option<String>,
+        /// Triage all laws with LAT data
+        #[arg(long)]
+        all: bool,
+        /// Show detailed per-law signals (not just summary)
+        #[arg(long)]
+        verbose: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -347,5 +362,215 @@ async fn main() -> anyhow::Result<()> {
             }
             CrdtAction::Save { zenoh } => sync::cmd_crdt_save(&data_dir, &zenoh).await,
         },
+        Command::Triage {
+            laws,
+            family,
+            all,
+            verbose,
+        } => {
+            cmd_triage(&data_dir, laws, family, all, verbose, pg_url.as_deref()).await
+        }
     }
+}
+
+async fn cmd_triage(
+    data_dir: &std::path::Path,
+    laws: Option<String>,
+    family: Option<String>,
+    all: bool,
+    verbose: bool,
+    pg_url: Option<&str>,
+) -> anyhow::Result<()> {
+    use arrow::array::{Array, StringArray};
+    use fractalaw_core::taxa::making;
+
+    let store = open_duck(data_dir)?;
+    let lance = open_provision_store(pg_url).await?;
+
+    // Resolve law names
+    let law_names: Vec<String> = if let Some(ref fam) = family {
+        let names = laws_in_family(&store, fam)?;
+        if names.is_empty() {
+            anyhow::bail!("No laws found with family '{fam}'");
+        }
+        println!("Family '{}': {} laws", fam, names.len());
+        names
+    } else if let Some(ref l) = laws {
+        l.split(',').map(|s| s.trim().to_string()).collect()
+    } else if all {
+        let batches = store.query_arrow(
+            "SELECT name FROM legislation WHERE is_making IS NOT NULL ORDER BY name",
+        )?;
+        let mut names = Vec::new();
+        for batch in &batches {
+            if let Some(col) = batch.column_by_name("name")
+                && let Some(arr) = col.as_any().downcast_ref::<StringArray>()
+            {
+                for i in 0..arr.len() {
+                    if !arr.is_null(i) {
+                        names.push(arr.value(i).to_string());
+                    }
+                }
+            }
+        }
+        println!("Triaging ALL {} laws", names.len());
+        names
+    } else {
+        anyhow::bail!(
+            "Specify --laws, --family, or --all.\n\
+             Example: fractalaw-sync triage --laws UK_ukpga_1974_37 --pg postgres://..."
+        );
+    };
+
+    if law_names.is_empty() {
+        println!("No laws to triage.");
+        return Ok(());
+    }
+
+    // Get DuckDB metadata for all laws (title, description, is_making)
+    let meta_sql = format!(
+        "SELECT name, title_en, description_en, is_making FROM legislation WHERE name IN ({})",
+        law_names
+            .iter()
+            .map(|n| format!("'{}'", n.replace('\'', "''")))
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    let meta_batches = store.query_arrow(&meta_sql)?;
+
+    // Build metadata lookup
+    let mut meta_map: std::collections::HashMap<String, (Option<String>, Option<String>, Option<bool>)> =
+        std::collections::HashMap::new();
+    for batch in &meta_batches {
+        let name_col = batch.column_by_name("name");
+        let title_col = batch.column_by_name("title_en");
+        let desc_col = batch.column_by_name("description_en");
+        let making_col = batch.column_by_name("is_making");
+        for row in 0..batch.num_rows() {
+            let name = name_col.and_then(|c| get_string_value(c.as_ref(), row)).unwrap_or_default();
+            let title = title_col.and_then(|c| get_string_value(c.as_ref(), row));
+            let desc = desc_col.and_then(|c| get_string_value(c.as_ref(), row));
+            let is_making = making_col.map(|c| {
+                if c.is_null(row) { None }
+                else {
+                    c.as_any()
+                        .downcast_ref::<arrow::array::BooleanArray>()
+                        .map(|a| a.value(row))
+                }
+            }).flatten();
+            meta_map.insert(name, (title, desc, is_making));
+        }
+    }
+
+    let mut making_count = 0u32;
+    let mut not_making_count = 0u32;
+    let mut uncertain_count = 0u32;
+    let mut disagree_count = 0u32;
+
+    for law_name in &law_names {
+        // Get provision texts from Postgres
+        let batches = lance
+            .query_legislation_text(law_name, 100_000, 0)
+            .await
+            .map_err(|e| anyhow::anyhow!("query {law_name}: {e}"))?;
+
+        let mut texts: Vec<String> = Vec::new();
+        for batch in &batches {
+            if let Some(col) = batch.column_by_name("text") {
+                for i in 0..batch.num_rows() {
+                    if let Some(t) = get_string_value(col.as_ref(), i) {
+                        if !t.is_empty() {
+                            texts.push(t);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Look up DuckDB family for specialist actor gating
+        let law_family = {
+            let fam_batches = store.query_arrow(&format!(
+                "SELECT family FROM legislation WHERE name = '{}'",
+                law_name.replace('\'', "''")
+            ))?;
+            fam_batches.first().and_then(|b| {
+                b.column_by_name("family")
+                    .and_then(|c| get_string_value(c.as_ref(), 0))
+            })
+        };
+
+        // Run triage
+        let text_refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+        let counts = making::triage_provisions(&text_refs, law_family.as_deref());
+
+        // Get metadata
+        let (title, desc, sertantai_making) = meta_map
+            .get(law_name.as_str())
+            .cloned()
+            .unwrap_or((None, None, None));
+
+        let meta = making::LawMetadata {
+            title: title.as_deref(),
+            description: desc.as_deref(),
+            body_paras: Some(counts.total),
+            schedule_paras: None,
+        };
+
+        let result = making::detect_with_triage(&meta, &counts);
+
+        // Compare with sertantai's is_making
+        let agrees = match (sertantai_making, &result.classification) {
+            (Some(true), making::MakingClassification::Making) => true,
+            (Some(false), making::MakingClassification::NotMaking) => true,
+            (None, _) => true, // no opinion to disagree with
+            _ => false,
+        };
+        if !agrees {
+            disagree_count += 1;
+        }
+
+        match result.classification {
+            making::MakingClassification::Making => making_count += 1,
+            making::MakingClassification::NotMaking => not_making_count += 1,
+            making::MakingClassification::Uncertain => uncertain_count += 1,
+        }
+
+        if verbose || !agrees {
+            let sertantai_str = match sertantai_making {
+                Some(true) => "making",
+                Some(false) => "not_making",
+                None => "null",
+            };
+            let flag = if agrees { " " } else { "!" };
+            println!(
+                "{flag} {law_name}: triage={} ({:.0}%) sertantai={} provisions={} obligations={} actors={} amendment={}",
+                result.classification.as_str(),
+                result.confidence * 100.0,
+                sertantai_str,
+                counts.total,
+                counts.with_obligation,
+                counts.with_actor,
+                counts.amendment,
+            );
+            if verbose {
+                for s in &result.signals {
+                    println!(
+                        "    T{} {} {:?} {:.0}% — {}",
+                        s.tier,
+                        s.name,
+                        s.direction,
+                        s.confidence * 100.0,
+                        s.value.chars().take(80).collect::<String>(),
+                    );
+                }
+            }
+        }
+    }
+
+    println!(
+        "\nTriage: {} making, {} not_making, {} uncertain ({} disagree with sertantai)",
+        making_count, not_making_count, uncertain_count, disagree_count,
+    );
+
+    Ok(())
 }

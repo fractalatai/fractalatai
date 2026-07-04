@@ -55,7 +55,7 @@ The enrichment pipeline (`cmd_taxa_enrich`) currently deletes LAT rows for non-m
 ## Work
 
 1. ✅ Build `triage_provisions()` + `detect_with_triage()` in fractalaw-core/src/taxa/making.rs — extends existing Bayesian detector with Tier 5 (provision text analysis)
-2. ⬜ Add `triage` subcommand to `fractalaw-sync` CLI
+2. ✅ Add `triage` subcommand to `fractalaw-sync` CLI (written, check blocked by disk — DuckDB C++ rebuild needs SSD)
 3. ⬜ Define Zenoh triage response schema (for sertantai contract)
 4. ⬜ Wire as Zenoh queryable in sync watch
 5. ⬜ Strip enrichment queue logic from sync watch
