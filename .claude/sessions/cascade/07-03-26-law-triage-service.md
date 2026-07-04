@@ -1,4 +1,4 @@
-# Session: Law Triage Service (ACTIVE)
+# Session: Law Triage Service (SUSPENDED)
 
 ## Problem
 
@@ -69,3 +69,20 @@ The enrichment pipeline (`cmd_taxa_enrich`) currently deletes LAT rows for non-m
 - ✅ `fractalaw-sync-cli` crate (Phase 2 of project restructure)
 - ✅ PgStore for provision access (`--pg`)
 - ⬜ Sync watch refactor (PgStore hardening session — related but independent)
+
+## Suspended: 2026-07-04 — blocked on disk space
+
+### What's done
+- `triage_provisions()` in `fractalaw-core/src/taxa/making.rs` — scans provision texts with purpose classifier, actor extractor, modal regex. Returns `TriageCounts`.
+- `detect_with_triage()` — extends the existing 4-tier Bayesian making detector with Tier 5 (provision text signals). Pure function.
+- `cmd_triage` in `fractalaw-sync-cli/src/main.rs` — CLI command with `--laws`/`--family`/`--all`/`--verbose`. Queries Postgres for provision texts, runs triage, compares with sertantai's `is_making`, flags disagreements.
+- `OBLIGATION`/`ENABLING` regexes made `pub(crate)` in `duty_patterns.rs`.
+- 5 tests written (untested — disk).
+
+### When resuming (after Samsung 870 EVO 1TB installed)
+
+1. **Install SSD**: mount at `/mnt/ssd` or add to `/var/home` volume, symlink `target/` to it
+2. **Verify builds**: `cargo check --workspace` then `cargo test -p fractalaw-core -- making`
+3. **Test live**: `cargo run -p fractalaw-sync-cli -- triage --laws UK_ukpga_1974_37 --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw`
+4. **Validate on corpus**: `--family "OH&S: Occupational / Personal Safety"` — check disagreements
+5. **Continue with items 3-7**: Zenoh queryable schema, wire into sync watch, strip enrichment queue, corpus validation, DuckDB columns
