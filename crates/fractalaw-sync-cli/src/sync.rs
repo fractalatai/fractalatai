@@ -1,5 +1,8 @@
 use arrow::array::Array;
 
+use fractalaw_core::taxa::making::{self, DetectionResult, MakingClassification};
+use fractalaw_store::ProvisionStore;
+
 use crate::open_duck;
 use crate::{get_string_value, laws_in_family, open_provision_store, ZenohArgs};
 
@@ -477,13 +480,22 @@ pub(crate) async fn cmd_sync_watch(
         .map_err(|e| anyhow::anyhow!("failed to declare status queryable: {e}"))?;
     println!("Serving pipeline status via queryable ({status_key})");
 
+    let triage_key = fractalaw_sync::zenoh_sync::keys::triage(sync.tenant());
+    let triage_queryable = sync
+        .session()
+        .declare_queryable(&triage_key)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to declare triage queryable: {e}"))?;
+    println!("Serving triage via queryable ({triage_key})");
+
     duck.ensure_pipeline_status_columns()?;
+    duck.ensure_triage_columns()?;
 
     println!(
         "Watching for sync events (tenant: {}, timeout: {timeout_secs}s per pull)...",
         zenoh.tenant
     );
-    println!("Pipeline: ensure LRT → pull LAT → ack → queue for enrichment");
+    println!("Pipeline: ensure LRT → pull LAT → triage → ack → queue if making");
     println!("Press Ctrl+C to stop.\n");
 
     let mut total_events = 0usize;
@@ -491,6 +503,7 @@ pub(crate) async fn cmd_sync_watch(
     let mut total_lat_pulls = 0usize;
     let mut total_rows = 0usize;
     let mut total_enriched = 0usize;
+    let mut total_skipped = 0usize;
     let mut total_deletions = 0usize;
 
     loop {
@@ -592,15 +605,35 @@ pub(crate) async fn cmd_sync_watch(
                     eprint!(" → ack error: {e}");
                 }
 
-                let escaped = law_name.replace('\'', "''");
-                let _ = duck.execute(&format!(
-                    "UPDATE legislation \
-                     SET enrichment_pending = true, \
-                         enrichment_added_at = CURRENT_TIMESTAMP \
-                     WHERE name = '{escaped}'"
-                ));
-                total_enriched += 1;
-                eprintln!(" → queued for enrichment");
+                // Run triage before deciding whether to queue for enrichment
+                let (triage_result, _counts) =
+                    run_triage_for_law(&duck, lance.as_ref(), law_name).await;
+                write_triage_to_duck(&duck, law_name, &triage_result);
+
+                match triage_result.classification {
+                    MakingClassification::Making | MakingClassification::Uncertain => {
+                        let escaped = law_name.replace('\'', "''");
+                        let _ = duck.execute(&format!(
+                            "UPDATE legislation \
+                             SET enrichment_pending = true, \
+                                 enrichment_added_at = CURRENT_TIMESTAMP \
+                             WHERE name = '{escaped}'"
+                        ));
+                        total_enriched += 1;
+                        eprintln!(
+                            " → triage={} ({:.0}%) → queued for enrichment",
+                            triage_result.classification.as_str(),
+                            triage_result.confidence * 100.0,
+                        );
+                    }
+                    MakingClassification::NotMaking => {
+                        total_skipped += 1;
+                        eprintln!(
+                            " → triage=not_making ({:.0}%) → skipped",
+                            triage_result.confidence * 100.0,
+                        );
+                    }
+                }
             }
             query = status_queryable.recv_async() => {
                 let query = match query {
@@ -645,6 +678,49 @@ pub(crate) async fn cmd_sync_watch(
                     eprintln!("  [status] replied with {} law statuses", response.len());
                 }
             }
+            query = triage_queryable.recv_async() => {
+                let query = match query {
+                    Ok(q) => q,
+                    Err(_) => continue,
+                };
+                let reply_key = query.key_expr().as_str().to_string();
+
+                let law_names: Vec<String> = {
+                    let mut names = Vec::new();
+
+                    let selector = query.selector();
+                    let params = selector.parameters().as_str();
+                    for param in params.split('&') {
+                        if let Some(val) = param.strip_prefix("laws=") {
+                            let decoded = val.replace("%2C", ",").replace("%20", " ");
+                            names.extend(
+                                decoded.split(',')
+                                    .map(|s| s.trim().to_string())
+                                    .filter(|s| !s.is_empty()),
+                            );
+                        }
+                    }
+
+                    if names.is_empty() {
+                        if let Some(p) = query.payload() {
+                            if let Ok(parsed) = serde_json::from_slice::<Vec<String>>(&p.to_bytes()) {
+                                names = parsed;
+                            }
+                        }
+                    }
+
+                    names
+                };
+
+                let response = build_triage_response(&duck, lance.as_ref(), &law_names).await;
+                let payload = serde_json::to_string(&response).unwrap_or_else(|_| "[]".to_string());
+
+                if let Err(e) = query.reply(&reply_key, payload.into_bytes()).await {
+                    tracing::warn!(error = %e, "failed to reply to triage query");
+                } else {
+                    eprintln!("  [triage] replied with {} triage results", response.len());
+                }
+            }
             _ = tokio::signal::ctrl_c() => {
                 println!("\nShutting down...");
                 break;
@@ -655,7 +731,8 @@ pub(crate) async fn cmd_sync_watch(
     println!(
         "Done. {total_events} events, {total_lrt_pulls} LRT pulls, \
          {total_lat_pulls} LAT pulls ({total_rows} provisions), \
-         {total_enriched} queued for enrichment, {total_deletions} deletions."
+         {total_enriched} queued for enrichment, {total_skipped} skipped (not making), \
+         {total_deletions} deletions."
     );
 
     Ok(())
@@ -893,6 +970,173 @@ fn build_status_response(
                 "stage": "needs_lat",
             }));
         }
+    }
+
+    results
+}
+
+// ── Triage helpers ──
+
+/// Fetch all provision texts for a law from the provision store.
+async fn get_provision_texts(
+    store: &dyn ProvisionStore,
+    law_name: &str,
+) -> Vec<String> {
+    let batches = match store.query_legislation_text(law_name, 100_000, 0).await {
+        Ok(b) => b,
+        Err(e) => {
+            tracing::warn!(law = law_name, error = %e, "triage: failed to query provisions");
+            return Vec::new();
+        }
+    };
+    let mut texts = Vec::new();
+    for batch in &batches {
+        if let Some(col) = batch.column_by_name("text") {
+            for i in 0..batch.num_rows() {
+                if let Some(t) = get_string_value(col.as_ref(), i) {
+                    if !t.is_empty() {
+                        texts.push(t);
+                    }
+                }
+            }
+        }
+    }
+    texts
+}
+
+/// Look up a law's family from DuckDB.
+fn get_law_family(
+    duck: &fractalaw_store::DuckStore,
+    law_name: &str,
+) -> Option<String> {
+    let escaped = law_name.replace('\'', "''");
+    let batches = duck
+        .query_arrow(&format!(
+            "SELECT family FROM legislation WHERE name = '{escaped}'"
+        ))
+        .ok()?;
+    batches
+        .first()
+        .and_then(|b| b.column_by_name("family").and_then(|c| get_string_value(c.as_ref(), 0)))
+}
+
+/// Look up law metadata for triage from DuckDB: (title, description, is_making).
+fn get_law_triage_metadata(
+    duck: &fractalaw_store::DuckStore,
+    law_name: &str,
+) -> (Option<String>, Option<String>, Option<bool>) {
+    let escaped = law_name.replace('\'', "''");
+    let batches = match duck.query_arrow(&format!(
+        "SELECT title, description, is_making FROM legislation WHERE name = '{escaped}'"
+    )) {
+        Ok(b) => b,
+        Err(_) => return (None, None, None),
+    };
+    let Some(batch) = batches.first() else {
+        return (None, None, None);
+    };
+    if batch.num_rows() == 0 {
+        return (None, None, None);
+    }
+    let title = batch
+        .column_by_name("title")
+        .and_then(|c| get_string_value(c.as_ref(), 0));
+    let desc = batch
+        .column_by_name("description")
+        .and_then(|c| get_string_value(c.as_ref(), 0));
+    let is_making = batch.column_by_name("is_making").and_then(|c| {
+        if c.is_null(0) {
+            None
+        } else {
+            c.as_any()
+                .downcast_ref::<arrow::array::BooleanArray>()
+                .map(|a| a.value(0))
+        }
+    });
+    (title, desc, is_making)
+}
+
+/// Write triage result to DuckDB.
+fn write_triage_to_duck(
+    duck: &fractalaw_store::DuckStore,
+    law_name: &str,
+    result: &DetectionResult,
+) {
+    let escaped = law_name.replace('\'', "''");
+    let _ = duck.execute(&format!(
+        "UPDATE legislation \
+         SET triage_classification = '{}', \
+             triage_confidence = {}, \
+             triage_tier = {}, \
+             triaged_at = CURRENT_TIMESTAMP \
+         WHERE name = '{escaped}'",
+        result.classification.as_str(),
+        result.confidence,
+        result.tier,
+    ));
+}
+
+/// Run triage for a single law and return (DetectionResult, TriageCounts).
+async fn run_triage_for_law(
+    duck: &fractalaw_store::DuckStore,
+    store: &dyn ProvisionStore,
+    law_name: &str,
+) -> (DetectionResult, making::TriageCounts) {
+    let texts = get_provision_texts(store, law_name).await;
+    let text_refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+    let law_family = get_law_family(duck, law_name);
+    let counts = making::triage_provisions(&text_refs, law_family.as_deref());
+
+    let (title, desc, _) = get_law_triage_metadata(duck, law_name);
+    let meta = making::LawMetadata {
+        title: title.as_deref(),
+        description: desc.as_deref(),
+        body_paras: Some(counts.total),
+        schedule_paras: None,
+    };
+    let result = making::detect_with_triage(&meta, &counts);
+    (result, counts)
+}
+
+/// Build JSON triage response for a list of law names.
+async fn build_triage_response(
+    duck: &fractalaw_store::DuckStore,
+    store: &dyn ProvisionStore,
+    law_names: &[String],
+) -> Vec<serde_json::Value> {
+    let mut results = Vec::new();
+
+    for law_name in law_names {
+        let (result, counts) = run_triage_for_law(duck, store, law_name).await;
+        let (_, _, sertantai_making) = get_law_triage_metadata(duck, law_name);
+
+        let agrees = match (sertantai_making, &result.classification) {
+            (Some(true), MakingClassification::Making) => true,
+            (Some(false), MakingClassification::NotMaking) => true,
+            (None, _) => true,
+            _ => false,
+        };
+
+        write_triage_to_duck(duck, law_name, &result);
+
+        results.push(serde_json::json!({
+            "law_name": law_name,
+            "classification": result.classification.as_str(),
+            "confidence": result.confidence,
+            "tier": result.tier,
+            "counts": {
+                "total": counts.total,
+                "process_rule": counts.process_rule,
+                "amendment": counts.amendment,
+                "enactment": counts.enactment,
+                "interpretation": counts.interpretation,
+                "with_actor": counts.with_actor,
+                "with_obligation": counts.with_obligation,
+                "with_enabling": counts.with_enabling,
+            },
+            "sertantai_is_making": sertantai_making,
+            "agrees": agrees,
+        }));
     }
 
     results

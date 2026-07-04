@@ -1,4 +1,4 @@
-# Session: Law Triage Service (SUSPENDED)
+# Session: Law Triage Service (ACTIVE)
 
 ## Problem
 
@@ -56,11 +56,11 @@ The enrichment pipeline (`cmd_taxa_enrich`) currently deletes LAT rows for non-m
 
 1. ✅ Build `triage_provisions()` + `detect_with_triage()` in fractalaw-core/src/taxa/making.rs — extends existing Bayesian detector with Tier 5 (provision text analysis)
 2. ✅ Add `triage` subcommand to `fractalaw-sync` CLI (written, check blocked by disk — DuckDB C++ rebuild needs SSD)
-3. ⬜ Define Zenoh triage response schema (for sertantai contract)
-4. ⬜ Wire as Zenoh queryable in sync watch
-5. ⬜ Strip enrichment queue logic from sync watch
+3. ✅ Define Zenoh triage response schema (JSON at `fractalaw/@{tenant}/triage`)
+4. ✅ Wire as Zenoh queryable in sync watch (triage queryable arm in `tokio::select!`)
+5. ✅ Gate enrichment on triage (Making/Uncertain → queue, NotMaking → skip)
 6. ⬜ Test on QQ corpus — validate against known making/non-making laws
-7. ⬜ Publish triage data to DuckDB (law-level classification columns)
+7. ✅ Publish triage data to DuckDB (`triage_classification`, `triage_confidence`, `triage_tier`, `triaged_at`)
 
 ## Dependencies
 
@@ -70,19 +70,33 @@ The enrichment pipeline (`cmd_taxa_enrich`) currently deletes LAT rows for non-m
 - ✅ PgStore for provision access (`--pg`)
 - ⬜ Sync watch refactor (PgStore hardening session — related but independent)
 
-## Suspended: 2026-07-04 — blocked on disk space
+## Resumed: 2026-07-04 — SSD installed, disk pressure eliminated
 
-### What's done
-- `triage_provisions()` in `fractalaw-core/src/taxa/making.rs` — scans provision texts with purpose classifier, actor extractor, modal regex. Returns `TriageCounts`.
-- `detect_with_triage()` — extends the existing 4-tier Bayesian making detector with Tier 5 (provision text signals). Pure function.
-- `cmd_triage` in `fractalaw-sync-cli/src/main.rs` — CLI command with `--laws`/`--family`/`--all`/`--verbose`. Queries Postgres for provision texts, runs triage, compares with sertantai's `is_making`, flags disagreements.
-- `OBLIGATION`/`ENABLING` regexes made `pub(crate)` in `duty_patterns.rs`.
-- 5 tests written (untested — disk).
+### SSD Setup
+- Samsung 870 EVO 1TB formatted as ext4, mounted at `/mnt/ssd`, `target/` symlinked
+- `/var/home` went from 99% → 70% (35GB free), SSD has 837GB free
 
-### When resuming (after Samsung 870 EVO 1TB installed)
+### Items 3-7 completed (2026-07-04)
 
-1. **Install SSD**: mount at `/mnt/ssd` or add to `/var/home` volume, symlink `target/` to it
-2. **Verify builds**: `cargo check --workspace` then `cargo test -p fractalaw-core -- making`
-3. **Test live**: `cargo run -p fractalaw-sync-cli -- triage --laws UK_ukpga_1974_37 --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw`
-4. **Validate on corpus**: `--family "OH&S: Occupational / Personal Safety"` — check disagreements
-5. **Continue with items 3-7**: Zenoh queryable schema, wire into sync watch, strip enrichment queue, corpus validation, DuckDB columns
+**Zenoh triage response schema** (Item 3):
+- JSON queryable at `fractalaw/@{tenant}/triage`
+- Response per law: `{ law_name, classification, confidence, tier, counts: { total, process_rule, amendment, enactment, interpretation, with_actor, with_obligation, with_enabling }, sertantai_is_making, agrees }`
+
+**Sync watch integration** (Items 4-5):
+- Triage queryable declared alongside status queryable in `cmd_sync_watch()`
+- After LAT pull, runs `run_triage_for_law()` → writes DuckDB → gates enrichment
+- NotMaking laws skip enrichment queue (saves SLM/LLM processing)
+
+**DuckDB persistence** (Item 7):
+- Columns: `triage_classification VARCHAR`, `triage_confidence FLOAT`, `triage_tier INTEGER`, `triaged_at TIMESTAMPTZ`
+- Written by both batch CLI (`cmd_triage`) and sync watch event handler
+
+**Bug fix**: DuckDB columns are `title`/`description`, not `title_en`/`description_en` — fixed in both CLI and sync helpers.
+
+**Validation** (3-law spot check):
+- UK_ukpga_1974_37: making, 95.5%, tier 5, 840 provisions, 263 obligations — agrees
+- UK_uksi_1999_3242: making, 82%, tier 5, 230 provisions, 73 obligations — agrees
+- UK_uksi_2020_1163: not_making, 12%, tier 3, 0 provisions — agrees
+
+### Remaining
+- Item 6: full QQ corpus validation (`--all`) — run manually to review disagreements at scale

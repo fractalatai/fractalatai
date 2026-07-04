@@ -174,6 +174,14 @@ pub mod keys {
         format!("{PREFIX}/@{tenant}/status/{law_name}")
     }
 
+    /// Key expression for triage queryable.
+    ///
+    /// Fractalaw serves this — sertantai queries to get making/not-making classification.
+    /// Example: `fractalaw/@acme/triage`
+    pub fn triage(tenant: &str) -> String {
+        format!("{PREFIX}/@{tenant}/triage")
+    }
+
     /// Key expression for sertantai customer laws queryable.
     ///
     /// Sertantai serves this — fractalaw queries it to get law names for a customer.

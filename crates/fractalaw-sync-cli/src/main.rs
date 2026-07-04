@@ -385,6 +385,7 @@ async fn cmd_triage(
     use fractalaw_core::taxa::making;
 
     let store = open_duck(data_dir)?;
+    store.ensure_triage_columns()?;
     let lance = open_provision_store(pg_url).await?;
 
     // Resolve law names
@@ -429,7 +430,7 @@ async fn cmd_triage(
 
     // Get DuckDB metadata for all laws (title, description, is_making)
     let meta_sql = format!(
-        "SELECT name, title_en, description_en, is_making FROM legislation WHERE name IN ({})",
+        "SELECT name, title, description, is_making FROM legislation WHERE name IN ({})",
         law_names
             .iter()
             .map(|n| format!("'{}'", n.replace('\'', "''")))
@@ -443,8 +444,8 @@ async fn cmd_triage(
         std::collections::HashMap::new();
     for batch in &meta_batches {
         let name_col = batch.column_by_name("name");
-        let title_col = batch.column_by_name("title_en");
-        let desc_col = batch.column_by_name("description_en");
+        let title_col = batch.column_by_name("title");
+        let desc_col = batch.column_by_name("description");
         let making_col = batch.column_by_name("is_making");
         for row in 0..batch.num_rows() {
             let name = name_col.and_then(|c| get_string_value(c.as_ref(), row)).unwrap_or_default();
@@ -517,6 +518,22 @@ async fn cmd_triage(
         };
 
         let result = making::detect_with_triage(&meta, &counts);
+
+        // Persist triage result to DuckDB
+        {
+            let escaped_name = law_name.replace('\'', "''");
+            let _ = store.execute(&format!(
+                "UPDATE legislation \
+                 SET triage_classification = '{}', \
+                     triage_confidence = {}, \
+                     triage_tier = {}, \
+                     triaged_at = CURRENT_TIMESTAMP \
+                 WHERE name = '{escaped_name}'",
+                result.classification.as_str(),
+                result.confidence,
+                result.tier,
+            ));
+        }
 
         // Compare with sertantai's is_making
         let agrees = match (sertantai_making, &result.classification) {

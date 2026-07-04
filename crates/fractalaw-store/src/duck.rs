@@ -605,6 +605,26 @@ impl DuckStore {
         Ok(())
     }
 
+    /// Ensure triage classification columns exist on `legislation`.
+    ///
+    /// Tracks the outcome of the Making/Not-Making pre-filter:
+    /// - `triage_classification` — "making", "not_making", or "uncertain"
+    /// - `triage_confidence` — 0.0 to 1.0 Bayesian posterior
+    /// - `triage_tier` — highest signal tier (1-5)
+    /// - `triaged_at` — when triage last ran
+    ///
+    /// Idempotent — safe to call multiple times.
+    pub fn ensure_triage_columns(&self) -> Result<(), StoreError> {
+        self.conn.execute_batch(
+            "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS triage_classification VARCHAR; \
+             ALTER TABLE legislation ADD COLUMN IF NOT EXISTS triage_confidence FLOAT; \
+             ALTER TABLE legislation ADD COLUMN IF NOT EXISTS triage_tier INTEGER; \
+             ALTER TABLE legislation ADD COLUMN IF NOT EXISTS triaged_at TIMESTAMPTZ",
+        )?;
+        info!("ensured triage columns exist");
+        Ok(())
+    }
+
     // ── Training data extraction ──
 
     /// Extract all DRRPEntry records as flat rows from the four DRRP columns.
