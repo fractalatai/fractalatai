@@ -20,41 +20,49 @@ Both are needed for a complete publish.
 - For provisions from Postgres: `--pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw`
 - **NEVER publish benchmark laws with --force re-processing first** — check `is_benchmark` in DuckDB
 
+## Binary
+
+Publish lives in the **`fractalaw-sync-cli`** crate (binary name: `fractalaw-sync`), not the main `fractalaw` CLI. Run via:
+
+```bash
+cargo run -p fractalaw-sync-cli -- publish [OPTIONS]
+```
+
 ## Usage
 
 ### Check what's ready to publish
 
 ```bash
-fractalaw taxa status --law-file data/qq-applicable-laws.csv --summary
+cargo run -p fractalaw-cli -- taxa status --law-file data/sertantai/qq-applicable-laws.csv --summary
 ```
 
 ### Publish specific laws (both enrichment + provisions)
 
 ```bash
 # Enrichment (law-level LRT)
-fractalaw sync publish --tenant dev --connect tcp/localhost:7447 --laws UK_ukpga_1974_37
+cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/localhost:7447 --laws UK_ukpga_1974_37
 
 # Provisions (per-provision LAT taxa) — needs --pg for Postgres data
-fractalaw sync publish --tenant dev --connect tcp/localhost:7447 --laws UK_ukpga_1974_37 --provisions --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw
+cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/localhost:7447 --laws UK_ukpga_1974_37 --provisions --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw
 ```
 
 ### Publish changed laws only
 
 ```bash
 # Laws where taxa_hash != published_hash
-fractalaw sync publish --tenant dev --connect tcp/localhost:7447 --changed
+cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/localhost:7447 --changed
 ```
 
 ### Publish all laws with taxa
 
 ```bash
-fractalaw sync publish --tenant dev --connect tcp/localhost:7447 --all
+cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/localhost:7447 --all
 ```
 
 ### Publish by family
 
 ```bash
-fractalaw sync publish --tenant dev --connect tcp/localhost:7447 --family "OH&S: Occupational / Personal Safety"
+cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/localhost:7447 --family "OH&S: Occupational / Personal Safety"
 ```
 
 ## Two-channel publish pattern
@@ -65,10 +73,10 @@ A complete publish for a set of laws requires **two commands**:
 LAWS="UK_ukpga_1974_37,UK_uksi_1999_3242"
 
 # 1. Enrichment (reads from DuckDB)
-fractalaw sync publish --tenant dev --connect tcp/localhost:7447 --laws "$LAWS"
+cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/localhost:7447 --laws "$LAWS"
 
 # 2. Provisions (reads from Postgres)
-fractalaw sync publish --tenant dev --connect tcp/localhost:7447 --laws "$LAWS" \
+cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/localhost:7447 --laws "$LAWS" \
   --provisions --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw
 ```
 
@@ -101,3 +109,4 @@ Only publish laws that return rows — otherwise provisions publish sends 0 rows
 - **Large batches**: if publishing 200+ laws, watch sertantai's disk — ElectricSQL WAL can grow rapidly. Publish in batches of 20-50 if needed.
 - **Provisions without --pg**: reads from LanceDB. If provisions are only in Postgres, you'll get "0 provisions" without `--pg`.
 - **Published hash**: after enrichment publish, DuckDB sets `published_hash = taxa_hash`. `--changed` won't re-publish until taxa changes again.
+- **What we publish vs what we don't**: The enrichment payload includes DRRP taxa (duty/rights/responsibility/power holders, duty_type, role), fitness (POPIMAR), and significance. It does **not** include `function`, `is_making`, or base metadata — those are sertantai's own LRT fields.
