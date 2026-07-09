@@ -601,6 +601,12 @@ pub(crate) async fn cmd_sync_watch(
                     }
                 };
 
+                // Mark LAT as pulled in DuckDB pipeline status
+                let escaped = law_name.replace('\'', "''");
+                let _ = duck.execute(&format!(
+                    "UPDATE legislation SET lat_pulled_at = CURRENT_TIMESTAMP WHERE name = '{escaped}'"
+                ));
+
                 if let Err(e) = sync.publish_ack(law_name, lat_rows).await {
                     eprint!(" → ack error: {e}");
                 }

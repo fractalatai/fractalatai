@@ -43,13 +43,31 @@ Previous sessions proved SLM outperforms the regex -> classifier -> SLM chain (S
 2. ✅ Pull latest QQ register from sertantai: **428 laws** (was 274). UUID: `c075d56b-8420-4408-b695-ccfbc1ba15ec`
 3. ✅ Run `taxa status` across full 428-law corpus
 4. ⬜ Publish 10 ready_to_publish laws (quick win)
-5. ⬜ Pull LAT for 130 missing laws from sertantai
-6. ⬜ Triage new laws (regex) — identify which have obligations
-7. ⬜ Embed new provisions
-8. ⬜ SLM batch on RunPod — new laws + 8 needs_classify
-9. ⬜ Reconcile + backfill all laws with unreconciled SLM results (including published laws like MCAA 2009)
-10. ⬜ Publish all updated laws to sertantai
-11. ⬜ Spot-check nature protection provisions (s.40 NERC, s.125-126 MCAA, etc.)
+5. ✅ Pull LAT via sync-watch (~106 laws landed), manually pulled NERC 2006 + Factories Act
+6. ✅ Triage new laws — sync-watch triaged on ingestion, published results back to sertantai
+7. ✅ Parse new laws (93 batch + 4 nature protection laws) — regex DRRP extraction
+8. ⬜ Embed new provisions (93 laws ready, scope bug fixed)
+9. ⬜ SLM batch on RunPod — new laws + 8 needs_classify
+10. ⬜ Reconcile + backfill all laws with unreconciled SLM results (including published laws like MCAA 2009)
+11. ⬜ Publish all updated laws to sertantai
+12. ✅ Spot-check nature protection provisions (s.40 NERC, s.125-126 MCAA, Habitats Regs, Wildlife Act)
+
+## Bugs Found and Fixed
+
+- **scope not persisted** — `taxa parse --pg` computed scope in memory but never wrote it to Postgres. `taxa embed` requires `scope = 'substantive'`, so new laws got 0 embeddings. Fixed: scope now written for all provisions (out, structural, substantive).
+- **lat_pulled_at stale** — sync-watch pulled LAT but never set `lat_pulled_at` in DuckDB, so `taxa status` showed 130 needs_lat when only ~37 genuinely missing. Fixed: sync-watch now sets timestamp after LAT pull.
+- **triage not published** — sync-watch triaged but didn't push the result back to sertantai. Fixed: triage result now published to `triage/{law_name}` after every ingestion.
+- **orphaned sync.rs** — 929 lines of dead code in fractalaw-cli from the CLI split. Removed.
+
+## Revoked Laws Cleaned
+
+28 revoked/repealed laws removed from Postgres LAT (4,519 provisions). 5 laws incorrectly marked revoked reinstated (live status bug on sertantai, now fixed).
+
+## Remaining
+
+- **~37 laws still need LAT** from sertantai (not yet parsed there)
+- **Comms Act 2003** (UK_ukpga_2003_21) — 10K provisions timing out during sertantai parse, needs fix
+- **101 pending_slm** actors from existing corpus need SLM batch
 
 ## Nature Protection QA — Eyeball Analysis
 

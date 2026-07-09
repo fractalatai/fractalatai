@@ -93,6 +93,7 @@ pub(crate) struct ActorEntry {
 
 pub(crate) struct ProvisionTaxa {
     pub(crate) section_id: String,
+    pub(crate) scope: String,
     pub(crate) drrp_types: Vec<String>,
     pub(crate) governed_actors: Vec<String>,
     pub(crate) government_actors: Vec<String>,
@@ -116,6 +117,38 @@ pub(crate) struct ProvisionTaxa {
     pub(crate) holder_inferred_from: Vec<String>,
     pub(crate) ancestor_distance: Option<i32>,
     pub(crate) actors: Vec<ActorEntry>,
+}
+
+impl ProvisionTaxa {
+    fn empty() -> Self {
+        Self {
+            section_id: String::new(),
+            scope: String::new(),
+            drrp_types: Vec::new(),
+            governed_actors: Vec::new(),
+            government_actors: Vec::new(),
+            duty_family: None,
+            duty_sub_type: None,
+            popimar: Vec::new(),
+            purposes: Vec::new(),
+            clause_refined: String::new(),
+            taxa_confidence: None,
+            fitness_polarity: Vec::new(),
+            fitness_person: Vec::new(),
+            fitness_process: Vec::new(),
+            fitness_place: Vec::new(),
+            fitness_plant: Vec::new(),
+            fitness_property: Vec::new(),
+            fitness_sector: Vec::new(),
+            section_type: String::new(),
+            hierarchy_path: String::new(),
+            depth: 0,
+            extraction_method: String::new(),
+            holder_inferred_from: Vec::new(),
+            ancestor_distance: None,
+            actors: Vec::new(),
+        }
+    }
 }
 
 pub(crate) async fn enrich_single_law(
@@ -288,6 +321,14 @@ fn parse_provisions(
                 &[], // purposes not yet known — Pass 1 only (section_type + text length)
             );
             if scope == fractalaw_core::taxa::ProvisionScope::Out {
+                // Still record scope so downstream (embed) knows to skip
+                if !section_id.is_empty() {
+                    provision_taxa.push(ProvisionTaxa {
+                        section_id,
+                        scope: "out".to_string(),
+                        ..ProvisionTaxa::empty()
+                    });
+                }
                 continue;
             }
 
@@ -297,6 +338,14 @@ fn parse_provisions(
                 && record.government_actors.is_empty()
                 && record.purposes.is_empty()
             {
+                // Passed scope filter but no taxa — still substantive, just empty
+                if !section_id.is_empty() {
+                    provision_taxa.push(ProvisionTaxa {
+                        section_id,
+                        scope: "substantive".to_string(),
+                        ..ProvisionTaxa::empty()
+                    });
+                }
                 continue;
             }
 
@@ -438,6 +487,7 @@ fn parse_provisions(
 
                 provision_taxa.push(ProvisionTaxa {
                     section_id,
+                    scope: if is_structural { "structural".to_string() } else { "substantive".to_string() },
                     drrp_types: if is_structural {
                         Vec::new()
                     } else {
@@ -1253,6 +1303,7 @@ async fn write_provision_taxa(
     use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 
     let mut section_ids = StringBuilder::new();
+    let mut scope_b = StringBuilder::new();
     let mut drrp_types_b = ListBuilder::new(StringBuilder::new());
     let mut governed_b = ListBuilder::new(StringBuilder::new());
     let mut government_b = ListBuilder::new(StringBuilder::new());
@@ -1304,6 +1355,7 @@ async fn write_provision_taxa(
             }
         }
         section_ids.append_value(&pt.section_id);
+        scope_b.append_value(&pt.scope);
 
         for v in &pt.drrp_types {
             drrp_types_b.values().append_value(v);
@@ -1447,6 +1499,7 @@ async fn write_provision_taxa(
     let item_field = std::sync::Arc::new(Field::new("item", DataType::Utf8, true));
     let taxa_schema = std::sync::Arc::new(Schema::new(vec![
         Field::new("section_id", DataType::Utf8, false),
+        Field::new("scope", DataType::Utf8, true),
         Field::new("drrp_types", DataType::List(item_field.clone()), true),
         Field::new("governed_actors", DataType::List(item_field.clone()), true),
         Field::new(
@@ -1500,6 +1553,7 @@ async fn write_provision_taxa(
         taxa_schema,
         vec![
             std::sync::Arc::new(section_ids.finish()),
+            std::sync::Arc::new(scope_b.finish()),
             std::sync::Arc::new(drrp_types_b.finish()),
             std::sync::Arc::new(governed_b.finish()),
             std::sync::Arc::new(government_b.finish()),
