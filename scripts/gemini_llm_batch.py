@@ -43,20 +43,44 @@ VALID_POSITIONS = {"active", "counterparty", "beneficiary", "mentioned"}
 VALID_DRRP = {"Obligation", "Liberty", "none"}
 
 
-def query_pending_llm(conn, limit=None):
+def query_pending_llm(conn, limit=None, significance=None, max_confidence=None, law_file=None):
     cur = conn.cursor()
-    sql = """
-        SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text
-        FROM provision_actors pa
-        JOIN legislation_text lt ON pa.section_id = lt.section_id
-        WHERE pa.extraction_method = 'pending_llm'
-        AND pa.llm_position IS NULL
-        AND lt.law_name NOT IN (SELECT DISTINCT split_part(section_id, ':', 1) FROM gold_benchmarks)
-        ORDER BY pa.section_id, pa.actor_label
-    """
+    params = []
+
+    if significance and max_confidence:
+        # Target: SLM-classified actors on provisions with specific significance and low confidence
+        sql = """
+            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text
+            FROM provision_actors pa
+            JOIN legislation_text lt ON pa.section_id = lt.section_id
+            WHERE lt.significance_overall = %s
+            AND pa.slm_confidence < %s
+            AND pa.slm_position IS NOT NULL
+            AND pa.llm_position IS NULL
+            AND lt.law_name NOT IN (SELECT DISTINCT split_part(section_id, ':', 1) FROM gold_benchmarks)
+        """
+        params = [significance, max_confidence]
+        if law_file:
+            with open(law_file) as f:
+                laws_csv = f.read().strip()
+            sql += " AND lt.law_name IN (SELECT unnest(string_to_array(%s, ',')))"
+            params.append(laws_csv)
+        sql += " ORDER BY pa.slm_confidence, pa.section_id"
+    else:
+        # Default: pending_llm actors
+        sql = """
+            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text
+            FROM provision_actors pa
+            JOIN legislation_text lt ON pa.section_id = lt.section_id
+            WHERE pa.extraction_method = 'pending_llm'
+            AND pa.llm_position IS NULL
+            AND lt.law_name NOT IN (SELECT DISTINCT split_part(section_id, ':', 1) FROM gold_benchmarks)
+            ORDER BY pa.section_id, pa.actor_label
+        """
+
     if limit:
         sql += f" LIMIT {limit}"
-    cur.execute(sql)
+    cur.execute(sql, params)
     rows = cur.fetchall()
     cur.close()
     return rows
@@ -83,12 +107,21 @@ def classify_actor(api_key, text, actor_label):
         resp = requests.post(url, json=body, timeout=30)
         resp.raise_for_status()
         content = resp.json()
-        text_resp = content.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "").strip()
+        # Concatenate all text parts (Gemini 2.5 may split across parts)
+        parts = content.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+        text_resp = "".join(p.get("text", "") for p in parts).strip()
 
         if "```json" in text_resp:
             text_resp = text_resp.split("```json")[1].split("```")[0].strip()
         elif "```" in text_resp:
             text_resp = text_resp.split("```")[1].split("```")[0].strip()
+
+        # Fallback: extract JSON object with regex
+        import re
+        if not text_resp.startswith("{"):
+            m = re.search(r'\{[^}]+\}', text_resp)
+            if m:
+                text_resp = m.group()
 
         parsed = json.loads(text_resp)
         position = parsed.get("position", "").lower().strip()
@@ -130,6 +163,11 @@ def main():
     parser = argparse.ArgumentParser(description="Gemini LLM batch classification")
     parser.add_argument("--limit", type=int, help="Limit number of actors")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--significance", choices=["HIGH", "MEDIUM", "LOW"],
+                        help="Target provisions by significance level (requires --max-confidence)")
+    parser.add_argument("--max-confidence", type=float, default=0.9,
+                        help="SLM confidence threshold (default: 0.9)")
+    parser.add_argument("--law-file", help="CSV file of law names to scope to")
     args = parser.parse_args()
 
     api_key = os.environ.get("GEMINI_API_KEY") or ""
@@ -144,8 +182,12 @@ def main():
         sys.exit(1)
 
     conn = psycopg2.connect(PG_DSN)
-    actors = query_pending_llm(conn, limit=args.limit)
-    print(f"Loaded {len(actors):,} pending_llm actors")
+    actors = query_pending_llm(conn, limit=args.limit,
+                                significance=args.significance,
+                                max_confidence=args.max_confidence,
+                                law_file=args.law_file)
+    mode = f"significance={args.significance} conf<{args.max_confidence}" if args.significance else "pending_llm"
+    print(f"Loaded {len(actors):,} actors ({mode})")
 
     if args.dry_run:
         for sid, label, cat, drrp, text in actors[:5]:

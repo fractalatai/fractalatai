@@ -6,14 +6,14 @@ description: Run the full compliance enrichment pipeline for a customer's legal 
 
 ## When This Applies
 
-When onboarding a customer's legal register for compliance enrichment — the full 4-tier cascade. The customer's applicable laws are provided as a CSV file (comma-separated law names, one line, no header).
+When onboarding a customer's legal register for compliance enrichment. The customer's applicable laws are provided as a CSV file (comma-separated law names, one line, no header).
 
 ## Prerequisites
 
-- Customer law file exists (e.g. `data/qq-applicable-laws.csv`)
-- Discovery enrichment already done (`taxa enrich` — regex parse + DuckDB)
+- Customer law file exists (e.g. `data/sertantai/qq-applicable-laws.csv`)
+- LAT provisions pulled into Postgres (via sync-watch or `pull-lat`)
 - Postgres running (`systemctl --user start fractalaw-pg.service`)
-- Ollama running with `gemma3-position` model loaded
+- SLM available (RunPod for batch, or local Ollama with `gemma3-position`)
 - Sertantai running for publish (if publishing)
 
 ## Pipeline Steps
@@ -23,10 +23,27 @@ Run in order. Each step depends on the previous. Use `customer-stats` skill betw
 ### Step 0: Baseline stats
 
 ```bash
-/usr/bin/python3 scripts/corpus_stats.py --law-file data/<customer>-applicable-laws.csv
+/usr/bin/python3 scripts/maintenance/corpus_stats.py --law-file data/sertantai/<customer>-applicable-laws.csv
 ```
 
 Check Tier 0 PASS and note the starting state.
+
+### Step 0b: Parse (regex DRRP extraction)
+
+Run on laws that have LAT in Postgres but haven't been parsed. Sets scope (out/structural/substantive), extracts actors, writes `provision_actors` rows. **Must run before embed** — embed requires `scope = 'substantive'`.
+
+```bash
+# Get laws needing parse (have provisions but no extraction_method)
+PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -t -A -c "
+SELECT string_agg(DISTINCT law_name, ',')
+FROM legislation_text
+WHERE extraction_method IS NULL AND scope IS NULL
+AND law_name IN (SELECT unnest(string_to_array('$(cat data/sertantai/<customer>-applicable-laws.csv)', ',')));
+"
+
+# Run
+cargo run -p fractalaw-cli -- taxa parse --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw --laws <output>
+```
 
 ### Step 1: Dep features (spaCy batch)
 
@@ -39,11 +56,11 @@ SELECT string_agg(DISTINCT lt.law_name, ',')
 FROM provision_actors pa
 JOIN legislation_text lt ON pa.section_id = lt.section_id
 WHERE pa.dep_is_subject IS NULL AND pa.regex_position IS NOT NULL
-AND lt.law_name IN (SELECT unnest(string_to_array('$(cat data/<customer>-applicable-laws.csv)', ',')));
+AND lt.law_name IN (SELECT unnest(string_to_array('$(cat data/sertantai/<customer>-applicable-laws.csv)', ',')));
 "
 
 # Run (if any laws returned)
-/usr/bin/python3 scripts/compute_dep_features.py --laws <output>
+/usr/bin/python3 scripts/ml/compute_dep_features.py --laws <output>
 ```
 
 ~450 provisions/s. Typically 5-10 min for 250 laws.
@@ -58,7 +75,7 @@ PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -t -A -
 SELECT string_agg(DISTINCT lt.law_name, ',')
 FROM legislation_text lt
 WHERE lt.embedding IS NULL AND lt.scope = 'substantive'
-AND lt.law_name IN (SELECT unnest(string_to_array('$(cat data/<customer>-applicable-laws.csv)', ',')));
+AND lt.law_name IN (SELECT unnest(string_to_array('$(cat data/sertantai/<customer>-applicable-laws.csv)', ',')));
 "
 
 # Run (if any laws returned)
@@ -69,7 +86,7 @@ cargo run -p fractalaw-cli -- taxa embed --pg postgres://fractalaw:fractalaw@loc
 
 ### Step 3: Classify
 
-Position classifier on all actors with embeddings + dep features.
+Position classifier on all actors with embeddings + dep features. SLM outperforms the classifier on accuracy (79.7% vs 59.9%), but classifier must run first — it provides a second signal for reconciliation, which then flags only unresolved actors as `pending_slm` for the SLM. Without classifier, all actors go to SLM unnecessarily.
 
 ```bash
 # Get laws needing classification
@@ -79,7 +96,7 @@ FROM provision_actors pa
 JOIN legislation_text lt ON pa.section_id = lt.section_id
 WHERE pa.cls_position IS NULL AND lt.embedding IS NOT NULL AND pa.dep_is_subject IS NOT NULL
 AND lt.scope = 'substantive'
-AND lt.law_name IN (SELECT unnest(string_to_array('$(cat data/<customer>-applicable-laws.csv)', ',')));
+AND lt.law_name IN (SELECT unnest(string_to_array('$(cat data/sertantai/<customer>-applicable-laws.csv)', ',')));
 "
 
 # Run
@@ -93,7 +110,7 @@ cargo run -p fractalaw-cli -- taxa classify --pg postgres://fractalaw:fractalaw@
 Correlative actor inference (Employee active → Employer counterparty).
 
 ```bash
-LAWS=$(cat data/<customer>-applicable-laws.csv)
+LAWS=$(cat data/sertantai/<customer>-applicable-laws.csv)
 cargo run -p fractalaw-cli -- taxa infer --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw --laws "$LAWS"
 ```
 
@@ -104,7 +121,7 @@ Instant — rule-based, no ML.
 4-tier reconciliation. Flags `pending_slm` for SLM and `pending_llm` for human-triggered LLM.
 
 ```bash
-LAWS=$(cat data/<customer>-applicable-laws.csv)
+LAWS=$(cat data/sertantai/<customer>-applicable-laws.csv)
 cargo run -p fractalaw-cli -- taxa reconcile --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw --laws "$LAWS"
 ```
 
@@ -113,41 +130,76 @@ Instant.
 ### Step 6: Check stats before SLM
 
 ```bash
-/usr/bin/python3 scripts/corpus_stats.py --law-file data/<customer>-applicable-laws.csv
+/usr/bin/python3 scripts/maintenance/corpus_stats.py --law-file data/sertantai/<customer>-applicable-laws.csv
 ```
 
 Note the `pending_slm` count — this is the SLM workload. At ~0.3 actors/s, estimate time.
 
-### Step 7: SLM
+### Step 7: SLM (RunPod)
 
-Classify pending_slm actors via local Ollama gemma3-position. **This is the bottleneck.**
+Classify pending_slm actors via RunPod GPU. Both position and significance run on the same pod.
+
+#### RunPod setup
+
+1. Spin up a pod (RTX 4090 or 5090) with network volume attached
+2. SSH in and install deps:
+   ```bash
+   apt-get update -qq && apt-get install -y -qq zstd postgresql-client > /dev/null
+   curl -fsSL https://ollama.com/install.sh | sh
+   pip install psycopg2-binary requests
+   ```
+3. Start Ollama and load the position model:
+   ```bash
+   ollama serve &
+   ollama create gemma3-position -f /workspace/Modelfile
+   ```
+4. Open reverse SSH tunnel from LOCAL machine (keeps running in foreground):
+   ```bash
+   ssh -T -R 5433:localhost:5433 root@<IP> -p <PORT> -i ~/.ssh/id_ed25519 -N
+   ```
+5. Models and batch scripts are on the network volume at `/workspace/`:
+   - `gemma3-position-q4.gguf` + `Modelfile` — DRRP + position
+   - `gemma3-significance-q4.gguf` + `Modelfile.significance` — obligation significance
+   - `runpod_slm_batch.py` — position batch script
+   - `runpod_significance_batch.py` — significance batch script
+
+#### Run position SLM
 
 ```bash
-LAWS=$(cat data/<customer>-applicable-laws.csv)
-cargo run -p fractalaw-cli -- taxa slm --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw --laws "$LAWS"
+# On pod (via SSH):
+python3 /workspace/runpod_slm_batch.py --dry-run      # check pending count
+python3 /workspace/runpod_slm_batch.py --workers 8     # full run
 ```
 
-~0.3 actors/s. 25K actors ≈ 24 hours. Run overnight.
+~10 actors/s on RTX 4090. 10K actors ≈ 17 min.
+
+#### Run significance SLM
+
+```bash
+# On pod — load significance model first:
+ollama create gemma3-significance -f /workspace/Modelfile.significance
+
+python3 /workspace/runpod_significance_batch.py --dry-run
+python3 /workspace/runpod_significance_batch.py --workers 8
+```
+
+~10 provisions/s. 40K Obligation provisions ≈ 70 min.
 
 ### Step 8: Re-reconcile
 
-With SLM tier populated. Per-class gating: active/counterparty accepted, beneficiary/mentioned → pending_llm.
+With SLM tier populated.
 
 ```bash
-LAWS=$(cat data/<customer>-applicable-laws.csv)
+LAWS=$(cat data/sertantai/<customer>-applicable-laws.csv)
 cargo run -p fractalaw-cli -- taxa reconcile --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw --laws "$LAWS"
 ```
 
-### Step 8b: Significance (Obligation provisions only)
-
-Rate significance of Obligation provisions on RunPod. Requires separate GGUF model (gemma3-significance) and reverse SSH tunnel.
-
-See `/runpod-finetune` skill for pod setup. Run `runpod_significance_batch.py` on pod with tunnel open.
+### Step 8b: Derive hierarchy significance
 
 After significance SLM completes, derive hierarchy from metadata locally:
 
 ```bash
-/usr/bin/python3 .claude/skills/customer-batch-parse/scripts/derive_hierarchy.py --law-file data/<customer>-applicable-laws.csv
+/usr/bin/python3 .claude/skills/customer-batch-parse/scripts/derive_hierarchy.py --law-file data/sertantai/<customer>-applicable-laws.csv
 ```
 
 ### Step 9: Backfill
@@ -155,14 +207,14 @@ After significance SLM completes, derive hierarchy from metadata locally:
 Aggregate provision_actors → legislation_text for sertantai publish.
 
 ```bash
-LAWS=$(cat data/<customer>-applicable-laws.csv)
+LAWS=$(cat data/sertantai/<customer>-applicable-laws.csv)
 cargo run -p fractalaw-cli -- taxa backfill --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw --laws "$LAWS"
 ```
 
 ### Step 10: Final stats
 
 ```bash
-/usr/bin/python3 scripts/corpus_stats.py --law-file data/<customer>-applicable-laws.csv
+/usr/bin/python3 scripts/maintenance/corpus_stats.py --law-file data/sertantai/<customer>-applicable-laws.csv
 ```
 
 All QA checks should PASS. `pending_slm` should be zero (or near-zero from parse errors). `pending_llm` is expected — human-triggered.
@@ -170,13 +222,13 @@ All QA checks should PASS. `pending_slm` should be zero (or near-zero from parse
 ### Step 11: Publish
 
 ```bash
-LAWS=$(cat data/<customer>-applicable-laws.csv)
+LAWS=$(cat data/sertantai/<customer>-applicable-laws.csv)
 
 # Enrichment (law-level LRT)
-cargo run -p fractalaw-cli -- sync publish --tenant dev --connect tcp/localhost:7447 --laws "$LAWS"
+cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/localhost:7447 --laws "$LAWS"
 
 # Provisions (per-provision LAT taxa)
-cargo run -p fractalaw-cli -- sync publish --tenant dev --connect tcp/localhost:7447 --laws "$LAWS" --provisions --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw
+cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/localhost:7447 --laws "$LAWS" --provisions --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw
 ```
 
 ## Targeting gaps only
@@ -187,12 +239,14 @@ For re-runs, don't re-process the whole corpus. Query for laws with gaps at each
 
 | Step | Typical time (250 laws) |
 |------|------------------------|
+| Parse | 2-5 min |
 | Dep features | 5-10 min |
-| Embed | 20 min |
+| Embed | 20 min (CPU) |
 | Classify | 30 min |
 | Infer | 1 min |
 | Reconcile | 30s |
-| SLM | 10-24 hours (bottleneck) |
+| SLM position (RunPod) | 15-20 min (10K actors) |
+| SLM significance (RunPod) | 60-70 min (40K provisions) |
 | Re-reconcile | 30s |
 | Backfill | 1 min |
 | Publish | 2 min |
