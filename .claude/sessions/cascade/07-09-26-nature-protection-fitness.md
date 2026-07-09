@@ -1,10 +1,66 @@
 ---
 session: Nature Protection Fitness
-status: active
+status: closed
 opened: 2026-07-09
+closed: 2026-07-09
+outcome: success
+
+summary: >
+  Scoping session for fitness (applicability) extraction. Reviewed existing
+  fitness module (OH&S-only regex dictionaries), identified the gap for nature
+  protection laws (25/6,644 provisions tagged), and produced a Gemini-reviewed
+  strategy (v0.2) with NER-first staircase, flexible entity types, and law-level
+  LRT persistence pattern.
+
+decisions:
+  - what: Replace rigid 6-P ontology with flexible typed entities
+    why: OH&S P-dimensions don't translate across domains — "Plant" means machinery in OH&S but literal plants in nature law
+    result: Six entity types (ACTOR, ACTIVITY, GEOGRAPHY, LEGAL_DESIGNATION, SUBJECT_MATTER, CONDITION) replace fixed schema
+
+  - what: NER-first staircase instead of jumping to generative SLM
+    why: Gemini review — generative models are the most expensive and least controllable option. NER is cheaper to train, faster to run, more explainable
+    result: Pipeline mirrors taxa cascade — NER → Relations → SLM for complex cases
+
+  - what: Implicit applicability (subject-matter conditions) handled from day one
+    why: Gemini review — criminal offence provisions are core compliance obligations, not edge cases
+    result: Extraction targets both "this Part applies to..." and "any person who kills a wild bird..."
+
+  - what: Fitness aggregates to law-level LRT, persists in DuckDB
+    why: LAT is transient (only kept for customer laws), but fitness signal needed on all 19K laws for applicability filtering
+    result: Mirrors taxa triage pattern — parse provisions, aggregate to law, publish to sertantai
+
+lessons:
+  - title: Fitness is not like actors — dictionaries don't scale
+    detail: Actor extraction works because there's a finite set of duty-bearers. Fitness conditions are bespoke per law. "Marine conservation zone", "European protected species", "licensable marine activity" — each law defines its own applicability vocabulary.
+    tag: architecture
+
+  - title: Gemini Pro produces better architectural reviews than Flash
+    detail: Used Pro with 16K thinking budget for the strategy review. The depth of critique (DAG structure, temporal dimension, training data contamination risk) justified the cost vs Flash. For code-level reviews Flash is fine.
+    tag: tooling
+
+  - title: Two review cycles catches more than one
+    detail: v0.1 review identified fundamental flaws. v0.2 review confirmed fixes and surfaced new, more sophisticated risks (training data contamination, relation extraction design). The second review was cheaper but equally valuable.
+    tag: methodology
+
+  - title: Don't suspend sessions without being asked
+    detail: Attempted to suspend the session prematurely. The user has their own rhythm — wait for the instruction.
+    tag: methodology
+
+artifacts:
+  - .claude/plans/FITNESS-STRATEGY.md
+  - data/code-review/gemini-fitness-strategy-review.md
+  - data/code-review/gemini-fitness-strategy-v02-review.md
+
+depends_on:
+  - 07-09-26-nature-protection.md
+
+enables:
+  - Phase 1 implementation (regex applicability detection)
+  - NER training data preparation from OH&S dictionary bootstrap
+  - Golden benchmark labelling for nature protection laws
 ---
 
-# Session: Nature Protection Fitness (ACTIVE)
+# Session: Nature Protection Fitness (CLOSED)
 
 ## Problem
 
@@ -48,14 +104,14 @@ This is closer to triage (law-level classification from key provisions) than to 
 2. ✅ Examine applicability patterns in 4 benchmark laws
 3. ✅ Write meta strategy plan (`.claude/plans/FITNESS-STRATEGY.md`)
 4. ✅ Write FITNESS-STRATEGY.md v0.2 — reviewed by Gemini Pro, all major concerns addressed
-5. ⬜ Eyeball the 25 existing fitness-tagged provisions — are they correct?
-5. ⬜ Phase 1: Improve regex identification of applicability provisions
-6. ⬜ Phase 2: SLM prompt design for fitness extraction from applicability provisions
-7. ⬜ Build golden benchmark labels for 4 nature protection laws
-8. ⬜ Training data from OH&S laws (dictionary results as ground truth)
-9. ⬜ Phase 3: Law-level propagation (structural hierarchy)
-10. ⬜ Re-parse and measure improvement
-11. ⬜ Republish updated fitness data to sertantai
+5. ⏸️ Eyeball the 25 existing fitness-tagged provisions (deferred — new session)
+6. ⏸️ Phase 1: Improve regex identification of applicability provisions (deferred — new session)
+7. ⏸️ Phase 2: NER staircase for fitness extraction (deferred — new session)
+8. ⏸️ Build golden benchmark labels for 4 nature protection laws (deferred — new session)
+9. ⏸️ Training data from OH&S laws (deferred — new session)
+10. ⏸️ Phase 3: Law-level propagation (deferred — new session)
+11. ⏸️ Re-parse and measure improvement (deferred — new session)
+12. ⏸️ Republish updated fitness data (deferred — new session)
 
 ## Gemini Review Feedback (2026-07-09)
 
