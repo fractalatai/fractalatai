@@ -1,10 +1,10 @@
 ---
 session: Nature Protection Fitness
-status: suspended
+status: active
 opened: 2026-07-09
 ---
 
-# Session: Nature Protection Fitness (SUSPENDED)
+# Session: Nature Protection Fitness (ACTIVE)
 
 ## Problem
 
@@ -44,16 +44,31 @@ This is closer to triage (law-level classification from key provisions) than to 
 
 ## Work
 
-1. ⬜ Examine existing fitness dictionary — what terms exist, what's missing for nature protection
-2. ⬜ Eyeball the 25 existing fitness-tagged provisions — are they correct?
-3. ⬜ Identify nature protection fitness terms (habitats, species, MCZs, SSSIs, etc.)
-4. ⬜ Add terms to fitness dictionary, scoped to relevant families
-5. ⬜ Re-parse the 4 benchmark laws and measure improvement
-6. ⬜ Extend to full WILDLIFE & COUNTRYSIDE + MARINE & RIVERINE families
-7. ⬜ Republish updated fitness data to sertantai
+1. ✅ Review existing fitness module — polarity detection (strong), P-dimension dictionaries (OH&S-only)
+2. ✅ Examine applicability patterns in 4 benchmark laws
+3. ✅ Write meta strategy plan (`.claude/plans/FITNESS-STRATEGY.md`)
+4. ✅ Write FITNESS-STRATEGY.md v0.2 — reviewed by Gemini Pro, all major concerns addressed
+5. ⬜ Eyeball the 25 existing fitness-tagged provisions — are they correct?
+5. ⬜ Phase 1: Improve regex identification of applicability provisions
+6. ⬜ Phase 2: SLM prompt design for fitness extraction from applicability provisions
+7. ⬜ Build golden benchmark labels for 4 nature protection laws
+8. ⬜ Training data from OH&S laws (dictionary results as ground truth)
+9. ⬜ Phase 3: Law-level propagation (structural hierarchy)
+10. ⬜ Re-parse and measure improvement
+11. ⬜ Republish updated fitness data to sertantai
+
+## Gemini Review Feedback (2026-07-09)
+
+v0.1 reviewed by Gemini Pro — harsh but productive. Five major concerns raised. v0.2 addressed all but temporal (already handled at law level via commencement/revocation data in DuckDB). Two new risks flagged:
+
+1. **Training data contamination** — OH&S dictionary bootstrap may bake in legacy errors. Need manual review of labels.
+2. **Relation extraction underspecified** — rule-based entity linking needs concrete design before implementation.
+
+Full reviews: `data/code-review/gemini-fitness-strategy-review.md` (v0.1) and `gemini-fitness-strategy-v02-review.md` (v0.2).
 
 ## Dependencies
 
 - ✅ Nature Protection session closed — 4 laws fully enriched with DRRP + significance
 - ✅ Fitness module exists (`crates/fractalaw-core/src/taxa/fitness.rs`)
 - ✅ POPIMAR columns in Postgres and publish payload
+- ✅ FITNESS-STRATEGY.md v0.2 reviewed and approved by Gemini Pro
