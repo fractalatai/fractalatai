@@ -51,6 +51,54 @@ Previous sessions proved SLM outperforms the regex -> classifier -> SLM chain (S
 10. ⬜ Publish all updated laws to sertantai
 11. ⬜ Spot-check nature protection provisions (s.40 NERC, s.125-126 MCAA, etc.)
 
+## Nature Protection QA — Eyeball Analysis
+
+Spot-checked 4 nature protection laws at QQ's request. Mixed results — highlights gaps the rework will fix.
+
+### UK_ukpga_2006_16 — NERC Act 2006 (s.40 biodiversity duty)
+
+**Status**: No LAT. Zero provisions in Postgres. Family = "X: No Family". Triage = uncertain (48%).
+
+The s.40 biodiversity duty ("every public authority must have regard to conserving biodiversity") hasn't been processed at all. LAT pulled during this session (871 provisions) but not yet enriched.
+
+### UK_ukpga_2009_23 — Marine and Coastal Access Act 2009
+
+**Status**: 3,115 provisions, 2,845 enriched. SLM ran but reconcile never completed — final position/drrp columns empty.
+
+- **s.66(1)** — Lists licensable marine activities (dredging, construction, deposits). No actors extracted — obligation is implicit ("it is a licensable marine activity to do..."). Pipeline missed it.
+- **s.125(2)-(9)** — Obligations on public authorities re MCZs. Government-facing. Actors found but all classified as `mentioned` by classifier; SLM correctly reclassified as `active` but results never reconciled.
+- **s.126(6)-(7)** — "the person seeking the authorisation" must satisfy the authority. SLM correctly identified `Ind: Person` as `active/Obligation` and `Gvt: Authority` as `counterparty`. Key provision for anyone applying for marine licences (e.g. quarry operator doing marine dredging). **Not reconciled.**
+
+### UK_uksi_2017_1012 — Conservation of Habitats and Species Regs 2017
+
+**Status**: 1,026 provisions, enriched. SLM ran and reconciled. Best quality of the four.
+
+- **reg.43(1)** — Criminal offence: any person who deliberately captures/injures/kills European protected species. `Ind: Person` correctly `active/Obligation`. Applies to employers on site.
+- **reg.55(1)** — Licensing body may grant a licence. Liberty, **but no actor extracted** — "relevant licensing body" not in dictionary triggers (only "licensing authority" matched). **Fixed**: added "licensing body" trigger.
+- **reg.55(9)** — Licensing body must not grant unless satisfied (three tests for EPS derogation). Obligation detected, **but no actor** — same dictionary gap. Fixed by same trigger addition.
+- **reg.63(1),(3),(5)** — Habitats Regulations Assessment duties on competent authorities. `Gvt: Authority` correctly identified.
+
+### UK_ukpga_1981_69 — Wildlife and Countryside Act 1981
+
+**Status**: Enriched, SLM ran and reconciled.
+
+- **s.1(5)** — Criminal offence: disturbing Schedule 1 birds. `Ind: Person` correctly `active/Obligation`. Directly relevant to quarry operators near nesting sites.
+- **s.9(4)** — Criminal offence: damaging Schedule 5 animal shelters. `Ind: Person` correctly `active/Obligation`.
+- **s.28G(2)** — SSSI conservation duty on public authorities. `Gvt: Authority` as `active`. Government-facing.
+- **s.28H(1)** — "a section 28G authority shall give notice..." — Obligation detected but **no actor extracted**. Cross-reference format "section 28G authority" doesn't match regex. Downstream subsections (4)-(6) do match because they use "the authority".
+- **s.28I(1)-(6)** — Authorising operations near SSSIs. Government-facing duties, correctly classified.
+
+### Summary
+
+| Law | Criminal offences (governed) | Government duties | Gaps |
+|-----|------------------------------|-------------------|------|
+| NERC 2006 | Unknown (no LAT processed) | s.40 biodiversity | No LAT |
+| MCAA 2009 | s.66(1) implicit | s.125, s.126 | SLM not reconciled, implicit actors missed |
+| Habitats Regs 2017 | reg.43(1) Person | reg.63 authority | reg.55 "licensing body" trigger missing (now fixed) |
+| Wildlife Act 1981 | s.1(5), s.9(4) Person | s.28G-I authority | s.28H(1) cross-ref format missed by regex |
+
+The criminal offence provisions (applying to "any person") are the most relevant to QQ as a governed employer. These are generally well-classified. Government-facing duties are correctly identified but less relevant to the customer. The main gaps are: missing LAT (NERC), unreconciled SLM results (MCAA), and two actor dictionary gaps (now one fixed).
+
 ## Dependencies
 
 - ✅ PgStore hub operational

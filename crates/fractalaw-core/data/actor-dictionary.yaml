@@ -228,7 +228,8 @@
   category: Gvt
   regex_patterns:
     - "[Ll]icen[cs]ing [Aa]uthority?i?e?s?"
-  triggers: [licensing authority]
+    - "(?:[Tt]he )?(?:[Rr]elevant )?[Ll]icen[cs]ing [Bb]od(?:y|ies)"
+  triggers: [licensing authority, licensing body, relevant licensing body]
   drrp_keywords: [authority]
 
 - label: "Gvt: Authority: Waste"
@@ -824,6 +825,17 @@
     - "(?:[Dd]ealers?|registered (?:firearms )?dealer)"
   triggers: [dealer, dealers]
   families: ["PUBLIC"]
+
+# ── Specialist: Wildlife & Countryside (family-gated) ─────────────
+
+- label: "Gvt: Authority"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "[Ss]ection \\d+\\w* authorit(?:y|ies)"
+  triggers: [section 28G authority]
+  drrp_keywords: [authority]
+  families: ["WILDLIFE & COUNTRYSIDE"]
 
 # ── Trigger-only entries (no regex patterns — used for LLM matching only) ──
 
