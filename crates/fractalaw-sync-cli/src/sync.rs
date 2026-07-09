@@ -495,7 +495,7 @@ pub(crate) async fn cmd_sync_watch(
         "Watching for sync events (tenant: {}, timeout: {timeout_secs}s per pull)...",
         zenoh.tenant
     );
-    println!("Pipeline: ensure LRT → pull LAT → triage → ack → queue if making");
+    println!("Pipeline: ensure LRT → pull LAT → triage → publish triage → ack → queue if making");
     println!("Press Ctrl+C to stop.\n");
 
     let mut total_events = 0usize;
@@ -606,9 +606,39 @@ pub(crate) async fn cmd_sync_watch(
                 }
 
                 // Run triage before deciding whether to queue for enrichment
-                let (triage_result, _counts) =
+                let (triage_result, counts) =
                     run_triage_for_law(&duck, lance.as_ref(), law_name).await;
                 write_triage_to_duck(&duck, law_name, &triage_result);
+
+                // Publish triage result back to sertantai (round-trip signal)
+                let (_, _, sertantai_making) = get_law_triage_metadata(&duck, law_name);
+                let agrees = match (sertantai_making, &triage_result.classification) {
+                    (Some(true), MakingClassification::Making) => true,
+                    (Some(false), MakingClassification::NotMaking) => true,
+                    (None, _) => true,
+                    _ => false,
+                };
+                let counts_json = serde_json::json!({
+                    "total": counts.total,
+                    "process_rule": counts.process_rule,
+                    "amendment": counts.amendment,
+                    "enactment": counts.enactment,
+                    "interpretation": counts.interpretation,
+                    "with_actor": counts.with_actor,
+                    "with_obligation": counts.with_obligation,
+                    "with_enabling": counts.with_enabling,
+                });
+                if let Err(e) = sync.publish_triage(
+                    law_name,
+                    triage_result.classification.as_str(),
+                    triage_result.confidence,
+                    triage_result.tier,
+                    &counts_json,
+                    sertantai_making,
+                    agrees,
+                ).await {
+                    eprint!(" → triage publish error: {e}");
+                }
 
                 match triage_result.classification {
                     MakingClassification::Making | MakingClassification::Uncertain => {
@@ -621,7 +651,7 @@ pub(crate) async fn cmd_sync_watch(
                         ));
                         total_enriched += 1;
                         eprintln!(
-                            " → triage={} ({:.0}%) → queued for enrichment",
+                            " → triage={} ({:.0}%) → queued for enrichment → published",
                             triage_result.classification.as_str(),
                             triage_result.confidence * 100.0,
                         );
@@ -629,7 +659,7 @@ pub(crate) async fn cmd_sync_watch(
                     MakingClassification::NotMaking => {
                         total_skipped += 1;
                         eprintln!(
-                            " → triage=not_making ({:.0}%) → skipped",
+                            " → triage=not_making ({:.0}%) → skipped → published",
                             triage_result.confidence * 100.0,
                         );
                     }

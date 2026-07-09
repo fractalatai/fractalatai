@@ -86,6 +86,26 @@ enum Command {
         #[command(subcommand)]
         action: CrdtAction,
     },
+    /// Query a customer's applicable law names from sertantai
+    CustomerLaws {
+        #[command(flatten)]
+        zenoh: ZenohArgs,
+        /// Customer name (e.g. "QQ") — discovers UUID automatically
+        #[arg(long)]
+        name: Option<String>,
+        /// Customer UUID (skip discovery, query directly)
+        #[arg(long, conflicts_with = "name")]
+        customer: Option<String>,
+        /// List available customers (discovery only)
+        #[arg(long, conflicts_with_all = ["name", "customer"])]
+        list: bool,
+        /// Query timeout in seconds
+        #[arg(long, default_value_t = 15)]
+        timeout: u64,
+        /// Write law names to a CSV file (comma-separated, one line)
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Triage laws: scan provisions to substantiate making/not-making classification
     Triage {
         /// Specific laws (comma-separated)
@@ -362,6 +382,16 @@ async fn main() -> anyhow::Result<()> {
             }
             CrdtAction::Save { zenoh } => sync::cmd_crdt_save(&data_dir, &zenoh).await,
         },
+        Command::CustomerLaws {
+            zenoh,
+            name,
+            customer,
+            list,
+            timeout,
+            output,
+        } => {
+            cmd_customer_laws(&zenoh, name.as_deref(), customer.as_deref(), list, timeout, output.as_deref()).await
+        }
         Command::Triage {
             laws,
             family,
@@ -371,6 +401,111 @@ async fn main() -> anyhow::Result<()> {
             cmd_triage(&data_dir, laws, family, all, verbose, pg_url.as_deref()).await
         }
     }
+}
+
+async fn cmd_customer_laws(
+    zenoh: &ZenohArgs,
+    name: Option<&str>,
+    customer_id: Option<&str>,
+    list: bool,
+    timeout_secs: u64,
+    output: Option<&std::path::Path>,
+) -> anyhow::Result<()> {
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+
+    print!("Waiting for zenoh peer...");
+    let peers = sync
+        .wait_for_peers(std::time::Duration::from_secs(10))
+        .await;
+    if peers == 0 {
+        println!(" no peers connected (timeout).");
+        anyhow::bail!("No zenoh peers found — is sertantai running?");
+    }
+    println!(" {peers} peer(s) connected.");
+
+    let timeout = std::time::Duration::from_secs(timeout_secs);
+
+    // Resolve customer UUID: either given directly or discovered by name
+    let resolved_id = if let Some(id) = customer_id {
+        id.to_string()
+    } else {
+        // Discovery step: query /sertantai/customers
+        let customers = sync
+            .query_customers(timeout)
+            .await
+            .map_err(|e| anyhow::anyhow!("customer discovery failed: {e}"))?;
+
+        if customers.is_empty() {
+            anyhow::bail!("No customers returned from sertantai. Is the queryable running?");
+        }
+
+        if list || name.is_none() {
+            println!("\nAvailable customers:");
+            for c in &customers {
+                let cname = c["name"].as_str().unwrap_or("?");
+                let cid = c["id"].as_str().unwrap_or("?");
+                let count = c["law_count"].as_u64().unwrap_or(0);
+                println!("  {cname:20} {count:>4} laws  {cid}");
+            }
+            if list {
+                return Ok(());
+            }
+            anyhow::bail!("Specify --name <CUSTOMER_NAME> or --customer <UUID>");
+        }
+
+        let target_name = name.unwrap();
+        let found = customers.iter().find(|c| {
+            c["name"]
+                .as_str()
+                .is_some_and(|n| n.eq_ignore_ascii_case(target_name))
+        });
+
+        match found {
+            Some(c) => {
+                let id = c["id"]
+                    .as_str()
+                    .ok_or_else(|| anyhow::anyhow!("customer has no id field"))?;
+                let count = c["law_count"].as_u64().unwrap_or(0);
+                println!("Found customer '{}': {} laws ({})", target_name, count, id);
+                id.to_string()
+            }
+            None => {
+                println!("Customer '{}' not found. Available:", target_name);
+                for c in &customers {
+                    let cname = c["name"].as_str().unwrap_or("?");
+                    println!("  {cname}");
+                }
+                anyhow::bail!("customer not found");
+            }
+        }
+    };
+
+    // Fetch laws for the resolved customer
+    println!("Querying laws for customer {resolved_id}...");
+    let names = sync
+        .query_customer_laws(&resolved_id, timeout)
+        .await
+        .map_err(|e| anyhow::anyhow!("query failed: {e}"))?;
+
+    if names.is_empty() {
+        println!("No laws returned.");
+        return Ok(());
+    }
+
+    println!("{} laws in customer register.", names.len());
+
+    if let Some(path) = output {
+        let csv = names.join(",");
+        std::fs::write(path, format!("{csv}\n"))?;
+        println!("Written to {}", path.display());
+    } else {
+        println!("{}", names.join(","));
+    }
+
+    Ok(())
 }
 
 async fn cmd_triage(

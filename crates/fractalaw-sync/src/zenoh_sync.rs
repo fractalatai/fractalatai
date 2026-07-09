@@ -174,12 +174,27 @@ pub mod keys {
         format!("{PREFIX}/@{tenant}/status/{law_name}")
     }
 
-    /// Key expression for triage queryable.
+    /// Key expression for triage queryable (batch, sertantai pulls).
     ///
     /// Fractalaw serves this — sertantai queries to get making/not-making classification.
     /// Example: `fractalaw/@acme/triage`
     pub fn triage(tenant: &str) -> String {
         format!("{PREFIX}/@{tenant}/triage")
+    }
+
+    /// Key expression for per-law triage result (fractalaw pushes after ingestion).
+    ///
+    /// Example: `fractalaw/@dev/triage/UK_ukpga_2006_16`
+    pub fn triage_result(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/triage/{law_name}")
+    }
+
+    /// Key expression for sertantai customer discovery queryable.
+    ///
+    /// Sertantai serves this — fractalaw queries it to list all customers.
+    /// Example: `fractalaw/@dev/sertantai/customers`
+    pub fn customers(tenant: &str) -> String {
+        format!("{PREFIX}/@{tenant}/sertantai/customers")
     }
 
     /// Key expression for sertantai customer laws queryable.
@@ -392,6 +407,44 @@ impl ZenohSync {
         Ok(())
     }
 
+    /// Publish a triage result for a law.
+    ///
+    /// Pushes to `fractalaw/@{tenant}/triage/{law_name}` as JSON.
+    /// This is the round-trip signal: sertantai sends LAT, fractalaw
+    /// triages (regex), and publishes back whether the law holds duties.
+    pub async fn publish_triage(
+        &self,
+        law_name: &str,
+        classification: &str,
+        confidence: f32,
+        tier: u8,
+        counts: &serde_json::Value,
+        sertantai_is_making: Option<bool>,
+        agrees: bool,
+    ) -> Result<(), ZenohError> {
+        let key = keys::triage_result(&self.tenant, law_name);
+        let payload = serde_json::json!({
+            "law_name": law_name,
+            "classification": classification,
+            "confidence": confidence,
+            "tier": tier,
+            "counts": counts,
+            "sertantai_is_making": sertantai_is_making,
+            "agrees": agrees,
+        });
+        info!(
+            key = %key,
+            classification,
+            confidence,
+            "publishing triage result"
+        );
+        self.session
+            .put(&key, payload.to_string().into_bytes())
+            .await
+            .map_err(ZenohError::Session)?;
+        Ok(())
+    }
+
     /// Declare a queryable that serves the actor dictionary YAML on demand.
     ///
     /// Returns a handle that keeps the queryable alive. Drop it to stop serving.
@@ -440,6 +493,35 @@ impl ZenohSync {
             .await
             .map_err(ZenohError::Session)?;
         Ok(())
+    }
+
+    /// Query sertantai for customer list (discovery step).
+    ///
+    /// Sends a zenoh `get()` to `fractalaw/@{tenant}/sertantai/customers`.
+    /// Returns JSON array of `{id, name, source, law_count}` objects.
+    pub async fn query_customers(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<serde_json::Value>, ZenohError> {
+        let key = keys::customers(&self.tenant);
+        info!(key = %key, "querying customers from sertantai");
+        let replies = self
+            .session
+            .get(&key)
+            .timeout(timeout)
+            .await
+            .map_err(ZenohError::Session)?;
+
+        while let Ok(reply) = replies.recv_async().await {
+            if let Ok(sample) = reply.into_result() {
+                let bytes = sample.payload().to_bytes();
+                if let Ok(customers) = serde_json::from_slice::<Vec<serde_json::Value>>(&bytes) {
+                    return Ok(customers);
+                }
+            }
+        }
+
+        Ok(Vec::new())
     }
 
     /// Query sertantai for a customer's law names.
