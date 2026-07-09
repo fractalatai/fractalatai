@@ -1,10 +1,103 @@
 ---
 session: Nature Protection
-status: active
+status: closed
 opened: 2026-07-09
+closed: 2026-07-09
+outcome: success
+
+summary: >
+  Full QQ corpus enrichment from 274 to 428 laws. Pulled latest register via new
+  customer-laws CLI, processed ~100 new laws through the complete pipeline (parse,
+  embed, classify, SLM, significance, LLM, backfill, publish). Fixed 7 bugs found
+  during the process. Published 428 laws / 119,835 provisions to sertantai.
+
+decisions:
+  - what: Classifier runs before SLM, not dropped
+    why: Classifier provides second signal for reconciliation — without it all actors go to SLM unnecessarily
+    result: 1,615 actors classified, reconciliation uses both signals to flag only unresolved actors for SLM
+
+  - what: Significance must run after backfill
+    why: Backfill sets drrp_types on legislation_text — significance script queries this field. Running before backfill misses new Obligation provisions
+    result: Required two significance runs to catch provisions created by backfill
+
+  - what: Disable logprobs in significance batch for concurrent workers
+    why: Ollama deadlocks under concurrent logprobs requests (Gemini review identified)
+    result: Multi-worker went from hung to 6.4/s on RTX 5090
+
+  - what: LLM validation of LOW-confidence HIGH-significance actors
+    why: Targeted QA of most important provisions where SLM was uncertain
+    result: 27/29 downgraded to mentioned/none — confirms SLM confidence threshold is a genuine uncertainty signal
+
+metrics:
+  corpus: { laws: 428, provisions: 136185, substantive: 99255, published: 119835 }
+  pipeline: { embed: 18632, classify: 1615, slm: 10413, llm: 316, inferred: 1720 }
+  reconciled: { total: 86356, slm: 75075, regex: 6668, llm: 2536, inferred: 1720, pending_llm: 357 }
+  significance: { rated: 27249, part_breakdowns: 110 }
+  embedding_coverage: 100%
+  bugs_fixed: 7
+  revoked_cleaned: { laws: 28, provisions: 4519 }
+  runpod_cost: { position_4090: ~0.40, significance_5090: ~0.30, total: ~0.70 }
+
+lessons:
+  - title: taxa parse --pg must write scope to Postgres
+    detail: Parse computed scope in memory but never persisted it. Embed filters on scope=substantive so new laws got 0 embeddings. Wasted a full embed run before discovering the bug. Always verify the first batch output before running at scale.
+    tag: data
+
+  - title: Ollama logprobs deadlocks under concurrent inference
+    detail: logprobs=True in the request body causes Ollama to hang with multiple workers. Single-worker works fine. Position script never had this because it doesn't use logprobs. Gemini review identified it in seconds.
+    tag: infrastructure
+
+  - title: Significance must run after backfill, not before
+    detail: Backfill writes drrp_types to legislation_text. Significance queries this field. Running significance before backfill misses all new Obligation provisions. Pipeline ordering is critical and wasn't documented.
+    tag: methodology
+
+  - title: sync-watch must set lat_pulled_at in DuckDB
+    detail: Without this, taxa status reports stale needs_lat counts. The DuckDB pipeline timestamps are the source of truth for taxa status but sync-watch wasn't updating them.
+    tag: architecture
+
+  - title: Use nohup for RunPod batch scripts
+    detail: SSH sessions drop after ~10 min of inactivity. Scripts launched via SSH die when the connection drops. nohup + log file prevents lost work.
+    tag: infrastructure
+
+  - title: OLLAMA_NUM_PARALLEL must be set before ollama serve starts
+    detail: Setting the env var after Ollama is running has no effect. Must kill and restart with the var set.
+    tag: infrastructure
+
+  - title: Gemini 2.5 Flash splits JSON across multiple response parts
+    detail: The model returns thinking tokens and response tokens in separate parts. Concatenate all parts before JSON parsing, and use regex fallback for extraction.
+    tag: tooling
+
+  - title: Customer-batch-parse skill had stale paths throughout
+    detail: Script paths (corpus_stats.py, compute_dep_features.py), data paths (qq-applicable-laws.csv), and publish commands (fractalaw sync → fractalaw-sync-cli) were all wrong after the CLI split and directory reorg. Skills rot when the codebase moves underneath them.
+    tag: tooling
+
+artifacts:
+  - crates/fractalaw-sync-cli/src/main.rs
+  - crates/fractalaw-sync-cli/src/sync.rs
+  - crates/fractalaw-sync/src/zenoh_sync.rs
+  - crates/fractalaw-cli/src/commands/pipeline.rs
+  - crates/fractalaw-core/data/actor-dictionary.yaml
+  - scripts/gemini_llm_batch.py
+  - scripts/ml/runpod_significance_batch.py
+  - .claude/skills/customer-batch-parse/SKILL.md
+  - .claude/skills/publish/SKILL.md
+  - .claude/skills/llm-batch/SKILL.md
+  - .claude/skills/db-changes/SKILL.md
+  - data/code-review/significance-logprobs-deadlock.md
+
+depends_on:
+  - 06-29-26-qq-corpus-4tier.md
+  - 07-04-26-qq-corpus-completion.md
+  - 06-30-26-slm-all-actors.md
+
+enables:
+  - QQ nature protection provisions live in sertantai with significance ratings
+  - 428-law register fully enriched and published
+  - customer-batch-parse skill validated and corrected for future customer onboarding
+  - Triage round-trip operational (sync-watch → triage → publish back)
 ---
 
-# Session: Nature Protection (ACTIVE)
+# Session: Nature Protection (CLOSED)
 
 ## Problem
 
@@ -42,15 +135,22 @@ Previous sessions proved SLM outperforms the regex -> classifier -> SLM chain (S
 1. ✅ Wire `customer-laws` CLI command into `fractalaw-sync-cli` (two-step: discover customers, fetch laws)
 2. ✅ Pull latest QQ register from sertantai: **428 laws** (was 274). UUID: `c075d56b-8420-4408-b695-ccfbc1ba15ec`
 3. ✅ Run `taxa status` across full 428-law corpus
-4. ⬜ Publish 10 ready_to_publish laws (quick win)
-5. ✅ Pull LAT via sync-watch (~106 laws landed), manually pulled NERC 2006 + Factories Act
-6. ✅ Triage new laws — sync-watch triaged on ingestion, published results back to sertantai
-7. ✅ Parse new laws (93 batch + 4 nature protection laws) — regex DRRP extraction
-8. ⬜ Embed new provisions (93 laws ready, scope bug fixed)
-9. ⬜ SLM batch on RunPod — new laws + 8 needs_classify
-10. ⬜ Reconcile + backfill all laws with unreconciled SLM results (including published laws like MCAA 2009)
-11. ⬜ Publish all updated laws to sertantai
-12. ✅ Spot-check nature protection provisions (s.40 NERC, s.125-126 MCAA, Habitats Regs, Wildlife Act)
+4. ✅ Pull LAT via sync-watch (~106 laws landed), manually pulled NERC 2006 + Factories Act
+5. ✅ Triage new laws — sync-watch triaged on ingestion, published results back to sertantai
+6. ✅ Parse new laws (93 batch + 4 nature protection laws) — regex DRRP extraction
+7. ✅ Embed 18,632 provisions (23 min CPU)
+8. ✅ Dep features for 10,413 actors
+9. ✅ Classifier for 117 laws (1,615 actors)
+10. ✅ SLM position batch on RunPod RTX 4090 — 10,413 actors, 0 errors
+11. ✅ Infer correlative actors (1,720 inferred)
+12. ✅ Reconcile 86,356 actors across 428 laws
+13. ✅ Significance SLM on RunPod RTX 5090 — 3,434 provisions (after backfill sequencing fix)
+14. ✅ Backfill — 54,409 provisions, 27,249 significance, 110 Part breakdowns
+15. ✅ LLM batch (Gemini) — 316 pending_llm actors classified, 0 errors
+16. ✅ LLM validation — 29 HIGH sig + low conf actors: 27/29 downgraded to mentioned/none (confirms SLM confidence threshold)
+17. ✅ Re-parse Habitats Regs + Wildlife Act with new actor dictionary triggers
+18. ✅ Publish — 428/428 enrichment + 119,835 provisions across 364 laws
+19. ✅ Spot-check nature protection provisions — all gaps closed
 
 ## Bugs Found and Fixed
 
@@ -58,6 +158,9 @@ Previous sessions proved SLM outperforms the regex -> classifier -> SLM chain (S
 - **lat_pulled_at stale** — sync-watch pulled LAT but never set `lat_pulled_at` in DuckDB, so `taxa status` showed 130 needs_lat when only ~37 genuinely missing. Fixed: sync-watch now sets timestamp after LAT pull.
 - **triage not published** — sync-watch triaged but didn't push the result back to sertantai. Fixed: triage result now published to `triage/{law_name}` after every ingestion.
 - **orphaned sync.rs** — 929 lines of dead code in fractalaw-cli from the CLI split. Removed.
+- **significance IS NULL filter** — RunPod significance script loaded all 43K Obligation provisions instead of just pending ones. Fixed: added `significance_overall IS NULL` to query.
+- **significance logprobs deadlock** — `logprobs: True` in Ollama request body causes deadlock under concurrent workers. Gemini review identified. Fixed: disabled logprobs.
+- **significance sequencing** — significance must run after backfill (backfill sets `drrp_types`). Documented in skill.
 
 ## Revoked Laws Cleaned
 
@@ -67,7 +170,7 @@ Previous sessions proved SLM outperforms the regex -> classifier -> SLM chain (S
 
 - **~37 laws still need LAT** from sertantai (not yet parsed there)
 - **Comms Act 2003** (UK_ukpga_2003_21) — 10K provisions timing out during sertantai parse, needs fix
-- **101 pending_slm** actors from existing corpus need SLM batch
+- **~7K Obligation provisions without significance** — provisions with no actors in provision_actors (obligation detected from text but no actor extracted)
 
 ## Nature Protection QA — Eyeball Analysis
 
@@ -124,5 +227,5 @@ The criminal offence provisions (applying to "any person") are the most relevant
 - ✅ `fractalaw-sync-cli` publish working (verified 2026-07-08)
 - ✅ SLM classifications exist for many laws (just not reconciled)
 - ✅ Sertantai Zenoh queryable for customer laws (verified)
-- ⬜ Sertantai LAT availability for 130 missing laws
-- ⬜ RunPod for SLM batch
+- ✅ Sertantai LAT availability — ~106 laws pulled via sync-watch
+- ✅ RunPod — RTX 4090 (position SLM) + RTX 5090 (significance SLM)
