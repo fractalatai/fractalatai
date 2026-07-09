@@ -173,10 +173,27 @@ Use the 4 nature protection laws as initial benchmarks, plus extend to OH&S laws
 - **SLM hallucination** — mitigated by NER-first staircase (SLM only for complex cases)
 - **Entity type evolution** — the 6 entity types may need expansion as new domains are added. Flexible schema (list of typed entities per provision) avoids rigid column proliferation
 
+## Law-Level Fitness (LRT) vs Provision-Level (LAT)
+
+Critical architectural distinction: fitness is a **law-level signal** that lives in DuckDB (LRT), not just a provision-level annotation.
+
+The data flow mirrors taxa triage:
+- **LAT** (provision text) is transient — only persisted for laws with obligations that a customer has in their legal register
+- **LRT** (law-level metadata) is permanent — every law in the corpus has an LRT record in DuckDB, published to sertantai
+- Fitness must be **aggregated from provisions up to law level** and persisted in DuckDB, even when the underlying LAT isn't kept
+
+This means fitness extraction is a two-stage process:
+1. **Parse provisions** (when LAT is available) — extract applicability entities from individual provisions
+2. **Aggregate to law level** (always) — roll up provision-level fitness into law-level tags in DuckDB
+
+The law-level fitness in LRT is what customers use to decide "does this law apply to me?" — before they ever look at individual provisions. It's the filter that narrows 19K laws to the ~400 in a customer's register. Sertantai needs this signal on every law, not just the ones with persisted LAT.
+
+This is exactly how taxa triage works today: sync-watch ingests LAT, runs triage (regex scan of provisions), writes the result to DuckDB (law-level), and publishes back to sertantai. The LAT may later be cleaned, but the triage decision persists. Fitness follows the same pattern.
+
 ## Pipeline Integration
 
 ```
-Provision text
+LAT arrives (sync-watch or batch)
   → Purpose classifier: is this an applicability provision? (regex gate)
   → If explicit scope declaration:
       → NER extracts typed entities (ACTOR, ACTIVITY, GEOGRAPHY, etc.)
@@ -185,5 +202,7 @@ Provision text
       → NER extracts ACTIVITY + ACTOR from the duty text itself
   → Propagate to all provisions in structural scope (Part/law)
   → DisappliesTo provisions narrow the propagated scope
-  → Publish fitness entities alongside DRRP taxa
+  → Aggregate provision fitness → law-level fitness (DuckDB LRT)
+  → Publish law-level fitness to sertantai (persists even if LAT is later cleaned)
+  → If customer law: also publish provision-level fitness alongside DRRP taxa
 ```
