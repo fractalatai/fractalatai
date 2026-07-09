@@ -151,8 +151,8 @@ def rate_provision(text, section_id, section_type, timeout=60):
             {"role": "user", "content": user_msg},
         ],
         "stream": False,
-        "logprobs": True,
-        "top_logprobs": 1,
+        # "logprobs": True,  # disabled — causes deadlock with concurrent workers
+        # "top_logprobs": 1,
         "options": {"temperature": 0.0},
     }
     try:

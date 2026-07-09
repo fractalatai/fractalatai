@@ -184,7 +184,9 @@ python3 /workspace/runpod_significance_batch.py --dry-run
 python3 /workspace/runpod_significance_batch.py --workers 8
 ```
 
-~10 provisions/s. The query must filter `significance_overall IS NULL` — without this, incremental runs reload the entire corpus (43K+) instead of just pending provisions. The script on the network volume was fixed 2026-07-09 to include this filter. If the dry-run count matches the full Obligation count rather than the pending count, the filter is missing.
+~6 provisions/s with 4 workers. **`logprobs` must be disabled** in the script for multi-worker runs — `logprobs: True` causes Ollama to deadlock under concurrent load (single-worker works fine but is 3x slower). The position script doesn't use logprobs which is why it never had this issue.
+
+The query must filter `significance_overall IS NULL` — without this, incremental runs reload the entire corpus (43K+) instead of just pending provisions. The script on the network volume was fixed 2026-07-09 to include this filter. If the dry-run count matches the full Obligation count rather than the pending count, the filter is missing.
 
 ### Step 8: Re-reconcile
 
@@ -194,6 +196,8 @@ With SLM tier populated.
 LAWS=$(cat data/sertantai/<customer>-applicable-laws.csv)
 cargo run -p fractalaw-cli -- taxa reconcile --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw --laws "$LAWS"
 ```
+
+**Sequencing matters**: Significance must run AFTER backfill, not before. Backfill writes `drrp_types = {Obligation}` to `legislation_text` — the significance script queries provisions with this flag. If significance runs before backfill, new provisions won't have `drrp_types` set yet and will be skipped. Run significance → backfill → significance again if needed, or simply run significance after the final backfill.
 
 ### Step 8b: Derive hierarchy significance
 
