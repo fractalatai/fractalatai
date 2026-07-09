@@ -148,11 +148,12 @@ Classify pending_slm actors via RunPod GPU. Both position and significance run o
    curl -fsSL https://ollama.com/install.sh | sh
    pip install psycopg2-binary requests
    ```
-3. Start Ollama and load the position model:
+3. Start Ollama with parallel slots enabled, then load the position model:
    ```bash
-   ollama serve &
+   OLLAMA_NUM_PARALLEL=8 ollama serve &
    ollama create gemma3-position -f /workspace/Modelfile
    ```
+   **Without `OLLAMA_NUM_PARALLEL`**, Ollama defaults to 1 concurrent request. Multiple workers will hang waiting for the single slot.
 4. Open reverse SSH tunnel from LOCAL machine (keeps running in foreground):
    ```bash
    ssh -T -R 5433:localhost:5433 root@<IP> -p <PORT> -i ~/.ssh/id_ed25519 -N
@@ -183,7 +184,7 @@ python3 /workspace/runpod_significance_batch.py --dry-run
 python3 /workspace/runpod_significance_batch.py --workers 8
 ```
 
-~10 provisions/s. 40K Obligation provisions ≈ 70 min.
+~10 provisions/s. The query must filter `significance_overall IS NULL` — without this, incremental runs reload the entire corpus (43K+) instead of just pending provisions. The script on the network volume was fixed 2026-07-09 to include this filter. If the dry-run count matches the full Obligation count rather than the pending count, the filter is missing.
 
 ### Step 8: Re-reconcile
 

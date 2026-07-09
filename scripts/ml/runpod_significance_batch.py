@@ -88,7 +88,7 @@ def preflight():
             "SELECT count(DISTINCT pa.section_id) FROM provision_actors pa "
             "JOIN legislation_text lt ON pa.section_id = lt.section_id "
             "WHERE (pa.slm_drrp = 'Obligation' OR pa.regex_drrp = 'Obligation') "
-            "AND lt.scope = 'substantive'"
+            "AND lt.scope = 'substantive' AND lt.significance_overall IS NULL"
         )
         count = cur.fetchone()[0]
         cur.close()
@@ -126,7 +126,7 @@ def query_obligation_provisions(conn, limit=None):
         FROM provision_actors pa
         JOIN legislation_text lt ON pa.section_id = lt.section_id
         WHERE (pa.slm_drrp = 'Obligation' OR pa.regex_drrp = 'Obligation')
-        AND lt.scope = 'substantive'
+        AND lt.scope = 'substantive' AND lt.significance_overall IS NULL
         ORDER BY pa.section_id
     """
     if limit:
