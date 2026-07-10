@@ -20,6 +20,8 @@ pub use lance::{LanceStore, read_parquet};
 mod pg;
 #[cfg(feature = "pg")]
 pub use pg::PgStore;
+#[cfg(feature = "pg")]
+pub use sqlx::PgPool;
 
 #[cfg(all(feature = "duckdb", feature = "datafusion"))]
 mod fusion;

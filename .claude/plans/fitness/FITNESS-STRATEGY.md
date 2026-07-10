@@ -150,15 +150,15 @@ Customer matching — resolving "does this law apply to me?" from extracted fitn
 
 Simple facet intersection is insufficient. See `FITNESS-RULES-ENGINE.md` for the matching design (separate plan).
 
-#### Staircase extraction (preserved from v0.2)
+#### Staircase extraction
 
-The NER-first staircase still applies — it's how Layer 1 mentions are extracted:
+The NER-first staircase applies across all three layers — progressively expensive tools:
 
 1. **Regex** — existing polarity detection + dictionaries. Cheap, runs on every provision.
 2. **NER model** — trained to extract applicability spans. Medium cost, runs on provisions with polarity.
 3. **SLM** — generative extraction for complex multi-clause applicability. Expensive, only for NER failures.
 
-Layer 2 linking and Layer 3 faceting can also use the staircase: dictionary linking first, SLM linking for unknown entities.
+Layer 2 linking and Layer 3 classification can also use the staircase: dictionary linking first, SLM linking for unknown entities.
 
 #### Migration from P-dimensions
 
@@ -174,6 +174,44 @@ The existing OH&S data maps cleanly:
 | Sector: "construction" | `construction` | sic_section=F |
 
 No data is lost. The rigid columns become flexible facets.
+
+#### Sub-phases
+
+Phase 2 is too large for a single session. Each sub-phase produces usable output and can be validated independently.
+
+**Phase 2a: Mention Storage + Regex Extraction**
+- Create `fitness_mentions` table in Postgres (section_id FK, span, polarity, scope_unit, extraction_method, confidence)
+- Run existing P-dimension dictionaries against all provisions with polarity (the 12,280 from Phase 1)
+- Store results as mentions — the existing dictionaries become the regex tier of the staircase
+- Migrate existing fitness_* column data into the new table
+- Measure: how many provisions get mentions, what's the coverage per family
+- This gives us the baseline for Layers 1+2 using existing tools
+
+**Phase 2b: Entity Catalogue + Linking**
+- Define the canonical entity catalogue — start from existing dictionary terms + terms discovered in Phase 1 corpus mining
+- Create `fitness_entities` and `fitness_entity_links` tables
+- Link mentions to entities (dictionary lookup for known terms)
+- Identify the gap: mentions that don't link to any known entity (these are the unknown terms that need NER/SLM)
+- Measure: link rate, gap size per family
+
+**Phase 2c: Scope Dimension Classification**
+- Assign the four scope dimensions to each entity in the catalogue
+- For existing dictionary entities this is a manual/rule-based mapping (Person→personal, Process→material, Place→territorial, etc.)
+- For new entities discovered in 2b, use heuristics or SLM
+- Validate against benchmark laws: do the scope dimension labels make sense?
+
+**Phase 2d: NER Training + Cross-Domain Extraction**
+- Build training data from Phase 2a mention output (OH&S dictionaries as ground truth labels)
+- Manual labelling of 200+ provisions across nature protection + environmental protection benchmark laws
+- Train NER model to extract applicability spans cross-domain
+- Run NER on provisions where regex found polarity but no dictionary matches
+- Measure: NER F1 on held-out test, new mentions discovered vs regex-only
+
+**Phase 2e: SLM for Complex Cases**
+- Identify provisions where NER fails (complex multi-clause, cross-referential scope)
+- Design SLM prompt for structured mention extraction
+- Run SLM on NER failures
+- Measure: coverage gain, cost per provision
 
 ### Negative Fitness (DisappliesTo)
 

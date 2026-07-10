@@ -23,6 +23,11 @@ pub struct PgStore {
 }
 
 impl PgStore {
+    /// Access the underlying connection pool (for direct queries in fitness etc.).
+    pub fn pool(&self) -> &PgPool {
+        &self.pool
+    }
+
     /// Connect to PostgreSQL.
     pub async fn connect(url: &str) -> Result<Self, StoreError> {
         let pool = PgPoolOptions::new()

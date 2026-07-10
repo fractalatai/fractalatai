@@ -133,6 +133,12 @@ enum Command {
         action: TaxaAction,
     },
 
+    /// Fitness applicability extraction (independent of DRRP taxa)
+    Fitness {
+        #[command(subcommand)]
+        action: FitnessAction,
+    },
+
     /// Export DRRP training data as Parquet (train/val/test splits)
     ExportTrainingData {
         /// Output directory for Parquet files
@@ -309,6 +315,32 @@ enum TaxaAction {
         /// Apply corrections to LanceDB (default: audit-only, no writes)
         #[arg(long)]
         apply: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum FitnessAction {
+    /// Extract applicability mentions from provision text → fitness_mentions table.
+    /// Runs polarity detection + dictionary extraction independently of DRRP taxa.
+    Extract {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Read law names from a file (one per line or CSV)
+        #[arg(long)]
+        law_file: Option<PathBuf>,
+        /// Re-extract all (clear existing fitness_mentions for these laws)
+        #[arg(long)]
+        force: bool,
+    },
+    /// Show fitness mention counts and coverage per law
+    Status {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Read law names from a file (one per line or CSV)
+        #[arg(long)]
+        law_file: Option<PathBuf>,
     },
 }
 
@@ -616,6 +648,52 @@ async fn main() -> anyhow::Result<()> {
             )
             .await
         }
+
+        // Fitness applicability extraction (independent of DRRP taxa).
+        Command::Fitness { action } => match action {
+            FitnessAction::Extract {
+                laws,
+                law_file,
+                force,
+            } => {
+                let pg_url = pg_url
+                    .as_deref()
+                    .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
+                let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
+                commands::fitness::cmd_fitness_extract(pg_url, law_names.as_deref(), force).await
+            }
+            FitnessAction::Status { laws, law_file } => {
+                let pg_url = pg_url
+                    .as_deref()
+                    .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
+                let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
+                commands::fitness::cmd_fitness_status(pg_url, law_names.as_deref()).await
+            }
+        },
+    }
+}
+
+/// Resolve law names from --laws or --law-file arguments.
+fn resolve_law_names(
+    laws: Option<&str>,
+    law_file: Option<&std::path::Path>,
+) -> anyhow::Result<Option<Vec<String>>> {
+    if let Some(l) = laws {
+        Ok(Some(
+            l.split(',').map(|s| s.trim().to_string()).collect(),
+        ))
+    } else if let Some(path) = law_file {
+        let content = std::fs::read_to_string(path)
+            .with_context(|| format!("reading law file: {}", path.display()))?;
+        let names: Vec<String> = content
+            .split(',')
+            .flat_map(|s| s.split('\n'))
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        Ok(Some(names))
+    } else {
+        Ok(None)
     }
 }
 
