@@ -1,11 +1,19 @@
-//! Fitness rule extraction for law-level applicability.
+//! Fitness extraction for law-level applicability.
 //!
-//! Parses Application+Scope provisions into structured `FitnessRule`s with:
-//! - **Polarity**: applies-to / disapplies-to / extends-to
-//! - **P-dimensions**: Person, Process, Place, Plant, Property, Sector
+//! Two-layer design (Phase 1 refactor):
 //!
-//! Designed to run at enrichment time on provisions tagged with
-//! `purpose::APPLICATION_SCOPE`, but also callable standalone on any text.
+//! 1. **Polarity detection** (`detect_polarity`) — lightweight regex that finds
+//!    applicability language ("shall apply to", "does not apply", "extends to").
+//!    Runs on ALL provisions to flag those that carry applicability signals,
+//!    regardless of purpose classification.
+//!
+//! 2. **Entity extraction** (`extract`) — heavier pass that also runs the
+//!    P-dimension dictionaries and cross-reference detection. Still gated to
+//!    `APPLICATION_SCOPE` provisions. Will be replaced by NER in Phase 2.
+//!
+//! The separation allows the pipeline to cheaply tag every provision with its
+//! applicability polarity, while only paying for dictionary matching on the
+//! provisions where it matters.
 
 use std::sync::LazyLock;
 
@@ -111,6 +119,33 @@ static APPLIES_RE: LazyLock<Regex> = LazyLock::new(|| {
     ).unwrap()
 });
 
+/// Scoping preamble: "Subject to the provisions of this Part/Act".
+/// Found at the start of criminal offence provisions — the law is scoping
+/// which provisions override this one. Strong applicability signal.
+static SUBJECT_TO_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)[Ss]ubject\s+to\s+(?:the\s+provisions?\s+of\s+)?(?:this|these|the)\s+(?:Act|Part|section|regulation|Chapter|Order|Schedule|Rules?)"
+    ).unwrap()
+});
+
+/// Activity scope definition: "it is a licensable/prohibited/regulated activity".
+/// Defines what activities fall within the law's scope. Found in marine
+/// licensing (MCAA s.66), environmental permitting, and planning law.
+static ACTIVITY_SCOPE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)(?:it\s+is\s+(?:a|an)\s+(?:licensable|prohibited|regulated|notifiable|controlled|relevant)\s+(?:marine\s+)?activit|the\s+following\s+(?:are|is|shall\s+be)\s+(?:licensable|prohibited|regulated|notifiable|controlled|relevant))"
+    ).unwrap()
+});
+
+/// Temporal applicability: commencement. "comes into force on", "shall come
+/// into force". The law declaring when it starts applying. Always has a
+/// legislative self-reference ("these Regulations come into force").
+static COMMENCEMENT_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)(?:comes?\s+into\s+force|shall\s+come\s+into\s+force|is\s+to\s+come\s+into\s+force)"
+    ).unwrap()
+});
+
 /// Detect references to other provisions (regulation N, paragraph N, schedule N, etc.).
 static CROSS_REF_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
@@ -119,7 +154,7 @@ static CROSS_REF_RE: LazyLock<Regex> = LazyLock::new(|| {
     .unwrap()
 });
 
-fn detect_polarity(text: &str) -> Option<RulePolarity> {
+fn detect_polarity_single(text: &str) -> Option<RulePolarity> {
     // Order matters: check negative before positive
     if DISAPPLIES_RE.is_match(text) {
         return Some(RulePolarity::DisappliesTo);
@@ -130,7 +165,105 @@ fn detect_polarity(text: &str) -> Option<RulePolarity> {
     if APPLIES_RE.is_match(text) {
         return Some(RulePolarity::AppliesTo);
     }
+    // Expanded patterns: scoping preambles, activity scope definitions,
+    // and commencement are positive applicability — the law is declaring
+    // its scope (material, activity, or temporal).
+    if SUBJECT_TO_RE.is_match(text)
+        || ACTIVITY_SCOPE_RE.is_match(text)
+        || COMMENCEMENT_RE.is_match(text)
+    {
+        return Some(RulePolarity::AppliesTo);
+    }
     None
+}
+
+// ── Legislative self-reference patterns ─────────────────────────────
+//
+// The law talks about itself using a finite vocabulary: "this Act",
+// "these Regulations", "subsection (3)", "regulation 6(4)".
+// When "apply/applies" follows a non-legislative noun ("risks",
+// "principles", "the employer"), it's NOT applicability — it's
+// ordinary English usage of the verb.
+//
+// These patterns gate the public `detect_polarity()` so it fires
+// only when the law is the subject of "apply".
+
+/// Demonstrative + legislative noun: "this Act", "these Regulations", "the Part"
+static SELF_REF_DEMO_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)(?:this|these|the|that|such)\s+(?:Act|Part|section|subsection|regulation|paragraph|sub-paragraph|article|Schedule|Order|Rules?|Directive|provisions?|Chapter|enactment|requirement|prohibition|duty|restriction)"
+    ).unwrap()
+});
+
+/// Numbered legislative reference: "regulation 6(4)", "paragraph (2)", "articles 21, 22"
+static SELF_REF_NUM_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)(?:regulations?|sections?|subsections?|paragraphs?|sub-paragraphs?|articles?|parts?)\s+[\d(]"
+    ).unwrap()
+});
+
+/// "Nothing in this Part/Act" — strong negative applicability marker.
+static NOTHING_IN_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b[Nn]othing\s+in\s+(?:this|these|the)\s+").unwrap()
+});
+
+/// Check whether text near a polarity match has a legislative self-reference.
+///
+/// Returns true if the provision is the law talking about its own applicability,
+/// not an actor "applying" something.
+fn has_legislative_subject(text: &str) -> bool {
+    SELF_REF_DEMO_RE.is_match(text)
+        || SELF_REF_NUM_RE.is_match(text)
+        || NOTHING_IN_RE.is_match(text)
+}
+
+/// Detect all applicability polarities in a provision.
+///
+/// Returns a deduplicated list of polarities found. A compound provision like
+/// "shall not apply to X, but shall apply to Y" returns both `DisappliesTo`
+/// and `AppliesTo`. Returns an empty vec if no applicability language is found.
+///
+/// Requires a **legislative self-reference** as the subject of "apply" —
+/// "this Part shall apply" fires, "risks which apply" does not. This makes
+/// it safe to run on every provision without the APPLICATION_SCOPE gate.
+pub fn detect_polarity(text: &str) -> Vec<RulePolarity> {
+    let text = text.trim();
+    if text.is_empty() {
+        return vec![];
+    }
+
+    let mut polarities = Vec::new();
+
+    // The core "apply/disapply/extend" patterns need a legislative
+    // self-reference to avoid false positives from "risks which apply".
+    let has_self_ref = has_legislative_subject(text);
+
+    if has_self_ref {
+        if DISAPPLIES_RE.is_match(text) {
+            polarities.push(RulePolarity::DisappliesTo);
+        }
+        if EXTENDS_RE.is_match(text) {
+            polarities.push(RulePolarity::ExtendsTo);
+        }
+        if APPLIES_RE.is_match(text) {
+            polarities.push(RulePolarity::AppliesTo);
+        }
+    }
+
+    // Expanded patterns: these contain their own legislative self-reference
+    // ("Subject to ... this Part", "it is a licensable activity") or are
+    // inherently about the law's own applicability ("comes into force").
+    // They always indicate AppliesTo.
+    if !polarities.contains(&RulePolarity::AppliesTo) {
+        if SUBJECT_TO_RE.is_match(text)
+            || ACTIVITY_SCOPE_RE.is_match(text)
+            || COMMENCEMENT_RE.is_match(text)
+        {
+            polarities.push(RulePolarity::AppliesTo);
+        }
+    }
+
+    polarities
 }
 
 fn detect_cross_refs(text: &str) -> Vec<String> {
@@ -557,7 +690,7 @@ pub fn extract(text: &str, family: Option<&str>) -> Vec<FitnessRule> {
     }
 
     // Single-polarity provision
-    let polarity = match detect_polarity(text) {
+    let polarity = match detect_polarity_single(text) {
         Some(p) => p,
         None => return vec![],
     };
@@ -651,8 +784,8 @@ fn try_split_compound(text: &str, family: Option<&str>) -> Option<Vec<FitnessRul
     let part_a = &text[..m.start()];
     let part_b = &text[m.start()..];
 
-    let pol_a = detect_polarity(part_a)?;
-    let pol_b = detect_polarity(part_b)?;
+    let pol_a = detect_polarity_single(part_a)?;
+    let pol_b = detect_polarity_single(part_b)?;
 
     // Only split if we get different polarities
     if pol_a == pol_b {
@@ -1186,5 +1319,172 @@ mod tests {
         let rules = extract(text, None);
         assert_eq!(rules.len(), 1);
         assert!(rules[0].cross_refs.is_empty());
+    }
+
+    // ── Public detect_polarity tests (legislative self-reference filter) ─
+
+    #[test]
+    fn polarity_legislative_self_ref_fires() {
+        // "This Part" is a legislative self-reference
+        let pols = detect_polarity("This Part applies to any public authority.");
+        assert_eq!(pols, vec![RulePolarity::AppliesTo]);
+    }
+
+    #[test]
+    fn polarity_these_regulations_fires() {
+        let pols = detect_polarity(
+            "These Regulations shall not apply to the master or crew of a sea-going ship.",
+        );
+        // "shall not apply" matches DisappliesTo; "apply to" also matches AppliesTo.
+        // Both are correct — the compound handler in extract() resolves precedence.
+        assert!(pols.contains(&RulePolarity::DisappliesTo));
+    }
+
+    #[test]
+    fn polarity_numbered_ref_fires() {
+        let pols = detect_polarity("Subsection (3) does not apply if the disclosure is made.");
+        assert_eq!(pols, vec![RulePolarity::DisappliesTo]);
+    }
+
+    #[test]
+    fn polarity_nothing_in_fires() {
+        let pols = detect_polarity(
+            "Nothing in the following enactments applies to anything done in pursuance of a licence.",
+        );
+        assert_eq!(pols, vec![RulePolarity::AppliesTo]);
+    }
+
+    #[test]
+    fn polarity_compound_both() {
+        let pols = detect_polarity(
+            "This regulation shall not apply to X, but shall apply to Y.",
+        );
+        assert!(pols.contains(&RulePolarity::DisappliesTo));
+        assert!(pols.contains(&RulePolarity::AppliesTo));
+    }
+
+    #[test]
+    fn polarity_extends_with_self_ref() {
+        let pols = detect_polarity("This Act extends to England and Wales only.");
+        assert_eq!(pols, vec![RulePolarity::ExtendsTo]);
+    }
+
+    // ── False positive rejection ────────────────────────────────────────
+
+    #[test]
+    fn polarity_rejects_actor_applying() {
+        // "employer shall apply" — actor applying a principle, not the law applying
+        let pols = detect_polarity(
+            "The employer shall apply the general principles of prevention.",
+        );
+        assert!(pols.is_empty(), "actor applying should be rejected, got: {:?}", pols);
+    }
+
+    #[test]
+    fn polarity_rejects_risks_which_apply() {
+        let pols = detect_polarity(
+            "identify all the risks which apply to their products",
+        );
+        assert!(pols.is_empty(), "non-legislative subject should be rejected, got: {:?}", pols);
+    }
+
+    #[test]
+    fn polarity_rejects_requirements_apply() {
+        let pols = detect_polarity(
+            "any requirements imposed by enactments which apply to the case",
+        );
+        assert!(
+            pols.is_empty(),
+            "relative clause 'which apply' without legislative subject should be rejected, got: {:?}",
+            pols
+        );
+    }
+
+    #[test]
+    fn polarity_rejects_conformity_applies() {
+        let pols = detect_polarity(
+            "the relevant conformity assessment procedure has been carried out as that procedure applies in Northern Ireland",
+        );
+        assert!(pols.is_empty(), "procedure applies should be rejected, got: {:?}", pols);
+    }
+
+    #[test]
+    fn polarity_empty_returns_empty() {
+        assert!(detect_polarity("").is_empty());
+        assert!(detect_polarity("   ").is_empty());
+    }
+
+    // ── Expanded pattern tests ──────────────────────────────────────────
+
+    #[test]
+    fn polarity_subject_to_provisions_of_this_part() {
+        // Wildlife Act s.1(1): "Subject to the provisions of this Part, if any person..."
+        let pols = detect_polarity(
+            "Subject to the provisions of this Part, if any person intentionally kills, injures or takes any wild bird, he shall be guilty of an offence.",
+        );
+        assert!(pols.contains(&RulePolarity::AppliesTo),
+            "scoping preamble should fire AppliesTo, got: {:?}", pols);
+    }
+
+    #[test]
+    fn polarity_subject_to_this_act() {
+        let pols = detect_polarity(
+            "Subject to this Act, no person shall wilfully disturb any wild bird.",
+        );
+        assert!(pols.contains(&RulePolarity::AppliesTo));
+    }
+
+    #[test]
+    fn polarity_licensable_marine_activity() {
+        // MCAA s.66(1): "it is a licensable marine activity to do any of the following"
+        let pols = detect_polarity(
+            "For the purposes of this Part, it is a licensable marine activity to do any of the following—",
+        );
+        assert!(pols.contains(&RulePolarity::AppliesTo),
+            "activity scope definition should fire AppliesTo, got: {:?}", pols);
+    }
+
+    #[test]
+    fn polarity_the_following_are_regulated() {
+        let pols = detect_polarity(
+            "The following are regulated activities for the purposes of this Part—",
+        );
+        assert!(pols.contains(&RulePolarity::AppliesTo));
+    }
+
+    #[test]
+    fn polarity_it_is_a_prohibited_activity() {
+        let pols = detect_polarity(
+            "It is a prohibited activity to deposit any substance in the marine area.",
+        );
+        assert!(pols.contains(&RulePolarity::AppliesTo));
+    }
+
+    #[test]
+    fn polarity_commencement() {
+        let pols = detect_polarity(
+            "These Regulations come into force on 1st October 2025.",
+        );
+        assert!(pols.contains(&RulePolarity::AppliesTo),
+            "commencement should fire AppliesTo, got: {:?}", pols);
+    }
+
+    #[test]
+    fn polarity_shall_come_into_force() {
+        let pols = detect_polarity(
+            "This section shall come into force on such day as the Secretary of State may appoint.",
+        );
+        assert!(pols.contains(&RulePolarity::AppliesTo));
+    }
+
+    #[test]
+    fn polarity_subject_to_not_false_positive() {
+        // "subject to" in a non-scoping context — should still fire because
+        // the pattern requires "this/these/the + Act/Part/section/etc."
+        let pols = detect_polarity(
+            "The employer shall ensure that workers are not subject to excessive noise.",
+        );
+        assert!(pols.is_empty(),
+            "non-legislative 'subject to' should not fire, got: {:?}", pols);
     }
 }

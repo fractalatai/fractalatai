@@ -338,11 +338,19 @@ fn parse_provisions(
                 && record.government_actors.is_empty()
                 && record.purposes.is_empty()
             {
-                // Passed scope filter but no taxa — still substantive, just empty
+                // Passed scope filter but no taxa — still substantive, just empty.
+                // Still run polarity detection: applicability language can appear
+                // in provisions that have no actors or DRRP types.
                 if !section_id.is_empty() {
+                    let fp_polarity: Vec<String> =
+                        fractalaw_core::taxa::fitness::detect_polarity(&record.cleaned_text)
+                            .iter()
+                            .map(|p| p.as_str().to_string())
+                            .collect();
                     provision_taxa.push(ProvisionTaxa {
                         section_id,
                         scope: "substantive".to_string(),
+                        fitness_polarity: fp_polarity,
                         ..ProvisionTaxa::empty()
                     });
                 }
@@ -384,8 +392,18 @@ fn parse_provisions(
                     // Multi-actor or DRRP=none with actors → low confidence, Tier 2 candidate
                     Some(0.30)
                 };
-                // Extract per-provision fitness tags from fitness_rules.
-                let mut fp_polarity = Vec::new();
+                // ── Fitness: polarity detection (runs on ALL provisions) ──
+                // Polarity is separated from entity extraction — detect_polarity
+                // is a cheap regex pass that flags provisions with applicability
+                // language regardless of purpose classification.
+                let fp_polarity: Vec<String> = fractalaw_core::taxa::fitness::detect_polarity(
+                    &record.cleaned_text,
+                )
+                .iter()
+                .map(|p| p.as_str().to_string())
+                .collect();
+
+                // ── Fitness: entity extraction (APPLICATION_SCOPE only) ──
                 let mut fp_person = Vec::new();
                 let mut fp_process = Vec::new();
                 let mut fp_place = Vec::new();
@@ -394,10 +412,6 @@ fn parse_provisions(
                 let mut fp_sector = Vec::new();
                 for rule in &record.fitness_rules {
                     use fractalaw_core::taxa::fitness::PDimension;
-                    let pol = rule.polarity.as_str().to_string();
-                    if !fp_polarity.contains(&pol) {
-                        fp_polarity.push(pol.clone());
-                    }
                     let mut r_person = Vec::new();
                     let mut r_process = Vec::new();
                     let mut r_place = Vec::new();
