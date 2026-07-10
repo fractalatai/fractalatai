@@ -348,6 +348,48 @@ NERC s.40(1):
 - **Numeric thresholds** — "5 or more employees", "greater than 1 tonne per year" — the `Match` node handles categorical codes but not numeric comparisons. v1 extracts these as CONDITION mentions; v2 extends the node type
 - **Temporal logic complexity** — `TimeWindow` covers commencement/sunset but not conditional temporal ("applies if the building was constructed before 1999"). v2+ concern
 
+## Entity Feedback Loop (cross-cutting)
+
+Entities discovered by higher tiers (NER, SLM, manual) feed back into the regex tier as family-gated dictionary entries. This is the staircase running in reverse — expensive tiers discover, cheap tiers absorb. Over time, the regex tier gets better and the expensive tiers have less work.
+
+### Pattern: family-gated fitness dictionaries
+
+Mirrors the existing actor dictionaries, which have core terms (employer, worker) that run everywhere plus family-scoped specialists (lifting operations → OH&S, fireworks → FIRE).
+
+For fitness entities:
+
+| Dictionary | Scope | Example entities |
+|---|---|---|
+| **Core** | all families | employer, England, construction work, premises, at work |
+| **WILDLIFE & COUNTRYSIDE** | family-gated | wild bird, European protected species, SSSI, wild animal, Schedule 1/5 species |
+| **MARINE & RIVERINE** | family-gated | marine conservation zone, licensable marine activity, UK marine licensing area, MCZ |
+| **ENVIRONMENTAL PROTECTION** | family-gated | contaminated land, environmental permit, waste operation, discharge consent |
+| **PLANNING & INFRASTRUCTURE** | family-gated | planning permission, development consent, listed building, conservation area |
+| **WATER & WASTEWATER** | family-gated | water undertaker, sewerage undertaker, water abstraction, flood risk |
+| **ENERGY** | family-gated | generating station, energy performance, renewable energy |
+
+### Promotion criteria
+
+An entity discovered by NER/SLM is promoted to a dictionary when:
+
+1. It appears in **3+ laws** within the same family (not a one-off bespoke term)
+2. Extraction confidence is **>0.8** across those appearances
+3. It resolves to a **canonical entity** in the entity catalogue (Phase 2b)
+
+Promotion can be automated (batch job after NER/SLM runs) or manual (analyst review of candidate terms). The dictionary is a YAML file compiled into the binary, same as the actor dictionary — changes require a rebuild but are version-controlled and auditable.
+
+### Flow
+
+```
+Phase 2d/2e: NER or SLM discovers "marine conservation zone" in MCAA
+  → appears in 5 MARINE & RIVERINE laws with confidence >0.9
+  → promoted to MARINE & RIVERINE specialist dictionary
+  → next `fitness extract` run catches it via regex (Phase 2a)
+  → NER/SLM no longer needed for that term in that family
+```
+
+This closes the feedback loop concern from the Gemini v0.3 review. It's not model retraining — it's dictionary growth from observed entities, gated by frequency and confidence.
+
 ## Law-Level Fitness (LRT) vs Provision-Level (LAT)
 
 Critical architectural distinction: fitness is a **law-level signal** that lives in DuckDB (LRT), not just a provision-level annotation.
