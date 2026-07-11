@@ -179,39 +179,27 @@ No data is lost. The rigid columns become flexible facets.
 
 Phase 2 is too large for a single session. Each sub-phase produces usable output and can be validated independently.
 
-**Phase 2a: Mention Storage + Regex Extraction**
-- Create `fitness_mentions` table in Postgres (section_id FK, span, polarity, scope_unit, extraction_method, confidence)
-- Run existing P-dimension dictionaries against all provisions with polarity (the 12,280 from Phase 1)
-- Store results as mentions — the existing dictionaries become the regex tier of the staircase
-- Migrate existing fitness_* column data into the new table
-- Measure: how many provisions get mentions, what's the coverage per family
-- This gives us the baseline for Layers 1+2 using existing tools
+**Phase 2a: Mention Storage + Regex Extraction** ✅ `07-10-26-fitness-mention-storage`
+- Created `fitness_mentions` table with per-tier columns (regex_entities, slm_entities, llm_entities)
+- Independent `fractalaw fitness extract` CLI command (decoupled from DRRP taxa)
+- 14,258 mentions across 701 laws. Per-tier columns prevent overwrite.
 
-**Phase 2b: Entity Catalogue + Linking**
-- Define the canonical entity catalogue — start from existing dictionary terms + terms discovered in Phase 1 corpus mining
-- Create `fitness_entities` and `fitness_entity_links` tables
-- Link mentions to entities (dictionary lookup for known terms)
-- Identify the gap: mentions that don't link to any known entity (these are the unknown terms that need NER/SLM)
-- Measure: link rate, gap size per family
+**Phase 2b: Entity Catalogue + Linking** ✅ `07-11-26-fitness-entity-catalogue`
+- 228 canonical entities in `fitness_entities` table (164 dictionary + 64 corpus-mined)
+- 100% link rate on dictionary entities. Gap: 9,849 polarity-only mentions.
 
-**Phase 2c: Scope Dimension Classification**
-- Assign the four scope dimensions to each entity in the catalogue
-- For existing dictionary entities this is a manual/rule-based mapping (Person→personal, Process→material, Place→territorial, etc.)
-- For new entities discovered in 2b, use heuristics or SLM
-- Validate against benchmark laws: do the scope dimension labels make sense?
+**Phase 2c: Scope Dimension Classification** ✅ (completed within Phase 2b)
+- All 228 entities have scope dimensions assigned at insertion time.
 
-**Phase 2d: NER Training + Cross-Domain Extraction**
-- Build training data from Phase 2a mention output (OH&S dictionaries as ground truth labels)
-- Manual labelling of 200+ provisions across nature protection + environmental protection benchmark laws
-- Train NER model to extract applicability spans cross-domain
-- Run NER on provisions where regex found polarity but no dictionary matches
-- Measure: NER F1 on held-out test, new mentions discovered vs regex-only
+**Phase 2d: Cross-Domain Dictionary Extraction** ✅ `07-11-26-fitness-cross-domain-extraction`
+- 12 family-scoped specialist dictionaries added (Wildlife, Marine, Planning, etc.)
+- 17 cross-domain actors added to core Person dict
+- Entity rate: 35% → 53%. Gap: 9,849 → 6,671.
 
-**Phase 2e: SLM for Complex Cases**
-- Identify provisions where NER fails (complex multi-clause, cross-referential scope)
-- Design SLM prompt for structured mention extraction
-- Run SLM on NER failures
-- Measure: coverage gain, cost per provision
+**Phase 2e: SLM Extraction** ✅ `07-11-26-fitness-slm-extraction`
+- Prompted gemma3:4b on RunPod RTX 5090: 6,604 provisions, 20 min, 98.98% success
+- Entity coverage: 53% → 97.7%. Temporal date extraction: 55 commencement dates.
+- Architecture fix: per-tier columns prevent --force from destroying higher-tier data.
 
 ### Negative Fitness (DisappliesTo)
 
@@ -228,22 +216,15 @@ Negative fitness feeds directly into customer-level applicability: "does this la
 
 Full design in `FITNESS-GRAPH.md`.
 
-**Phase 3a: Scope Unit Extraction**
-- Determine what each mention scopes: the whole law, a Part, a Chapter, or just the provision
-- "This Part applies to..." → scope_unit = the Part
-- "Subsection (3) does not apply where..." → scope_unit = the provision itself
-- "These Regulations apply to..." → scope_unit = the whole law
-- Parse the legislative self-reference in the mention text to derive scope_unit
-- Regex for common patterns ("this Part", "these Regulations", "this Act"), SLM for ambiguous cases
+**Phase 3a: Scope Unit Extraction** ✅ `07-11-26-fitness-scope-unit`
+- scope_unit populated on all 14,258 mentions: 92.5% provision, 6.8% law, 0.7% Part/Chapter/Schedule.
+- Regex matches legislative unit as SUBJECT of applicability verb, not qualifiers.
 
-**Phase 3b: Hierarchy Tree Walk + Propagation**
-- Build scope tree per law from populated scope_units
-- Walk top-down: law-level → Part-level → section-level
-- AppliesTo adds to inherited scope, DisappliesTo subtracts
-- Cross-reference overrides (Section A disapplies Section B)
-- Write inherited fitness to provisions without their own mentions
-- No new graph database — uses existing `hierarchy_path`, `part`, `chapter`
-- v1 scope: intra-law hierarchy + commencement. Inter-law amendment scope inheritance deferred.
+**Phase 3b: Hierarchy Tree Walk + Propagation** ✅ `07-11-26-fitness-graph-propagation`
+- Law-level: 334 laws → 399,662 propagated mentions. Part-level: 62 mentions → 8,816 propagated.
+- Corpus fitness coverage: 9.4% → 62.7% (14,204 → 94,240 provisions).
+- Propagated mentions carry both regex + SLM entities with discounted confidence (80%).
+- v1 scope: intra-law hierarchy. Inter-law amendment scope inheritance deferred.
 
 ### Phase 4: Rule Compiler (design spike required)
 
