@@ -6,11 +6,34 @@
 
 use anyhow::Context;
 use fractalaw_core::taxa::fitness;
-use fractalaw_store::PgStore;
+use fractalaw_store::{DuckStore, PgStore};
+
+/// Look up law → family mapping from DuckDB.
+fn load_family_map(duck: &DuckStore) -> std::collections::HashMap<String, String> {
+    let mut map = std::collections::HashMap::new();
+    if let Ok(batches) = duck.query_arrow("SELECT name, family FROM legislation WHERE family IS NOT NULL") {
+        for batch in &batches {
+            let name_col = batch.column_by_name("name");
+            let fam_col = batch.column_by_name("family");
+            if let (Some(n), Some(f)) = (name_col, fam_col) {
+                for i in 0..batch.num_rows() {
+                    if let (Some(name), Some(fam)) = (
+                        crate::utils::get_string_value(n.as_ref(), i),
+                        crate::utils::get_string_value(f.as_ref(), i),
+                    ) {
+                        map.insert(name, fam);
+                    }
+                }
+            }
+        }
+    }
+    map
+}
 
 /// Extract fitness mentions for laws (or all laws if none specified).
 pub(crate) async fn cmd_fitness_extract(
     pg_url: &str,
+    duck: &DuckStore,
     law_names: Option<&[String]>,
     force: bool,
 ) -> anyhow::Result<()> {
@@ -18,6 +41,10 @@ pub(crate) async fn cmd_fitness_extract(
         .await
         .context("connecting to PostgreSQL")?;
     let pool = store.pool();
+
+    // Load law → family mapping for specialist dictionary selection
+    let family_map = load_family_map(duck);
+    eprintln!("Loaded {} law→family mappings from DuckDB", family_map.len());
 
     // Ensure the fitness_mentions table exists
     sqlx::query(
@@ -112,8 +139,10 @@ pub(crate) async fn cmd_fitness_extract(
 
         polarity_count += 1;
 
-        // Phase 2a: dictionary extraction (core dictionaries only for now)
-        let rules = fitness::extract(&cleaned, None);
+        // Phase 2a+2d: dictionary extraction with family-scoped specialists
+        let law_name = section_id.split(':').next().unwrap_or("");
+        let family = family_map.get(law_name).map(|s| s.as_str());
+        let rules = fitness::extract(&cleaned, family);
 
         if rules.is_empty() {
             // Polarity detected but no dictionary matches — store

@@ -309,7 +309,26 @@ static PERSON_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
         ("person\\s+at\\s+work", "person at work"),
         ("persons?\\s+(?:at\\s+)?work", "person at work"),
         ("sub[- ]?contractor", "sub-contractor"),
-        // Single-word terms
+        // Cross-domain government/institutional actors
+        ("Secretary\\s+of\\s+State", "Secretary of State"),
+        ("Scottish\\s+Ministers?", "Scottish Ministers"),
+        ("Welsh\\s+Ministers?", "Welsh Ministers"),
+        ("local\\s+planning\\s+authorit(?:y|ies)", "local planning authority"),
+        ("national\\s+park\\s+authorit(?:y|ies)", "national park authority"),
+        ("local\\s+authorit(?:y|ies)", "local authority"),
+        ("public\\s+authorit(?:y|ies)", "public authority"),
+        ("public\\s+bod(?:y|ies)", "public body"),
+        ("competent\\s+authorit(?:y|ies)", "competent authority"),
+        ("appropriate\\s+authorit(?:y|ies)", "appropriate authority"),
+        ("enforc(?:ing|ement)\\s+authorit(?:y|ies)", "enforcement authority"),
+        ("statutory\\s+undertaker(?:s)?", "statutory undertaker"),
+        ("harbour\\s+authorit(?:y|ies)", "harbour authority"),
+        ("highway\\s+authorit(?:y|ies)", "highway authority"),
+        ("water\\s+undertaker(?:s)?", "water undertaker"),
+        ("sewerage\\s+undertaker(?:s)?", "sewerage undertaker"),
+        ("(?:nature\\s+)?conservation\\s+bod(?:y|ies)", "nature conservation body"),
+        ("registered\\s+provider(?:s)?", "registered provider"),
+        // Single-word governed actors
         ("employer(?:s)?", "employer"),
         ("employee(?:s)?", "employee"),
         ("worker(?:s)?", "worker"),
@@ -417,10 +436,19 @@ static PLACE_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
         ("territorial\\s+(?:sea|waters?)", "territorial sea"),
         ("continental\\s+shelf", "continental shelf"),
         ("construction\\s+site", "construction site"),
+        // Cross-domain geographic/designation terms
+        ("(?:area|areas)\\s+of\\s+outstanding\\s+natural\\s+beauty", "area of outstanding natural beauty"),
+        ("exclusive\\s+economic\\s+zone", "exclusive economic zone"),
+        ("national\\s+park", "national park"),
+        ("conservation\\s+area", "conservation area"),
+        ("inland\\s+water(?:s|way)?", "inland waters"),
+        ("coastal\\s+water(?:s)?", "coastal waters"),
+        // Jurisdictions
         ("England(?:\\s+and\\s+Wales)?", "England"),
         ("Wales", "Wales"),
         ("Scotland", "Scotland"),
         ("offshore", "offshore"),
+        // Workplace/site types
         ("mine(?:s)?", "mine"),
         ("quarr(?:y|ies)", "quarry"),
         ("factor(?:y|ies)", "factory"),
@@ -642,9 +670,114 @@ static FIRE_PLANT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
     ])
 });
 
+// ── Cross-Domain Specialist Dictionaries ────────────────────────────
+//
+// Family-scoped dictionaries for non-OH&S/FIRE domains.
+// Populated from corpus mining (Phase 1) and entity feedback loop.
+
+static WILDLIFE_PROCESS_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("habitats?\\s+(?:regulations?\\s+)?assessment", "habitats assessment"),
+        ("biodiversity", "biodiversity"),
+    ])
+});
+
+static WILDLIFE_PLANT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("European\\s+protected\\s+species", "European protected species"),
+        ("invasive\\s+(?:alien\\s+)?species", "invasive alien species"),
+        ("wild\\s+bird(?:s)?", "wild bird"),
+        ("wild\\s+animal(?:s)?", "wild animal"),
+        ("wild\\s+plant(?:s)?", "wild plant"),
+    ])
+});
+
+static WILDLIFE_PLACE_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("(?:site|sites)\\s+of\\s+special\\s+scientific\\s+interest", "site of special scientific interest"),
+        ("\\bSSSI(?:s)?\\b", "SSSI"),
+        ("European\\s+site(?:s)?", "European site"),
+        ("protected\\s+(?:area|site)(?:s)?", "protected area"),
+    ])
+});
+
+static MARINE_PROCESS_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("licensable\\s+(?:marine\\s+)?activit(?:y|ies)", "licensable marine activity"),
+    ])
+});
+
+static MARINE_PLACE_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("marine\\s+conservation\\s+zone(?:s)?", "marine conservation zone"),
+        ("\\bMCZ(?:s)?\\b", "MCZ"),
+        ("(?:UK\\s+)?marine\\s+licen[cs]ing\\s+area", "UK marine licensing area"),
+    ])
+});
+
+static ENVPROT_PROCESS_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("environmental\\s+permit(?:s)?", "environmental permit"),
+        ("environmental\\s+(?:impact\\s+)?assessment", "environmental assessment"),
+        ("discharge\\s+consent(?:s)?", "discharge consent"),
+    ])
+});
+
+static ENVPROT_PLANT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("contaminated\\s+land", "contaminated land"),
+        ("hazardous\\s+(?:substance|waste)(?:s)?", "hazardous substance"),
+    ])
+});
+
+static PLANNING_PROCESS_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("planning\\s+permission", "planning permission"),
+        ("development\\s+consent", "development consent"),
+        ("compulsory\\s+(?:purchase|acquisition)", "compulsory acquisition"),
+    ])
+});
+
+static PLANNING_PLACE_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("listed\\s+building(?:s)?", "listed building"),
+        ("scheduled\\s+monument(?:s)?", "scheduled monument"),
+        ("world\\s+heritage\\s+(?:site|property|properties)", "world heritage site"),
+    ])
+});
+
+static WATER_PROCESS_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("water\\s+(?:abstraction|discharge)", "water abstraction"),
+        ("flood\\s+(?:risk|defence|management)", "flood risk"),
+    ])
+});
+
+static ENERGY_PROCESS_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("energy\\s+(?:performance|efficiency)", "energy performance"),
+        ("renewable\\s+energy", "renewable energy"),
+        ("generating\\s+station(?:s)?", "generating station"),
+    ])
+});
+
+static CLIMATE_PLANT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("greenhouse\\s+gas(?:es)?", "greenhouse gas"),
+        ("carbon\\s+(?:capture|storage|trading|emission)", "carbon emissions"),
+    ])
+});
+
+static NUCLEAR_PLANT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("radioactive\\s+(?:substance|waste|material)(?:s)?", "radioactive substance"),
+        ("nuclear\\s+(?:installation|site|material)(?:s)?", "nuclear installation"),
+    ])
+});
+
 /// Return specialist dictionaries for a given law family.
 ///
-/// Currently OH&S and FIRE families have specialists. Returns empty vec
+/// OH&S, FIRE, and cross-domain families have specialists. Returns empty vec
 /// for unknown families — the core dictionaries still run.
 fn specialist_dicts_for(family: &str) -> Vec<(PDimension, &'static [DictEntry])> {
     if family.starts_with("OH&S") {
@@ -660,6 +793,43 @@ fn specialist_dicts_for(family: &str) -> Vec<(PDimension, &'static [DictEntry])>
             (PDimension::Process, &FIRE_PROCESS_DICT),
             (PDimension::Place, &FIRE_PLACE_DICT),
             (PDimension::Plant, &FIRE_PLANT_DICT),
+        ]
+    } else if family.starts_with("WILDLIFE") {
+        vec![
+            (PDimension::Process, &WILDLIFE_PROCESS_DICT),
+            (PDimension::Plant, &WILDLIFE_PLANT_DICT),
+            (PDimension::Place, &WILDLIFE_PLACE_DICT),
+        ]
+    } else if family.starts_with("MARINE") {
+        vec![
+            (PDimension::Process, &MARINE_PROCESS_DICT),
+            (PDimension::Place, &MARINE_PLACE_DICT),
+        ]
+    } else if family.starts_with("ENVIRONMENTAL") {
+        vec![
+            (PDimension::Process, &ENVPROT_PROCESS_DICT),
+            (PDimension::Plant, &ENVPROT_PLANT_DICT),
+        ]
+    } else if family.starts_with("PLANNING") || family.starts_with("TOWN") || family.starts_with("HISTORIC") {
+        vec![
+            (PDimension::Process, &PLANNING_PROCESS_DICT),
+            (PDimension::Place, &PLANNING_PLACE_DICT),
+        ]
+    } else if family.starts_with("WATER") {
+        vec![
+            (PDimension::Process, &WATER_PROCESS_DICT),
+        ]
+    } else if family.starts_with("ENERGY") {
+        vec![
+            (PDimension::Process, &ENERGY_PROCESS_DICT),
+        ]
+    } else if family.starts_with("CLIMATE") {
+        vec![
+            (PDimension::Plant, &CLIMATE_PLANT_DICT),
+        ]
+    } else if family.starts_with("NUCLEAR") {
+        vec![
+            (PDimension::Plant, &NUCLEAR_PLANT_DICT),
         ]
     } else {
         vec![]

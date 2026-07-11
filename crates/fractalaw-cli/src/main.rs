@@ -660,7 +660,8 @@ async fn main() -> anyhow::Result<()> {
                     .as_deref()
                     .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
-                commands::fitness::cmd_fitness_extract(pg_url, law_names.as_deref(), force).await
+                let duck = open_duck(&data_dir)?;
+                commands::fitness::cmd_fitness_extract(pg_url, &duck, law_names.as_deref(), force).await
             }
             FitnessAction::Status { laws, law_file } => {
                 let pg_url = pg_url
