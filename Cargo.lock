@@ -3447,6 +3447,7 @@ dependencies = [
  "futures",
  "lancedb",
  "parquet",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
