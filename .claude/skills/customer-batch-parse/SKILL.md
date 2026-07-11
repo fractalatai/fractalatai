@@ -139,37 +139,13 @@ Note the `pending_slm` count — this is the SLM workload. At ~0.3 actors/s, est
 
 Classify pending_slm actors via RunPod GPU. Both position and significance run on the same pod.
 
-#### RunPod setup
-
-1. Spin up a pod (RTX 4090 or 5090) with network volume attached
-2. SSH in and install deps:
-   ```bash
-   apt-get update -qq && apt-get install -y -qq zstd postgresql-client > /dev/null
-   curl -fsSL https://ollama.com/install.sh | sh
-   pip install psycopg2-binary requests
-   ```
-3. Start Ollama with parallel slots enabled, then load the position model:
-   ```bash
-   OLLAMA_NUM_PARALLEL=8 ollama serve &
-   ollama create gemma3-position -f /workspace/Modelfile
-   ```
-   **Without `OLLAMA_NUM_PARALLEL`**, Ollama defaults to 1 concurrent request. Multiple workers will hang waiting for the single slot.
-4. Open reverse SSH tunnel from LOCAL machine (keeps running in foreground):
-   ```bash
-   ssh -T -R 5433:localhost:5433 root@<IP> -p <PORT> -i ~/.ssh/id_ed25519 -N
-   ```
-5. Models and batch scripts are on the network volume at `/workspace/`:
-   - `gemma3-position-q4.gguf` + `Modelfile` — DRRP + position
-   - `gemma3-significance-q4.gguf` + `Modelfile.significance` — obligation significance
-   - `runpod_slm_batch.py` — position batch script
-   - `runpod_significance_batch.py` — significance batch script
+**See `/runpod-batch-inference` skill for pod setup, SSH tunnel, Ollama configuration, and known issues.**
 
 #### Run position SLM
 
 ```bash
-# On pod (via SSH):
-python3 /workspace/runpod_slm_batch.py --dry-run      # check pending count
-python3 /workspace/runpod_slm_batch.py --workers 8     # full run
+# Upload script + verify writes with --limit 10 first (see runpod-batch-inference skill)
+python3 -u /workspace/runpod_slm_batch.py --workers 8
 ```
 
 ~10 actors/s on RTX 4090. 10K actors ≈ 17 min.
@@ -177,16 +153,14 @@ python3 /workspace/runpod_slm_batch.py --workers 8     # full run
 #### Run significance SLM
 
 ```bash
-# On pod — load significance model first:
+# Load significance model:
 ollama create gemma3-significance -f /workspace/Modelfile.significance
 
-python3 /workspace/runpod_significance_batch.py --dry-run
-python3 /workspace/runpod_significance_batch.py --workers 8
+# Verify writes with --limit 10 first
+python3 -u /workspace/runpod_significance_batch.py --workers 4
 ```
 
-~6 provisions/s with 4 workers. **`logprobs` must be disabled** in the script for multi-worker runs — `logprobs: True` causes Ollama to deadlock under concurrent load (single-worker works fine but is 3x slower). The position script doesn't use logprobs which is why it never had this issue.
-
-The query must filter `significance_overall IS NULL` — without this, incremental runs reload the entire corpus (43K+) instead of just pending provisions. The script on the network volume was fixed 2026-07-09 to include this filter. If the dry-run count matches the full Obligation count rather than the pending count, the filter is missing.
+~6 provisions/s on RTX 5090.
 
 ### Step 8: Re-reconcile
 

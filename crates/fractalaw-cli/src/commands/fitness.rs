@@ -7,6 +7,8 @@
 use anyhow::Context;
 use fractalaw_core::taxa::fitness;
 use fractalaw_store::{DuckStore, PgStore};
+use regex::Regex;
+use std::sync::LazyLock;
 
 /// Look up law → family mapping from DuckDB.
 fn load_family_map(duck: &DuckStore) -> std::collections::HashMap<String, String> {
@@ -66,21 +68,24 @@ pub(crate) async fn cmd_fitness_extract(
     .execute(pool)
     .await?;
 
-    // Optionally clear existing mentions for these laws
+    // Optionally clear regex-tier mentions for re-extraction.
+    // NEVER deletes SLM/manual data — only clears extraction_method='regex'.
     if force {
         if let Some(names) = law_names {
             for name in names {
-                sqlx::query("DELETE FROM fitness_mentions WHERE section_id LIKE $1")
-                    .bind(format!("{name}:%"))
-                    .execute(pool)
-                    .await?;
-            }
-            eprintln!("Cleared fitness_mentions for {} laws", names.len());
-        } else {
-            sqlx::query("DELETE FROM fitness_mentions")
+                sqlx::query(
+                    "DELETE FROM fitness_mentions WHERE section_id LIKE $1 AND extraction_method = 'regex'"
+                )
+                .bind(format!("{name}:%"))
                 .execute(pool)
                 .await?;
-            eprintln!("Cleared all fitness_mentions");
+            }
+            eprintln!("Cleared regex fitness_mentions for {} laws (SLM/manual preserved)", names.len());
+        } else {
+            sqlx::query("DELETE FROM fitness_mentions WHERE extraction_method = 'regex'")
+                .execute(pool)
+                .await?;
+            eprintln!("Cleared all regex fitness_mentions (SLM/manual preserved)");
         }
     }
 
@@ -99,6 +104,7 @@ pub(crate) async fn cmd_fitness_extract(
              AND NOT EXISTS (
                  SELECT 1 FROM fitness_mentions fm
                  WHERE fm.section_id = lt.section_id
+                 AND fm.extraction_method IN ('regex', 'slm', 'manual')
              )",
         )
         .bind(&name_list)
@@ -112,6 +118,7 @@ pub(crate) async fn cmd_fitness_extract(
              AND NOT EXISTS (
                  SELECT 1 FROM fitness_mentions fm
                  WHERE fm.section_id = lt.section_id
+                 AND fm.extraction_method IN ('regex', 'slm', 'manual')
              )",
         )
         .fetch_all(pool)
@@ -145,18 +152,34 @@ pub(crate) async fn cmd_fitness_extract(
         let rules = fitness::extract(&cleaned, family);
 
         if rules.is_empty() {
-            // Polarity detected but no dictionary matches — store
-            // polarity-only mention (gap for NER to fill later)
+            // Polarity detected but no dictionary matches.
+            // Check for temporal entities (commencement/sunset dates).
+            let temporal_entity = extract_date(&cleaned);
+
             for pol in &polarities {
-                sqlx::query(
-                    "INSERT INTO fitness_mentions
-                     (section_id, polarity, extraction_method, confidence, source_detail)
-                     VALUES ($1, $2, 'regex', 0.7, 'polarity_only')",
-                )
-                .bind(section_id)
-                .bind(pol.as_str())
-                .execute(pool)
-                .await?;
+                if let Some(ref date) = temporal_entity {
+                    sqlx::query(
+                        "INSERT INTO fitness_mentions
+                         (section_id, polarity, regex_entities, regex_scope_dimensions, extraction_method, confidence, source_detail)
+                         VALUES ($1, $2, $3, $4, 'regex', 0.9, 'date_extraction')",
+                    )
+                    .bind(section_id)
+                    .bind(pol.as_str())
+                    .bind(&[date.clone()] as &[String])
+                    .bind(&["temporal".to_string()] as &[String])
+                    .execute(pool)
+                    .await?;
+                } else {
+                    sqlx::query(
+                        "INSERT INTO fitness_mentions
+                         (section_id, polarity, extraction_method, confidence, source_detail)
+                         VALUES ($1, $2, 'regex', 0.7, 'polarity_only')",
+                    )
+                    .bind(section_id)
+                    .bind(pol.as_str())
+                    .execute(pool)
+                    .await?;
+                }
                 inserted += 1;
             }
         } else {
@@ -194,7 +217,7 @@ pub(crate) async fn cmd_fitness_extract(
 
                 sqlx::query(
                     "INSERT INTO fitness_mentions
-                     (section_id, polarity, entities, scope_dimensions, extraction_method, confidence, source_detail)
+                     (section_id, polarity, regex_entities, regex_scope_dimensions, extraction_method, confidence, source_detail)
                      VALUES ($1, $2, $3, $4, 'regex', 0.8, 'core_dict')",
                 )
                 .bind(section_id)
@@ -216,7 +239,102 @@ pub(crate) async fn cmd_fitness_extract(
         "\nDone. {} provisions with polarity, {} mentions inserted.",
         polarity_count, inserted
     );
+
+    // ── Date backfill: extract commencement/sunset dates into existing mentions ──
+    // These provisions already have polarity-only mentions but no entities.
+    // The COMMENCEMENT_RE flagged them; now extract the actual date.
+    let date_rows = sqlx::query_as::<_, (i32, String)>(
+        "SELECT fm.id, lt.text
+         FROM fitness_mentions fm
+         JOIN legislation_text lt ON fm.section_id = lt.section_id
+         WHERE (fm.regex_entities IS NULL OR fm.regex_entities = '{}')
+         AND (fm.slm_entities IS NULL OR fm.slm_entities = '{}')
+         AND lt.text IS NOT NULL",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    let mut dates_extracted = 0u32;
+    for (mention_id, text) in &date_rows {
+        let cleaned = fractalaw_core::taxa::text_cleaner::clean(text);
+        if let Some(date) = extract_date(&cleaned) {
+            sqlx::query(
+                "UPDATE fitness_mentions
+                 SET regex_entities = ARRAY[$1],
+                     regex_scope_dimensions = ARRAY['temporal'],
+                     source_detail = 'date_extraction',
+                     confidence = 0.9
+                 WHERE id = $2",
+            )
+            .bind(&date)
+            .bind(mention_id)
+            .execute(pool)
+            .await?;
+            dates_extracted += 1;
+        }
+    }
+
+    if dates_extracted > 0 {
+        eprintln!("Date backfill: {dates_extracted} commencement/sunset dates extracted.");
+    }
+
     Ok(())
+}
+
+// ── Temporal entity extraction ──────────────────────────────────────
+
+/// UK legislation date: "30th November 2017", "1st January 2025"
+static DATE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)(\d{1,2})(?:st|nd|rd|th)?\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})"
+    ).unwrap()
+});
+
+/// Month-year only: "April 2011"
+static MONTH_YEAR_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"(?i)(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})"
+    ).unwrap()
+});
+
+/// Extract a date from commencement/sunset text as an ISO date string.
+fn extract_date(text: &str) -> Option<String> {
+    // Only try date extraction on commencement/sunset provisions
+    let is_temporal = text.contains("come into force")
+        || text.contains("comes into force")
+        || text.contains("came into force")
+        || text.contains("enter into force")
+        || text.contains("enters into force")
+        || text.contains("ceases to have effect")
+        || text.contains("ceased to have effect");
+
+    if !is_temporal {
+        return None;
+    }
+
+    let months = [
+        "january", "february", "march", "april", "may", "june",
+        "july", "august", "september", "october", "november", "december",
+    ];
+
+    // Try full date first
+    if let Some(caps) = DATE_RE.captures(text) {
+        let day: u32 = caps[1].parse().ok()?;
+        let month_name = caps[2].to_lowercase();
+        let month = months.iter().position(|&m| m == month_name)? as u32 + 1;
+        let year: u32 = caps[3].parse().ok()?;
+        return Some(format!("{year:04}-{month:02}-{day:02}"));
+    }
+
+    // Fall back to month-year
+    if let Some(caps) = MONTH_YEAR_RE.captures(text) {
+        let month_name = caps[1].to_lowercase();
+        let month = months.iter().position(|&m| m == month_name)? as u32 + 1;
+        let year: u32 = caps[2].parse().ok()?;
+        return Some(format!("{year:04}-{month:02}-01"));
+    }
+
+    None
 }
 
 /// Show fitness mention coverage for laws.
