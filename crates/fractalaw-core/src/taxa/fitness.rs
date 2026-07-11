@@ -551,6 +551,44 @@ static SECTOR_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
         ("food\\s+(?:industry|sector|safety|production)", "food"),
         ("medicinal\\s+product(?:s)?", "pharmaceuticals"),
         ("(?:public|private)\\s+sector", "public/private sector"),
+        // Cross-domain terms promoted from SLM feedback loop
+        ("transport", "transport"),
+    ])
+});
+
+// ── Cross-Domain Core Dictionaries (SLM feedback loop) ─────────────
+//
+// Terms promoted from SLM extraction that appear across multiple families.
+// Added to core (not family-scoped) because they're genuinely cross-domain.
+
+static CROSS_DOMAIN_PERSON_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("body\\s+corporate", "body corporate"),
+        ("limited\\s+(?:liability\\s+)?partner(?:ship)?(?:s)?", "LLP"),
+    ])
+});
+
+static CROSS_DOMAIN_PROCESS_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("building\\s+work(?:s)?", "building work"),
+        ("development\\s+(?:of\\s+)?land", "development of land"),
+    ])
+});
+
+static CROSS_DOMAIN_PLACE_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("(?:the\\s+)?land\\b", "land"),
+        ("dwelling(?:s)?", "dwelling"),
+        ("building(?:s)?", "building"),
+    ])
+});
+
+static CROSS_DOMAIN_PLANT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
+    dict(&[
+        ("vehicle(?:s)?", "vehicle"),
+        ("motor\\s+vehicle(?:s)?", "motor vehicle"),
+        ("goods\\s+vehicle(?:s)?", "goods vehicle"),
+        ("licen[cs]e(?:s)?", "licence"),
     ])
 });
 
@@ -996,6 +1034,11 @@ fn extract_tags(text: &str, family: Option<&str>) -> Vec<PDimensionTag> {
         (PDimension::Plant, &PLANT_DICT),
         (PDimension::Property, &PROPERTY_DICT),
         (PDimension::Sector, &SECTOR_DICT),
+        // Cross-domain terms from SLM feedback loop
+        (PDimension::Person, &CROSS_DOMAIN_PERSON_DICT),
+        (PDimension::Process, &CROSS_DOMAIN_PROCESS_DICT),
+        (PDimension::Place, &CROSS_DOMAIN_PLACE_DICT),
+        (PDimension::Plant, &CROSS_DOMAIN_PLANT_DICT),
     ];
 
     for (dim, dict) in core_dicts {
