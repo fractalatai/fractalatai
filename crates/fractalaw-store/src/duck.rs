@@ -91,6 +91,26 @@ impl DuckStore {
         self.count_table("legislation")
     }
 
+    /// Check whether a law exists in the `legislation` table.
+    pub fn legislation_exists(&self, name: &str) -> Result<bool, StoreError> {
+        let sql = format!(
+            "SELECT count(*)::BIGINT AS cnt FROM legislation WHERE name = '{}'",
+            name.replace('\'', "''")
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let batches: Vec<RecordBatch> = stmt.query_arrow([])?.collect();
+        if let Some(batch) = batches.first() {
+            if let Some(arr) = batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<arrow::array::Int64Array>()
+            {
+                return Ok(arr.value(0) > 0);
+            }
+        }
+        Ok(false)
+    }
+
     /// Number of rows in the `law_edges` table.
     pub fn law_edges_count(&self) -> Result<usize, StoreError> {
         self.count_table("law_edges")
@@ -296,6 +316,145 @@ impl DuckStore {
             let col_list = cols.join(", ");
             let sql = format!(
                 "INSERT INTO legislation ({col_list}) SELECT {col_list} FROM read_parquet('{}')",
+                tmp.path().display()
+            );
+            self.conn.execute_batch(&sql)?;
+            total_rows += batch.num_rows();
+        }
+        Ok(total_rows)
+    }
+
+    /// Columns that sertantai owns — safe to accept from an LRT pull.
+    /// Everything else (taxa, fitness, significance, pipeline state) is
+    /// fractalaw-owned and must never be overwritten by sertantai data.
+    const SERTANTAI_OWNED_COLS: &'static [&'static str] = &[
+        // Identity
+        "title", "family", "sub_family", "year", "number",
+        "type_code", "type_desc", "type_class", "jurisdiction",
+        // Source
+        "source_authority", "source_url", "description", "explanatory_note",
+        // Dates
+        "primary_date", "made_date", "enactment_date", "in_force_date",
+        "valid_date", "modified_date", "latest_amend_date", "latest_rescind_date",
+        "restrict_start_date",
+        // Extent
+        "extent_code", "extent_regions", "extent_national", "extent_detail",
+        "restrict_extent",
+        // Status
+        "status", "status_source", "status_conflict", "status_conflict_detail",
+        // Function
+        "function", "is_making", "is_amending", "is_rescinding",
+        "is_enacting", "is_commencing",
+        // Relationships
+        "enacted_by", "enacting", "amending", "amended_by",
+        "rescinding", "rescinded_by",
+        // Document stats
+        "body_paras", "total_paras", "schedule_paras", "attachment_paras", "images",
+        // Annotations
+        "total_text_amendments", "total_modifications",
+        "total_commencements", "total_extents",
+        // Subjects / domain (sertantai classification)
+        "domain", "subjects", "si_code",
+        // Sertantai timestamps
+        "updated_at",
+    ];
+
+    /// Merge-update legislation records from sertantai LRT data.
+    ///
+    /// Defensive rules:
+    /// 1. **Whitelist only** — only updates columns sertantai owns (see `SERTANTAI_OWNED_COLS`)
+    /// 2. **Skip NULLs** — never overwrites a non-NULL value with NULL from sertantai
+    /// 3. **Column name mapping** — handles `title_en` → `title` and `family_ii` → `sub_family`
+    /// 4. **Fractalaw-owned columns untouched** — taxa, fitness, significance, pipeline state
+    pub fn merge_legislation(&self, batches: &[RecordBatch]) -> Result<usize, StoreError> {
+        let whitelist: std::collections::HashSet<&str> =
+            Self::SERTANTAI_OWNED_COLS.iter().copied().collect();
+
+        let mut total_rows = 0usize;
+        for batch in batches {
+            if batch.num_rows() == 0 {
+                continue;
+            }
+
+            // Write batch to temp parquet
+            let tmp = tempfile::Builder::new().suffix(".parquet").tempfile()?;
+            {
+                let mut writer = parquet::arrow::ArrowWriter::try_new(
+                    tmp.as_file().try_clone()?,
+                    batch.schema(),
+                    None,
+                )
+                .map_err(|e| StoreError::Other(format!("parquet writer: {e}")))?;
+                writer
+                    .write(batch)
+                    .map_err(|e| StoreError::Other(format!("parquet write: {e}")))?;
+                writer
+                    .close()
+                    .map_err(|e| StoreError::Other(format!("parquet close: {e}")))?;
+            }
+
+            // Determine which columns in the DuckDB table actually exist
+            let mut col_stmt = self.conn.prepare(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = 'legislation'"
+            )?;
+            let table_cols: std::collections::HashSet<String> = col_stmt
+                .query_map([], |row| row.get::<_, String>(0))?
+                .filter_map(|r| r.ok())
+                .collect();
+
+            // Map batch column names to DuckDB column names
+            // sertantai sends title_en → we store title, family_ii → sub_family
+            let col_mapping: Vec<(&str, &str)> = vec![
+                ("title_en", "title"),
+                ("family_ii", "sub_family"),
+            ];
+
+            let schema = batch.schema();
+            let batch_cols: std::collections::HashSet<&str> = schema
+                .fields()
+                .iter()
+                .map(|f| f.name().as_str())
+                .collect();
+
+            // Build the list of (src_col, dst_col) pairs to update:
+            // - dst_col must be in the whitelist
+            // - dst_col must exist in the DuckDB table
+            // - src_col must exist in the batch
+            let mut update_pairs: Vec<(String, String)> = Vec::new();
+
+            // Direct matches (batch col name = DuckDB col name)
+            for col in &batch_cols {
+                if *col == "name" {
+                    continue;
+                }
+                if whitelist.contains(col) && table_cols.contains(*col) {
+                    update_pairs.push((col.to_string(), col.to_string()));
+                }
+            }
+
+            // Mapped columns (batch col name ≠ DuckDB col name)
+            for (src, dst) in &col_mapping {
+                if batch_cols.contains(src) && whitelist.contains(dst) && table_cols.contains(*dst) {
+                    // Remove any direct match that would conflict
+                    update_pairs.retain(|(_, d)| d != dst);
+                    update_pairs.push((src.to_string(), dst.to_string()));
+                }
+            }
+
+            if update_pairs.is_empty() {
+                continue;
+            }
+
+            // Build UPDATE with COALESCE to skip NULLs:
+            // SET col = COALESCE(src.col, legislation.col)
+            // This means: take sertantai's value if non-NULL, else keep ours.
+            let set_clause = update_pairs
+                .iter()
+                .map(|(src, dst)| format!("{dst} = COALESCE(src.{src}, legislation.{dst})"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let sql = format!(
+                "UPDATE legislation SET {set_clause} FROM read_parquet('{}') AS src WHERE legislation.name = src.name",
                 tmp.path().display()
             );
             self.conn.execute_batch(&sql)?;

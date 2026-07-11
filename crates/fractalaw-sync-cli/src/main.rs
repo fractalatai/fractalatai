@@ -73,6 +73,20 @@ enum Command {
         #[arg(long, default_value_t = 30)]
         timeout: u64,
     },
+    /// Pull LRT (law-level metadata) from sertantai via zenoh and upsert into DuckDB
+    PullLrt {
+        #[command(flatten)]
+        zenoh: ZenohArgs,
+        /// Law names to pull (comma-separated). If omitted with --qq, uses QQ applicable laws.
+        #[arg(long)]
+        laws: Option<String>,
+        /// Pull LRT for all QQ applicable laws
+        #[arg(long)]
+        qq: bool,
+        /// Query timeout in seconds
+        #[arg(long, default_value_t = 30)]
+        timeout: u64,
+    },
     /// Watch for sync events and run the full round-trip pipeline (long-running)
     Watch {
         #[command(flatten)]
@@ -368,6 +382,24 @@ async fn main() -> anyhow::Result<()> {
             let law_names: Vec<String> =
                 laws.split(',').map(|s| s.trim().to_string()).collect();
             sync::cmd_sync_pull_lat(&data_dir, &zenoh, &law_names, timeout, pg_url.as_deref()).await
+        }
+        Command::PullLrt {
+            zenoh,
+            laws,
+            qq,
+            timeout,
+        } => {
+            let law_names: Vec<String> = if let Some(ref laws_str) = laws {
+                laws_str.split(',').map(|s| s.trim().to_string()).collect()
+            } else if qq {
+                let qq_path = data_dir.join("sertantai/qq-applicable-laws.csv");
+                let csv = std::fs::read_to_string(&qq_path)
+                    .context("reading qq-applicable-laws.csv")?;
+                csv.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()
+            } else {
+                anyhow::bail!("specify --laws or --qq");
+            };
+            sync::cmd_sync_pull_lrt(&data_dir, &zenoh, &law_names, timeout).await
         }
         Command::Watch { zenoh, timeout } => {
             sync::cmd_sync_watch(&data_dir, &zenoh, timeout, pg_url.as_deref()).await

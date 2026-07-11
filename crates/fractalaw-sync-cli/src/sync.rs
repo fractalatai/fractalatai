@@ -374,6 +374,81 @@ pub(crate) async fn cmd_sync_publish_provisions(
     Ok(())
 }
 
+pub(crate) async fn cmd_sync_pull_lrt(
+    data_dir: &std::path::Path,
+    zenoh: &ZenohArgs,
+    law_names: &[String],
+    timeout_secs: u64,
+) -> anyhow::Result<()> {
+    let duck = crate::open_duck(data_dir)?;
+
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+
+    let timeout = std::time::Duration::from_secs(timeout_secs);
+
+    println!(
+        "Pulling LRT for {} laws from sertantai (tenant: {}, timeout: {timeout_secs}s)...",
+        law_names.len(),
+        zenoh.tenant,
+    );
+
+    let mut total_pulled = 0usize;
+    let mut total_skipped = 0usize;
+
+    for law_name in law_names {
+        eprint!("  {law_name}: ");
+
+        let batches = sync
+            .query_lrt(law_name, timeout)
+            .await
+            .map_err(|e| anyhow::anyhow!("query failed for {law_name}: {e}"))?;
+
+        if batches.is_empty() {
+            eprintln!("no data");
+            total_skipped += 1;
+            continue;
+        }
+
+        // Check if law already exists — if so, merge (UPDATE) rather than
+        // upsert (DELETE+INSERT) to preserve enriched columns (taxa, fitness,
+        // significance etc.) that sertantai doesn't send.
+        let exists = duck.legislation_exists(law_name).unwrap_or(false);
+
+        if exists {
+            match duck.merge_legislation(&batches) {
+                Ok(n) => {
+                    eprintln!("{n} row(s) merged");
+                    total_pulled += 1;
+                }
+                Err(e) => {
+                    eprintln!("merge error: {e}");
+                    total_skipped += 1;
+                }
+            }
+        } else {
+            match duck.upsert_legislation(&batches) {
+                Ok(n) => {
+                    eprintln!("{n} row(s) inserted");
+                    total_pulled += 1;
+                }
+                Err(e) => {
+                    eprintln!("insert error: {e}");
+                    total_skipped += 1;
+                }
+            }
+        }
+    }
+
+    println!(
+        "\nPulled {total_pulled}/{} laws ({total_skipped} skipped).",
+        law_names.len(),
+    );
+    Ok(())
+}
+
 pub(crate) async fn cmd_sync_pull_lat(
     _data_dir: &std::path::Path,
     zenoh: &ZenohArgs,
