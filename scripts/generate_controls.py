@@ -359,11 +359,28 @@ def store_predicate(duck_conn, law_name, predicate, model):
 
 # --- Main pipeline ---
 
+def law_has_controls(duck_conn, law_name):
+    """Check if a law already has generated controls in the staging table."""
+    try:
+        row = duck_conn.execute(
+            "SELECT count(*) FROM suggested_controls WHERE law_name = ? AND control_type = 'specific'",
+            [law_name]
+        ).fetchone()
+        return row[0] > 0
+    except Exception:
+        return False
+
+
 def process_law(law_name, duck_conn, pg_conn, api_key, system_prompt, predicate_prompt,
-                dry_run=False, skip_predicate=False):
+                dry_run=False, skip_predicate=False, force=False):
     """Process a single law: generate controls, validate, store."""
     print(f"\n{'='*60}")
     print(f"Processing: {law_name}")
+
+    # 0. Skip if already generated (unless --force)
+    if not force and not dry_run and law_has_controls(duck_conn, law_name):
+        print(f"  SKIP: controls already exist (use --force to regenerate)")
+        return {"law": law_name, "skipped": True}
 
     # 1. Get law outline
     outline = get_law_outline(duck_conn, law_name)
@@ -399,7 +416,11 @@ def process_law(law_name, duck_conn, pg_conn, api_key, system_prompt, predicate_
         print(f"  Saved to: {out_path}")
         return {"law": law_name, "provisions": len(provisions), "dry_run": True}
 
-    # 5. Call Gemini Pro
+    # 5. If --force, clear existing controls for this law
+    if force:
+        duck_conn.execute("DELETE FROM suggested_controls WHERE law_name = ?", [law_name])
+
+    # 6. Call Gemini Pro
     print(f"  Calling Gemini Pro...")
     try:
         controls = call_gemini(api_key, system_prompt, user_prompt)
@@ -484,9 +505,11 @@ def main():
     group.add_argument("--law", help="Generate for a single law (e.g. UK_uksi_1997_1713)")
     group.add_argument("--family", help="Generate for all laws in a family")
     group.add_argument("--all", action="store_true", help="Generate for all laws")
+    parser.add_argument("--qq", action="store_true", help="Scope to QQ applicable laws only")
     parser.add_argument("--dry-run", action="store_true", help="Assemble prompts without calling Gemini")
     parser.add_argument("--limit", type=int, help="Limit number of laws to process")
     parser.add_argument("--skip-predicate", action="store_true", help="Skip policy predicate generation")
+    parser.add_argument("--force", action="store_true", help="Regenerate even if controls already exist")
     args = parser.parse_args()
 
     # API key
@@ -519,7 +542,15 @@ def main():
     elif args.all:
         law_names = get_all_laws(duck_conn, limit=args.limit)
 
-    print(f"Laws to process: {len(law_names)}")
+    # Scope to QQ applicable laws if requested
+    if args.qq:
+        qq_csv = Path("data/sertantai/qq-applicable-laws.csv").read_text().strip()
+        qq_set = {n.strip() for n in qq_csv.split(",") if n.strip()}
+        before = len(law_names)
+        law_names = [n for n in law_names if n in qq_set]
+        print(f"Laws to process: {len(law_names)} (scoped to QQ from {before})")
+    else:
+        print(f"Laws to process: {len(law_names)}")
 
     # Ensure staging table exists
     ensure_staging_table(duck_conn)
@@ -530,17 +561,20 @@ def main():
         result = process_law(
             law_name, duck_conn, pg_conn, api_key, system_prompt, predicate_prompt,
             dry_run=args.dry_run, skip_predicate=args.skip_predicate,
+            force=args.force,
         )
         if result:
             results.append(result)
 
     # Summary
+    skipped = sum(1 for r in results if r.get("skipped"))
+    generated = [r for r in results if not r.get("skipped") and not r.get("dry_run")]
     print(f"\n{'='*60}")
-    print(f"SUMMARY: {len(results)} laws processed")
-    if results and not args.dry_run:
-        total_prov = sum(r["provisions"] for r in results)
-        total_ctrl = sum(r.get("controls", 0) for r in results)
-        total_flags = sum(r.get("flags", 0) for r in results)
+    print(f"SUMMARY: {len(results)} laws processed ({skipped} skipped, {len(generated)} generated)")
+    if generated and not args.dry_run:
+        total_prov = sum(r["provisions"] for r in generated)
+        total_ctrl = sum(r.get("controls", 0) for r in generated)
+        total_flags = sum(r.get("flags", 0) for r in generated)
         print(f"  Provisions: {total_prov}")
         print(f"  Controls:   {total_ctrl}")
         print(f"  Ratio:      {total_prov/total_ctrl:.1f}:1" if total_ctrl else "  Ratio: N/A")

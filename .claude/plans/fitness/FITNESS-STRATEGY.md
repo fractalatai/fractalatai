@@ -226,12 +226,24 @@ Negative fitness feeds directly into customer-level applicability: "does this la
 
 **Goal**: Applicability declared once, applied to all provisions in scope.
 
-Full design in `FITNESS-GRAPH.md`. Summary:
+Full design in `FITNESS-GRAPH.md`.
 
-- **Nodes**: scope units — law, Part, Chapter, section, Schedule
-- **Edges**: structural inheritance (Part → sections within), cross-reference overrides (DisappliesTo narrowing), commencement propagation from commencement orders
-- **Algorithm**: top-down tree walk using existing `hierarchy_path`, `part`, `chapter` data. Law-level scope → Part-level merges → section-level overrides. No new graph database needed.
-- **v1 scope**: intra-law hierarchy + commencement. Inter-law amendment scope inheritance deferred.
+**Phase 3a: Scope Unit Extraction**
+- Determine what each mention scopes: the whole law, a Part, a Chapter, or just the provision
+- "This Part applies to..." → scope_unit = the Part
+- "Subsection (3) does not apply where..." → scope_unit = the provision itself
+- "These Regulations apply to..." → scope_unit = the whole law
+- Parse the legislative self-reference in the mention text to derive scope_unit
+- Regex for common patterns ("this Part", "these Regulations", "this Act"), SLM for ambiguous cases
+
+**Phase 3b: Hierarchy Tree Walk + Propagation**
+- Build scope tree per law from populated scope_units
+- Walk top-down: law-level → Part-level → section-level
+- AppliesTo adds to inherited scope, DisappliesTo subtracts
+- Cross-reference overrides (Section A disapplies Section B)
+- Write inherited fitness to provisions without their own mentions
+- No new graph database — uses existing `hierarchy_path`, `part`, `chapter`
+- v1 scope: intra-law hierarchy + commencement. Inter-law amendment scope inheritance deferred.
 
 ### Phase 4: Rule Compiler (design spike required)
 
