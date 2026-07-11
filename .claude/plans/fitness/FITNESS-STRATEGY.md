@@ -230,7 +230,7 @@ Full design in `FITNESS-GRAPH.md`.
 
 **Goal**: Compile extracted mentions into boolean expression trees per law.
 
-Full design in `FITNESS-RULES-ENGINE.md`. This phase bridges extraction (Phase 2) and evaluation (Phase 5). The compiler turns a set of mentions from provisions into a structured expression tree.
+Full design in `FITNESS-RULES-ENGINE.md`. This phase bridges extraction (Phase 2) and evaluation (Phase 6). The compiler turns a set of mentions from provisions into a structured expression tree.
 
 **Critical challenge** (Gemini v0.3 system review): inferring logical connectives between co-occurring mentions. "Any employer or self-employed person, except domestic premises" → three mentions, but the compiler must know employer/self-employed are OR, and domestic premises is NOT. This requires understanding sentence structure, not just span extraction.
 
@@ -245,7 +245,27 @@ Full design in `FITNESS-RULES-ENGINE.md`. This phase bridges extraction (Phase 2
 - Numeric thresholds ("5 or more employees") — v1: extract as CONDITION mention, v2: add numeric comparison to `Match` node
 - "Crown application" provisions — government-facing, never matches private employers
 
-### Phase 5: Rules Engine (sertantai, query-time)
+### Phase 5: SLM Fine-Tuning + Re-extraction
+
+**Goal**: Improve SLM entity quality before handoff to sertantai.
+
+The Phase 2e prompted base model (gemma3:4b) achieved 98.98% JSON success but ~40% entity noise — extracting procedural terms ("claim", "payment", "instrument") alongside genuine applicability subjects. The rules engine can't distinguish good from noisy entities; false positives in Match nodes cause incorrect law-customer matches.
+
+**Approach**:
+1. Build training data from the 7,325 dictionary-extracted mentions (regex_entities) — these are known-correct because the dictionaries are curated
+2. Format as JSONL training pairs: provision text → JSON entity array (same format as the SLM prompt)
+3. Fine-tune gemma3:4b via LoRA on RunPod (see `/runpod-finetune` skill)
+4. Evaluate on held-out test set: precision and recall vs base model
+5. Re-run extraction on the 6,671 gap provisions with the fine-tuned model
+6. Write to `slm_entities` column (overwrites base model results, same tier)
+7. Re-propagate (Phase 3b) with cleaner entities
+
+**Success criteria**:
+- Entity precision >80% (vs ~60% from base model prompting)
+- No increase in empty results (maintain recall)
+- Noisy procedural terms eliminated from Match nodes
+
+### Phase 6: Rules Engine (sertantai, query-time)
 
 **Goal**: Evaluate compiled expression trees against customer profiles to answer "does this law apply to me?"
 
@@ -323,7 +343,12 @@ NERC s.40(1):
 - Logical connective inference accuracy assessed and documented
 - Numeric thresholds extracted as CONDITION mentions
 
-### Phase 5 (rules engine — sertantai)
+### Phase 5 (SLM fine-tuning)
+- Entity precision >80% (vs ~60% from base model prompting)
+- No increase in empty results (maintain recall)
+- Noisy procedural terms eliminated from Match nodes
+
+### Phase 6 (rules engine — sertantai)
 - For QQ (quarry operator in England): system correctly identifies applicable nature protection obligations AND correctly excludes non-applicable ones
 - Precision >80%: laws tagged as applicable are genuinely applicable
 - Recall >70%: genuinely applicable laws are not missed
@@ -435,7 +460,7 @@ Fractalaw (enrichment-time, Rust):
 Sertantai (query-time, Elixir):
 
   Customer asks "what applies to me?"
-    → Phase 5: Evaluate
+    → Phase 6: Evaluate
         → Stage 1: coarse filter via inverted entity index + hierarchy expansion
         → Stage 2: expression tree evaluation per candidate law
         → confidence scoring: high = included, medium = flagged, low = excluded
