@@ -12,10 +12,34 @@ OH&S pilot validated the pipeline at 3.9:1 ratio with 1.1% flag rate. 380 of 428
 
 ## Work
 
-1. ⏸️ Batch by family — 160/428 QQ laws done (37%), 972 controls, 160 predicates. Resume with `--all --qq`.
-2. ⬜ Corpus stats after completion
-3. ⬜ Spot-check non-OH&S families for quality
-4. ⬜ Final quality report
+1. ✅ Batch complete — 220/428 QQ laws with controls (208 skipped, no provisions)
+2. ✅ Corpus stats: 1,341 controls, 222 predicates, 92 flagged
+3. ✅ Spot-checked 12 diverse non-OH&S laws (86 controls) — zero deontic leaks, zero paperwork referents
+4. ✅ Final quality report below
+
+## Final Report
+
+| Metric | Value |
+|--------|-------|
+| Laws with controls | 220 / 428 QQ (208 have no governed provisions) |
+| Controls | 1,341 |
+| Policy predicates | 222 |
+| Validated | 1,471 (94.1%) |
+| Flagged | 92 (5.9%) |
+| Controls per law | min 1, median 6, max 18, avg 6.1 |
+
+### Flag breakdown
+
+| Flag | Count | Notes |
+|------|-------|-------|
+| JUDGEMENT_MISSING | 73 | Soft — judgement term in text but not in field |
+| INVALID_REF | 36 | Provision ref not in input set (filtered provisions) |
+| PAPERWORK | 4 | Description references document existence |
+| DEONTIC | 2 | "must" or "shall" in title |
+
+### Spot-check (12 laws, 86 controls)
+
+Families covered: Wildlife & Countryside, Pollution, Lead at Work, Working Time, Water Industry, Transport (operators), Rabbit control, Environmental Damage, Driver Hours, REACH Chemicals, Occupiers' Liability. Zero deontic leaks, zero paperwork referents. Load-bearing judgement well-flagged throughout.
 
 ## Progress
 
