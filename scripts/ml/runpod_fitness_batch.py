@@ -81,7 +81,7 @@ def preflight():
         cur = conn.cursor()
         cur.execute(
             "SELECT count(*) FROM fitness_mentions "
-            "WHERE (slm_entities IS NULL OR slm_entities = '{}') "
+            "WHERE (ft_entities IS NULL OR ft_entities = '{}') "
         )
         count = cur.fetchone()[0]
         cur.close()
@@ -118,12 +118,13 @@ def preflight():
 # ── Query ──────────────────────────────────────────────────────────────
 
 def query_gap_provisions(conn, limit=None):
-    """Fetch mentions needing SLM extraction (no slm_entities yet)."""
+    """Fetch mentions needing fine-tuned extraction (no ft_entities yet)."""
     sql = """
         SELECT fm.id, fm.section_id, fm.polarity, lt.text
         FROM fitness_mentions fm
         JOIN legislation_text lt ON fm.section_id = lt.section_id
-        WHERE (fm.slm_entities IS NULL OR fm.slm_entities = '{}')
+        WHERE (fm.ft_entities IS NULL OR fm.ft_entities = '{}')
+        AND fm.extraction_method != 'propagated'
         AND lt.text IS NOT NULL AND length(lt.text) > 20
         ORDER BY fm.id
     """
@@ -216,26 +217,18 @@ def extract_entities(mention_id, section_id, polarity, text, timeout=90):
 
 # ── Write ──────────────────────────────────────────────────────────────
 
-def write_results(conn, results):
-    """Write SLM-extracted entities to slm_* columns (never overwrites regex data)."""
-    cur = conn.cursor()
-    updated = 0
-    for mention_id, entities, scopes, status in results:
-        if entities is not None and len(entities) > 0:
-            cur.execute(
-                """UPDATE fitness_mentions
-                   SET slm_entities = %s,
-                       slm_scope_dimensions = %s,
-                       slm_confidence = 0.75,
-                       source_detail = %s,
-                       updated_at = now()
-                   WHERE id = %s""",
-                (entities, scopes, "gemma3_4b_prompted", mention_id),
-            )
-            updated += 1
-    conn.commit()
-    cur.close()
-    return updated
+def write_one(cur, mention_id, entities, scopes):
+    """Write a single result to ft_* columns immediately."""
+    cur.execute(
+        """UPDATE fitness_mentions
+           SET ft_entities = %s,
+               ft_scope_dimensions = %s,
+               ft_confidence = 0.85,
+               source_detail = 'gemma3_fitness_finetuned',
+               updated_at = now()
+           WHERE id = %s""",
+        (entities, scopes, mention_id),
+    )
 
 
 # ── Main ───────────────────────────────────────────────────────────────
@@ -264,15 +257,21 @@ def main():
         print("Nothing to process.")
         return
 
+    # Separate connection for writes (save-as-you-go)
+    write_conn = psycopg2.connect(PG_DSN)
+    write_conn.autocommit = True
+    write_cur = write_conn.cursor()
+
     start_time = time.time()
-    results = []
+    written = 0
 
     if args.workers <= 1:
         for i, (mid, sid, pol, text) in enumerate(rows):
-            result = extract_entities(mid, sid, pol, text)
-            results.append(result)
+            mention_id, entities, scopes, status = extract_entities(mid, sid, pol, text)
+            if not args.dry_run and not args.test and entities and len(entities) > 0:
+                write_one(write_cur, mention_id, entities, scopes)
+                written += 1
             if args.test:
-                _, entities, scopes, status = result
                 print(f"\n  {sid} ({pol}):")
                 print(f"    entities: {entities}")
                 print(f"    scopes: {scopes}")
@@ -281,36 +280,37 @@ def main():
                 elapsed = time.time() - start_time
                 rate = (i + 1) / elapsed
                 eta = (len(rows) - i - 1) / rate if rate > 0 else 0
-                print(f"  {i+1}/{len(rows)} ({rate:.1f}/s, ETA {eta/60:.0f}min) — {dict(stats)}")
+                print(f"  {i+1}/{len(rows)} ({rate:.1f}/s, ETA {eta/60:.0f}min) — {dict(stats)} written={written}")
     else:
+        write_lock = threading.Lock()
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
             futures = {
                 executor.submit(extract_entities, mid, sid, pol, text): mid
                 for mid, sid, pol, text in rows
             }
             for i, future in enumerate(as_completed(futures)):
-                result = future.result()
-                results.append(result)
+                mention_id, entities, scopes, status = future.result()
+                if not args.dry_run and entities and len(entities) > 0:
+                    with write_lock:
+                        write_one(write_cur, mention_id, entities, scopes)
+                        written += 1
                 if (i + 1) % 100 == 0:
                     elapsed = time.time() - start_time
                     rate = (i + 1) / elapsed
                     eta = (len(rows) - i - 1) / rate if rate > 0 else 0
-                    print(f"  {i+1}/{len(rows)} ({rate:.1f}/s, ETA {eta/60:.0f}min) — {dict(stats)}")
+                    print(f"  {i+1}/{len(rows)} ({rate:.1f}/s, ETA {eta/60:.0f}min) — {dict(stats)} written={written}")
 
     elapsed = time.time() - start_time
     print(f"\n{'=' * 60}")
     print(f"EXTRACTION COMPLETE")
-    print(f"  Processed: {len(results)}")
-    print(f"  Duration: {elapsed:.0f}s ({len(results)/elapsed:.1f} provisions/s)")
-    print(f"  Stats: {dict(stats)}")
+    print(f"  Processed: {len(rows)}")
+    print(f"  Written:   {written}")
+    print(f"  Duration:  {elapsed:.0f}s ({len(rows)/elapsed:.1f} provisions/s)")
+    print(f"  Stats:     {dict(stats)}")
     print(f"{'=' * 60}")
 
-    if args.dry_run or args.test:
-        print("DRY RUN — no writes to database")
-    else:
-        updated = write_results(conn, results)
-        print(f"Updated {updated} mentions in fitness_mentions (extraction_method='slm')")
-
+    write_cur.close()
+    write_conn.close()
     conn.close()
 
 

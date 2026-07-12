@@ -164,9 +164,72 @@ OLLAMA_NUM_PARALLEL=4 nohup ollama serve &>/tmp/ollama.log &
 ## Post-Batch
 
 1. **Verify results in DB** before stopping the pod
-2. **Stop the pod** immediately — GPU charges by the minute
-3. **Don't terminate** if the network volume has models/scripts you'll reuse
-4. Idle volume storage costs $0.13/day
+2. **Copy ALL outputs to `/workspace`** before stopping — `/tmp` and container-local storage are LOST on stop. This includes GGUF files, logs, eval results. If it's not on `/workspace`, it doesn't survive.
+3. **Stop the pod** immediately — GPU charges by the minute
+4. **Don't terminate** if the network volume has models/scripts you'll reuse
+5. Idle volume storage costs $0.13/day
+
+### CRITICAL: Each extraction tier gets its own column — NEVER overwrite another tier's data
+
+Every extraction method writes to its OWN column. No method may clear, update, or overwrite another tier's column. The columns are:
+
+- `regex_entities` — dictionary extraction only
+- `slm_entities` — base SLM (prompted, no fine-tune)
+- `ft_entities` — fine-tuned SLM
+- `llm_entities` — LLM (Gemini etc.)
+
+`--force` on ANY command must ONLY clear its own tier's column. NEVER `DELETE FROM` the whole table or clear all columns. If you need to re-run regex extraction, clear `regex_entities` only. If you need to re-run SLM, clear `slm_entities` only.
+
+**The whole point of per-tier columns is that data from different tiers can be compared.** Destroying one tier's data to re-run another defeats the purpose of the architecture.
+
+```python
+# BAD — destroys all tiers
+DELETE FROM fitness_mentions
+DELETE FROM fitness_mentions WHERE extraction_method = 'regex'  # deletes ROWS that have slm data too
+
+# GOOD — clears only this tier's columns
+UPDATE fitness_mentions SET regex_entities = NULL, regex_scope_dimensions = NULL
+UPDATE fitness_mentions SET ft_entities = NULL WHERE ...
+```
+
+### CRITICAL: Save-as-you-go, never batch writes at the end
+
+Batch scripts MUST write each result to the database immediately after extraction — not collect results in memory and write at the end. If the process dies, the tunnel drops, or the pod is stopped, all in-memory results are lost.
+
+```python
+# BAD — loses everything if process dies
+results = []
+for row in rows:
+    results.append(extract(row))
+write_results(conn, results)  # dies here = all work lost
+
+# GOOD — each result persisted immediately
+write_conn = psycopg2.connect(PG_DSN)
+write_conn.autocommit = True
+write_cur = write_conn.cursor()
+for row in rows:
+    result = extract(row)
+    write_one(write_cur, result)  # committed immediately
+```
+
+Use `autocommit = True` on the write connection so each UPDATE is committed independently. Use a separate connection from the read connection. Use a `threading.Lock` for multi-worker writes.
+
+### CRITICAL: `/tmp` vs `/workspace`
+
+- **`/workspace`** = network volume. Survives stop/start. Persists until pod is terminated.
+- **`/tmp`**, **`/root`**, **`/`** = container-local. LOST on stop. Gone forever.
+
+**NEVER leave artifacts on `/tmp`**. If a script writes to `/tmp` (e.g. GGUF quantisation to avoid network mount IO errors), copy to `/workspace` immediately after:
+
+```bash
+cp /tmp/gemma3-fitness-q4.gguf /workspace/
+```
+
+Before reporting a pod is ready to stop, verify ALL outputs are on `/workspace`:
+
+```bash
+ls -lh /workspace/*.gguf /workspace/output/
+```
 
 ## Scripts
 

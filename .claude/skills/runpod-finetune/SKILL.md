@@ -178,10 +178,18 @@ ollama create gemma3-position -f Modelfile
 
 ## Post-Training Cleanup
 
-1. **Stop the pod** immediately after downloading outputs
-2. **Terminate the pod** if you don't need to re-run (volume disk costs $0.13/day idle)
-3. **Back up to NAS**: `cp models/gemma3-position-q4.gguf /mnt/nas/sertantai-data/data/fractalaw-backups/YYYYMMDD/`
-4. **Back up adapter**: `cp -r data/slm-adapter/ /mnt/nas/sertantai-data/data/fractalaw-backups/YYYYMMDD/slm-adapter/`
+1. **Copy ALL outputs from `/tmp` to `/workspace`** — GGUF files written to `/tmp` (to avoid network mount IO errors) are LOST on pod stop. Copy immediately after quantisation:
+   ```bash
+   cp /tmp/gemma3-*-q4.gguf /workspace/
+   ```
+2. **Verify all artifacts are on `/workspace`** before stopping:
+   ```bash
+   ls -lh /workspace/*.gguf /workspace/output/
+   ```
+3. **Stop the pod** immediately after downloading outputs
+4. **Terminate the pod** if you don't need to re-run (volume disk costs $0.13/day idle)
+5. **Back up to NAS**: `cp models/gemma3-position-q4.gguf /mnt/nas/sertantai-data/data/fractalaw-backups/YYYYMMDD/`
+6. **Back up adapter**: `cp -r data/slm-adapter/ /mnt/nas/sertantai-data/data/fractalaw-backups/YYYYMMDD/slm-adapter/`
 
 ## Critical Lessons
 

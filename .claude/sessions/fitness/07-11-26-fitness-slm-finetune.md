@@ -17,12 +17,13 @@ Phase 5 of FITNESS-STRATEGY.md: the base gemma3:4b produced ~40% entity noise du
 1. ✅ Enriched dictionaries first (feedback loop): added cross-domain terms (vehicle, building, land, dwelling, LLP, motor vehicle, body corporate, building work, licence) to core dictionaries
 2. ✅ Re-ran regex extraction: training examples grew 7,325 → 8,706 (+19% diversity)
 3. ✅ Exported training data as JSONL with scope dimensions from entity catalogue. Train: 7,835 / Test: 871
-4. ✅ Uploaded to RunPod RTX 5090 (32GB). Training started — gemma3:4b 16-bit LoRA, 3 epochs.
-5. ⬜ Training completes (~90 min) — check log, download GGUF
-6. ⬜ Evaluate: precision + recall vs base model on held-out test
-7. ⬜ Re-run extraction on gap provisions with fine-tuned model
-8. ⬜ Measure entity quality improvement
-9. ⬜ Re-propagate (Phase 3b) with cleaner entities
+4. ✅ Uploaded to RunPod RTX 5090 (32GB). Training: 45 min, 2,940 steps, loss 0.56→0.25.
+5. ✅ Eval: precision 93.3%, recall 91.7%, F1 92.5%, scope accuracy 100% (vs ~60% base model)
+6. ✅ GGUF: BF16 + Q4_K_M exported. BF16 persisted on network volume. Q4 download interrupted (1.2/2.4GB) — re-quantise from BF16 on next pod attach.
+7. ⬜ Download GGUF (re-quantise from BF16 on network volume, then scp)
+8. ⬜ Load into Ollama, re-run extraction on gap provisions
+9. ⬜ Measure entity quality improvement vs base model
+10. ⬜ Re-propagate (Phase 3b) with cleaner entities
 
 ## Dependencies
 

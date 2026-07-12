@@ -68,24 +68,28 @@ pub(crate) async fn cmd_fitness_extract(
     .execute(pool)
     .await?;
 
-    // Optionally clear regex-tier mentions for re-extraction.
-    // NEVER deletes SLM/manual data — only clears extraction_method='regex'.
+    // Optionally clear regex-tier COLUMNS for re-extraction.
+    // NEVER deletes rows — only NULLs the regex_entities/regex_scope_dimensions columns.
+    // Other tiers (slm_entities, ft_entities) are untouched.
     if force {
         if let Some(names) = law_names {
             for name in names {
                 sqlx::query(
-                    "DELETE FROM fitness_mentions WHERE section_id LIKE $1 AND extraction_method = 'regex'"
+                    "UPDATE fitness_mentions SET regex_entities = NULL, regex_scope_dimensions = NULL \
+                     WHERE section_id LIKE $1"
                 )
                 .bind(format!("{name}:%"))
                 .execute(pool)
                 .await?;
             }
-            eprintln!("Cleared regex fitness_mentions for {} laws (SLM/manual preserved)", names.len());
+            eprintln!("Cleared regex_entities for {} laws (other tiers preserved)", names.len());
         } else {
-            sqlx::query("DELETE FROM fitness_mentions WHERE extraction_method = 'regex'")
-                .execute(pool)
-                .await?;
-            eprintln!("Cleared all regex fitness_mentions (SLM/manual preserved)");
+            sqlx::query(
+                "UPDATE fitness_mentions SET regex_entities = NULL, regex_scope_dimensions = NULL"
+            )
+            .execute(pool)
+            .await?;
+            eprintln!("Cleared all regex_entities (other tiers preserved)");
         }
     }
 
