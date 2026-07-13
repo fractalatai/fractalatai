@@ -44,7 +44,7 @@ enables:
   - Sertantai DB cleanup of legacy fitness columns
 ---
 
-# Session: Fitness Pipeline Cleanup (ACTIVE)
+# Session: Fitness Pipeline Cleanup (CLOSED)
 
 ## Problem
 
