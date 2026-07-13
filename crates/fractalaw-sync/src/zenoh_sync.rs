@@ -189,6 +189,32 @@ pub mod keys {
         format!("{PREFIX}/@{tenant}/triage/{law_name}")
     }
 
+    // ── Controls key expressions ──
+
+    /// Key expression for a specific law's generated controls.
+    ///
+    /// N rows per law — one per control. Arrow IPC payload.
+    /// Example: `fractalaw/@dev/controls/UK_uksi_1997_1713`
+    pub fn controls(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/controls/{law_name}")
+    }
+
+    /// Key expression for a specific law's policy predicate.
+    ///
+    /// 1 row per law — the law's "big idea" as a checkable proposition.
+    /// Example: `fractalaw/@dev/controls/predicate/UK_uksi_1997_1713`
+    pub fn controls_predicate(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/controls/predicate/{law_name}")
+    }
+
+    /// Key expression for control generation request events (sertantai → fractalaw).
+    ///
+    /// JSON payload: `{"action": "generate", "laws": [...], "force": false}`
+    /// Example: `fractalaw/@dev/events/controls`
+    pub fn events_controls(tenant: &str) -> String {
+        format!("{PREFIX}/@{tenant}/events/controls")
+    }
+
     /// Key expression for sertantai customer discovery queryable.
     ///
     /// Sertantai serves this — fractalaw queries it to list all customers.
@@ -329,6 +355,68 @@ impl ZenohSync {
             bytes = ipc_bytes.len(),
             rows = batches.iter().map(|b| b.num_rows()).sum::<usize>(),
             "publishing taxa enrichment"
+        );
+
+        self.session
+            .put(&key, ipc_bytes)
+            .await
+            .map_err(ZenohError::Session)?;
+
+        Ok(())
+    }
+
+    /// Publish generated controls for a specific law.
+    ///
+    /// `batches` should contain the controls columns from DuckDB's
+    /// `suggested_controls` table as Arrow RecordBatches.
+    pub async fn publish_controls(
+        &self,
+        law_name: &str,
+        batches: &[RecordBatch],
+    ) -> Result<(), ZenohError> {
+        if batches.is_empty() || batches.iter().all(|b| b.num_rows() == 0) {
+            return Err(ZenohError::NoData {
+                law_name: law_name.to_string(),
+            });
+        }
+
+        let ipc_bytes = encode_arrow_ipc(batches)?;
+        let key = keys::controls(&self.tenant, law_name);
+
+        info!(
+            key = %key,
+            bytes = ipc_bytes.len(),
+            rows = batches.iter().map(|b| b.num_rows()).sum::<usize>(),
+            "publishing controls"
+        );
+
+        self.session
+            .put(&key, ipc_bytes)
+            .await
+            .map_err(ZenohError::Session)?;
+
+        Ok(())
+    }
+
+    /// Publish the policy predicate for a specific law.
+    pub async fn publish_predicate(
+        &self,
+        law_name: &str,
+        batches: &[RecordBatch],
+    ) -> Result<(), ZenohError> {
+        if batches.is_empty() || batches.iter().all(|b| b.num_rows() == 0) {
+            return Err(ZenohError::NoData {
+                law_name: law_name.to_string(),
+            });
+        }
+
+        let ipc_bytes = encode_arrow_ipc(batches)?;
+        let key = keys::controls_predicate(&self.tenant, law_name);
+
+        info!(
+            key = %key,
+            bytes = ipc_bytes.len(),
+            "publishing policy predicate"
         );
 
         self.session
@@ -1036,6 +1124,32 @@ mod tests {
         assert_eq!(
             keys::taxa_provisions_wildcard("acme"),
             "fractalaw/@acme/taxa/provisions/*"
+        );
+    }
+
+    // ── Controls key expression tests ──
+
+    #[test]
+    fn key_controls() {
+        assert_eq!(
+            keys::controls("dev", "UK_uksi_1997_1713"),
+            "fractalaw/@dev/controls/UK_uksi_1997_1713"
+        );
+    }
+
+    #[test]
+    fn key_controls_predicate() {
+        assert_eq!(
+            keys::controls_predicate("dev", "UK_uksi_1997_1713"),
+            "fractalaw/@dev/controls/predicate/UK_uksi_1997_1713"
+        );
+    }
+
+    #[test]
+    fn key_events_controls() {
+        assert_eq!(
+            keys::events_controls("dev"),
+            "fractalaw/@dev/events/controls"
         );
     }
 

@@ -87,6 +87,20 @@ enum Command {
         #[arg(long, default_value_t = 30)]
         timeout: u64,
     },
+    /// Publish generated controls to sertantai via zenoh
+    PublishControls {
+        #[command(flatten)]
+        zenoh: ZenohArgs,
+        /// Specific laws to publish (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Publish controls for all QQ applicable laws
+        #[arg(long)]
+        qq: bool,
+        /// Publish ALL laws with generated controls
+        #[arg(long)]
+        all: bool,
+    },
     /// Watch for sync events and run the full round-trip pipeline (long-running)
     Watch {
         #[command(flatten)]
@@ -400,6 +414,14 @@ async fn main() -> anyhow::Result<()> {
                 anyhow::bail!("specify --laws or --qq");
             };
             sync::cmd_sync_pull_lrt(&data_dir, &zenoh, &law_names, timeout).await
+        }
+        Command::PublishControls {
+            zenoh,
+            laws,
+            qq,
+            all,
+        } => {
+            sync::cmd_sync_publish_controls(&data_dir, &zenoh, laws, qq, all).await
         }
         Command::Watch { zenoh, timeout } => {
             sync::cmd_sync_watch(&data_dir, &zenoh, timeout, pg_url.as_deref()).await

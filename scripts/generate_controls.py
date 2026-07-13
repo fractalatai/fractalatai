@@ -75,9 +75,8 @@ def get_law_outline(duck_conn, law_name):
         SELECT name, title, family, sub_family, year, jurisdiction,
                description, body_paras, total_paras, status,
                duty_holder, rights_holder, duty_type,
-               fitness_person, fitness_process, fitness_place,
-               fitness_plant, fitness_sector, extent_regions,
-               explanatory_note
+               fitness_entities, fitness_scope_dimensions,
+               extent_regions, explanatory_note
         FROM legislation WHERE name = ?
     """, [law_name]).fetchone()
     if not row:
@@ -85,9 +84,8 @@ def get_law_outline(duck_conn, law_name):
     cols = ["name", "title", "family", "sub_family", "year", "jurisdiction",
             "description", "body_paras", "total_paras", "status",
             "duty_holder", "rights_holder", "duty_type",
-            "fitness_person", "fitness_process", "fitness_place",
-            "fitness_plant", "fitness_sector", "extent_regions",
-            "explanatory_note"]
+            "fitness_entities", "fitness_scope_dimensions",
+            "extent_regions", "explanatory_note"]
     return dict(zip(cols, row))
 
 
@@ -179,24 +177,23 @@ def format_user_prompt(law_outline, provisions):
             lines.append(f"Rights holders: {holders}")
 
     # Fitness dimensions
-    for dim in ["fitness_person", "fitness_process", "fitness_place", "fitness_plant", "fitness_sector"]:
-        val = lo.get(dim)
-        if val and (isinstance(val, list) and len(val) > 0):
-            label = dim.replace("fitness_", "Fitness — ").title()
-            lines.append(f"{label}: {val}")
+    if lo.get("fitness_entities"):
+        lines.append(f"Fitness entities: {lo['fitness_entities']}")
+    if lo.get("fitness_scope_dimensions"):
+        lines.append(f"Fitness scope: {lo['fitness_scope_dimensions']}")
 
     lines.append(f"\n## Governed Obligations ({len(provisions)} provisions, HIGH + MEDIUM significance)\n")
 
-    for row in provisions:
+    for idx, row in enumerate(provisions, 1):
         section_id, text, drrp_types, governed_actors, purposes, significance, clause_refined = row
-        # Extract short ref from section_id (everything after the colon)
+        # Extract short ref for display context (but LLM returns the index, not this)
         short_ref = section_id.split(":", 1)[1] if ":" in section_id else section_id
 
         sig_label = f" — {significance}" if significance else ""
         actors_str = ", ".join(governed_actors) if governed_actors else ""
         actor_label = f" [{actors_str}]" if actors_str else ""
 
-        lines.append(f"### {short_ref} — Obligation{actor_label}{sig_label}")
+        lines.append(f"### [{idx}] {short_ref} — Obligation{actor_label}{sig_label}")
         # Truncate very long provision text
         prov_text = text if len(text) <= 500 else text[:500] + "..."
         lines.append(f'"{prov_text}"')
@@ -205,7 +202,7 @@ def format_user_prompt(law_outline, provisions):
     lines.append("Generate candidate controls for this law.")
     lines.append("- Indicative mood only — no 'must', 'shall', 'should'")
     lines.append("- Consolidate where the operational mechanism is the same")
-    lines.append(f"- Use short section references in linked_provisions (e.g. '{provisions[0][0].split(':',1)[1] if provisions else 'reg.3(1)'}')")
+    lines.append("- linked_provisions: return the [N] numbers from the provision headings as integers")
 
     return "\n".join(lines)
 
@@ -395,12 +392,10 @@ def process_law(law_name, duck_conn, pg_conn, api_key, system_prompt, predicate_
         return None
     print(f"  Provisions: {len(provisions)} governed obligations")
 
-    # 3. Build provision ref set (short refs for validation)
+    # 3. Build provision ref set (full section_ids for validation after index resolution)
     provision_refs = set()
     for row in provisions:
-        sid = row[0]
-        short = sid.split(":", 1)[1] if ":" in sid else sid
-        provision_refs.add(short)
+        provision_refs.add(row[0])  # full section_id
 
     # 4. Assemble prompt
     user_prompt = format_user_prompt(outline, provisions)
@@ -416,10 +411,6 @@ def process_law(law_name, duck_conn, pg_conn, api_key, system_prompt, predicate_
         print(f"  Saved to: {out_path}")
         return {"law": law_name, "provisions": len(provisions), "dry_run": True}
 
-    # 5. If --force, clear existing controls for this law
-    if force:
-        duck_conn.execute("DELETE FROM suggested_controls WHERE law_name = ?", [law_name])
-
     # 6. Call Gemini Pro
     print(f"  Calling Gemini Pro...")
     try:
@@ -433,7 +424,35 @@ def process_law(law_name, duck_conn, pg_conn, api_key, system_prompt, predicate_
         return None
     print(f"  Generated: {len(controls)} controls")
 
-    # 6. Validate (Phase 2 lint)
+    # 6a. Resolve provision indices to section_ids
+    # Build index → section_id map (1-based, matching the prompt numbering)
+    idx_to_sid = {}
+    for idx, row in enumerate(provisions, 1):
+        idx_to_sid[idx] = row[0]  # row[0] is section_id
+
+    resolved_count = 0
+    unresolved_count = 0
+    for ctrl in controls:
+        linked = ctrl.get("linked_provisions", [])
+        resolved = []
+        for ref in linked:
+            if isinstance(ref, int) and ref in idx_to_sid:
+                resolved.append(idx_to_sid[ref])
+                resolved_count += 1
+            elif isinstance(ref, str):
+                # Fallback: LLM returned a string ref instead of index — keep as-is
+                resolved.append(ref)
+                unresolved_count += 1
+            else:
+                unresolved_count += 1
+        ctrl["linked_provisions"] = resolved
+
+    if unresolved_count > 0:
+        print(f"  Provision refs: {resolved_count} resolved, {unresolved_count} unresolved (LLM returned strings instead of indices)")
+    else:
+        print(f"  Provision refs: {resolved_count} resolved (100%)")
+
+    # 6b. Validate (Phase 2 lint)
     validation_results = []
     total_flags = 0
     for ctrl in controls:
@@ -443,7 +462,9 @@ def process_law(law_name, duck_conn, pg_conn, api_key, system_prompt, predicate_
             total_flags += len(flags)
     print(f"  Validation: {total_flags} flags across {sum(1 for f in validation_results if f)} controls")
 
-    # 7. Store
+    # 7. Store (delete old data only after successful generation)
+    if force:
+        duck_conn.execute("DELETE FROM suggested_controls WHERE law_name = ?", [law_name])
     store_controls(duck_conn, law_name, controls, GEMINI_MODEL, validation_results)
     print(f"  Stored: {len(controls)} controls in suggested_controls")
 

@@ -87,7 +87,7 @@ These are defaults. The customer will override them with their operational conte
 
 Return a JSON array. Each element:
 
-**Important**: `linked_provisions` uses the SHORT section references exactly as given in the input (e.g. `reg.3(1)`, `s.2(1)`). Do NOT construct full law identifiers — the pipeline adds the law prefix automatically.
+**Important**: `linked_provisions` uses the NUMBERED INDICES from the input (e.g. `[1, 3, 5]`). Each provision in the input is labeled `### [1]`, `### [2]` etc. Return those numbers as integers — the pipeline resolves them to section identifiers. Do NOT return section references or law names.
 
 ```json
 {
@@ -101,7 +101,7 @@ Return a JSON array. Each element:
   "info_distance": "Direct | Adjacent | Mediated | Remote",
   "blast_radius": "Local | Area | Site | Enterprise",
   "expected_touch_frequency": "description of how often and when this control is exercised",
-  "linked_provisions": ["reg.3(1)", "reg.3(2)"],
+  "linked_provisions": [1, 3, 5],
   "mapping_strength": "Primary | Supporting | Ancillary",
   "load_bearing_judgement": "the judgement term (or null if fully reducible)",
   "evidence_hint": {
@@ -128,7 +128,7 @@ Return a JSON array. Each element:
   "info_distance": "Adjacent",
   "blast_radius": "Local",
   "expected_touch_frequency": "Per confined space entry — exercised every time an entry is authorised",
-  "linked_provisions": ["reg.5(1)", "reg.5(2)"],
+  "linked_provisions": [4, 5],
   "mapping_strength": "Primary",
   "load_bearing_judgement": "suitable and sufficient — whether the assessment is adequate to the actual hazard requires competence in confined space hazards",
   "evidence_hint": {
@@ -164,7 +164,7 @@ RIGHT:
   "info_distance": "Adjacent",
   "blast_radius": "Area",
   "expected_touch_frequency": "When a new person starts, when a new substance is introduced, when tasks change",
-  "linked_provisions": ["s.2(2)(c)"],
+  "linked_provisions": [3],
   "mapping_strength": "Primary",
   "load_bearing_judgement": "competent — 'such training as is necessary' requires judgement about what is necessary for the actual hazard",
   "evidence_hint": {
@@ -183,7 +183,7 @@ When provisions reg.3(a) and reg.3(b) both address avoiding confined space entry
 {
   "title": "Before any confined space entry, a documented consideration of alternatives demonstrates that entry cannot reasonably be avoided",
   "description": "Someone has genuinely evaluated whether the work can be done from outside. Not a tick-box but a recorded reasoning that names specific alternatives and why they were ruled out.",
-  "linked_provisions": ["reg.4(1)", "reg.4(2)"],
+  "linked_provisions": [2, 3],
   "mapping_strength": "Primary"
 }
 ```

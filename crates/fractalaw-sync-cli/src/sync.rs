@@ -468,6 +468,7 @@ pub(crate) async fn cmd_sync_publish_controls(
                 json_extract_string(control_json, '$.info_distance') AS info_distance, \
                 json_extract_string(control_json, '$.blast_radius') AS blast_radius, \
                 json_extract_string(control_json, '$.expected_touch_frequency') AS expected_touch_frequency, \
+                json_extract(control_json, '$.linked_provisions')::VARCHAR[] AS linked_provisions, \
                 json_extract_string(control_json, '$.mapping_strength') AS mapping_strength, \
                 json_extract_string(control_json, '$.load_bearing_judgement') AS load_bearing_judgement, \
                 json_extract_string(control_json, '$.evidence_hint.type_a') AS evidence_type_a, \

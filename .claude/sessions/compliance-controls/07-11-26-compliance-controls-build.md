@@ -1,10 +1,10 @@
 ---
 session: Compliance Controls Build Plan
-status: active
+status: suspended
 opened: 2026-07-11
 ---
 
-# Session: Compliance Controls Build Plan (ACTIVE)
+# Session: Compliance Controls Build Plan (SUSPENDED)
 
 ## Problem
 
@@ -41,22 +41,13 @@ The COMPLIANCE-CONTROLS.md v0.2 design is reviewed and approved. It needs to be 
 
 **Session**: `07-11-26-phase1-pipeline.md` (closed)
 
-### Phase 2: Corpus Run — QQ Family Pilot
+### Phase 2: Corpus Run — QQ Family Pilot — DONE
 
-Run the pipeline across QQ OH&S laws (~50 laws). Assess results, identify whether consolidation is needed.
+1. ✅ 47 OH&S laws → 349 controls at 3.9:1 ratio
+2. ✅ Zero intra-law duplicates, HDBSCAN dropped
+3. ✅ Cross-law controls reframed as law-specific interchanges (Mode 2)
 
-1. ⬜ Generate controls for OH&S family laws (batch mode)
-2. ⬜ Measure: controls per law, constraint pass rates, provision coverage
-3. ⬜ Spot-check 10-15 controls — quality review
-4. ⬜ Assess intra-law duplication: do any laws produce near-duplicate controls?
-5. ⬜ Assess cross-law duplication: how many "risk assessment" controls across HSWA, MHSW, COSHH etc?
-6. ⬜ Decide: is HDBSCAN consolidation needed, or does the LLM's built-in consolidation suffice?
-7. ⬜ Generate policy predicates for the pilot set
-8. ⬜ Iterate prompt if failure modes found
-
-**Depends on**: Phase 1 (generate + validate working)
-**Enables**: Phase 3 (full corpus) or Phase 2b (consolidation, if needed)
-**Estimated effort**: 1 session
+**Session**: `07-11-26-phase2-ohs-pilot.md` (closed)
 
 ### Phase 2b: Consolidation — DROPPED
 
@@ -66,15 +57,13 @@ Pilot showed 3.9:1 consolidation from the LLM prompt alone. Cross-law "duplicate
 
 Run across all ~2K laws in batch. Quality review and iterate.
 
-1. ⬜ Batch generation across full corpus (~2,150 Gemini Pro calls)
-2. ⬜ Corpus stats: total controls, distribution by family, constraint pass rates
-3. ⬜ Spot-check 20-30 controls across families
-4. ⬜ Identify failure modes, iterate prompt
-5. ⬜ Final quality report
+1. ✅ QQ corpus complete: 220/428 laws → 1,341 controls + 222 predicates
+2. ✅ 94.1% validated, 5.9% flagged (73 JUDGEMENT_MISSING, 36 INVALID_REF, 4 PAPERWORK, 2 DEONTIC)
+3. ✅ Spot-checked 12 non-OH&S laws (86 controls) — zero deontic, zero paperwork
+4. ✅ No prompt iteration needed
+5. ✅ 208 QQ laws have no governed provisions — 100% of processable laws complete
 
-**Depends on**: Phase 2 (pilot validated)
-**Enables**: Phase 4
-**Estimated effort**: 1-2 sessions
+**Session**: `07-11-26-phase3-qq-corpus.md` (closed)
 
 ### Phase 4: Publish + Delivery
 
