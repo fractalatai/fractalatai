@@ -42,6 +42,7 @@ pub mod making;
 pub mod popimar;
 pub mod purpose;
 pub mod signals;
+pub mod applicability;
 pub mod text_cleaner;
 
 use regex::Regex;

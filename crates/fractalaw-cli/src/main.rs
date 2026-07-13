@@ -342,6 +342,15 @@ enum FitnessAction {
         #[arg(long)]
         law_file: Option<PathBuf>,
     },
+    /// Compile fitness mentions into expression trees per law → DuckDB
+    Compile {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Read law names from a file (one per line or CSV)
+        #[arg(long)]
+        law_file: Option<PathBuf>,
+    },
 }
 
 /// Open the provision store (PgStore if --pg is set, otherwise LanceStore).
@@ -669,6 +678,14 @@ async fn main() -> anyhow::Result<()> {
                     .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
                 commands::fitness::cmd_fitness_status(pg_url, law_names.as_deref()).await
+            }
+            FitnessAction::Compile { laws, law_file } => {
+                let pg_url = pg_url
+                    .as_deref()
+                    .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
+                let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
+                let duck = open_duck(&data_dir)?;
+                commands::fitness::cmd_fitness_compile(pg_url, &duck, law_names.as_deref()).await
             }
         },
     }

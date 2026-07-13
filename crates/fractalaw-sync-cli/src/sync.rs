@@ -176,6 +176,7 @@ pub(crate) async fn cmd_sync_publish(
                     fitness_plant, fitness_property, fitness_sector, fitness, \
                     fitness_entities, fitness_scope_dimensions, \
                     fitness_mention_count, fitness_applies_count, fitness_disapplies_count, \
+                    compiled_applicability, \
                     significance_rating, significance_score, \
                     significance_high_count, significance_medium_count, \
                     significance_low_count, significance_total_obligations, \

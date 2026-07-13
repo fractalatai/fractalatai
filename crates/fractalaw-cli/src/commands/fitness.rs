@@ -5,6 +5,7 @@
 //! no DRRP coupling.
 
 use anyhow::Context;
+use fractalaw_core::taxa::applicability::ApplicabilityNode;
 use fractalaw_core::taxa::fitness;
 use fractalaw_store::{DuckStore, PgStore};
 use regex::Regex;
@@ -404,4 +405,173 @@ pub(crate) async fn cmd_fitness_status(
     );
 
     Ok(())
+}
+
+// ── Expression tree compiler ────────────────────────────────────────
+
+/// Compile fitness mentions into expression trees per law, write to DuckDB.
+pub(crate) async fn cmd_fitness_compile(
+    pg_url: &str,
+    duck: &DuckStore,
+    law_names: Option<&[String]>,
+) -> anyhow::Result<()> {
+    let store = PgStore::connect(pg_url)
+        .await
+        .context("connecting to PostgreSQL")?;
+    let pool = store.pool();
+
+    // Load entity → scope dimension mapping
+    let entity_dims: std::collections::HashMap<String, String> = {
+        let rows = sqlx::query_as::<_, (String, Vec<String>)>(
+            "SELECT display_name, scope_dimensions FROM fitness_entities",
+        )
+        .fetch_all(pool)
+        .await?;
+        rows.into_iter()
+            .map(|(name, dims)| (name.to_lowercase(), dims.first().cloned().unwrap_or_else(|| "material".to_string())))
+            .collect()
+    };
+
+    // Get all non-propagated mentions grouped by law
+    let mentions = if let Some(names) = law_names {
+        let name_list: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
+        sqlx::query_as::<_, (String, String, Option<String>, Option<Vec<String>>, Option<Vec<String>>)>(
+            "SELECT split_part(section_id, ':', 1) as law_name, polarity, scope_unit, entities, scope_dimensions \
+             FROM fitness_mentions \
+             WHERE extraction_method != 'propagated' \
+             AND entities IS NOT NULL AND entities != '{}' \
+             AND split_part(section_id, ':', 1) = ANY($1) \
+             ORDER BY split_part(section_id, ':', 1), scope_unit, polarity",
+        )
+        .bind(&name_list)
+        .fetch_all(pool)
+        .await?
+    } else {
+        sqlx::query_as::<_, (String, String, Option<String>, Option<Vec<String>>, Option<Vec<String>>)>(
+            "SELECT split_part(section_id, ':', 1) as law_name, polarity, scope_unit, entities, scope_dimensions \
+             FROM fitness_mentions \
+             WHERE extraction_method != 'propagated' \
+             AND entities IS NOT NULL AND entities != '{}' \
+             ORDER BY split_part(section_id, ':', 1), scope_unit, polarity",
+        )
+        .fetch_all(pool)
+        .await?
+    };
+
+    eprintln!("Loaded {} mentions for compilation", mentions.len());
+
+    // Group by law
+    let mut by_law: std::collections::BTreeMap<String, Vec<(String, Option<String>, Vec<String>, Vec<String>)>> =
+        std::collections::BTreeMap::new();
+    for (law, pol, scope, ents, dims) in mentions {
+        let ents = ents.unwrap_or_default();
+        let dims = dims.unwrap_or_default();
+        if !ents.is_empty() {
+            by_law.entry(law).or_default().push((pol, scope, ents, dims));
+        }
+    }
+
+    // Ensure DuckDB column exists
+    let _ = duck.execute("ALTER TABLE legislation ADD COLUMN compiled_applicability VARCHAR");
+
+    // Compile each law
+    let mut compiled = 0u32;
+    for (law_name, mentions) in &by_law {
+        let tree = compile_law(mentions, &entity_dims);
+        if let Some(tree) = tree {
+            let json = tree.to_json().map_err(|e| anyhow::anyhow!("JSON error for {law_name}: {e}"))?;
+            duck.execute(&format!(
+                "UPDATE legislation SET compiled_applicability = '{}' WHERE name = '{}'",
+                json.replace('\'', "''"),
+                law_name.replace('\'', "''"),
+            ))?;
+            compiled += 1;
+        }
+    }
+
+    eprintln!("Compiled expression trees for {compiled}/{} laws", by_law.len());
+    Ok(())
+}
+
+/// Compile all mentions for a single law into an expression tree.
+fn compile_law(
+    mentions: &[(String, Option<String>, Vec<String>, Vec<String>)],
+    entity_dims: &std::collections::HashMap<String, String>,
+) -> Option<ApplicabilityNode> {
+    let mut applies_nodes = Vec::new();
+    let mut disapplies_nodes = Vec::new();
+    let mut time_nodes = Vec::new();
+
+    for (polarity, _scope, entities, _dims) in mentions {
+        // Check for temporal entities (ISO dates)
+        let temporal: Vec<&String> = entities.iter().filter(|e| is_iso_date(e)).collect();
+        let non_temporal: Vec<&String> = entities.iter().filter(|e| !is_iso_date(e)).collect();
+
+        // Temporal → TimeWindow
+        for date in &temporal {
+            match polarity.as_str() {
+                "AppliesTo" | "ExtendsTo" => {
+                    time_nodes.push(ApplicabilityNode::time_window(Some(date), None));
+                }
+                "DisappliesTo" => {
+                    time_nodes.push(ApplicabilityNode::time_window(None, Some(date)));
+                }
+                _ => {}
+            }
+        }
+
+        if non_temporal.is_empty() {
+            continue;
+        }
+
+        // Group entities by scope dimension
+        let mut by_dim: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
+        for entity in &non_temporal {
+            let dim = entity_dims
+                .get(&entity.to_lowercase())
+                .cloned()
+                .unwrap_or_else(|| "material".to_string());
+            by_dim.entry(dim).or_default().push(
+                entity.to_lowercase().replace(' ', "_"),
+            );
+        }
+
+        // Each dimension → Match node (same dimension = OR)
+        let mut dim_nodes: Vec<ApplicabilityNode> = Vec::new();
+        for (dim, codes) in by_dim {
+            dim_nodes.push(ApplicabilityNode::match_any(&dim, codes));
+        }
+
+        // Multiple dimensions → AND
+        let mention_node = ApplicabilityNode::and(dim_nodes);
+
+        match polarity.as_str() {
+            "DisappliesTo" => disapplies_nodes.push(mention_node),
+            _ => applies_nodes.push(mention_node),
+        }
+    }
+
+    // Combine: applies AND NOT(disapplies) AND time_windows
+    let mut top_nodes = Vec::new();
+
+    if !applies_nodes.is_empty() {
+        top_nodes.push(ApplicabilityNode::and(applies_nodes));
+    }
+    for dis in disapplies_nodes {
+        top_nodes.push(dis.negate());
+    }
+    top_nodes.extend(time_nodes);
+
+    if top_nodes.is_empty() {
+        return None;
+    }
+
+    Some(ApplicabilityNode::and(top_nodes))
+}
+
+fn is_iso_date(s: &str) -> bool {
+    s.len() == 10
+        && s.as_bytes().get(4) == Some(&b'-')
+        && s.as_bytes().get(7) == Some(&b'-')
+        && s[..4].chars().all(|c| c.is_ascii_digit())
 }
