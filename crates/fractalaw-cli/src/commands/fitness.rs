@@ -551,14 +551,37 @@ fn compile_law(
         }
     }
 
-    // Combine: applies AND NOT(disapplies) AND time_windows
+    // Combine: OR(applies) AND NOT(OR(law-level disapplies)) AND time_windows
+    //
+    // AppliesTo = disjunctive: ANY provision's applicability = law applies
+    // DisappliesTo = law-level exclusions only. Provision-level exceptions
+    // (where the same code appears in both AppliesTo and DisappliesTo) are
+    // dropped — they're section-specific overrides, not law-wide exclusions.
     let mut top_nodes = Vec::new();
 
     if !applies_nodes.is_empty() {
-        top_nodes.push(ApplicabilityNode::and(applies_nodes));
-    }
-    for dis in disapplies_nodes {
-        top_nodes.push(dis.negate());
+        // Collect all codes from AppliesTo for conflict detection
+        let applies_codes: std::collections::HashSet<String> = applies_nodes
+            .iter()
+            .flat_map(|node| extract_codes(node))
+            .collect();
+
+        top_nodes.push(ApplicabilityNode::or(applies_nodes));
+
+        // Filter disapplies: only keep codes that DON'T appear in AppliesTo
+        if !disapplies_nodes.is_empty() {
+            let filtered: Vec<ApplicabilityNode> = disapplies_nodes
+                .into_iter()
+                .filter(|node| {
+                    let codes = extract_codes(node);
+                    // Keep if NONE of its codes conflict with AppliesTo
+                    !codes.iter().any(|c| applies_codes.contains(c))
+                })
+                .collect();
+            if !filtered.is_empty() {
+                top_nodes.push(ApplicabilityNode::or(filtered).negate());
+            }
+        }
     }
     top_nodes.extend(time_nodes);
 
@@ -567,6 +590,25 @@ fn compile_law(
     }
 
     Some(ApplicabilityNode::and(top_nodes))
+}
+
+/// Extract all codes from an ApplicabilityNode (recursively).
+fn extract_codes(node: &ApplicabilityNode) -> Vec<String> {
+    match node {
+        ApplicabilityNode::Match { codes, .. } => codes.clone(),
+        ApplicabilityNode::And { children } | ApplicabilityNode::Or { children } => {
+            children.iter().flat_map(extract_codes).collect()
+        }
+        ApplicabilityNode::Not { child } => extract_codes(child),
+        ApplicabilityNode::Conditional { condition, then } => {
+            let mut codes = extract_codes(condition);
+            codes.extend(extract_codes(then));
+            codes
+        }
+        ApplicabilityNode::TimeWindow { inner, .. } => {
+            inner.as_ref().map(|n| extract_codes(n)).unwrap_or_default()
+        }
+    }
 }
 
 fn is_iso_date(s: &str) -> bool {

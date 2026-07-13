@@ -24,6 +24,10 @@ This is the last step before the fitness data is usable — without reconciliati
 8. ✅ Updated ZENOH-SPEC.md to v2.2 with new fitness fields.
 9. ✅ Created sertantai implementation guide: `docs/controls/FITNESS-APPLICABILITY.md` with Elixir evaluator code, customer profile schema, hierarchy expansion.
 10. ✅ 42 orphan laws with non-standard naming (UK_YYYY_NNN instead of UK_uksi_YYYY_NNN) identified and cleaned. 37 renamed (1:1 match), 4 manually resolved (wsi/ssi/uksi), 1 deleted (duplicate). Zero orphans remaining.
+11. ✅ Fixed compiler: AppliesTo → Or (any match = law applies), DisappliesTo → Not(Or(...)) (single grouped exclusion)
+12. ✅ Fixed compiler: provision-level DisappliesTo codes that conflict with AppliesTo codes are dropped (section-specific exceptions, not law-wide exclusions). NERC Act: 10→6 disapplies after filtering.
+13. ✅ Recompiled 696 laws, republished 4 benchmarks
+14. ⬜ Verify sertantai evaluator returns correct matches with fixed trees
 
 ## Dependencies
 
