@@ -91,8 +91,6 @@ impl PgStore {
         let rows = sqlx::query(
             "SELECT section_id, drrp_types, duty_family, duty_sub_type, popimar, purposes, \
              clause_refined, taxa_confidence, taxa_classified_at, \
-             fitness_polarity, fitness_person, fitness_process, fitness_place, \
-             fitness_plant, fitness_property, fitness_sector, \
              extraction_method, holder_inferred_from, ancestor_distance, actors, \
              significance_scope_duty_bearer, significance_scope_protected_class, \
              significance_gravity, significance_strength, significance_hierarchy, \

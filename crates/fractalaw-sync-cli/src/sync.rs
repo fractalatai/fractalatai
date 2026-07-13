@@ -71,7 +71,7 @@ pub(crate) async fn cmd_sync_publish(
 ) -> anyhow::Result<()> {
     let store = open_duck(data_dir)?;
     store.ensure_taxa_hash_columns()?;
-    store.ensure_fitness_columns()?;
+    // Legacy ensure_fitness_columns() removed — fitness uses fitness_mentions table
 
     let law_names: Vec<String> = if let Some(ref fam) = family {
         let names = laws_in_family(&store, fam)?;
@@ -172,8 +172,6 @@ pub(crate) async fn cmd_sync_publish(
             "SELECT name, duty_holder, rights_holder, responsibility_holder, power_holder, \
                     duty_type, role, role_gvt, \
                     duties, rights, responsibilities, powers, \
-                    fitness_person, fitness_process, fitness_place, \
-                    fitness_plant, fitness_property, fitness_sector, fitness, \
                     fitness_entities, fitness_scope_dimensions, \
                     fitness_mention_count, fitness_applies_count, fitness_disapplies_count, \
                     compiled_applicability, \

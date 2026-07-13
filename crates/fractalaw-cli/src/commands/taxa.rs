@@ -1913,7 +1913,7 @@ pub(crate) async fn cmd_taxa_parse(
     force: bool,
 ) -> anyhow::Result<usize> {
     store.ensure_taxa_hash_columns()?;
-    store.ensure_fitness_columns()?;
+    // Legacy ensure_fitness_columns() removed — fitness uses fitness_mentions table
 
     let mut enriched = 0usize;
     let mut failed = 0usize;
@@ -3404,7 +3404,7 @@ pub(crate) async fn cmd_taxa_escalate(
     law_names: &[String],
 ) -> anyhow::Result<()> {
     store.ensure_taxa_hash_columns()?;
-    store.ensure_fitness_columns()?;
+    // Legacy ensure_fitness_columns() removed — fitness uses fitness_mentions table
     lance.ensure_gap_c_columns().await?;
 
     let tier2_provider = std::env::var("LLM_PROVIDER").ok();
@@ -3468,7 +3468,7 @@ pub(crate) async fn cmd_taxa_enrich(
 ) -> anyhow::Result<()> {
     // Ensure taxa_hash/published_hash and fitness columns exist (idempotent).
     store.ensure_taxa_hash_columns()?;
-    store.ensure_fitness_columns()?;
+    // Legacy ensure_fitness_columns() removed — fitness uses fitness_mentions table
 
     let lance = crate::open_provision_store(data_dir, pg_url).await?;
 

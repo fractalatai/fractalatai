@@ -644,35 +644,8 @@ impl DuckStore {
 
     // ── Fitness / Applicability columns ──
 
-    /// Ensure fitness tag columns and detail column exist on `legislation`.
-    ///
-    /// 6 tag columns (`fitness_person` .. `fitness_sector`) as `VARCHAR[]` and
-    /// 1 detail column (`fitness`) as `STRUCT(polarity, person, process, place,
-    /// plant, property, sector, article)[]`.
-    ///
-    /// Idempotent — safe to call multiple times.
-    pub fn ensure_fitness_columns(&self) -> Result<(), StoreError> {
-        for col in [
-            "fitness_person",
-            "fitness_process",
-            "fitness_place",
-            "fitness_plant",
-            "fitness_property",
-            "fitness_sector",
-        ] {
-            self.conn.execute_batch(&format!(
-                "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS {col} VARCHAR[]"
-            ))?;
-        }
-        let fitness_struct = "STRUCT(polarity VARCHAR, person VARCHAR, process VARCHAR, \
-                              place VARCHAR, plant VARCHAR, property VARCHAR, \
-                              sector VARCHAR, article VARCHAR)[]";
-        self.conn.execute_batch(&format!(
-            "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS fitness {fitness_struct}"
-        ))?;
-        info!("ensured fitness columns exist (6 tag + 1 detail)");
-        Ok(())
-    }
+    // Legacy ensure_fitness_columns() removed — fitness now uses fitness_mentions (Postgres)
+    // + fitness_entities/fitness_scope_dimensions/compiled_applicability (DuckDB, added by fitness compile CLI).
 
     // ── Taxa change-tracking columns ──
 
@@ -1461,65 +1434,7 @@ mod tests {
         assert_eq!(after_second[0].num_columns(), cols_first);
     }
 
-    #[test]
-    fn ensure_fitness_columns_adds_seven_columns() {
-        let dir = require_data();
-        let store = DuckStore::open().unwrap();
-        store
-            .load_legislation(&dir.join("legislation.parquet"))
-            .unwrap();
-
-        let before = store
-            .query_arrow("SELECT * FROM legislation LIMIT 1")
-            .unwrap();
-        let before_cols = before[0].num_columns();
-
-        store.ensure_fitness_columns().unwrap();
-
-        let after = store
-            .query_arrow("SELECT * FROM legislation LIMIT 1")
-            .unwrap();
-        assert_eq!(after[0].num_columns(), before_cols + 7);
-
-        for col in [
-            "fitness_person",
-            "fitness_process",
-            "fitness_place",
-            "fitness_plant",
-            "fitness_property",
-            "fitness_sector",
-            "fitness",
-        ] {
-            let check = store
-                .query_arrow(&format!(
-                    "SELECT {col} FROM legislation WHERE {col} IS NOT NULL LIMIT 1"
-                ))
-                .unwrap();
-            let rows: usize = check.iter().map(|b| b.num_rows()).sum();
-            assert_eq!(rows, 0, "{col} should be all NULL initially");
-        }
-    }
-
-    #[test]
-    fn ensure_fitness_columns_idempotent() {
-        let dir = require_data();
-        let store = DuckStore::open().unwrap();
-        store
-            .load_legislation(&dir.join("legislation.parquet"))
-            .unwrap();
-
-        store.ensure_fitness_columns().unwrap();
-        let after_first = store
-            .query_arrow("SELECT * FROM legislation LIMIT 1")
-            .unwrap();
-        let cols_first = after_first[0].num_columns();
-
-        store.ensure_fitness_columns().unwrap();
-        let after_second = store
-            .query_arrow("SELECT * FROM legislation LIMIT 1")
-            .unwrap();
-        assert_eq!(after_second[0].num_columns(), cols_first);
-    }
+    // Legacy ensure_fitness_columns tests removed.
 
     #[test]
     fn ensure_drrp_ai_columns_idempotent() {

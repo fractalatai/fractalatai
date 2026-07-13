@@ -49,13 +49,8 @@ pub(crate) struct LawTaxa {
     pub(crate) rights: Vec<(String, String, String, String)>,
     pub(crate) responsibilities: Vec<(String, String, String, String)>,
     pub(crate) powers: Vec<(String, String, String, String)>,
-    pub(crate) fitness_persons: std::collections::BTreeSet<String>,
-    pub(crate) fitness_processes: std::collections::BTreeSet<String>,
-    pub(crate) fitness_places: std::collections::BTreeSet<String>,
-    pub(crate) fitness_plants: std::collections::BTreeSet<String>,
-    pub(crate) fitness_properties: std::collections::BTreeSet<String>,
-    pub(crate) fitness_sectors: std::collections::BTreeSet<String>,
-    pub(crate) fitness_entries: Vec<FitnessEntry>,
+    // Legacy fitness_persons/processes/places/plants/properties/sectors/entries removed.
+    // Fitness now handled by `fitness extract` CLI → fitness_mentions table.
 }
 
 impl LawTaxa {
@@ -72,13 +67,6 @@ impl LawTaxa {
             rights: Vec::new(),
             responsibilities: Vec::new(),
             powers: Vec::new(),
-            fitness_persons: std::collections::BTreeSet::new(),
-            fitness_processes: std::collections::BTreeSet::new(),
-            fitness_places: std::collections::BTreeSet::new(),
-            fitness_plants: std::collections::BTreeSet::new(),
-            fitness_properties: std::collections::BTreeSet::new(),
-            fitness_sectors: std::collections::BTreeSet::new(),
-            fitness_entries: Vec::new(),
         }
     }
 }
@@ -103,13 +91,8 @@ pub(crate) struct ProvisionTaxa {
     pub(crate) purposes: Vec<String>,
     pub(crate) clause_refined: String,
     pub(crate) taxa_confidence: Option<f32>,
-    pub(crate) fitness_polarity: Vec<String>,
-    pub(crate) fitness_person: Vec<String>,
-    pub(crate) fitness_process: Vec<String>,
-    pub(crate) fitness_place: Vec<String>,
-    pub(crate) fitness_plant: Vec<String>,
-    pub(crate) fitness_property: Vec<String>,
-    pub(crate) fitness_sector: Vec<String>,
+    // Legacy fitness_polarity/person/process/place/plant/property/sector removed.
+    // Fitness handled by `fitness extract` CLI independently.
     pub(crate) section_type: String,
     pub(crate) hierarchy_path: String,
     pub(crate) depth: i32,
@@ -133,13 +116,6 @@ impl ProvisionTaxa {
             purposes: Vec::new(),
             clause_refined: String::new(),
             taxa_confidence: None,
-            fitness_polarity: Vec::new(),
-            fitness_person: Vec::new(),
-            fitness_process: Vec::new(),
-            fitness_place: Vec::new(),
-            fitness_plant: Vec::new(),
-            fitness_property: Vec::new(),
-            fitness_sector: Vec::new(),
             section_type: String::new(),
             hierarchy_path: String::new(),
             depth: 0,
@@ -339,18 +315,10 @@ fn parse_provisions(
                 && record.purposes.is_empty()
             {
                 // Passed scope filter but no taxa — still substantive, just empty.
-                // Still run polarity detection: applicability language can appear
-                // in provisions that have no actors or DRRP types.
                 if !section_id.is_empty() {
-                    let fp_polarity: Vec<String> =
-                        fractalaw_core::taxa::fitness::detect_polarity(&record.cleaned_text)
-                            .iter()
-                            .map(|p| p.as_str().to_string())
-                            .collect();
                     provision_taxa.push(ProvisionTaxa {
                         section_id,
                         scope: "substantive".to_string(),
-                        fitness_polarity: fp_polarity,
                         ..ProvisionTaxa::empty()
                     });
                 }
@@ -392,112 +360,8 @@ fn parse_provisions(
                     // Multi-actor or DRRP=none with actors → low confidence, Tier 2 candidate
                     Some(0.30)
                 };
-                // ── Fitness: polarity detection (runs on ALL provisions) ──
-                // Polarity is separated from entity extraction — detect_polarity
-                // is a cheap regex pass that flags provisions with applicability
-                // language regardless of purpose classification.
-                let fp_polarity: Vec<String> = fractalaw_core::taxa::fitness::detect_polarity(
-                    &record.cleaned_text,
-                )
-                .iter()
-                .map(|p| p.as_str().to_string())
-                .collect();
-
-                // ── Fitness: entity extraction (APPLICATION_SCOPE only) ──
-                let mut fp_person = Vec::new();
-                let mut fp_process = Vec::new();
-                let mut fp_place = Vec::new();
-                let mut fp_plant = Vec::new();
-                let mut fp_property = Vec::new();
-                let mut fp_sector = Vec::new();
-                for rule in &record.fitness_rules {
-                    use fractalaw_core::taxa::fitness::PDimension;
-                    let mut r_person = Vec::new();
-                    let mut r_process = Vec::new();
-                    let mut r_place = Vec::new();
-                    let mut r_plant = Vec::new();
-                    let mut r_property = Vec::new();
-                    let mut r_sector = Vec::new();
-                    for tag in &rule.tags {
-                        match tag.dimension {
-                            PDimension::Person => {
-                                if !fp_person.contains(&tag.term) {
-                                    fp_person.push(tag.term.clone());
-                                }
-                                r_person.push(tag.term.clone());
-                            }
-                            PDimension::Process => {
-                                if !fp_process.contains(&tag.term) {
-                                    fp_process.push(tag.term.clone());
-                                }
-                                r_process.push(tag.term.clone());
-                            }
-                            PDimension::Place => {
-                                if !fp_place.contains(&tag.term) {
-                                    fp_place.push(tag.term.clone());
-                                }
-                                r_place.push(tag.term.clone());
-                            }
-                            PDimension::Plant => {
-                                if !fp_plant.contains(&tag.term) {
-                                    fp_plant.push(tag.term.clone());
-                                }
-                                r_plant.push(tag.term.clone());
-                            }
-                            PDimension::Property => {
-                                if !fp_property.contains(&tag.term) {
-                                    fp_property.push(tag.term.clone());
-                                }
-                                r_property.push(tag.term.clone());
-                            }
-                            PDimension::Sector => {
-                                if !fp_sector.contains(&tag.term) {
-                                    fp_sector.push(tag.term.clone());
-                                }
-                                r_sector.push(tag.term.clone());
-                            }
-                        }
-                        // Aggregate into law-level sets.
-                        match tag.dimension {
-                            PDimension::Person => {
-                                taxa.fitness_persons.insert(tag.term.clone());
-                            }
-                            PDimension::Process => {
-                                taxa.fitness_processes.insert(tag.term.clone());
-                            }
-                            PDimension::Place => {
-                                taxa.fitness_places.insert(tag.term.clone());
-                            }
-                            PDimension::Plant => {
-                                taxa.fitness_plants.insert(tag.term.clone());
-                            }
-                            PDimension::Property => {
-                                taxa.fitness_properties.insert(tag.term.clone());
-                            }
-                            PDimension::Sector => {
-                                taxa.fitness_sectors.insert(tag.term.clone());
-                            }
-                        }
-                    }
-                    // Build FitnessEntry tuple for law-level detail.
-                    let join = |v: &[String]| {
-                        if v.is_empty() {
-                            String::new()
-                        } else {
-                            v.join(", ")
-                        }
-                    };
-                    taxa.fitness_entries.push((
-                        rule.polarity.as_str().to_string(),
-                        join(&r_person),
-                        join(&r_process),
-                        join(&r_place),
-                        join(&r_plant),
-                        join(&r_property),
-                        join(&r_sector),
-                        format!("section/{provision}"),
-                    ));
-                }
+                // Fitness extraction removed from DRRP pipeline.
+                // Fitness is handled independently by `fitness extract` CLI → fitness_mentions table.
 
                 provision_taxa.push(ProvisionTaxa {
                     section_id,
@@ -530,13 +394,6 @@ fn parse_provisions(
                         .clone()
                         .unwrap_or_else(|| record.cleaned_text.clone()),
                     taxa_confidence,
-                    fitness_polarity: fp_polarity,
-                    fitness_person: fp_person,
-                    fitness_process: fp_process,
-                    fitness_place: fp_place,
-                    fitness_plant: fp_plant,
-                    fitness_property: fp_property,
-                    fitness_sector: fp_sector,
                     section_type: section_type.clone(),
                     hierarchy_path: hierarchy_path.clone(),
                     depth,
@@ -1328,13 +1185,7 @@ async fn write_provision_taxa(
     let mut clause_refined_b = StringBuilder::new();
     let mut confidence_b = Float32Builder::new();
     let mut classified_at_b = TimestampNanosecondBuilder::new().with_timezone("UTC");
-    let mut fit_polarity_b = ListBuilder::new(StringBuilder::new());
-    let mut fit_person_b = ListBuilder::new(StringBuilder::new());
-    let mut fit_process_b = ListBuilder::new(StringBuilder::new());
-    let mut fit_place_b = ListBuilder::new(StringBuilder::new());
-    let mut fit_plant_b = ListBuilder::new(StringBuilder::new());
-    let mut fit_property_b = ListBuilder::new(StringBuilder::new());
-    let mut fit_sector_b = ListBuilder::new(StringBuilder::new());
+    // Legacy fitness builders removed.
     let mut extraction_method_b = StringBuilder::new();
     let mut inferred_from_b = StringBuilder::new();
     let mut ancestor_distance_b = arrow::array::Int32Builder::new();
@@ -1412,34 +1263,7 @@ async fn write_provision_taxa(
         }
         classified_at_b.append_value(now_ns);
 
-        for v in &pt.fitness_polarity {
-            fit_polarity_b.values().append_value(v);
-        }
-        fit_polarity_b.append(true);
-        for v in &pt.fitness_person {
-            fit_person_b.values().append_value(v);
-        }
-        fit_person_b.append(true);
-        for v in &pt.fitness_process {
-            fit_process_b.values().append_value(v);
-        }
-        fit_process_b.append(true);
-        for v in &pt.fitness_place {
-            fit_place_b.values().append_value(v);
-        }
-        fit_place_b.append(true);
-        for v in &pt.fitness_plant {
-            fit_plant_b.values().append_value(v);
-        }
-        fit_plant_b.append(true);
-        for v in &pt.fitness_property {
-            fit_property_b.values().append_value(v);
-        }
-        fit_property_b.append(true);
-        for v in &pt.fitness_sector {
-            fit_sector_b.values().append_value(v);
-        }
-        fit_sector_b.append(true);
+        // Legacy fitness columns removed from RecordBatch builder.
 
         extraction_method_b.append_value(&pt.extraction_method);
         if pt.holder_inferred_from.is_empty() {
@@ -1532,13 +1356,7 @@ async fn write_provision_taxa(
             DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())),
             true,
         ),
-        Field::new("fitness_polarity", DataType::List(item_field.clone()), true),
-        Field::new("fitness_person", DataType::List(item_field.clone()), true),
-        Field::new("fitness_process", DataType::List(item_field.clone()), true),
-        Field::new("fitness_place", DataType::List(item_field.clone()), true),
-        Field::new("fitness_plant", DataType::List(item_field.clone()), true),
-        Field::new("fitness_property", DataType::List(item_field.clone()), true),
-        Field::new("fitness_sector", DataType::List(item_field.clone()), true),
+        // Legacy fitness_* fields removed from provision schema.
         Field::new("extraction_method", DataType::Utf8, true),
         Field::new("holder_inferred_from", DataType::Utf8, true),
         Field::new("ancestor_distance", DataType::Int32, true),
@@ -1578,13 +1396,6 @@ async fn write_provision_taxa(
             std::sync::Arc::new(clause_refined_b.finish()),
             std::sync::Arc::new(confidence_b.finish()),
             std::sync::Arc::new(classified_at_b.finish()),
-            std::sync::Arc::new(fit_polarity_b.finish()),
-            std::sync::Arc::new(fit_person_b.finish()),
-            std::sync::Arc::new(fit_process_b.finish()),
-            std::sync::Arc::new(fit_place_b.finish()),
-            std::sync::Arc::new(fit_plant_b.finish()),
-            std::sync::Arc::new(fit_property_b.finish()),
-            std::sync::Arc::new(fit_sector_b.finish()),
             std::sync::Arc::new(extraction_method_b.finish()),
             std::sync::Arc::new(inferred_from_b.finish()),
             std::sync::Arc::new(ancestor_distance_b.finish()),
@@ -1618,7 +1429,6 @@ fn write_law_taxa(
     if taxa.duty_types.is_empty()
         && taxa.roles.is_empty()
         && taxa.roles_gvt.is_empty()
-        && taxa.fitness_entries.is_empty()
     {
         store.execute(&format!(
             "UPDATE legislation SET \
@@ -1627,10 +1437,7 @@ fn write_law_taxa(
                 duty_type = NULL, role = NULL, role_gvt = NULL, \
                 duties = NULL, rights = NULL, \
                 responsibilities = NULL, powers = NULL, \
-                fitness_person = NULL, fitness_process = NULL, \
-                fitness_place = NULL, fitness_plant = NULL, \
-                fitness_property = NULL, fitness_sector = NULL, \
-                fitness = NULL, taxa_hash = NULL \
+                taxa_hash = NULL \
              WHERE name = '{}'",
             law_name.replace('\'', "''")
         ))?;
@@ -1650,13 +1457,6 @@ fn write_law_taxa(
         &taxa.rights,
         &taxa.responsibilities,
         &taxa.powers,
-        &taxa.fitness_persons,
-        &taxa.fitness_processes,
-        &taxa.fitness_places,
-        &taxa.fitness_plants,
-        &taxa.fitness_properties,
-        &taxa.fitness_sectors,
-        &taxa.fitness_entries,
     );
 
     // Check if taxa actually changed — skip UPDATE if hash is identical.
@@ -1696,13 +1496,6 @@ fn write_law_taxa(
             rights = {rights},
             responsibilities = {responsibilities},
             powers = {powers},
-            fitness_person = {fitness_person},
-            fitness_process = {fitness_process},
-            fitness_place = {fitness_place},
-            fitness_plant = {fitness_plant},
-            fitness_property = {fitness_property},
-            fitness_sector = {fitness_sector},
-            fitness = {fitness},
             taxa_hash = '{taxa_hash}'
          WHERE name = '{name}'",
         duty_holder = format_sql_list(taxa.duty_holders.iter().map(|s| s.as_str())),
@@ -1716,13 +1509,6 @@ fn write_law_taxa(
         rights = format_sql_drrp_entries(&taxa.rights),
         responsibilities = format_sql_drrp_entries(&taxa.responsibilities),
         powers = format_sql_drrp_entries(&taxa.powers),
-        fitness_person = format_sql_list(taxa.fitness_persons.iter().map(|s| s.as_str())),
-        fitness_process = format_sql_list(taxa.fitness_processes.iter().map(|s| s.as_str())),
-        fitness_place = format_sql_list(taxa.fitness_places.iter().map(|s| s.as_str())),
-        fitness_plant = format_sql_list(taxa.fitness_plants.iter().map(|s| s.as_str())),
-        fitness_property = format_sql_list(taxa.fitness_properties.iter().map(|s| s.as_str())),
-        fitness_sector = format_sql_list(taxa.fitness_sectors.iter().map(|s| s.as_str())),
-        fitness = format_sql_fitness_entries(&taxa.fitness_entries),
         taxa_hash = new_hash,
         name = law_name.replace('\'', "''"),
     );

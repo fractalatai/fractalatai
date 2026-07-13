@@ -24,19 +24,7 @@ pub mod esh {
         ])
     }
 
-    /// Struct fields for `FitnessEntry` — used in fitness detail `List<Struct>` column.
-    fn fitness_entry_struct() -> Fields {
-        Fields::from(vec![
-            Field::new("polarity", DataType::Utf8, true),
-            Field::new("person", DataType::Utf8, true),
-            Field::new("process", DataType::Utf8, true),
-            Field::new("place", DataType::Utf8, true),
-            Field::new("plant", DataType::Utf8, true),
-            Field::new("property", DataType::Utf8, true),
-            Field::new("sector", DataType::Utf8, true),
-            Field::new("article", DataType::Utf8, true),
-        ])
-    }
+    // Legacy fitness_entry_struct() removed — fitness now uses fitness_mentions table + compiled_applicability
 
     /// Timestamp(Nanosecond, UTC) — the standard timestamp type for all tables.
     fn timestamp_ns_utc() -> DataType {
@@ -151,22 +139,8 @@ pub mod esh {
             Field::new("taxa_hash", DataType::Utf8, true),
             Field::new("published_hash", DataType::Utf8, true),
             Field::new("provisions_published_at", timestamp_ns_utc(), true),
-            // 1.10c Fitness / Applicability (7)
-            Field::new("fitness_person", list_utf8.clone(), true),
-            Field::new("fitness_process", list_utf8.clone(), true),
-            Field::new("fitness_place", list_utf8.clone(), true),
-            Field::new("fitness_plant", list_utf8.clone(), true),
-            Field::new("fitness_property", list_utf8.clone(), true),
-            Field::new("fitness_sector", list_utf8.clone(), true),
-            Field::new(
-                "fitness",
-                DataType::List(Arc::new(Field::new(
-                    "item",
-                    DataType::Struct(fitness_entry_struct()),
-                    true,
-                ))),
-                true,
-            ),
+            // 1.10c Fitness — legacy P-dimension columns removed.
+            // Fitness now lives in fitness_mentions table (Postgres) + compiled_applicability (DuckDB).
             // 1.10 Commencement Status (1)
             Field::new("commencement_status", DataType::Utf8, true),
             // 1.11 Annotation Totals (4)
@@ -295,42 +269,8 @@ pub mod esh {
             Field::new("clause_refined", DataType::Utf8, true),
             Field::new("taxa_confidence", DataType::Float32, true),
             Field::new("taxa_classified_at", timestamp_ns_utc(), true),
-            // 3.10 Fitness — per-provision applicability tags (7)
-            Field::new(
-                "fitness_polarity",
-                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
-                true,
-            ),
-            Field::new(
-                "fitness_person",
-                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
-                true,
-            ),
-            Field::new(
-                "fitness_process",
-                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
-                true,
-            ),
-            Field::new(
-                "fitness_place",
-                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
-                true,
-            ),
-            Field::new(
-                "fitness_plant",
-                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
-                true,
-            ),
-            Field::new(
-                "fitness_property",
-                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
-                true,
-            ),
-            Field::new(
-                "fitness_sector",
-                DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
-                true,
-            ),
+            // 3.10 Fitness — legacy P-dimension columns removed.
+            // Per-provision fitness now in fitness_mentions table.
             // 3.10b Gap C resolution provenance (3)
             Field::new("extraction_method", DataType::Utf8, true),
             Field::new("holder_inferred_from", DataType::Utf8, true),
@@ -459,7 +399,7 @@ mod tests {
 
     #[test]
     fn legislation_schema_field_count() {
-        assert_eq!(esh::legislation_schema().fields().len(), 100);
+        assert_eq!(esh::legislation_schema().fields().len(), 93);
     }
 
     #[test]
@@ -469,7 +409,7 @@ mod tests {
 
     #[test]
     fn legislation_text_schema_field_count() {
-        assert_eq!(esh::legislation_text_schema().fields().len(), 59);
+        assert_eq!(esh::legislation_text_schema().fields().len(), 52);
     }
 
     #[test]
@@ -727,28 +667,7 @@ mod tests {
 
     // ── Fitness entry struct ──
 
-    #[test]
-    fn fitness_entry_struct_has_8_fields() {
-        let schema = esh::legislation_schema();
-        let field = schema.field_with_name("fitness").unwrap();
-        match field.data_type() {
-            DataType::List(inner) => match inner.data_type() {
-                DataType::Struct(fields) => {
-                    assert_eq!(fields.len(), 8);
-                    assert!(fields.iter().any(|f| f.name() == "polarity"));
-                    assert!(fields.iter().any(|f| f.name() == "person"));
-                    assert!(fields.iter().any(|f| f.name() == "process"));
-                    assert!(fields.iter().any(|f| f.name() == "place"));
-                    assert!(fields.iter().any(|f| f.name() == "plant"));
-                    assert!(fields.iter().any(|f| f.name() == "property"));
-                    assert!(fields.iter().any(|f| f.name() == "sector"));
-                    assert!(fields.iter().any(|f| f.name() == "article"));
-                }
-                other => panic!("expected Struct, got {other:?}"),
-            },
-            other => panic!("expected List, got {other:?}"),
-        }
-    }
+    // Legacy fitness_entry_struct test removed.
 
     // ── All four DRRP detail columns use DRRPEntry ──
 

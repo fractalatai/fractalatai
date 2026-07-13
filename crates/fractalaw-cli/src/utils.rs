@@ -2,17 +2,7 @@ use arrow::array::{Array, Float32Array, Float64Array, Int64Array, LargeStringArr
 use arrow::record_batch::RecordBatch;
 use fractalaw_store::DuckStore;
 
-/// (polarity, person, process, place, plant, property, sector, article)
-pub(crate) type FitnessEntry = (
-    String,
-    String,
-    String,
-    String,
-    String,
-    String,
-    String,
-    String,
-);
+// Legacy FitnessEntry type alias removed.
 
 /// Find the largest byte offset <= `max_bytes` that is a valid char boundary.
 pub(crate) fn truncate_at_char_boundary(s: &str, max_bytes: usize) -> usize {
@@ -136,39 +126,9 @@ pub(crate) fn format_sql_drrp_entries(entries: &[(String, String, String, String
     format!("[{}]", items.join(", "))
 }
 
-/// Format fitness entries as a DuckDB `List<Struct>` literal.
-pub(crate) fn format_sql_fitness_entries(entries: &[FitnessEntry]) -> String {
-    if entries.is_empty() {
-        return "NULL".to_string();
-    }
-    let esc = |s: &str| s.replace('\'', "''");
-    let null_or_val = |s: &str| {
-        if s.is_empty() {
-            "NULL".to_string()
-        } else {
-            format!("'{}'", esc(s))
-        }
-    };
-    let items: Vec<String> = entries
-        .iter()
-        .map(|(pol, per, proc, pl, plt, prop, sec, art)| {
-            format!(
-                "{{'polarity':{},'person':{},'process':{},'place':{},'plant':{},'property':{},'sector':{},'article':{}}}",
-                null_or_val(pol),
-                null_or_val(per),
-                null_or_val(proc),
-                null_or_val(pl),
-                null_or_val(plt),
-                null_or_val(prop),
-                null_or_val(sec),
-                null_or_val(art),
-            )
-        })
-        .collect();
-    format!("[{}]", items.join(", "))
-}
+// Legacy format_sql_fitness_entries() removed.
 
-/// Compute a content hash of the 11 published taxa columns from a `LawTaxa` struct.
+/// Compute a content hash of the DRRP taxa columns from a `LawTaxa` struct.
 ///
 /// Uses `DefaultHasher` (SipHash) over a canonical string built from sorted
 /// column values. Returns a hex-encoded u64 hash.
@@ -185,13 +145,6 @@ pub(crate) fn compute_taxa_hash(
     rights: &[(String, String, String, String)],
     responsibilities: &[(String, String, String, String)],
     powers: &[(String, String, String, String)],
-    fitness_persons: &std::collections::BTreeSet<String>,
-    fitness_processes: &std::collections::BTreeSet<String>,
-    fitness_places: &std::collections::BTreeSet<String>,
-    fitness_plants: &std::collections::BTreeSet<String>,
-    fitness_properties: &std::collections::BTreeSet<String>,
-    fitness_sectors: &std::collections::BTreeSet<String>,
-    fitness_entries: &[FitnessEntry],
 ) -> String {
     use std::hash::{Hash, Hasher};
     let mut hasher = std::hash::DefaultHasher::new();
@@ -263,44 +216,7 @@ pub(crate) fn compute_taxa_hash(
         a.hash(&mut hasher);
     }
 
-    // Fitness tag sets (BTreeSet — already sorted).
-    hasher.write_u8(0xFF);
-    for v in fitness_persons {
-        v.hash(&mut hasher);
-    }
-    hasher.write_u8(0xFF);
-    for v in fitness_processes {
-        v.hash(&mut hasher);
-    }
-    hasher.write_u8(0xFF);
-    for v in fitness_places {
-        v.hash(&mut hasher);
-    }
-    hasher.write_u8(0xFF);
-    for v in fitness_plants {
-        v.hash(&mut hasher);
-    }
-    hasher.write_u8(0xFF);
-    for v in fitness_properties {
-        v.hash(&mut hasher);
-    }
-    hasher.write_u8(0xFF);
-    for v in fitness_sectors {
-        v.hash(&mut hasher);
-    }
-    hasher.write_u8(0xFF);
-    let mut sorted_fitness: Vec<_> = fitness_entries.iter().collect();
-    sorted_fitness.sort();
-    for (pol, per, proc, pl, plt, prop, sec, art) in sorted_fitness {
-        pol.hash(&mut hasher);
-        per.hash(&mut hasher);
-        proc.hash(&mut hasher);
-        pl.hash(&mut hasher);
-        plt.hash(&mut hasher);
-        prop.hash(&mut hasher);
-        sec.hash(&mut hasher);
-        art.hash(&mut hasher);
-    }
+    // Legacy fitness hash inputs removed.
 
     format!("{:016x}", hasher.finish())
 }
