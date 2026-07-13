@@ -1,10 +1,10 @@
 ---
 session: Fitness Reconcile and Publish
-status: suspended
+status: active
 opened: 2026-07-13
 ---
 
-# Session: Fitness Reconcile and Publish (SUSPENDED)
+# Session: Fitness Reconcile and Publish (ACTIVE)
 
 ## Problem
 
@@ -23,7 +23,7 @@ This is the last step before the fitness data is usable — without reconciliati
 7. ✅ Fixed temporal gap: reconciliation was COALESCE (one tier wins) not UNION (merge all tiers). 228 laws now have temporal scope. Re-published 209.
 8. ✅ Updated ZENOH-SPEC.md to v2.2 with new fitness fields.
 9. ✅ Created sertantai implementation guide: `docs/controls/FITNESS-APPLICABILITY.md` with Elixir evaluator code, customer profile schema, hierarchy expansion.
-10. ⏸️ 19 laws with temporal fitness missing from DuckDB (have provisions but no LRT record). Need `query_lrt` from sertantai to create LRT rows.
+10. ✅ 42 orphan laws with non-standard naming (UK_YYYY_NNN instead of UK_uksi_YYYY_NNN) identified and cleaned. 37 renamed (1:1 match), 4 manually resolved (wsi/ssi/uksi), 1 deleted (duplicate). Zero orphans remaining.
 
 ## Dependencies
 
