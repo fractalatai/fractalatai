@@ -1,3 +1,4 @@
+use anyhow::Context;
 use arrow::array::Array;
 
 use fractalaw_core::taxa::making::{self, DetectionResult, MakingClassification};
@@ -173,6 +174,8 @@ pub(crate) async fn cmd_sync_publish(
                     duties, rights, responsibilities, powers, \
                     fitness_person, fitness_process, fitness_place, \
                     fitness_plant, fitness_property, fitness_sector, fitness, \
+                    fitness_entities, fitness_scope_dimensions, \
+                    fitness_mention_count, fitness_applies_count, fitness_disapplies_count, \
                     significance_rating, significance_score, \
                     significance_high_count, significance_medium_count, \
                     significance_low_count, significance_total_obligations, \
@@ -370,6 +373,159 @@ pub(crate) async fn cmd_sync_publish_provisions(
     println!(
         "Published {total_provisions} provisions across {published}/{} laws.",
         law_names.len()
+    );
+    Ok(())
+}
+
+pub(crate) async fn cmd_sync_publish_controls(
+    data_dir: &std::path::Path,
+    zenoh: &ZenohArgs,
+    laws: Option<String>,
+    qq: bool,
+    all: bool,
+) -> anyhow::Result<()> {
+    let store = crate::open_duck(data_dir)?;
+
+    // Determine which laws to publish
+    let law_names: Vec<String> = if let Some(ref l) = laws {
+        l.split(',').map(|s| s.trim().to_string()).collect()
+    } else if qq {
+        let qq_path = data_dir.join("sertantai/qq-applicable-laws.csv");
+        let csv = std::fs::read_to_string(&qq_path)
+            .context("reading qq-applicable-laws.csv")?;
+        let names: Vec<String> = csv.split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+        names
+    } else if all {
+        // All laws with controls in staging
+        let batches = store.query_arrow(
+            "SELECT DISTINCT law_name FROM suggested_controls \
+             WHERE control_type = 'specific' ORDER BY law_name",
+        )?;
+        let mut names = Vec::new();
+        for batch in &batches {
+            if let Some(col) = batch.column_by_name("law_name") {
+                if let Some(arr) = col.as_any().downcast_ref::<arrow::array::StringArray>() {
+                    for i in 0..arr.len() {
+                        if !arr.is_null(i) {
+                            names.push(arr.value(i).to_string());
+                        }
+                    }
+                }
+            }
+        }
+        names
+    } else {
+        anyhow::bail!("specify --laws, --qq, or --all");
+    };
+
+    if law_names.is_empty() {
+        println!("No laws to publish.");
+        return Ok(());
+    }
+
+    println!(
+        "Publishing controls for {} laws to zenoh (tenant: {})...",
+        law_names.len(),
+        zenoh.tenant,
+    );
+
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+
+    print!("Waiting for zenoh peer...");
+    let peers = sync
+        .wait_for_peers(std::time::Duration::from_secs(15))
+        .await;
+    if peers == 0 {
+        println!(" no peers connected (timeout). Publishing anyway.");
+    } else {
+        println!(" {peers} peer(s) connected.");
+    }
+
+    let mut published_controls = 0usize;
+    let mut published_predicates = 0usize;
+    let mut total_control_rows = 0usize;
+
+    for law_name in &law_names {
+        let safe_name = law_name.replace('\'', "''");
+
+        // Query controls for this law from staging table.
+        // DuckDB JSON extraction: control_json->>'$.key' or json_extract_string.
+        let ctrl_sql = format!(
+            "SELECT \
+                law_name, id AS control_id, \
+                json_extract_string(control_json, '$.title') AS title, \
+                json_extract_string(control_json, '$.description') AS description, \
+                json_extract_string(control_json, '$.what_it_checks') AS what_it_checks, \
+                json_extract_string(control_json, '$.control_type') AS control_type, \
+                json_extract_string(control_json, '$.nature') AS nature, \
+                json_extract_string(control_json, '$.domain') AS domain, \
+                json_extract_string(control_json, '$.frequency') AS frequency, \
+                json_extract_string(control_json, '$.info_distance') AS info_distance, \
+                json_extract_string(control_json, '$.blast_radius') AS blast_radius, \
+                json_extract_string(control_json, '$.expected_touch_frequency') AS expected_touch_frequency, \
+                json_extract_string(control_json, '$.mapping_strength') AS mapping_strength, \
+                json_extract_string(control_json, '$.load_bearing_judgement') AS load_bearing_judgement, \
+                json_extract_string(control_json, '$.evidence_hint.type_a') AS evidence_type_a, \
+                json_extract_string(control_json, '$.evidence_hint.type_b') AS evidence_type_b, \
+                json_extract_string(control_json, '$.honest_limit') AS honest_limit, \
+                'Planned' AS status, \
+                'Jurisdiction' AS tier, \
+                generation_model, \
+                base_hash \
+             FROM suggested_controls \
+             WHERE law_name = '{safe_name}' AND control_type = 'specific'",
+        );
+
+        let ctrl_batches = store.query_arrow(&ctrl_sql)?;
+        let ctrl_rows: usize = ctrl_batches.iter().map(|b| b.num_rows()).sum();
+
+        if ctrl_rows == 0 {
+            continue;
+        }
+
+        // Publish controls
+        sync.publish_controls(law_name, &ctrl_batches)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to publish controls for {law_name}: {e}"))?;
+        total_control_rows += ctrl_rows;
+        published_controls += 1;
+
+        // Query and publish predicate
+        let pred_sql = format!(
+            "SELECT \
+                law_name, id AS predicate_id, \
+                json_extract_string(control_json, '$.title') AS title, \
+                json_extract_string(control_json, '$.description') AS description, \
+                json_extract_string(control_json, '$.what_it_checks') AS what_it_checks, \
+                json_extract_string(control_json, '$.honest_limit') AS honest_limit, \
+                generation_model, \
+                base_hash \
+             FROM suggested_controls \
+             WHERE law_name = '{safe_name}' AND control_type = 'predicate'",
+        );
+
+        let pred_batches = store.query_arrow(&pred_sql)?;
+        let pred_rows: usize = pred_batches.iter().map(|b| b.num_rows()).sum();
+
+        if pred_rows > 0 {
+            sync.publish_predicate(law_name, &pred_batches)
+                .await
+                .map_err(|e| anyhow::anyhow!("failed to publish predicate for {law_name}: {e}"))?;
+            published_predicates += 1;
+        }
+
+        eprint!(".");
+    }
+    eprintln!();
+
+    println!(
+        "Published {total_control_rows} controls across {published_controls} laws, {published_predicates} predicates.",
     );
     Ok(())
 }

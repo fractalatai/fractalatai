@@ -265,6 +265,16 @@ The Phase 2e prompted base model (gemma3:4b) achieved 98.98% JSON success but ~4
 - No increase in empty results (maintain recall)
 - Noisy procedural terms eliminated from Match nodes
 
+### Phase 5b: Reconciliation + Re-propagation + Publish
+
+**Goal**: Merge per-tier entity columns into final `entities`, re-propagate with clean data, aggregate to DuckDB LRT, publish to sertantai.
+
+**Reconciliation**: three tiers (regex_entities, slm_entities, ft_entities) merged into final `entities` column. Priority: ft > regex > slm (fine-tuned is highest quality at 93.3% precision, regex is curated dictionaries, base SLM is noisy). Union of entities from the best available tier, deduplicated.
+
+**Re-propagation**: clear propagated mentions, re-run Phase 3b with reconciled entities.
+
+**Publish**: aggregate provision-level fitness to law-level in DuckDB, publish to sertantai via Zenoh.
+
 ### Phase 6: Rules Engine (sertantai, query-time)
 
 **Goal**: Evaluate compiled expression trees against customer profiles to answer "does this law apply to me?"
