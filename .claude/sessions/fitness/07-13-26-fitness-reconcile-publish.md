@@ -1,10 +1,10 @@
 ---
 session: Fitness Reconcile and Publish
-status: suspended
+status: active
 opened: 2026-07-13
 ---
 
-# Session: Fitness Reconcile and Publish (SUSPENDED)
+# Session: Fitness Reconcile and Publish (ACTIVE)
 
 ## Problem
 
