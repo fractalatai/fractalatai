@@ -259,24 +259,37 @@ LAWS=$(cat data/sertantai/<customer>-applicable-laws.csv)
 cargo run -p fractalaw-cli -- taxa reconcile --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw --laws "$LAWS"
 ```
 
-**Sequencing matters**: Significance must run AFTER backfill, not before. Backfill writes `drrp_types = {Obligation}` to `legislation_text` — the significance script queries provisions with this flag. If significance runs before backfill, new provisions won't have `drrp_types` set yet and will be skipped. Run significance → backfill → significance again if needed, or simply run significance after the final backfill.
+**Sequencing is critical for significance.** Three things must happen in order:
+
+1. **Backfill first** — writes `drrp_types = {Obligation}` to `legislation_text`. The significance script queries `provision_actors.regex_drrp = 'Obligation' OR slm_drrp = 'Obligation'` joined to `legislation_text.significance_overall IS NULL`. Without backfill, new provisions don't have `drrp_types` set and may be skipped.
+
+2. **Significance SLM** — writes 4 dimension columns (`significance_gravity`, `significance_scope_duty_bearer`, `significance_scope_protected_class`, `significance_strength`). Does NOT write `significance_overall`.
+
+3. **Derive hierarchy** — writes `significance_hierarchy` from metadata (law type + depth). This is the 5th dimension.
+
+4. **Backfill again** — computes `significance_overall` from all 5 dimensions. **Will set `significance_overall = NULL` if `significance_hierarchy` is missing.** This is why derive_hierarchy MUST run before the final backfill.
+
+The full cycle is: **backfill → significance → derive_hierarchy → backfill**. If significance was run out of order, run: significance → derive_hierarchy → backfill to catch up.
 
 ### Step 8b: Derive hierarchy significance
 
-After significance SLM completes, derive hierarchy from metadata locally:
+After significance SLM completes, derive hierarchy from metadata locally. **Must run before final backfill** — backfill needs all 5 dimensions to compute `significance_overall`.
 
 ```bash
-/usr/bin/python3 .claude/skills/customer-batch-parse/scripts/derive_hierarchy.py --law-file data/sertantai/<customer>-applicable-laws.csv
+LAWS=$(cat data/sertantai/<customer>-applicable-laws.csv)
+/usr/bin/python3 .claude/skills/customer-batch-parse/scripts/derive_hierarchy.py --laws "$LAWS"
 ```
 
-### Step 9: Backfill
+### Step 9: Backfill (final)
 
-Aggregate provision_actors → legislation_text for sertantai publish.
+Aggregate provision_actors → legislation_text AND compute `significance_overall` from all 5 dimensions.
 
 ```bash
 LAWS=$(cat data/sertantai/<customer>-applicable-laws.csv)
 cargo run -p fractalaw-cli -- taxa backfill --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw --laws "$LAWS"
 ```
+
+**Verify significance_overall is populated** — if any Obligation provisions still have `significance_overall IS NULL`, check that `significance_hierarchy` is set. If not, re-run derive_hierarchy then backfill.
 
 ### Step 10: Final stats
 
