@@ -117,7 +117,7 @@ def preflight():
 
 # ── Query ──────────────────────────────────────────────────────────────
 
-def query_gap_provisions(conn, limit=None):
+def query_gap_provisions(conn, limit=None, law_names=None):
     """Fetch mentions needing fine-tuned extraction (no ft_entities yet)."""
     sql = """
         SELECT fm.id, fm.section_id, fm.polarity, lt.text
@@ -126,8 +126,11 @@ def query_gap_provisions(conn, limit=None):
         WHERE (fm.ft_entities IS NULL OR fm.ft_entities = '{}')
         AND fm.extraction_method != 'propagated'
         AND lt.text IS NOT NULL AND length(lt.text) > 20
-        ORDER BY fm.id
     """
+    if law_names:
+        placeholders = ",".join(f"'{n}'" for n in law_names)
+        sql += f" AND lt.law_name IN ({placeholders})"
+    sql += " ORDER BY fm.id"
     if limit:
         sql += f" LIMIT {limit}"
     cur = conn.cursor()
@@ -239,18 +242,30 @@ def main():
     parser.add_argument("--limit", type=int, help="Max provisions to process")
     parser.add_argument("--workers", type=int, default=1, help="Parallel workers (match OLLAMA_NUM_PARALLEL)")
     parser.add_argument("--dry-run", action="store_true", help="Extract but don't write to DB")
+    parser.add_argument("--laws", help="Comma-separated law names or path to a file (one per line) to scope extraction")
     args = parser.parse_args()
 
     if args.test:
         args.limit = 5
         args.workers = 1
 
+    # Parse --laws: comma-separated string or file path (one per line)
+    law_names = None
+    if args.laws:
+        import os
+        if os.path.isfile(args.laws):
+            with open(args.laws) as f:
+                law_names = [line.strip() for line in f if line.strip()]
+        else:
+            law_names = [n.strip() for n in args.laws.split(",") if n.strip()]
+        print(f"Scoped to {len(law_names)} laws")
+
     ok, total = preflight()
     if not ok:
         sys.exit(1)
 
     conn = psycopg2.connect(PG_DSN)
-    rows = query_gap_provisions(conn, args.limit)
+    rows = query_gap_provisions(conn, args.limit, law_names=law_names)
     print(f"\nLoaded {len(rows)} provisions for extraction")
 
     if not rows:
