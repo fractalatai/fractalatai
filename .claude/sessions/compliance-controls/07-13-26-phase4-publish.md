@@ -1,10 +1,10 @@
 ---
 session: Controls Publish
-status: active
+status: suspended
 opened: 2026-07-13
 ---
 
-# Session: Controls Publish (ACTIVE)
+# Session: Controls Publish (SUSPENDED)
 
 ## Problem
 
@@ -30,6 +30,11 @@ The Baserow Controls template already exists in sertantai — that's the UI laye
 7. ⬜ Zenoh subscriber to receive controls from fractalaw
 8. ⬜ Trigger mechanism — request control generation for a law or customer register
 9. ⬜ Baserow sync — populate Controls + Control Mappings templates from Postgres
+
+### Blockers
+- 244 SI laws have `art.` section_ids in our Postgres — sertantai has `reg.`. Old LAT from Feb 2026 before sertantai parser fix. Enrichment is on the `art.` rows. Need section_id rename migration (separate session).
+- 172 laws reparsed (2026-07-13) — 95 now have mixed `art.`/`reg.` rows. `reg.` rows are bare (no enrichment). Need full pipeline on `reg.` rows then drop `art.` rows.
+- Indexed provision approach (prompt v2) eliminates LLM hallucination but needs corpus-wide regeneration to replace old string-ref controls.
 
 ### Integration
 10. ⬜ Test round-trip: sertantai requests → fractalaw generates → publishes → sertantai stores → visible in Baserow

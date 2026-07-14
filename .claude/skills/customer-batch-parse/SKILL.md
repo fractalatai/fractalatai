@@ -20,7 +20,79 @@ When onboarding a customer's legal register for compliance enrichment. The custo
 
 Run in order. Each step depends on the previous. Use `customer-stats` skill between steps to verify coverage.
 
-### Step 0: Baseline stats
+### Step 0: Identify the batch from DuckDB queue
+
+Laws triaged as `making` or `uncertain` by sync watch have `enrichment_pending = true` in DuckDB. Use this to identify the batch rather than manually querying Postgres for gaps:
+
+```bash
+/usr/bin/python3 -c "
+import duckdb
+conn = duckdb.connect('data/fractalaw.duckdb', read_only=True)
+pending = conn.execute(\"SELECT count(*) FROM legislation WHERE enrichment_pending = true\").fetchone()[0]
+not_making = conn.execute(\"SELECT count(*) FROM legislation WHERE triage_classification = 'not_making'\").fetchone()[0]
+print(f'Queued for enrichment: {pending}')
+print(f'Triaged not_making: {not_making}')
+conn.close()
+"
+```
+
+### Step 0a: Remove LAT for not_making laws
+
+Laws triaged as `not_making` should have their LAT provisions removed from Postgres to prevent wasted enrichment. This was previously automatic but is now a manual authorised step.
+
+**Review the list before deleting** — confirm these are genuinely not-making (amending-only, commencement-only, etc.):
+
+```bash
+# List not_making laws
+/usr/bin/python3 -c "
+import duckdb
+conn = duckdb.connect('data/fractalaw.duckdb', read_only=True)
+rows = conn.execute(\"\"\"
+    SELECT name, title, triage_confidence 
+    FROM legislation 
+    WHERE triage_classification = 'not_making'
+    ORDER BY triage_confidence
+\"\"\").fetchall()
+for r in rows:
+    print(f'  {r[2]:.0%} {r[0]:30s} {(r[1] or \"(no title)\")[:50]}')
+print(f'\\nTotal: {len(rows)}')
+conn.close()
+"
+```
+
+After review, delete their provisions from Postgres:
+
+```bash
+# DELETE LAT for not_making laws — DESTRUCTIVE, review list first
+PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -c "
+DELETE FROM legislation_text
+WHERE law_name IN (
+    SELECT name FROM duckdb_scan('data/fractalaw.duckdb', 'legislation')
+    WHERE triage_classification = 'not_making'
+);
+"
+```
+
+> **Note**: This requires the DuckDB foreign data wrapper or a two-step approach — export law names from DuckDB then pass to Postgres. If duckdb_scan isn't available, use:
+
+```bash
+# Two-step: export names then delete
+NOT_MAKING=$(/usr/bin/python3 -c "
+import duckdb
+conn = duckdb.connect('data/fractalaw.duckdb', read_only=True)
+rows = conn.execute(\"SELECT name FROM legislation WHERE triage_classification = 'not_making'\").fetchall()
+print(','.join(f\"'{r[0]}'\" for r in rows))
+conn.close()
+")
+
+PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -c "
+DELETE FROM provision_actors WHERE section_id IN (SELECT section_id FROM legislation_text WHERE law_name IN ($NOT_MAKING));
+DELETE FROM fitness_mentions WHERE section_id IN (SELECT section_id FROM legislation_text WHERE law_name IN ($NOT_MAKING));
+DELETE FROM legislation_text WHERE law_name IN ($NOT_MAKING);
+"
+```
+
+### Step 0b: Baseline stats
 
 ```bash
 /usr/bin/python3 scripts/maintenance/corpus_stats.py --law-file data/sertantai/<customer>-applicable-laws.csv
@@ -28,7 +100,7 @@ Run in order. Each step depends on the previous. Use `customer-stats` skill betw
 
 Check Tier 0 PASS and note the starting state.
 
-### Step 0b: Parse (regex DRRP extraction)
+### Step 0c: Parse (regex DRRP extraction)
 
 Run on laws that have LAT in Postgres but haven't been parsed. Sets scope (out/structural/substantive), extracts actors, writes `provision_actors` rows. **Must run before embed** — embed requires `scope = 'substantive'`.
 
@@ -161,6 +233,22 @@ python3 -u /workspace/runpod_significance_batch.py --workers 4
 ```
 
 ~6 provisions/s on RTX 5090.
+
+#### Run fitness SLM
+
+Fitness extraction is an independent pipeline. See `/fitness-pipeline` skill for full details including pod setup, model loading, and verification.
+
+```bash
+# On RunPod — load fitness model and run batch
+ollama create gemma3-fitness -f /workspace/Modelfile.fitness
+python3 -u /workspace/scripts/runpod_fitness_batch.py --workers 4
+```
+
+~6 provisions/s on RTX 5090. Runs on all provisions (not gated by DRRP type). After batch completes, compile expression trees locally:
+
+```bash
+cargo run -p fractalaw-cli -- fitness compile --laws "$(cat data/sertantai/<customer>-applicable-laws.csv)"
+```
 
 ### Step 8: Re-reconcile
 
