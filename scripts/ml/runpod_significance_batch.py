@@ -118,7 +118,7 @@ def preflight():
 
 # ── Query ───────────────────────────────────────────────────────────────
 
-def query_obligation_provisions(conn, limit=None):
+def query_obligation_provisions(conn, limit=None, law_names=None):
     """Fetch unique Obligation provisions needing significance rating."""
     sql = """
         SELECT DISTINCT ON (pa.section_id)
@@ -127,8 +127,11 @@ def query_obligation_provisions(conn, limit=None):
         JOIN legislation_text lt ON pa.section_id = lt.section_id
         WHERE (pa.slm_drrp = 'Obligation' OR pa.regex_drrp = 'Obligation')
         AND lt.scope = 'substantive' AND lt.significance_overall IS NULL
-        ORDER BY pa.section_id
     """
+    if law_names:
+        placeholders = ",".join(f"'{n}'" for n in law_names)
+        sql += f" AND lt.law_name IN ({placeholders})"
+    sql += " ORDER BY pa.section_id"
     if limit:
         sql = f"SELECT * FROM ({sql}) sub LIMIT {limit}"
     cur = conn.cursor()
@@ -243,7 +246,19 @@ def main():
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--batch-size", type=int, default=100)
+    parser.add_argument("--laws", help="Comma-separated law names or path to a file (one per line) to scope extraction")
     args = parser.parse_args()
+
+    # Parse --laws: comma-separated string or file path (one per line)
+    law_names = None
+    if args.laws:
+        import os
+        if os.path.isfile(args.laws):
+            with open(args.laws) as f:
+                law_names = [line.strip() for line in f if line.strip()]
+        else:
+            law_names = [n.strip() for n in args.laws.split(",") if n.strip()]
+        print(f"Scoped to {len(law_names)} laws")
 
     ok, total_count = preflight()
     if not ok:
@@ -255,7 +270,7 @@ def main():
         print(f"\nTEST MODE: {limit:,} of {total_count:,} provisions (5%)")
 
     conn = psycopg2.connect(PG_DSN)
-    provisions = query_obligation_provisions(conn, limit=limit)
+    provisions = query_obligation_provisions(conn, limit=limit, law_names=law_names)
     total = len(provisions)
     print(f"Loaded {total:,} Obligation provisions, {args.workers} workers\n", flush=True)
 

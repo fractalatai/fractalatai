@@ -40,43 +40,52 @@ conn.close()
 
 Laws triaged as `not_making` should have their LAT provisions removed from Postgres to prevent wasted enrichment. This was previously automatic but is now a manual authorised step.
 
-**Review the list before deleting** — confirm these are genuinely not-making (amending-only, commencement-only, etc.):
+**Review the list before deleting.** Use DuckDB `is_amending` and `is_commencing` flags plus the title to identify obvious non-making candidates:
 
 ```bash
-# List not_making laws
 /usr/bin/python3 -c "
 import duckdb
 conn = duckdb.connect('data/fractalaw.duckdb', read_only=True)
 rows = conn.execute(\"\"\"
-    SELECT name, title, triage_confidence 
+    SELECT name, title, triage_confidence,
+           is_amending, is_commencing, is_making
     FROM legislation 
     WHERE triage_classification = 'not_making'
-    ORDER BY triage_confidence
+    ORDER BY is_amending DESC, is_commencing DESC, name
 \"\"\").fetchall()
+
+print('=== OBVIOUS NON-MAKING (Amendment/Commencement) ===')
+obvious = []
+review = []
 for r in rows:
-    print(f'  {r[2]:.0%} {r[0]:30s} {(r[1] or \"(no title)\")[:50]}')
-print(f'\\nTotal: {len(rows)}')
+    title = (r[1] or '(no title)')
+    is_amendment = r[3] or 'Amendment' in title
+    is_commencement = r[4] or 'Commencement' in title
+    is_revocation = 'Revocation' in title or 'Revoked' in title
+    is_extension = 'Extension' in title and ('Byelaws' in title or 'Order' in title)
+    if is_amendment or is_commencement or is_revocation or is_extension:
+        tag = 'AMD' if is_amendment else ('COM' if is_commencement else ('REV' if is_revocation else 'EXT'))
+        print(f'  [{tag}] {r[0]:35s} {title[:55]}')
+        obvious.append(r[0])
+    else:
+        review.append(r)
+
+print(f'\n=== NEED REVIEW ({len(review)}) ===')
+for r in review:
+    print(f'  {r[2]:.0%} {r[0]:35s} {(r[1] or \"(no title)\")[:55]}')
+
+print(f'\nObvious non-making: {len(obvious)} (safe to delete)')
+print(f'Need review: {len(review)} (check before deleting)')
 conn.close()
 "
 ```
 
-After review, delete their provisions from Postgres:
+**Amendment, Commencement, Revocation, and Extension laws** are always safe to delete — they modify, commence, revoke, or extend the application of other laws but contain no standalone obligations. Delete the obvious ones first, then review the remainder.
+
+After review, delete from Postgres. **CASCADE FKs** on `legislation_text` automatically clean `provision_actors` and `fitness_mentions`:
 
 ```bash
-# DELETE LAT for not_making laws — DESTRUCTIVE, review list first
-PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -c "
-DELETE FROM legislation_text
-WHERE law_name IN (
-    SELECT name FROM duckdb_scan('data/fractalaw.duckdb', 'legislation')
-    WHERE triage_classification = 'not_making'
-);
-"
-```
-
-> **Note**: This requires the DuckDB foreign data wrapper or a two-step approach — export law names from DuckDB then pass to Postgres. If duckdb_scan isn't available, use:
-
-```bash
-# Two-step: export names then delete
+# Export law names from DuckDB, delete from Postgres (CASCADE handles child tables)
 NOT_MAKING=$(/usr/bin/python3 -c "
 import duckdb
 conn = duckdb.connect('data/fractalaw.duckdb', read_only=True)
@@ -86,11 +95,61 @@ conn.close()
 ")
 
 PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -c "
-DELETE FROM provision_actors WHERE section_id IN (SELECT section_id FROM legislation_text WHERE law_name IN ($NOT_MAKING));
-DELETE FROM fitness_mentions WHERE section_id IN (SELECT section_id FROM legislation_text WHERE law_name IN ($NOT_MAKING));
 DELETE FROM legislation_text WHERE law_name IN ($NOT_MAKING);
 "
 ```
+
+> **CASCADE**: `provision_actors` and `fitness_mentions` both have `ON DELETE CASCADE` foreign keys to `legislation_text.section_id`. A single `DELETE FROM legislation_text` cleans all three tables.
+
+### Step 0a-QA: Triage vs Enrichment disagreements
+
+After enrichment completes (Steps 1-9), check for triage false negatives — laws that triage classified as `not_making` or `uncertain` but enrichment found actual obligations. These are laws where the enrichment data is the authority, not the triage:
+
+```bash
+/usr/bin/python3 -c "
+import duckdb, psycopg2
+
+pg = psycopg2.connect('host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw')
+cur = pg.cursor()
+duck = duckdb.connect('data/fractalaw.duckdb', read_only=True)
+
+rows = duck.execute(\"\"\"
+    SELECT name, title, triage_classification, triage_confidence
+    FROM legislation WHERE triage_classification IN ('not_making', 'uncertain')
+    ORDER BY triage_classification, name
+\"\"\").fetchall()
+
+false_neg = []
+true_neg = []
+for r in rows:
+    cur.execute('''
+        SELECT count(DISTINCT section_id)
+        FROM legislation_text
+        WHERE law_name = %s AND 'Obligation' = ANY(drrp_types)
+    ''', (r[0],))
+    obligs = cur.fetchone()[0]
+    if obligs > 0:
+        false_neg.append((r[0], r[1], r[2], obligs))
+    else:
+        true_neg.append((r[0], r[1], r[2]))
+
+print(f'=== FALSE NEGATIVES (triage wrong, enrichment found obligations) === ({len(false_neg)})')
+for name, title, triage, obligs in false_neg:
+    print(f'  [{triage:11s}] {name:35s} obligs={obligs:3d}  {(title or \"(no title)\")[:45]}')
+
+print(f'\n=== TRUE NEGATIVES (triage correct, no obligations) === ({len(true_neg)})')
+for name, title, triage in true_neg:
+    print(f'  [{triage:11s}] {name:35s} {(title or \"(no title)\")[:50]}')
+
+pg.close(); duck.close()
+"
+```
+
+**False negatives**: enrichment found obligations → sertantai will set `is_making=true` from taxa publish regardless of triage signal. These laws should keep their LAT. No action needed — taxa takes priority over triage in sertantai.
+
+**True negatives**: no obligations found by enrichment → confirm they are genuinely non-making (check for dot-filled/repealed text, amendment-only, commencement-only, forms/designations). Delete LAT for confirmed non-making laws.
+
+> **Note**: Run this QA AFTER enrichment completes — it compares triage (regex-only, fast) against enrichment (full pipeline including SLM). The disagreements reveal where triage's confidence threshold is too aggressive for small laws with few provisions.
 
 ### Step 0b: Baseline stats
 
