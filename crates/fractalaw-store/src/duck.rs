@@ -751,7 +751,8 @@ impl DuckStore {
             "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS triage_classification VARCHAR; \
              ALTER TABLE legislation ADD COLUMN IF NOT EXISTS triage_confidence FLOAT; \
              ALTER TABLE legislation ADD COLUMN IF NOT EXISTS triage_tier INTEGER; \
-             ALTER TABLE legislation ADD COLUMN IF NOT EXISTS triaged_at TIMESTAMPTZ",
+             ALTER TABLE legislation ADD COLUMN IF NOT EXISTS triaged_at TIMESTAMPTZ; \
+             ALTER TABLE legislation ADD COLUMN IF NOT EXISTS triage_counts VARCHAR",
         )?;
         info!("ensured triage columns exist");
         Ok(())

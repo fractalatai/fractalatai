@@ -845,7 +845,7 @@ pub(crate) async fn cmd_sync_watch(
                 // Run triage before deciding whether to queue for enrichment
                 let (triage_result, counts) =
                     run_triage_for_law(&duck, lance.as_ref(), law_name).await;
-                write_triage_to_duck(&duck, law_name, &triage_result);
+                write_triage_to_duck(&duck, law_name, &triage_result, &counts);
 
                 // Publish triage result back to sertantai (round-trip signal)
                 let (_, _, sertantai_making) = get_law_triage_metadata(&duck, law_name);
@@ -1323,23 +1323,37 @@ fn get_law_triage_metadata(
     (title, desc, is_making)
 }
 
-/// Write triage result to DuckDB.
+/// Write triage result to DuckDB (including counts as JSON for later republish).
 fn write_triage_to_duck(
     duck: &fractalaw_store::DuckStore,
     law_name: &str,
     result: &DetectionResult,
+    counts: &making::TriageCounts,
 ) {
     let escaped = law_name.replace('\'', "''");
+    let counts_json = serde_json::json!({
+        "total": counts.total,
+        "process_rule": counts.process_rule,
+        "amendment": counts.amendment,
+        "enactment": counts.enactment,
+        "interpretation": counts.interpretation,
+        "with_actor": counts.with_actor,
+        "with_obligation": counts.with_obligation,
+        "with_enabling": counts.with_enabling,
+    });
+    let escaped_counts = counts_json.to_string().replace('\'', "''");
     let _ = duck.execute(&format!(
         "UPDATE legislation \
          SET triage_classification = '{}', \
              triage_confidence = {}, \
              triage_tier = {}, \
+             triage_counts = '{}', \
              triaged_at = CURRENT_TIMESTAMP \
          WHERE name = '{escaped}'",
         result.classification.as_str(),
         result.confidence,
         result.tier,
+        escaped_counts,
     ));
 }
 
@@ -1384,7 +1398,7 @@ async fn build_triage_response(
             _ => false,
         };
 
-        write_triage_to_duck(duck, law_name, &result);
+        write_triage_to_duck(duck, law_name, &result, &counts);
 
         results.push(serde_json::json!({
             "law_name": law_name,

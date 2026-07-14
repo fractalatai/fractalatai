@@ -148,6 +148,25 @@ enum Command {
         /// Show detailed per-law signals (not just summary)
         #[arg(long)]
         verbose: bool,
+        /// Publish triage results to sertantai via zenoh after classification
+        #[arg(long)]
+        publish: bool,
+        #[command(flatten)]
+        zenoh: ZenohArgs,
+    },
+    /// Publish existing triage results from DuckDB to sertantai (no re-classification)
+    PublishTriage {
+        #[command(flatten)]
+        zenoh: ZenohArgs,
+        /// Specific laws to publish (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Publish triage for all laws in a DuckDB family
+        #[arg(long)]
+        family: Option<String>,
+        /// Publish triage for ALL triaged laws
+        #[arg(long)]
+        all: bool,
     },
 }
 
@@ -451,8 +470,18 @@ async fn main() -> anyhow::Result<()> {
             family,
             all,
             verbose,
+            publish,
+            zenoh,
         } => {
-            cmd_triage(&data_dir, laws, family, all, verbose, pg_url.as_deref()).await
+            cmd_triage(&data_dir, laws, family, all, verbose, pg_url.as_deref(), publish, &zenoh).await
+        }
+        Command::PublishTriage {
+            zenoh,
+            laws,
+            family,
+            all,
+        } => {
+            cmd_publish_triage(&data_dir, &zenoh, laws, family, all).await
         }
     }
 }
@@ -569,6 +598,8 @@ async fn cmd_triage(
     all: bool,
     verbose: bool,
     pg_url: Option<&str>,
+    publish: bool,
+    zenoh_args: &ZenohArgs,
 ) -> anyhow::Result<()> {
     use arrow::array::{Array, StringArray};
     use fractalaw_core::taxa::making;
@@ -576,6 +607,24 @@ async fn cmd_triage(
     let store = open_duck(data_dir)?;
     store.ensure_triage_columns()?;
     let lance = open_provision_store(pg_url).await?;
+
+    // Set up Zenoh session if --publish requested
+    let sync = if publish {
+        let config = zenoh_args.build_zenoh_config()?;
+        let z = fractalaw_sync::ZenohSync::with_config(&zenoh_args.tenant, config)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+        print!("Waiting for zenoh peer...");
+        let peers = z.wait_for_peers(std::time::Duration::from_secs(10)).await;
+        if peers == 0 {
+            println!(" no peers connected (timeout).");
+            anyhow::bail!("No zenoh peers found — is sertantai running?");
+        }
+        println!(" {peers} peer(s) connected.");
+        Some(z)
+    } else {
+        None
+    };
 
     // Resolve law names
     let law_names: Vec<String> = if let Some(ref fam) = family {
@@ -656,6 +705,7 @@ async fn cmd_triage(
     let mut not_making_count = 0u32;
     let mut uncertain_count = 0u32;
     let mut disagree_count = 0u32;
+    let mut published_count = 0u32;
 
     for law_name in &law_names {
         // Get provision texts from Postgres
@@ -708,19 +758,32 @@ async fn cmd_triage(
 
         let result = making::detect_with_triage(&meta, &counts);
 
-        // Persist triage result to DuckDB
+        // Persist triage result to DuckDB (including counts for later republish)
         {
             let escaped_name = law_name.replace('\'', "''");
+            let counts_json = serde_json::json!({
+                "total": counts.total,
+                "process_rule": counts.process_rule,
+                "amendment": counts.amendment,
+                "enactment": counts.enactment,
+                "interpretation": counts.interpretation,
+                "with_actor": counts.with_actor,
+                "with_obligation": counts.with_obligation,
+                "with_enabling": counts.with_enabling,
+            });
+            let escaped_counts = counts_json.to_string().replace('\'', "''");
             let _ = store.execute(&format!(
                 "UPDATE legislation \
                  SET triage_classification = '{}', \
                      triage_confidence = {}, \
                      triage_tier = {}, \
+                     triage_counts = '{}', \
                      triaged_at = CURRENT_TIMESTAMP \
                  WHERE name = '{escaped_name}'",
                 result.classification.as_str(),
                 result.confidence,
                 result.tier,
+                escaped_counts,
             ));
         }
 
@@ -733,6 +796,32 @@ async fn cmd_triage(
         };
         if !agrees {
             disagree_count += 1;
+        }
+
+        // Publish triage result to sertantai via zenoh
+        if let Some(ref z) = sync {
+            let counts_json = serde_json::json!({
+                "total": counts.total,
+                "process_rule": counts.process_rule,
+                "amendment": counts.amendment,
+                "enactment": counts.enactment,
+                "interpretation": counts.interpretation,
+                "with_actor": counts.with_actor,
+                "with_obligation": counts.with_obligation,
+                "with_enabling": counts.with_enabling,
+            });
+            match z.publish_triage(
+                law_name,
+                result.classification.as_str(),
+                result.confidence,
+                result.tier,
+                &counts_json,
+                sertantai_making,
+                agrees,
+            ).await {
+                Ok(()) => published_count += 1,
+                Err(e) => eprintln!("  publish error for {law_name}: {e}"),
+            }
         }
 
         match result.classification {
@@ -773,10 +862,182 @@ async fn cmd_triage(
         }
     }
 
-    println!(
-        "\nTriage: {} making, {} not_making, {} uncertain ({} disagree with sertantai)",
-        making_count, not_making_count, uncertain_count, disagree_count,
-    );
+    if publish {
+        println!(
+            "\nTriage: {} making, {} not_making, {} uncertain ({} disagree with sertantai) — {} published",
+            making_count, not_making_count, uncertain_count, disagree_count, published_count,
+        );
+    } else {
+        println!(
+            "\nTriage: {} making, {} not_making, {} uncertain ({} disagree with sertantai)",
+            making_count, not_making_count, uncertain_count, disagree_count,
+        );
+    }
 
+    Ok(())
+}
+
+/// Publish existing triage results from DuckDB to sertantai without re-running classification.
+async fn cmd_publish_triage(
+    data_dir: &std::path::Path,
+    zenoh_args: &ZenohArgs,
+    laws: Option<String>,
+    family: Option<String>,
+    all: bool,
+) -> anyhow::Result<()> {
+    use arrow::array::Array;
+
+    let store = open_duck(data_dir)?;
+    store.ensure_triage_columns()?;
+
+    // Resolve law names (only triaged laws)
+    let law_names: Vec<String> = if let Some(ref fam) = family {
+        let names = laws_in_family(&store, fam)?;
+        if names.is_empty() {
+            anyhow::bail!("No laws found with family '{fam}'");
+        }
+        println!("Family '{}': {} laws", fam, names.len());
+        names
+    } else if let Some(ref l) = laws {
+        l.split(',').map(|s| s.trim().to_string()).collect()
+    } else if all {
+        let batches = store.query_arrow(
+            "SELECT name FROM legislation WHERE triage_classification IS NOT NULL ORDER BY name",
+        )?;
+        let mut names = Vec::new();
+        for batch in &batches {
+            if let Some(col) = batch.column_by_name("name")
+                && let Some(arr) = col.as_any().downcast_ref::<arrow::array::StringArray>()
+            {
+                for i in 0..arr.len() {
+                    if !arr.is_null(i) {
+                        names.push(arr.value(i).to_string());
+                    }
+                }
+            }
+        }
+        println!("Publishing triage for {} laws", names.len());
+        names
+    } else {
+        anyhow::bail!(
+            "Specify --laws, --family, or --all.\n\
+             Example: fractalaw-sync publish-triage --laws UK_ukpga_1974_37 --tenant dev --connect tcp/..."
+        );
+    };
+
+    if law_names.is_empty() {
+        println!("No laws to publish.");
+        return Ok(());
+    }
+
+    // Read triage results from DuckDB
+    let in_clause = law_names
+        .iter()
+        .map(|n| format!("'{}'", n.replace('\'', "''")))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let batches = store.query_arrow(&format!(
+        "SELECT name, triage_classification, triage_confidence, triage_tier, \
+                triage_counts, is_making \
+         FROM legislation WHERE name IN ({in_clause})"
+    ))?;
+
+    struct TriageRow {
+        name: String,
+        classification: String,
+        confidence: f32,
+        tier: u8,
+        counts: serde_json::Value,
+        is_making: Option<bool>,
+    }
+
+    let mut rows: Vec<TriageRow> = Vec::new();
+    for batch in &batches {
+        for i in 0..batch.num_rows() {
+            let name = batch.column_by_name("name")
+                .and_then(|c| get_string_value(c.as_ref(), i))
+                .unwrap_or_default();
+            let classification = batch.column_by_name("triage_classification")
+                .and_then(|c| get_string_value(c.as_ref(), i));
+            let Some(classification) = classification else {
+                eprintln!("  {name}: no triage result — skipping");
+                continue;
+            };
+            let confidence = batch.column_by_name("triage_confidence")
+                .and_then(|c| {
+                    if c.is_null(i) { None }
+                    else { c.as_any().downcast_ref::<arrow::array::Float32Array>().map(|a| a.value(i)) }
+                })
+                .or_else(|| batch.column_by_name("triage_confidence").and_then(|c| {
+                    if c.is_null(i) { None }
+                    else { c.as_any().downcast_ref::<arrow::array::Float64Array>().map(|a| a.value(i) as f32) }
+                }))
+                .unwrap_or(0.0);
+            let tier = batch.column_by_name("triage_tier")
+                .and_then(|c| {
+                    if c.is_null(i) { None }
+                    else { c.as_any().downcast_ref::<arrow::array::Int32Array>().map(|a| a.value(i) as u8) }
+                })
+                .unwrap_or(0);
+            let counts_str = batch.column_by_name("triage_counts")
+                .and_then(|c| get_string_value(c.as_ref(), i));
+            let counts: serde_json::Value = counts_str
+                .and_then(|s| serde_json::from_str(&s).ok())
+                .unwrap_or(serde_json::json!({}));
+            let is_making = batch.column_by_name("is_making").and_then(|c| {
+                if c.is_null(i) { None }
+                else { c.as_any().downcast_ref::<arrow::array::BooleanArray>().map(|a| a.value(i)) }
+            });
+            rows.push(TriageRow { name, classification, confidence, tier, counts, is_making });
+        }
+    }
+
+    if rows.is_empty() {
+        println!("No triaged laws found for the given selection.");
+        return Ok(());
+    }
+
+    // Open Zenoh session
+    let config = zenoh_args.build_zenoh_config()?;
+    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh_args.tenant, config)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+    print!("Waiting for zenoh peer...");
+    let peers = sync.wait_for_peers(std::time::Duration::from_secs(10)).await;
+    if peers == 0 {
+        println!(" no peers connected (timeout).");
+        anyhow::bail!("No zenoh peers found — is sertantai running?");
+    }
+    println!(" {peers} peer(s) connected.");
+
+    let mut published = 0u32;
+    for row in &rows {
+        let agrees = match (row.is_making, row.classification.as_str()) {
+            (Some(true), "making") => true,
+            (Some(false), "not_making") => true,
+            (None, _) => true,
+            _ => false,
+        };
+        match sync.publish_triage(
+            &row.name,
+            &row.classification,
+            row.confidence,
+            row.tier,
+            &row.counts,
+            row.is_making,
+            agrees,
+        ).await {
+            Ok(()) => {
+                published += 1;
+                println!(
+                    "  {}: {}  ({:.0}%) → published",
+                    row.name, row.classification, row.confidence * 100.0,
+                );
+            }
+            Err(e) => eprintln!("  {}: publish error: {e}", row.name),
+        }
+    }
+
+    println!("\nPublished triage for {published}/{} laws.", rows.len());
     Ok(())
 }
