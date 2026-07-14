@@ -292,9 +292,11 @@ def main():
                 write_batch(conn, pending_updates)
                 pending_updates = []
 
-            # Progress every ~100 (use modulo range for multi-worker increments)
+            # Progress every ~100 (milestone-based for multi-worker safety)
             done = stats["done"]
-            if done > 0 and done % 100 < max(args.workers, 1):
+            milestone = done // 100
+            if milestone > stats.get("_last_milestone", 0):
+                stats["_last_milestone"] = milestone
                 elapsed = time.time() - t0
                 rate = done / elapsed
                 eta = (total - done) / rate if rate > 0 else 0

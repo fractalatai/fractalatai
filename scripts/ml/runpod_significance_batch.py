@@ -283,7 +283,9 @@ def main():
                 pending_updates = []
 
             done = stats["done"]
-            if done > 0 and done % 100 < max(args.workers, 1):
+            milestone = done // 100
+            if milestone > stats.get("_last_milestone", 0):
+                stats["_last_milestone"] = milestone
                 elapsed = time.time() - t0
                 rate = done / elapsed
                 eta = (total - done) / rate if rate > 0 else 0

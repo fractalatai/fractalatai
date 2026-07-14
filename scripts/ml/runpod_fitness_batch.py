@@ -294,7 +294,9 @@ def main():
                     with write_lock:
                         write_one(write_cur, mention_id, entities, scopes)
                         written += 1
-                if (i + 1) > 0 and (i + 1) % 100 < max(args.workers, 1):
+                milestone = (i + 1) // 100
+                if milestone > stats.get("_last_milestone", 0):
+                    stats["_last_milestone"] = milestone
                     elapsed = time.time() - start_time
                     rate = (i + 1) / elapsed
                     eta = (len(rows) - i - 1) / rate if rate > 0 else 0
