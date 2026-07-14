@@ -298,6 +298,25 @@ cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/localhost:
 cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/localhost:7447 --laws "$LAWS" --provisions --pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw
 ```
 
+### Step 12: Clear enrichment queue
+
+After publish is confirmed, clear the `enrichment_pending` flag for the processed laws:
+
+```bash
+/usr/bin/python3 -c "
+import duckdb
+conn = duckdb.connect('data/fractalaw.duckdb')
+updated = conn.execute(\"\"\"
+    UPDATE legislation SET enrichment_pending = false
+    WHERE enrichment_pending = true
+    AND name IN (SELECT unnest(string_to_array('$(cat data/sertantai/<customer>-applicable-laws.csv)', ',')))
+\"\"\").fetchone()
+remaining = conn.execute('SELECT count(*) FROM legislation WHERE enrichment_pending = true').fetchone()[0]
+print(f'Cleared enrichment_pending. Remaining in queue: {remaining}')
+conn.close()
+"
+```
+
 ## Targeting gaps only
 
 For re-runs, don't re-process the whole corpus. Query for laws with gaps at each step (shown in the SQL above) and pass only those to `--laws`. This avoids re-processing tens of thousands of already-classified actors.

@@ -280,7 +280,7 @@ def main():
                 elapsed = time.time() - start_time
                 rate = (i + 1) / elapsed
                 eta = (len(rows) - i - 1) / rate if rate > 0 else 0
-                print(f"  {i+1}/{len(rows)} ({rate:.1f}/s, ETA {eta/60:.0f}min) — {dict(stats)} written={written}")
+                print(f"  {i+1}/{len(rows)} ({rate:.1f}/s, ETA {eta/60:.0f}min) — {dict(stats)} written={written}", flush=True)
     else:
         write_lock = threading.Lock()
         with ThreadPoolExecutor(max_workers=args.workers) as executor:
@@ -294,11 +294,11 @@ def main():
                     with write_lock:
                         write_one(write_cur, mention_id, entities, scopes)
                         written += 1
-                if (i + 1) % 100 == 0:
+                if (i + 1) > 0 and (i + 1) % 100 < max(args.workers, 1):
                     elapsed = time.time() - start_time
                     rate = (i + 1) / elapsed
                     eta = (len(rows) - i - 1) / rate if rate > 0 else 0
-                    print(f"  {i+1}/{len(rows)} ({rate:.1f}/s, ETA {eta/60:.0f}min) — {dict(stats)} written={written}")
+                    print(f"  {i+1}/{len(rows)} ({rate:.1f}/s, ETA {eta/60:.0f}min) — {dict(stats)} written={written}", flush=True)
 
     elapsed = time.time() - start_time
     print(f"\n{'=' * 60}")

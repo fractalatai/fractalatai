@@ -100,12 +100,61 @@ ssh -p <PORT> -i ~/.ssh/id_ed25519 root@<IP> 'tail -3 /workspace/batch.log'
 ```bash
 # Check final stats
 ssh -p <PORT> -i ~/.ssh/id_ed25519 root@<IP> 'tail -10 /workspace/batch.log'
+```
 
-# Verify in DB
+### Post-SLM QA
+
+**Use these exact queries** — not ad-hoc queries on `slm_position IS NULL` which conflates "reconcile decided SLM isn't needed" with "SLM hasn't run yet".
+
+#### Position SLM
+
+```bash
 PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -c "
-SELECT extraction_method, count(*) FROM <target_table> GROUP BY 1;
+-- The ONLY correct test: pending_slm count should be zero
+SELECT count(*) AS pending_slm
+FROM provision_actors WHERE extraction_method = 'pending_slm';
+
+-- Context: breakdown by extraction_method (informational, not a pass/fail)
+SELECT extraction_method, count(*) 
+FROM provision_actors 
+WHERE extraction_method IS NOT NULL
+GROUP BY 1 ORDER BY 2 DESC;
 "
 ```
+
+**PASS**: `pending_slm = 0`
+**FAIL**: `pending_slm > 0` — SLM batch didn't process all queued actors
+
+> **WARNING**: `slm_position IS NULL` is NOT a valid test. Actors with `extraction_method = 'regex'` and `reconcile_confidence = 'MEDIUM'` intentionally have no `slm_position` — reconcile accepted the regex result without SLM. This is correct behaviour, not a gap.
+
+#### Significance SLM
+
+```bash
+PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -c "
+-- Obligation provisions that should have significance but don't
+SELECT count(*) AS missing_significance
+FROM legislation_text 
+WHERE 'Obligation' = ANY(drrp_types)
+AND significance_overall IS NULL
+AND scope = 'substantive';
+"
+```
+
+**PASS**: `missing_significance = 0` (or near-zero — some edge cases are expected)
+
+#### Fitness SLM
+
+```bash
+PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -c "
+-- Provisions with regex fitness mentions but no SLM extraction
+SELECT count(*) AS missing_slm_fitness
+FROM fitness_mentions 
+WHERE slm_entities IS NULL
+AND regex_entities IS NOT NULL;
+"
+```
+
+**PASS**: `missing_slm_fitness = 0`
 
 ## Known Issues
 
@@ -151,6 +200,64 @@ Setting `OLLAMA_NUM_PARALLEL=4` AFTER `ollama serve` is running has no effect. M
 ```bash
 pkill -f "ollama serve"; sleep 2
 OLLAMA_NUM_PARALLEL=4 nohup ollama serve &>/tmp/ollama.log &
+```
+
+### System-level ollama serve blocks custom startup
+
+RunPod PyTorch templates may auto-start `ollama serve` at boot (PID in the low hundreds). Your `nohup ollama serve` silently fails because the port is already bound. The system serve runs with default `OLLAMA_NUM_PARALLEL=1`, causing ~4x slower throughput.
+
+**Always check and kill before starting:**
+
+```bash
+# Check for existing ollama
+ps aux | grep "ollama serve" | grep -v grep
+
+# Kill system serve AND its llama-server child
+pkill -9 -f "llama-server"  # kill child FIRST
+sleep 1
+pkill -9 -f "ollama serve"  # then parent
+sleep 2
+
+# Verify clean
+ps aux | grep -E "ollama|llama" | grep -v grep || echo "Clean"
+
+# Start with correct parallel count
+OLLAMA_NUM_PARALLEL=8 nohup ollama serve &>/tmp/ollama.log &
+```
+
+### Verify -np matches workers BEFORE starting batch
+
+After starting ollama, warm up a model then check the llama-server args:
+
+```bash
+ollama run gemma3-position "test" 2>/dev/null | head -1
+ps aux | grep llama-server | grep -v grep | grep -o "\-np [0-9]*"
+```
+
+If `-np` doesn't match your `--workers` count, the batch will be bottlenecked. Kill and restart ollama.
+
+### Logs may appear empty despite progress
+
+The batch script log file may show only the preflight checks and nothing else, even with `-u` (unbuffered). **Check the database directly** to confirm progress:
+
+```bash
+# Position: count remaining pending
+PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -t -A -c \
+  "SELECT count(*) FROM provision_actors WHERE slm_position IS NULL AND regex_position IS NOT NULL"
+
+# Significance: count remaining unrated
+PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -t -A -c \
+  "SELECT count(*) FROM legislation_text WHERE significance_overall IS NULL AND 'Obligation' = ANY(drrp_types)"
+```
+
+### Scripts and models persist on /workspace
+
+All artefacts (scripts, Modelfiles, GGUF models) are on the RunPod network volume at `/workspace/scripts/`, `/workspace/models/`. They survive pod stop/start. **No upload needed** for repeat runs — just create the ollama models from the existing Modelfiles:
+
+```bash
+ollama create gemma3-position -f /workspace/models/drrp/Modelfile
+ollama create gemma3-significance -f /workspace/models/significance/Modelfile
+ollama create gemma3-fitness -f /workspace/models/fitness/Modelfile
 ```
 
 ## Speed Reference

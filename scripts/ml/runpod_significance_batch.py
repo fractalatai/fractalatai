@@ -283,7 +283,7 @@ def main():
                 pending_updates = []
 
             done = stats["done"]
-            if done % 100 == 0 and done > 0:
+            if done > 0 and done % 100 < max(args.workers, 1):
                 elapsed = time.time() - t0
                 rate = done / elapsed
                 eta = (total - done) / rate if rate > 0 else 0
