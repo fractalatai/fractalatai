@@ -6,10 +6,10 @@ assembles prompts from validated templates, calls Gemini Pro, validates
 output, and stores results in DuckDB staging table.
 
 Usage:
-    /usr/bin/python3 scripts/generate_controls.py --law UK_uksi_1997_1713
-    /usr/bin/python3 scripts/generate_controls.py --law UK_uksi_1997_1713 --dry-run
-    /usr/bin/python3 scripts/generate_controls.py --family "OH&S: Occupational / Personal Safety" --limit 5
-    /usr/bin/python3 scripts/generate_controls.py --all --significance HIGH,MEDIUM --limit 10
+    /usr/bin/python3 scripts/compliance/generate_controls.py --law UK_uksi_1997_1713
+    /usr/bin/python3 scripts/compliance/generate_controls.py --law UK_uksi_1997_1713 --dry-run
+    /usr/bin/python3 scripts/compliance/generate_controls.py --family "OH&S: Occupational / Personal Safety" --limit 5
+    /usr/bin/python3 scripts/compliance/generate_controls.py --all --significance HIGH,MEDIUM --limit 10
 """
 
 import argparse
@@ -31,7 +31,7 @@ PG_DSN = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=frac
 DUCKDB_PATH = "data/fractalaw.duckdb"
 GEMINI_MODEL = "gemini-2.5-pro"
 GEMINI_FLASH = "gemini-2.5-flash"
-PROMPTS_DIR = Path(".claude/plans/compliance-controls/prompts")
+PROMPTS_DIR = Path(__file__).parent / "prompts"
 RESULTS_DIR = Path("data/compliance-controls")
 
 # Rate limiting

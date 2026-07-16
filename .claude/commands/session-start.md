@@ -26,16 +26,23 @@ opened: <YYYY-MM-DD>
 
 1-3 sentences. What's broken, missing, or needed? Why now? Include a concrete example if possible.
 
-## Work
+## Todo
 
-Numbered checklist of items to complete. Use ⬜ for pending:
-1. ⬜ First item
-2. ⬜ Second item
+- ⬜ First item
+- ⬜ Second item
+- ⬜ Third item
 
 ## Dependencies
 
 - ✅ or ⬜ for each prerequisite — what must exist before this work can proceed
 ```
+
+The `## Todo` list is the **spine of the document**. It must be:
+- **Flat** — no subsection headings (no `### Phase 0`, `### Phase 1`). Just a single list.
+- **Scannable** — one line per item, brief descriptions
+- **Front and centre** — immediately after `## Problem`, before anything else
+
+Detail sections are **appended below** as work progresses, in the same order as the todo items. Each detail section can reference its todo item. The result is a structured document that grows organically — the todo list is the index, the sections below are the content.
 
 For PENDING sessions (scoped but not starting now), use `status: pending` in the frontmatter and `(PENDING)` in the heading.
 

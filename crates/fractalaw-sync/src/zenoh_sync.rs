@@ -215,6 +215,16 @@ pub mod keys {
         format!("{PREFIX}/@{tenant}/events/controls")
     }
 
+    // ── Evidence key expressions ──
+
+    /// Key expression for a specific law's generated evidence patterns.
+    ///
+    /// N rows per law — one per control's evidence pattern. Arrow IPC payload.
+    /// Example: `fractalaw/@dev/evidence/UK_uksi_1997_1713`
+    pub fn evidence(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/evidence/{law_name}")
+    }
+
     /// Key expression for sertantai customer discovery queryable.
     ///
     /// Sertantai serves this — fractalaw queries it to list all customers.
@@ -417,6 +427,39 @@ impl ZenohSync {
             key = %key,
             bytes = ipc_bytes.len(),
             "publishing policy predicate"
+        );
+
+        self.session
+            .put(&key, ipc_bytes)
+            .await
+            .map_err(ZenohError::Session)?;
+
+        Ok(())
+    }
+
+    /// Publish evidence patterns for a specific law.
+    ///
+    /// `batches` should contain the evidence columns from DuckDB's
+    /// `suggested_evidence` table as Arrow RecordBatches.
+    pub async fn publish_evidence(
+        &self,
+        law_name: &str,
+        batches: &[RecordBatch],
+    ) -> Result<(), ZenohError> {
+        if batches.is_empty() || batches.iter().all(|b| b.num_rows() == 0) {
+            return Err(ZenohError::NoData {
+                law_name: law_name.to_string(),
+            });
+        }
+
+        let ipc_bytes = encode_arrow_ipc(batches)?;
+        let key = keys::evidence(&self.tenant, law_name);
+
+        info!(
+            key = %key,
+            bytes = ipc_bytes.len(),
+            rows = batches.iter().map(|b| b.num_rows()).sum::<usize>(),
+            "publishing evidence patterns"
         );
 
         self.session
@@ -1150,6 +1193,14 @@ mod tests {
         assert_eq!(
             keys::events_controls("dev"),
             "fractalaw/@dev/events/controls"
+        );
+    }
+
+    #[test]
+    fn key_evidence() {
+        assert_eq!(
+            keys::evidence("dev", "UK_uksi_1997_1713"),
+            "fractalaw/@dev/evidence/UK_uksi_1997_1713"
         );
     }
 

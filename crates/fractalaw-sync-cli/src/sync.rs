@@ -530,6 +530,130 @@ pub(crate) async fn cmd_sync_publish_controls(
     Ok(())
 }
 
+pub(crate) async fn cmd_sync_publish_evidence(
+    data_dir: &std::path::Path,
+    zenoh: &ZenohArgs,
+    laws: Option<String>,
+    qq: bool,
+    all: bool,
+) -> anyhow::Result<()> {
+    let store = crate::open_duck(data_dir)?;
+
+    // Determine which laws to publish (same pattern as controls)
+    let law_names: Vec<String> = if let Some(ref l) = laws {
+        l.split(',').map(|s| s.trim().to_string()).collect()
+    } else if qq {
+        let qq_path = data_dir.join("sertantai/qq-applicable-laws.csv");
+        let csv = std::fs::read_to_string(&qq_path)
+            .context("reading qq-applicable-laws.csv")?;
+        csv.split(',')
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect()
+    } else if all {
+        let batches = store.query_arrow(
+            "SELECT DISTINCT law_name FROM suggested_evidence ORDER BY law_name",
+        )?;
+        let mut names = Vec::new();
+        for batch in &batches {
+            if let Some(col) = batch.column_by_name("law_name") {
+                if let Some(arr) = col.as_any().downcast_ref::<arrow::array::StringArray>() {
+                    for i in 0..arr.len() {
+                        if !arr.is_null(i) {
+                            names.push(arr.value(i).to_string());
+                        }
+                    }
+                }
+            }
+        }
+        names
+    } else {
+        anyhow::bail!("specify --laws, --qq, or --all");
+    };
+
+    if law_names.is_empty() {
+        println!("No laws to publish.");
+        return Ok(());
+    }
+
+    println!(
+        "Publishing evidence patterns for {} laws to zenoh (tenant: {})...",
+        law_names.len(),
+        zenoh.tenant,
+    );
+
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+
+    print!("Waiting for zenoh peer...");
+    let peers = sync
+        .wait_for_peers(std::time::Duration::from_secs(15))
+        .await;
+    if peers == 0 {
+        println!(" no peers connected (timeout). Publishing anyway.");
+    } else {
+        println!(" {peers} peer(s) connected.");
+    }
+
+    let mut published_laws = 0usize;
+    let mut total_rows = 0usize;
+
+    for law_name in &law_names {
+        let safe_name = law_name.replace('\'', "''");
+
+        // Extract evidence JSON fields into flat Arrow columns.
+        // Artefacts stay as a JSON array string — sertantai unpacks.
+        let sql = format!(
+            "SELECT \
+                law_name, \
+                control_id, \
+                control_title, \
+                json_extract(evidence_json, '$.artefacts')::VARCHAR AS artefacts_json, \
+                json_extract_string(evidence_json, '$.judgement.needs_judgement')::BOOLEAN AS needs_judgement, \
+                json_extract_string(evidence_json, '$.judgement.judgement_rationale') AS judgement_rationale, \
+                json_extract_string(evidence_json, '$.judgement.recommended_method') AS recommended_method, \
+                json_extract_string(evidence_json, '$.judgement.basis_guidance') AS basis_guidance, \
+                json_extract_string(evidence_json, '$.judgement.discriminating_question') AS discriminating_question, \
+                json_extract_string(evidence_json, '$.judgement.drift_signal') AS drift_signal, \
+                json_extract_string(evidence_json, '$.judgement.drift_conditions') AS drift_conditions, \
+                json_extract_string(evidence_json, '$.strategy.voi_quadrant') AS voi_quadrant, \
+                json_extract_string(evidence_json, '$.strategy.voi_rationale') AS voi_rationale, \
+                json_extract_string(evidence_json, '$.strategy.evidence_standard') AS evidence_standard, \
+                json_extract_string(evidence_json, '$.strategy.recommended_interval') AS recommended_interval, \
+                json_extract_string(evidence_json, '$.strategy.sample_size_guidance') AS sample_size_guidance, \
+                json_extract_string(evidence_json, '$.strategy.staleness_tolerance') AS staleness_tolerance, \
+                json_extract_string(evidence_json, '$.strategy.nature_strategy') AS nature_strategy, \
+                generation_model, \
+                base_hash \
+             FROM suggested_evidence \
+             WHERE law_name = '{safe_name}' AND status IN ('validated', 'flagged')",
+        );
+
+        let batches = store.query_arrow(&sql)?;
+        let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+
+        if rows == 0 {
+            continue;
+        }
+
+        sync.publish_evidence(law_name, &batches)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to publish evidence for {law_name}: {e}"))?;
+        total_rows += rows;
+        published_laws += 1;
+
+        eprint!(".");
+    }
+    eprintln!();
+
+    println!(
+        "Published {total_rows} evidence patterns across {published_laws} laws.",
+    );
+    Ok(())
+}
+
 pub(crate) async fn cmd_sync_pull_lrt(
     data_dir: &std::path::Path,
     zenoh: &ZenohArgs,

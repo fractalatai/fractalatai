@@ -6,9 +6,9 @@ and validates LLM output. Does NOT call Gemini — uses saved Phase 0 test
 results as reference data.
 
 Usage:
-    /usr/bin/python3 scripts/test_generate_controls.py
-    /usr/bin/python3 scripts/test_generate_controls.py -v
-    /usr/bin/python3 scripts/test_generate_controls.py TestPromptAssembly.test_confined_spaces_provisions
+    /usr/bin/python3 scripts/compliance/test_generate_controls.py
+    /usr/bin/python3 scripts/compliance/test_generate_controls.py -v
+    /usr/bin/python3 scripts/compliance/test_generate_controls.py TestPromptAssembly.test_confined_spaces_provisions
 """
 
 import json

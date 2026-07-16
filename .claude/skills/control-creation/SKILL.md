@@ -13,25 +13,25 @@ When generating L3 Controls from L1 Legal Obligations — the canonical control 
 - Postgres running with provisions (`systemctl --user start fractalaw-pg.service`)
 - DuckDB legislation table populated with law metadata
 - Gemini API key: `export GEMINI_API_KEY="$(grep GEMINI_API_KEY ~/.bashrc | cut -d'"' -f2)"`
-- Prompts validated: `.claude/plans/compliance-controls/prompts/system-prompt-v1.md` and `policy-predicate-prompt-v1.md`
+- Prompts validated: `scripts/compliance/prompts/system-prompt-v1.md` and `policy-predicate-prompt-v1.md`
 
 ## Quick Reference
 
 ```bash
 # Single law
-/usr/bin/python3 scripts/generate_controls.py --law UK_uksi_1997_1713
+/usr/bin/python3 scripts/compliance/generate_controls.py --law UK_uksi_1997_1713
 
 # Single law — dry run (show prompt, no Gemini call)
-/usr/bin/python3 scripts/generate_controls.py --law UK_uksi_1997_1713 --dry-run
+/usr/bin/python3 scripts/compliance/generate_controls.py --law UK_uksi_1997_1713 --dry-run
 
 # Family batch, QQ-scoped
-/usr/bin/python3 scripts/generate_controls.py --family "💙 OH&S: Occupational / Personal Safety" --qq
+/usr/bin/python3 scripts/compliance/generate_controls.py --family "💙 OH&S: Occupational / Personal Safety" --qq
 
 # All remaining QQ laws (skips already-done)
-/usr/bin/python3 scripts/generate_controls.py --all --qq
+/usr/bin/python3 scripts/compliance/generate_controls.py --all --qq
 
 # Regenerate a law (overwrites existing)
-/usr/bin/python3 scripts/generate_controls.py --law UK_uksi_1997_1713 --force
+/usr/bin/python3 scripts/compliance/generate_controls.py --law UK_uksi_1997_1713 --force
 
 # Publish controls to sertantai
 cargo run -p fractalaw-sync-cli -- publish-controls --laws UK_uksi_1997_1713 --tenant dev --connect tcp/localhost:7447
@@ -160,11 +160,11 @@ cargo run -p fractalaw-sync-cli -- publish-controls --all --tenant dev --connect
 
 | File | Purpose |
 |------|---------|
-| `scripts/generate_controls.py` | Pipeline script — prompt assembly, Gemini call, lint, storage |
-| `scripts/test_generate_controls.py` | 30 tests for the pipeline |
-| `.claude/plans/compliance-controls/prompts/system-prompt-v1.md` | Controls generation prompt (8 constraints + 3 few-shot) |
-| `.claude/plans/compliance-controls/prompts/policy-predicate-prompt-v1.md` | Policy predicate prompt |
-| `.claude/plans/compliance-controls/COMPLIANCE-CONTROLS.md` | Design doc v0.2 |
+| `scripts/compliance/generate_controls.py` | Pipeline script — prompt assembly, Gemini call, lint, storage |
+| `scripts/compliance/test_generate_controls.py` | 30 tests for the pipeline |
+| `scripts/compliance/prompts/system-prompt-v1.md` | Controls generation prompt (8 constraints + 3 few-shot) |
+| `scripts/compliance/prompts/policy-predicate-prompt-v1.md` | Policy predicate prompt |
+| `.claude/plans/compliance/COMPLIANCE-CONTROLS.md` | Design doc v0.2 (plans = ephemeral scaffold) |
 | `data/compliance-controls/generated/` | Raw JSON outputs per law |
 | DuckDB `suggested_controls` table | Staging table for all generated controls |
 

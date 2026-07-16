@@ -101,6 +101,20 @@ enum Command {
         #[arg(long)]
         all: bool,
     },
+    /// Publish generated evidence patterns to sertantai via zenoh
+    PublishEvidence {
+        #[command(flatten)]
+        zenoh: ZenohArgs,
+        /// Specific laws to publish (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Publish evidence for all QQ applicable laws
+        #[arg(long)]
+        qq: bool,
+        /// Publish ALL laws with generated evidence
+        #[arg(long)]
+        all: bool,
+    },
     /// Watch for sync events and run the full round-trip pipeline (long-running)
     Watch {
         #[command(flatten)]
@@ -441,6 +455,14 @@ async fn main() -> anyhow::Result<()> {
             all,
         } => {
             sync::cmd_sync_publish_controls(&data_dir, &zenoh, laws, qq, all).await
+        }
+        Command::PublishEvidence {
+            zenoh,
+            laws,
+            qq,
+            all,
+        } => {
+            sync::cmd_sync_publish_evidence(&data_dir, &zenoh, laws, qq, all).await
         }
         Command::Watch { zenoh, timeout } => {
             sync::cmd_sync_watch(&data_dir, &zenoh, timeout, pg_url.as_deref()).await
