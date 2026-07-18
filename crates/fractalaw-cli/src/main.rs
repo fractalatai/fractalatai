@@ -139,6 +139,12 @@ enum Command {
         action: FitnessAction,
     },
 
+    /// JSP (Joint Service Publication) enrichment pipeline
+    Jsp {
+        #[command(subcommand)]
+        action: commands::jsp::JspAction,
+    },
+
     /// Export DRRP training data as Parquet (train/val/test splits)
     ExportTrainingData {
         /// Output directory for Parquet files
@@ -688,6 +694,9 @@ async fn main() -> anyhow::Result<()> {
                 commands::fitness::cmd_fitness_compile(pg_url, &duck, law_names.as_deref()).await
             }
         },
+
+        // JSP enrichment pipeline (separate from legislation taxa).
+        Command::Jsp { action } => commands::jsp::cmd_jsp(action, &open_duck(&data_dir)?),
     }
 }
 

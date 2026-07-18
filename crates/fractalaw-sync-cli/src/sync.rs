@@ -654,6 +654,211 @@ pub(crate) async fn cmd_sync_publish_evidence(
     Ok(())
 }
 
+// ── Secondary source (JSP/ACoP) sync ────────────────────────────────
+
+/// Pull provisions for a secondary source from sertantai into DuckDB staging.
+///
+/// Creates `jsp_provisions` table if it doesn't exist, then upserts provisions
+/// from the Zenoh queryable response (Arrow IPC).
+pub(crate) async fn cmd_sync_pull_secondary(
+    data_dir: &std::path::Path,
+    zenoh: &ZenohArgs,
+    source_id: &str,
+    timeout_secs: u64,
+) -> anyhow::Result<()> {
+    let store = crate::open_duck(data_dir)?;
+
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+
+    print!("Waiting for zenoh peer...");
+    let peers = sync
+        .wait_for_peers(std::time::Duration::from_secs(15))
+        .await;
+    if peers == 0 {
+        println!(" no peers connected (timeout).");
+        anyhow::bail!("no zenoh peers — is sertantai running?");
+    }
+    println!(" {peers} peer(s) connected.");
+
+    println!("Pulling provisions for {source_id} from sertantai (timeout: {timeout_secs}s)...");
+
+    let timeout = std::time::Duration::from_secs(timeout_secs);
+    let batches = sync
+        .query_secondary_provisions(source_id, timeout)
+        .await
+        .map_err(|e| anyhow::anyhow!("query failed for {source_id}: {e}"))?;
+
+    if batches.is_empty() {
+        println!("No data received from sertantai for {source_id}");
+        return Ok(());
+    }
+
+    let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+
+    // Create staging table
+    store.execute(
+        "CREATE TABLE IF NOT EXISTS jsp_provisions (
+            section_id TEXT PRIMARY KEY,
+            source_id TEXT NOT NULL,
+            position BIGINT,
+            section_type TEXT,
+            depth BIGINT,
+            heading TEXT,
+            text TEXT,
+            text_source TEXT,
+            pulled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )"
+    )?;
+
+    // Clear existing rows for this source
+    store.execute(&format!(
+        "DELETE FROM jsp_provisions WHERE source_id = '{}'",
+        source_id.replace('\'', "''")
+    ))?;
+
+    // Use DuckStore::insert_batch to load Arrow data via Parquet temp file.
+    // First create a staging table with the Arrow schema, insert, then merge.
+    // Create staging table from the Arrow schema directly — avoids column order mismatch.
+    // DuckDB's CREATE TABLE AS + read_parquet handles schema inference automatically.
+    store.execute("DROP TABLE IF EXISTS _jsp_staging")?;
+
+    // Log schema for debugging
+    if let Some(b) = batches.first() {
+        eprintln!("  Arrow schema ({} columns):", b.num_columns());
+        for f in b.schema().fields() {
+            eprintln!("    {}: {}", f.name(), f.data_type());
+        }
+    }
+
+    // Write all batches to staging via insert_batch.
+    // First batch creates the table structure.
+    let first = &batches[0];
+    // Create from schema: use DuckDB CTAS from the parquet temp file
+    {
+        let tmp = std::env::temp_dir().join("_jsp_staging.parquet");
+        let file = std::fs::File::create(&tmp)?;
+        let mut writer = parquet::arrow::ArrowWriter::try_new(file, first.schema(), None)
+            .context("parquet writer")?;
+        for batch in &batches {
+            writer.write(batch).context("parquet write")?;
+        }
+        writer.close().context("parquet close")?;
+        store.execute(&format!(
+            "CREATE TABLE _jsp_staging AS SELECT * FROM read_parquet('{}')",
+            tmp.display()
+        ))?;
+        std::fs::remove_file(&tmp).ok();
+    }
+
+    store.execute(
+        "INSERT OR REPLACE INTO jsp_provisions (section_id, source_id, position, section_type, depth, heading, text, text_source)
+         SELECT section_id, source_id, position, section_type, depth, heading, text, text_source
+         FROM _jsp_staging
+         WHERE section_id IS NOT NULL"
+    )?;
+    store.execute("DROP TABLE _jsp_staging")?;
+
+    println!("Staged {total_rows} provisions for {source_id} in DuckDB (jsp_provisions)");
+    println!("Enrich with: fractalaw jsp enrich {source_id}");
+    Ok(())
+}
+
+/// Publish JSP/ACoP enrichment from DuckDB staging to sertantai via Zenoh.
+///
+/// Reads from `jsp_enrichment` table, builds Arrow RecordBatch, and publishes
+/// on `fractalaw/@{tenant}/taxa/secondary/{source_id}`.
+pub(crate) async fn cmd_sync_publish_secondary(
+    data_dir: &std::path::Path,
+    zenoh: &ZenohArgs,
+    source_id: Option<String>,
+    all: bool,
+) -> anyhow::Result<()> {
+    let store = crate::open_duck(data_dir)?;
+
+    let source_ids: Vec<String> = if let Some(ref sid) = source_id {
+        vec![sid.clone()]
+    } else if all {
+        let batches = store.query_arrow(
+            "SELECT DISTINCT source_id FROM jsp_enrichment ORDER BY source_id",
+        )?;
+        let mut names = Vec::new();
+        for batch in &batches {
+            if let Some(col) = batch.column_by_name("source_id") {
+                if let Some(arr) = col.as_any().downcast_ref::<arrow::array::StringArray>() {
+                    for i in 0..arr.len() {
+                        if !arr.is_null(i) {
+                            names.push(arr.value(i).to_string());
+                        }
+                    }
+                }
+            }
+        }
+        names
+    } else {
+        anyhow::bail!("specify --source-id or --all");
+    };
+
+    if source_ids.is_empty() {
+        println!("No enriched sources found in DuckDB. Run 'fractalaw jsp enrich' first.");
+        return Ok(());
+    }
+
+    println!(
+        "Publishing secondary enrichment for {} source(s) to zenoh (tenant: {})...",
+        source_ids.len(),
+        zenoh.tenant,
+    );
+
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+
+    print!("Waiting for zenoh peer...");
+    let peers = sync
+        .wait_for_peers(std::time::Duration::from_secs(15))
+        .await;
+    if peers == 0 {
+        println!(" no peers connected (timeout). Publishing anyway.");
+    } else {
+        println!(" {peers} peer(s) connected.");
+    }
+
+    let mut published = 0usize;
+    let mut total_rows = 0usize;
+
+    for sid in &source_ids {
+        let safe = sid.replace('\'', "''");
+        let sql = format!(
+            "SELECT section_id, drrp_types, governed_actors, government_actors, \
+                    obligation_strength, modal_verb, clause_refined \
+             FROM jsp_enrichment WHERE source_id = '{safe}'"
+        );
+
+        let batches = store.query_arrow(&sql)?;
+        let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+
+        if rows == 0 {
+            continue;
+        }
+
+        sync.publish_secondary_taxa(sid, &batches)
+            .await
+            .map_err(|e| anyhow::anyhow!("failed to publish enrichment for {sid}: {e}"))?;
+        total_rows += rows;
+        published += 1;
+
+        eprint!(".");
+    }
+    eprintln!();
+
+    println!("Published {total_rows} enrichment rows across {published} source(s).");
+    Ok(())
+}
+
 pub(crate) async fn cmd_sync_pull_lrt(
     data_dir: &std::path::Path,
     zenoh: &ZenohArgs,

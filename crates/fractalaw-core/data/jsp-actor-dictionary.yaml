@@ -1,0 +1,229 @@
+# JSP Actor Dictionary — MoD Organisational Roles
+#
+# Separate from the legislative actor dictionary. JSPs assign
+# organisational responsibilities (SRO, ODH, CO, AP) within an
+# existing legal framework — not Hohfeldian duty/right positions.
+#
+# Same format as actor-dictionary.yaml: label, type, category,
+# regex_patterns, triggers. Loaded separately at compile time.
+#
+# Ordering matters: specific entries before generic.
+# regex_patterns get boundary wrappers at compile time.
+#
+# Categories: MoD-Ministerial, MoD-Senior, MoD-Military,
+# MoD-Safety, MoD-Operational, MoD-Technical, MoD-Environment,
+# MoD-Supply, MoD-Finance, MoD-Org
+
+# ── Ministerial / Senior ────────────────────────────────────────────
+
+- label: "MoD: Secretary of State for Defence"
+  type: government
+  category: MoD-Ministerial
+  regex_patterns:
+    - "Secretary of State(?:\\s+for Defence)?"
+  triggers: [secretary of state for defence, sos(def)]
+
+- label: "MoD: Permanent Under-Secretary"
+  type: government
+  category: MoD-Senior
+  regex_patterns:
+    - "Permanent Under[- ]Secretary"
+    - "\\bPUS\\b"
+  triggers: [permanent under-secretary, pus]
+
+- label: "MoD: Chief of Defence Staff"
+  type: government
+  category: MoD-Military
+  regex_patterns:
+    - "Chief of Defence Staff"
+    - "\\bCDS\\b"
+  triggers: [chief of defence staff, cds]
+
+# ── Safety Governance ───────────────────────────────────────────────
+
+- label: "MoD: Defence Safety Authority"
+  type: government
+  category: MoD-Safety
+  regex_patterns:
+    - "Defence Safety Authority"
+    - "\\bDSA\\b"
+  triggers: [defence safety authority, dsa]
+
+- label: "MoD: Senior Duty Holder"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Ss]enior [Dd]uty [Hh]older"
+    - "\\bSDH\\b"
+  triggers: [senior duty holder, sdh]
+
+- label: "MoD: Operating Duty Holder"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Oo]perating [Dd]uty [Hh]older"
+    - "\\bODH\\b"
+  triggers: [operating duty holder, odh]
+
+- label: "MoD: Duty Holder"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Dd]uty [Hh]older"
+  triggers: [duty holder, dutyholder, dh]
+
+- label: "MoD: Unit Safety Officer"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Uu]nit [Ss]afety [Oo]fficer"
+    - "\\bUSO\\b"
+  triggers: [unit safety officer, uso, safety officer]
+
+- label: "MoD: Safety Case Author"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Ss]afety [Cc]ase [Aa]uthor"
+  triggers: [safety case author]
+
+- label: "MoD: Independent Safety Adviser"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Ii]ndependent [Ss]afety [Aa]dviser"
+    - "\\bISA\\b"
+  triggers: [independent safety adviser, isa]
+
+- label: "MoD: Safety Committee"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Ss]afety [Cc]ommittee"
+    - "[Hh]ealth and [Ss]afety [Cc]ommittee"
+  triggers: [safety committee, health and safety committee]
+
+- label: "MoD: Single Service Safety Adviser"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Ss]ingle [Ss]ervice [Ss]afety [Aa]dviser"
+    - "\\bSSSA\\b"
+  triggers: [single service safety adviser, sssa]
+
+# ── Accountability Chain ────────────────────────────────────────────
+
+- label: "MoD: Senior Responsible Owner"
+  type: governed
+  category: MoD-Accountability
+  regex_patterns:
+    - "[Ss]enior [Rr]esponsible [Oo]wner"
+    - "\\bSRO\\b"
+  triggers: [senior responsible owner, sro]
+
+- label: "MoD: Accountable Person"
+  type: governed
+  category: MoD-Accountability
+  regex_patterns:
+    - "[Aa]ccountable [Pp]erson"
+    - "\\bAP\\b"
+  triggers: [accountable person, ap]
+
+# ── Operational Chain ───────────────────────────────────────────────
+
+- label: "MoD: Commanding Officer"
+  type: governed
+  category: MoD-Operational
+  regex_patterns:
+    - "[Cc]ommanding [Oo]fficer"
+    - "\\bCO\\b"
+  triggers: [commanding officer, co, unit commander]
+
+- label: "MoD: Head of Establishment"
+  type: governed
+  category: MoD-Operational
+  regex_patterns:
+    - "[Hh]ead of [Ee]stablishment"
+    - "\\bHoE\\b"
+  triggers: [head of establishment, hoe]
+
+- label: "MoD: Commander/Manager"
+  type: governed
+  category: MoD-Operational
+  regex_patterns:
+    - "(?:commander|manager|line manager)"
+  triggers: [commander, manager, line manager]
+
+- label: "MoD: User"
+  type: governed
+  category: MoD-Operational
+  regex_patterns:
+    - "\\b[Uu]ser\\b"
+  triggers: [user, military user]
+
+- label: "MoD: Operator"
+  type: governed
+  category: MoD-Operational
+  regex_patterns:
+    - "\\b[Oo]perator\\b"
+  triggers: [operator, equipment operator]
+
+# ── Technical ───────────────────────────────────────────────────────
+
+- label: "MoD: Project Technical Authority"
+  type: governed
+  category: MoD-Technical
+  regex_patterns:
+    - "[Pp]roject [Tt]echnical [Aa]uthority"
+    - "\\bPTA\\b"
+  triggers: [project technical authority, pta]
+
+# ── Environment ─────────────────────────────────────────────────────
+
+- label: "MoD: Environmental Protection Adviser"
+  type: governed
+  category: MoD-Environment
+  regex_patterns:
+    - "[Ee]nvironmental [Pp]rotection [Aa]dviser"
+    - "\\bEPA\\b"
+  triggers: [environmental protection adviser, epa, environmental adviser]
+
+# ── Supply Chain ────────────────────────────────────────────────────
+
+- label: "MoD: Prime Contractor"
+  type: governed
+  category: MoD-Supply
+  regex_patterns:
+    - "[Pp]rime [Cc]ontractor"
+  triggers: [prime contractor, prime]
+
+- label: "MoD: Contractor"
+  type: governed
+  category: MoD-Supply
+  regex_patterns:
+    - "\\b[Cc]ontractor\\b"
+  triggers: [contractor, defence contractor]
+
+- label: "MoD: Infrastructure Provider"
+  type: governed
+  category: MoD-Supply
+  regex_patterns:
+    - "[Ii]nfrastructure [Pp]rovider"
+  triggers: [infrastructure provider]
+
+# ── Organisational / Finance ────────────────────────────────────────
+
+- label: "MoD: Defence Organisation"
+  type: governed
+  category: MoD-Org
+  regex_patterns:
+    - "[Dd]efence [Oo]rganisation"
+  triggers: [defence organisation, mod organisation]
+
+- label: "MoD: Top Level Budget Holder"
+  type: governed
+  category: MoD-Finance
+  regex_patterns:
+    - "[Tt]op [Ll]evel [Bb]udget [Hh]older"
+    - "\\bTLB\\b"
+  triggers: [top level budget holder, tlb holder, tlb]

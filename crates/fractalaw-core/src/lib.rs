@@ -1,4 +1,5 @@
 pub mod drrp;
+pub mod jsp;
 pub mod schema;
 pub mod sort_key;
 pub mod taxa;

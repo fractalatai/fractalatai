@@ -225,6 +225,47 @@ pub mod keys {
         format!("{PREFIX}/@{tenant}/evidence/{law_name}")
     }
 
+    // ── Secondary source (JSP/ACoP) key expressions ──
+
+    /// Key expression for querying all secondary sources from sertantai.
+    ///
+    /// Returns JSON array of source metadata.
+    /// Example: `fractalaw/@dev/data/secondary/sources`
+    pub fn secondary_sources(tenant: &str) -> String {
+        format!("{PREFIX}/@{tenant}/data/secondary/sources")
+    }
+
+    /// Key expression for querying a single secondary source from sertantai.
+    ///
+    /// Returns JSON source metadata.
+    /// Example: `fractalaw/@dev/data/secondary/sources/JSP-375-CH23`
+    pub fn secondary_source(tenant: &str, source_id: &str) -> String {
+        format!("{PREFIX}/@{tenant}/data/secondary/sources/{source_id}")
+    }
+
+    /// Key expression for querying provisions of a secondary source from sertantai.
+    ///
+    /// Returns Arrow IPC (default) or JSON.
+    /// Example: `fractalaw/@dev/data/secondary/provisions/JSP-375-CH23`
+    pub fn secondary_provisions(tenant: &str, source_id: &str) -> String {
+        format!("{PREFIX}/@{tenant}/data/secondary/provisions/{source_id}")
+    }
+
+    /// Key expression for publishing taxa enrichment for a secondary source.
+    ///
+    /// Arrow IPC payload with enrichment columns.
+    /// Example: `fractalaw/@dev/taxa/secondary/JSP-375-CH23`
+    pub fn taxa_secondary(tenant: &str, source_id: &str) -> String {
+        format!("{PREFIX}/@{tenant}/taxa/secondary/{source_id}")
+    }
+
+    /// Wildcard key expression for all secondary taxa enrichment under a tenant.
+    ///
+    /// Example: `fractalaw/@dev/taxa/secondary/*`
+    pub fn taxa_secondary_wildcard(tenant: &str) -> String {
+        format!("{PREFIX}/@{tenant}/taxa/secondary/*")
+    }
+
     /// Key expression for sertantai customer discovery queryable.
     ///
     /// Sertantai serves this — fractalaw queries it to list all customers.
@@ -365,6 +406,110 @@ impl ZenohSync {
             bytes = ipc_bytes.len(),
             rows = batches.iter().map(|b| b.num_rows()).sum::<usize>(),
             "publishing taxa enrichment"
+        );
+
+        self.session
+            .put(&key, ipc_bytes)
+            .await
+            .map_err(ZenohError::Session)?;
+
+        Ok(())
+    }
+
+    // ── Secondary source (JSP/ACoP) methods ──
+
+    /// Query secondary source provisions from sertantai.
+    ///
+    /// Pulls provisions for a specific source (e.g., "JSP-375-CH23")
+    /// as Arrow IPC via Zenoh queryable.
+    pub async fn query_secondary_provisions(
+        &self,
+        source_id: &str,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<RecordBatch>, ZenohError> {
+        let key = keys::secondary_provisions(&self.tenant, source_id);
+        info!(key = %key, "querying secondary provisions from sertantai");
+
+        let replies = self
+            .session
+            .get(&key)
+            .timeout(timeout)
+            .await
+            .map_err(ZenohError::Session)?;
+
+        let mut all_batches = Vec::new();
+        while let Ok(reply) = replies.recv_async().await {
+            if let Ok(sample) = reply.result() {
+                let bytes = sample.payload().to_bytes();
+                if bytes.is_empty() {
+                    continue;
+                }
+                let batches = decode_arrow_ipc(&bytes)?;
+                all_batches.extend(batches);
+            }
+        }
+
+        info!(
+            source_id = %source_id,
+            batches = all_batches.len(),
+            rows = all_batches.iter().map(|b| b.num_rows()).sum::<usize>(),
+            "received secondary provisions"
+        );
+
+        Ok(all_batches)
+    }
+
+    /// Query all secondary sources metadata from sertantai.
+    ///
+    /// Returns raw JSON bytes — caller deserializes.
+    pub async fn query_secondary_sources(
+        &self,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<u8>, ZenohError> {
+        let key = keys::secondary_sources(&self.tenant);
+        info!(key = %key, "querying secondary sources from sertantai");
+
+        let replies = self
+            .session
+            .get(&key)
+            .timeout(timeout)
+            .await
+            .map_err(ZenohError::Session)?;
+
+        while let Ok(reply) = replies.recv_async().await {
+            if let Ok(sample) = reply.result() {
+                let bytes = sample.payload().to_bytes();
+                if !bytes.is_empty() {
+                    return Ok(bytes.to_vec());
+                }
+            }
+        }
+
+        Ok(Vec::new())
+    }
+
+    /// Publish taxa enrichment for a secondary source (JSP/ACoP).
+    ///
+    /// Same as `publish_taxa` but uses the secondary key expression.
+    pub async fn publish_secondary_taxa(
+        &self,
+        source_id: &str,
+        batches: &[RecordBatch],
+    ) -> Result<(), ZenohError> {
+        if batches.is_empty() || batches.iter().all(|b| b.num_rows() == 0) {
+            return Err(ZenohError::NoData {
+                law_name: source_id.to_string(),
+            });
+        }
+
+        let ipc_bytes = encode_arrow_ipc(batches)?;
+        let key = keys::taxa_secondary(&self.tenant, source_id);
+
+        info!(
+            key = %key,
+            bytes = ipc_bytes.len(),
+            rows = batches.iter().map(|b| b.num_rows()).sum::<usize>(),
+            "publishing secondary taxa enrichment"
         );
 
         self.session

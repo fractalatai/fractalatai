@@ -168,6 +168,28 @@ enum Command {
         #[command(flatten)]
         zenoh: ZenohArgs,
     },
+    /// Pull secondary source provisions (JSP/ACoP) from sertantai into DuckDB staging
+    PullSecondary {
+        #[command(flatten)]
+        zenoh: ZenohArgs,
+        /// Source identifier (e.g., JSP-375-CH23)
+        #[arg(long)]
+        source_id: String,
+        /// Query timeout in seconds
+        #[arg(long, default_value_t = 30)]
+        timeout: u64,
+    },
+    /// Publish JSP/ACoP enrichment from DuckDB staging to sertantai via zenoh
+    PublishSecondary {
+        #[command(flatten)]
+        zenoh: ZenohArgs,
+        /// Source identifier (e.g., JSP-375-CH23)
+        #[arg(long)]
+        source_id: Option<String>,
+        /// Publish all enriched secondary sources
+        #[arg(long)]
+        all: bool,
+    },
     /// Publish existing triage results from DuckDB to sertantai (no re-classification)
     PublishTriage {
         #[command(flatten)]
@@ -496,6 +518,20 @@ async fn main() -> anyhow::Result<()> {
             zenoh,
         } => {
             cmd_triage(&data_dir, laws, family, all, verbose, pg_url.as_deref(), publish, &zenoh).await
+        }
+        Command::PullSecondary {
+            zenoh,
+            source_id,
+            timeout,
+        } => {
+            sync::cmd_sync_pull_secondary(&data_dir, &zenoh, &source_id, timeout).await
+        }
+        Command::PublishSecondary {
+            zenoh,
+            source_id,
+            all,
+        } => {
+            sync::cmd_sync_publish_secondary(&data_dir, &zenoh, source_id, all).await
         }
         Command::PublishTriage {
             zenoh,

@@ -16,6 +16,7 @@ fractalaw-store = { path = "../fractalaw-store", features = ["duckdb", "pg"] }
 fractalaw-sync = { path = "../fractalaw-sync", features = ["http", "zenoh"] }
 zenoh = { workspace = true }
 arrow = { workspace = true, features = ["prettyprint"] }
+parquet = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true }
 tokio = { workspace = true }
