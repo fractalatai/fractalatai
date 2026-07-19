@@ -27,6 +27,8 @@
 
 pub mod actors;
 pub mod patterns;
+pub mod references;
+pub mod resolve;
 
 use crate::taxa::text_cleaner;
 

@@ -8,7 +8,7 @@ Plan has full design detail; this tracks execution only.
 
 ## Phases
 - [x] Phase 1: DRRP Enrichment — [phase-1-drrp-enrichment.md](phase-1-drrp-enrichment.md) (CLOSED)
-- [ ] Phase 2: Reference Extraction — [phase-2-reference-extraction.md](phase-2-reference-extraction.md) (PENDING)
+- [x] Phase 2: Reference Extraction — [phase-2-reference-extraction.md](phase-2-reference-extraction.md) (CLOSED)
 - [ ] Phase 3: Obligation & RACI — [phase-3-obligation-raci.md](phase-3-obligation-raci.md) (PENDING)
 - [ ] Phase 4: Mandated Artefacts — [phase-4-mandated-artefacts.md](phase-4-mandated-artefacts.md) (PENDING)
 - [ ] Phase 5: Semantics & Controls — [phase-5-semantics-controls.md](phase-5-semantics-controls.md) (PENDING)

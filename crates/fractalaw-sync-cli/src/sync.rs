@@ -832,10 +832,22 @@ pub(crate) async fn cmd_sync_publish_secondary(
 
     for sid in &source_ids {
         let safe = sid.replace('\'', "''");
+
+        // Consolidated query: DRRP enrichment LEFT JOIN aggregated references
         let sql = format!(
-            "SELECT section_id, drrp_types, governed_actors, government_actors, \
-                    obligation_strength, modal_verb, clause_refined \
-             FROM jsp_enrichment WHERE source_id = '{safe}'"
+            "SELECT e.section_id, e.drrp_types, e.governed_actors, e.government_actors, \
+                    e.obligation_strength, e.modal_verb, e.clause_refined, \
+                    refs.references_json \
+             FROM jsp_enrichment e \
+             LEFT JOIN ( \
+                 SELECT source_section_id, \
+                        list({{target_type: target_type, target_id: target_id, citation: citation}})::VARCHAR \
+                        AS references_json \
+                 FROM jsp_references \
+                 WHERE resolved = TRUE \
+                 GROUP BY source_section_id \
+             ) refs ON refs.source_section_id = e.section_id \
+             WHERE e.source_id = '{safe}'"
         );
 
         let batches = store.query_arrow(&sql)?;
