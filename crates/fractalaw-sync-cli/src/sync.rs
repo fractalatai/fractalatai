@@ -833,11 +833,13 @@ pub(crate) async fn cmd_sync_publish_secondary(
     for sid in &source_ids {
         let safe = sid.replace('\'', "''");
 
-        // Consolidated query: DRRP enrichment LEFT JOIN aggregated references
+        // Consolidated query: DRRP enrichment LEFT JOIN references + obligations + RACI
         let sql = format!(
             "SELECT e.section_id, e.drrp_types, e.governed_actors, e.government_actors, \
                     e.obligation_strength, e.modal_verb, e.clause_refined, \
-                    refs.references_json \
+                    refs.references_json, \
+                    obs.obligations_json, \
+                    raci.raci_json \
              FROM jsp_enrichment e \
              LEFT JOIN ( \
                  SELECT source_section_id, \
@@ -847,6 +849,24 @@ pub(crate) async fn cmd_sync_publish_secondary(
                  WHERE resolved = TRUE \
                  GROUP BY source_section_id \
              ) refs ON refs.source_section_id = e.section_id \
+             LEFT JOIN ( \
+                 SELECT section_id, \
+                        list({{obligation_index: obligation_index, text: text, modal_verb: modal_verb, \
+                               strength: strength, clause_refined: clause_refined, \
+                               competence: competence_requirements}})::VARCHAR \
+                        AS obligations_json \
+                 FROM jsp_obligations \
+                 GROUP BY section_id \
+             ) obs ON obs.section_id = e.section_id \
+             LEFT JOIN ( \
+                 SELECT r.section_id, \
+                        list({{role_label: r.role_label, assignment_type: r.assignment_type, \
+                               obligation_index: o.obligation_index}})::VARCHAR \
+                        AS raci_json \
+                 FROM jsp_raci r \
+                 JOIN jsp_obligations o ON r.obligation_id = o.obligation_id \
+                 GROUP BY r.section_id \
+             ) raci ON raci.section_id = e.section_id \
              WHERE e.source_id = '{safe}'"
         );
 

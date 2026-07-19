@@ -26,6 +26,7 @@
 //! ```
 
 pub mod actors;
+pub mod obligations;
 pub mod patterns;
 pub mod references;
 pub mod resolve;

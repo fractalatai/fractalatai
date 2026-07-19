@@ -29,6 +29,21 @@ pub enum JspAction {
         dry_run: bool,
     },
 
+    /// Extract individual obligations and RACI assignments from JSP provisions
+    ExtractObligations {
+        /// Source identifier (e.g., JSP-375-CH23)
+        source_id: String,
+        /// Show extracted obligations without writing to DuckDB
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Query RACI assignments for a role across all JSP sources
+    Raci {
+        /// Role label or fragment (e.g., "Commanding Officer", "Contractor")
+        role: String,
+    },
+
     /// Trace: find which JSP provisions reference a given legislation provision or law
     Trace {
         /// Target identifier — a law_name (e.g., UK_uksi_1989_635) or section_id
@@ -44,6 +59,8 @@ pub fn cmd_jsp(action: JspAction, duck: &DuckStore) -> Result<()> {
     match action {
         JspAction::Enrich { source_id, dry_run } => cmd_enrich(duck, &source_id, dry_run),
         JspAction::ExtractRefs { source_id, dry_run } => cmd_extract_refs(duck, &source_id, dry_run),
+        JspAction::ExtractObligations { source_id, dry_run } => cmd_extract_obligations(duck, &source_id, dry_run),
+        JspAction::Raci { role } => cmd_raci(duck, &role),
         JspAction::Trace { target_id } => cmd_trace(duck, &target_id),
         JspAction::Stats => cmd_stats(duck),
     }
@@ -399,6 +416,216 @@ fn cmd_extract_refs(duck: &DuckStore, source_id: &str, dry_run: bool) -> Result<
 
     println!("\nStaged {inserted} references in DuckDB (jsp_references)");
     Ok(())
+}
+
+/// Extract obligations and RACI assignments from JSP provisions.
+fn cmd_extract_obligations(duck: &DuckStore, source_id: &str, dry_run: bool) -> Result<()> {
+    let sql = format!(
+        "SELECT section_id, text FROM jsp_provisions WHERE source_id = '{}' AND text IS NOT NULL ORDER BY position",
+        source_id.replace('\'', "''")
+    );
+    let batches = match duck.query_arrow(&sql) {
+        Ok(b) => b,
+        Err(_) => {
+            eprintln!("Table 'jsp_provisions' not found. Pull provisions first.");
+            return Ok(());
+        }
+    };
+
+    let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+    if total_rows == 0 {
+        println!("No provisions found for {source_id}");
+        return Ok(());
+    }
+
+    println!("Extracting obligations from {total_rows} provisions in {source_id}...");
+
+    let mut all_obligations: Vec<(String, jsp::obligations::Obligation)> = Vec::new();
+    let mut raci_counts: std::collections::HashMap<String, std::collections::HashMap<&str, usize>> =
+        std::collections::HashMap::new();
+
+    for batch in &batches {
+        use arrow::array::{Array, StringArray};
+
+        let sid_col: Option<&StringArray> = batch.column_by_name("section_id")
+            .and_then(|c| c.as_any().downcast_ref());
+        let text_col: Option<&StringArray> = batch.column_by_name("text")
+            .and_then(|c| c.as_any().downcast_ref());
+
+        for row in 0..batch.num_rows() {
+            let sid = sid_col.and_then(|c: &StringArray| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("");
+            let text = text_col.and_then(|c: &StringArray| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("");
+            if text.is_empty() { continue; }
+
+            let obs = jsp::obligations::extract_obligations(text);
+            for ob in obs {
+                for r in &ob.raci {
+                    raci_counts
+                        .entry(r.role_label.clone())
+                        .or_default()
+                        .entry(r.assignment_type)
+                        .and_modify(|c| *c += 1)
+                        .or_insert(1);
+                }
+                all_obligations.push((sid.to_string(), ob));
+            }
+        }
+    }
+
+    // Print summary
+    println!("\nObligations extracted: {}", all_obligations.len());
+
+    let mandatory = all_obligations.iter().filter(|(_, o)| o.strength == Some("Mandatory")).count();
+    let recommended = all_obligations.iter().filter(|(_, o)| o.strength == Some("Recommended")).count();
+    let permissive = all_obligations.iter().filter(|(_, o)| o.strength == Some("Permissive")).count();
+    println!("  Mandatory: {mandatory}");
+    println!("  Recommended: {recommended}");
+    println!("  Permissive: {permissive}");
+
+    let with_competence = all_obligations.iter().filter(|(_, o)| !o.competence.is_empty()).count();
+    if with_competence > 0 {
+        println!("  With competence requirements: {with_competence}");
+    }
+
+    if !raci_counts.is_empty() {
+        println!("\nRACI assignments:");
+        let mut sorted: Vec<_> = raci_counts.iter().collect();
+        sorted.sort_by_key(|(label, _)| label.clone());
+        for (role, types) in &sorted {
+            let r = types.get("R").unwrap_or(&0);
+            let a = types.get("A").unwrap_or(&0);
+            let c = types.get("C").unwrap_or(&0);
+            let i = types.get("I").unwrap_or(&0);
+            println!("  {role}: R={r} A={a} C={c} I={i}");
+        }
+    }
+
+    if dry_run {
+        println!("\n(dry run — not writing to DuckDB)");
+        return Ok(());
+    }
+
+    // Create staging tables
+    duck.execute(
+        "CREATE TABLE IF NOT EXISTS jsp_obligations (
+            obligation_id TEXT PRIMARY KEY,
+            section_id TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            obligation_index INTEGER,
+            text TEXT NOT NULL,
+            modal_verb TEXT,
+            strength TEXT,
+            clause_refined TEXT,
+            competence_requirements TEXT,
+            extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )"
+    ).context("failed to create jsp_obligations table")?;
+
+    duck.execute(
+        "CREATE TABLE IF NOT EXISTS jsp_raci (
+            raci_id TEXT PRIMARY KEY,
+            obligation_id TEXT NOT NULL,
+            section_id TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            role_label TEXT NOT NULL,
+            assignment_type TEXT NOT NULL,
+            assignment_source TEXT NOT NULL,
+            extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )"
+    ).context("failed to create jsp_raci table")?;
+
+    // Clear existing data for this source
+    let safe = source_id.replace('\'', "''");
+    duck.execute(&format!("DELETE FROM jsp_obligations WHERE source_id = '{safe}'"))?;
+    duck.execute(&format!("DELETE FROM jsp_raci WHERE source_id = '{safe}'"))?;
+
+    let esc = |s: &str| s.replace('\'', "''");
+    let mut ob_count = 0usize;
+    let mut raci_count = 0usize;
+
+    for (sid, ob) in &all_obligations {
+        let ob_id = format!("{sid}:ob.{}", ob.index);
+        let competence = ob.competence.join(",");
+
+        duck.execute(&format!(
+            "INSERT INTO jsp_obligations (obligation_id, section_id, source_id, obligation_index, text, modal_verb, strength, clause_refined, competence_requirements)
+             VALUES ('{}', '{}', '{}', {}, '{}', {}, {}, {}, {})",
+            esc(&ob_id), esc(sid), esc(source_id), ob.index,
+            esc(&ob.text),
+            ob.modal_verb.map(|m| format!("'{m}'")).unwrap_or("NULL".into()),
+            ob.strength.map(|s| format!("'{s}'")).unwrap_or("NULL".into()),
+            ob.clause_refined.as_deref().map(|c| format!("'{}'", esc(c))).unwrap_or("NULL".into()),
+            if competence.is_empty() { "NULL".into() } else { format!("'{}'", esc(&competence)) },
+        ))?;
+        ob_count += 1;
+
+        for (ri, r) in ob.raci.iter().enumerate() {
+            let raci_id = format!("{ob_id}:raci.{ri}");
+            duck.execute(&format!(
+                "INSERT INTO jsp_raci (raci_id, obligation_id, section_id, source_id, role_label, assignment_type, assignment_source)
+                 VALUES ('{}', '{}', '{}', '{}', '{}', '{}', '{}')",
+                esc(&raci_id), esc(&ob_id), esc(sid), esc(source_id),
+                esc(&r.role_label), r.assignment_type, r.source,
+            ))?;
+            raci_count += 1;
+        }
+    }
+
+    println!("\nStaged {ob_count} obligations and {raci_count} RACI assignments in DuckDB");
+    Ok(())
+}
+
+/// Query RACI assignments for a role across all JSP sources.
+fn cmd_raci(duck: &DuckStore, role: &str) -> Result<()> {
+    let safe = role.replace('\'', "''");
+    let sql = format!(
+        "SELECT r.role_label, r.assignment_type, r.source_id, \
+                o.strength, o.text \
+         FROM jsp_raci r \
+         JOIN jsp_obligations o ON r.obligation_id = o.obligation_id \
+         WHERE r.role_label LIKE '%{safe}%' \
+         ORDER BY r.role_label, r.source_id, r.assignment_type"
+    );
+
+    match duck.query_arrow(&sql) {
+        Ok(batches) => {
+            let total: usize = batches.iter().map(|b| b.num_rows()).sum();
+            if total == 0 {
+                println!("No RACI assignments found for '{role}'");
+                println!("Run 'fractalaw jsp extract-obligations' first.");
+                return Ok(());
+            }
+
+            use arrow::array::{Array, StringArray};
+
+            println!("RACI assignments matching '{role}': {total}\n");
+            for batch in &batches {
+                let role_col: Option<&StringArray> = batch.column_by_name("role_label").and_then(|c| c.as_any().downcast_ref());
+                let type_col: Option<&StringArray> = batch.column_by_name("assignment_type").and_then(|c| c.as_any().downcast_ref());
+                let src_col: Option<&StringArray> = batch.column_by_name("source_id").and_then(|c| c.as_any().downcast_ref());
+                let strength_col: Option<&StringArray> = batch.column_by_name("strength").and_then(|c| c.as_any().downcast_ref());
+                let text_col: Option<&StringArray> = batch.column_by_name("text").and_then(|c| c.as_any().downcast_ref());
+
+                for row in 0..batch.num_rows() {
+                    let rl = role_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("?");
+                    let at = type_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("?");
+                    let src = src_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("?");
+                    let strength = strength_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("?");
+                    let text = text_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("");
+
+                    let truncated = if text.len() > 120 { format!("{}...", &text[..120]) } else { text.to_string() };
+                    println!("[{at}] {rl} ({src}, {strength})");
+                    println!("  {truncated}");
+                    println!();
+                }
+            }
+            Ok(())
+        }
+        Err(_) => {
+            println!("Table 'jsp_raci' not found. Run 'fractalaw jsp extract-obligations' first.");
+            Ok(())
+        }
+    }
 }
 
 /// Trace: find JSP provisions that reference a given law or section.
