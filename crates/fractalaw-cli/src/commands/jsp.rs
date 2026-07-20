@@ -60,6 +60,37 @@ pub enum JspAction {
         artefact_type: Option<String>,
     },
 
+    /// Extract terms and acronyms from JSP provisions
+    ExtractTerms {
+        /// Source identifier (e.g., JSP-375-CH23)
+        source_id: String,
+        /// Show extracted terms without writing to DuckDB
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Show term conflicts across JSP sources
+    Terms {
+        /// Show only conflicts (same acronym, different expansion)
+        #[arg(long)]
+        conflicts: bool,
+    },
+
+    /// Generate controls from JSP mandated artefacts (additive to legislation controls)
+    Controls {
+        /// Source identifier (e.g., JSP-375-CH23)
+        source_id: String,
+        /// Show generated controls without writing to DuckDB
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Traceability gap analysis: legislative obligations with no JSP implementation
+    Gaps {
+        /// Source identifier — a JSP chapter (e.g., JSP-375-CH23) or parent (e.g., JSP-375)
+        source_id: String,
+    },
+
     /// Trace: find which JSP provisions reference a given legislation provision or law
     Trace {
         /// Target identifier — a law_name (e.g., UK_uksi_1989_635) or section_id
@@ -77,8 +108,12 @@ pub fn cmd_jsp(action: JspAction, duck: &DuckStore) -> Result<()> {
         JspAction::ExtractRefs { source_id, dry_run } => cmd_extract_refs(duck, &source_id, dry_run),
         JspAction::ExtractObligations { source_id, dry_run } => cmd_extract_obligations(duck, &source_id, dry_run),
         JspAction::Raci { role } => cmd_raci(duck, &role),
+        JspAction::ExtractTerms { source_id, dry_run } => cmd_extract_terms(duck, &source_id, dry_run),
+        JspAction::Terms { conflicts } => cmd_terms(duck, conflicts),
         JspAction::ExtractArtefacts { source_id, dry_run } => cmd_extract_artefacts(duck, &source_id, dry_run),
         JspAction::Artefacts { artefact_type } => cmd_artefacts(duck, artefact_type.as_deref()),
+        JspAction::Controls { source_id, dry_run } => cmd_controls(duck, &source_id, dry_run),
+        JspAction::Gaps { source_id } => cmd_gaps(duck, &source_id),
         JspAction::Trace { target_id } => cmd_trace(duck, &target_id),
         JspAction::Stats => cmd_stats(duck),
     }
@@ -646,6 +681,133 @@ fn cmd_raci(duck: &DuckStore, role: &str) -> Result<()> {
     }
 }
 
+/// Extract terms and acronyms from JSP provisions.
+fn cmd_extract_terms(duck: &DuckStore, source_id: &str, dry_run: bool) -> Result<()> {
+    let safe = source_id.replace('\'', "''");
+    let sql = format!(
+        "SELECT section_id, text FROM jsp_provisions WHERE source_id = '{safe}' AND text IS NOT NULL ORDER BY position"
+    );
+    let batches = match duck.query_arrow(&sql) {
+        Ok(b) => b,
+        Err(_) => {
+            eprintln!("Table 'jsp_provisions' not found. Pull provisions first.");
+            return Ok(());
+        }
+    };
+
+    let total: usize = batches.iter().map(|b| b.num_rows()).sum();
+    if total == 0 {
+        println!("No provisions found for {source_id}");
+        return Ok(());
+    }
+
+    println!("Extracting terms from {total} provisions in {source_id}...");
+
+    let mut all_terms: Vec<(String, jsp::terms::JspTerm)> = Vec::new();
+
+    for batch in &batches {
+        use arrow::array::{Array, StringArray};
+        let sid_col: Option<&StringArray> = batch.column_by_name("section_id").and_then(|c| c.as_any().downcast_ref());
+        let text_col: Option<&StringArray> = batch.column_by_name("text").and_then(|c| c.as_any().downcast_ref());
+
+        for row in 0..batch.num_rows() {
+            let sid = sid_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("");
+            let text = text_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("");
+            if text.is_empty() { continue; }
+
+            let terms = jsp::terms::extract_terms(text);
+            for t in terms {
+                all_terms.push((sid.to_string(), t));
+            }
+        }
+    }
+
+    // Dedup across provisions (same acronym from different provisions)
+    let mut seen = std::collections::HashSet::new();
+    all_terms.retain(|(_, t)| seen.insert(t.normalised.clone()));
+
+    println!("\nTerms extracted: {}", all_terms.len());
+    for (sid, t) in &all_terms {
+        let short = sid.rsplit_once(':').map(|(_, s)| s).unwrap_or(sid);
+        match &t.acronym {
+            Some(acr) => println!("  {acr} = {} (from {short})", t.term),
+            None => println!("  \"{}\" (from {short})", t.term),
+        }
+    }
+
+    if dry_run {
+        println!("\n(dry run — not writing to DuckDB)");
+        return Ok(());
+    }
+
+    duck.execute(
+        "CREATE TABLE IF NOT EXISTS jsp_terms (
+            term_id TEXT PRIMARY KEY,
+            section_id TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            term TEXT NOT NULL,
+            acronym TEXT,
+            normalised TEXT NOT NULL,
+            extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )"
+    ).context("failed to create jsp_terms table")?;
+
+    duck.execute(&format!("DELETE FROM jsp_terms WHERE source_id = '{safe}'"))?;
+
+    let esc = |s: &str| s.replace('\'', "''");
+    let mut count = 0usize;
+    for (sid, t) in &all_terms {
+        let term_id = format!("{source_id}:{}", t.normalised);
+        let acr_sql = t.acronym.as_deref().map(|a| format!("'{}'", esc(a))).unwrap_or("NULL".into());
+        duck.execute(&format!(
+            "INSERT OR REPLACE INTO jsp_terms (term_id, section_id, source_id, term, acronym, normalised)
+             VALUES ('{}', '{}', '{}', '{}', {}, '{}')",
+            esc(&term_id), esc(sid), esc(source_id), esc(&t.term), acr_sql, esc(&t.normalised)
+        ))?;
+        count += 1;
+    }
+
+    println!("\nStaged {count} terms in DuckDB (jsp_terms)");
+    Ok(())
+}
+
+/// Show terms, optionally filtering for conflicts across sources.
+fn cmd_terms(duck: &DuckStore, conflicts: bool) -> Result<()> {
+    if conflicts {
+        let sql = "SELECT t1.acronym, t1.term, t1.source_id, t2.term AS conflicting_term, t2.source_id AS conflicting_source \
+                   FROM jsp_terms t1 \
+                   JOIN jsp_terms t2 ON t1.normalised = t2.normalised AND t1.source_id < t2.source_id AND t1.term != t2.term \
+                   ORDER BY t1.normalised";
+        match duck.query_arrow(sql) {
+            Ok(batches) => {
+                let total: usize = batches.iter().map(|b| b.num_rows()).sum();
+                if total == 0 {
+                    println!("No term conflicts found across sources.");
+                } else {
+                    println!("Term conflicts: {total}\n");
+                    println!("{}", arrow::util::pretty::pretty_format_batches(&batches)?);
+                }
+            }
+            Err(_) => println!("Table 'jsp_terms' not found. Run 'fractalaw jsp extract-terms' first."),
+        }
+    } else {
+        let sql = "SELECT source_id, count(*) as terms, count(acronym) as acronyms \
+                   FROM jsp_terms GROUP BY source_id ORDER BY source_id";
+        match duck.query_arrow(sql) {
+            Ok(batches) => {
+                let total: usize = batches.iter().map(|b| b.num_rows()).sum();
+                if total == 0 {
+                    println!("No terms in DuckDB. Run 'fractalaw jsp extract-terms' first.");
+                } else {
+                    println!("{}", arrow::util::pretty::pretty_format_batches(&batches)?);
+                }
+            }
+            Err(_) => println!("Table 'jsp_terms' not found. Run 'fractalaw jsp extract-terms' first."),
+        }
+    }
+    Ok(())
+}
+
 /// Extract mandated artefacts from JSP obligations.
 fn cmd_extract_artefacts(duck: &DuckStore, source_id: &str, dry_run: bool) -> Result<()> {
     let safe = source_id.replace('\'', "''");
@@ -800,6 +962,283 @@ fn cmd_artefacts(duck: &DuckStore, artefact_type: Option<&str>) -> Result<()> {
             Ok(())
         }
     }
+}
+
+/// Generate controls from JSP mandated artefacts.
+///
+/// Each mandated artefact becomes a control in `suggested_controls` with
+/// `source_id` set to the JSP chapter. Controls are additive — they don't
+/// touch existing legislation controls.
+fn cmd_controls(duck: &DuckStore, source_id: &str, dry_run: bool) -> Result<()> {
+    let safe = source_id.replace('\'', "''");
+
+    // Read artefacts with their parent obligation text and RACI
+    let sql = format!(
+        "SELECT a.artefact_id, a.artefact_type, a.obligation_id, a.section_id, \
+                o.text AS obligation_text, o.strength, o.modal_verb, o.competence_requirements, \
+                r.role_label, r.assignment_type \
+         FROM jsp_mandated_artefacts a \
+         JOIN jsp_obligations o ON a.obligation_id = o.obligation_id \
+         LEFT JOIN jsp_raci r ON r.obligation_id = a.obligation_id \
+         WHERE a.source_id = '{safe}' \
+         ORDER BY a.section_id, a.artefact_type"
+    );
+
+    let batches = match duck.query_arrow(&sql) {
+        Ok(b) => b,
+        Err(_) => {
+            eprintln!("Tables not found. Run extract-obligations and extract-artefacts first.");
+            return Ok(());
+        }
+    };
+
+    let total: usize = batches.iter().map(|b| b.num_rows()).sum();
+    if total == 0 {
+        println!("No mandated artefacts found for {source_id}.");
+        return Ok(());
+    }
+
+    // Group by artefact_id to collect RACI roles per artefact
+    use arrow::array::{Array, StringArray};
+    use std::collections::HashMap;
+
+    struct ArtefactData {
+        artefact_type: String,
+        obligation_text: String,
+        strength: String,
+        section_id: String,
+        competence: String,
+        roles: Vec<(String, String)>, // (role_label, assignment_type)
+    }
+
+    let mut artefacts: HashMap<String, ArtefactData> = HashMap::new();
+
+    for batch in &batches {
+        let aid_col: Option<&StringArray> = batch.column_by_name("artefact_id").and_then(|c| c.as_any().downcast_ref());
+        let atype_col: Option<&StringArray> = batch.column_by_name("artefact_type").and_then(|c| c.as_any().downcast_ref());
+        let otext_col: Option<&StringArray> = batch.column_by_name("obligation_text").and_then(|c| c.as_any().downcast_ref());
+        let strength_col: Option<&StringArray> = batch.column_by_name("strength").and_then(|c| c.as_any().downcast_ref());
+        let sid_col: Option<&StringArray> = batch.column_by_name("section_id").and_then(|c| c.as_any().downcast_ref());
+        let comp_col: Option<&StringArray> = batch.column_by_name("competence_requirements").and_then(|c| c.as_any().downcast_ref());
+        let role_col: Option<&StringArray> = batch.column_by_name("role_label").and_then(|c| c.as_any().downcast_ref());
+        let rtype_col: Option<&StringArray> = batch.column_by_name("assignment_type").and_then(|c| c.as_any().downcast_ref());
+
+        for row in 0..batch.num_rows() {
+            let get = |col: Option<&StringArray>| col.and_then(|c| if c.is_valid(row) { Some(c.value(row).to_string()) } else { None }).unwrap_or_default();
+
+            let aid = get(aid_col);
+            let role = get(role_col);
+            let rtype = get(rtype_col);
+
+            let entry = artefacts.entry(aid.clone()).or_insert_with(|| ArtefactData {
+                artefact_type: get(atype_col),
+                obligation_text: get(otext_col),
+                strength: get(strength_col),
+                section_id: get(sid_col),
+                competence: get(comp_col),
+                roles: Vec::new(),
+            });
+
+            if !role.is_empty() {
+                entry.roles.push((role, rtype));
+            }
+        }
+    }
+
+    println!("Generating controls from {} mandated artefacts in {source_id}...", artefacts.len());
+
+    // Find the law_name(s) this JSP implements (from references)
+    let law_name = duck.query_arrow(&format!(
+        "SELECT DISTINCT target_id FROM jsp_references \
+         WHERE source_id = '{safe}' AND target_type = 'legislation' AND resolved = TRUE \
+         LIMIT 1"
+    )).ok()
+    .and_then(|batches| batches.first().and_then(|b| {
+        b.column_by_name("target_id")
+            .and_then(|c| c.as_any().downcast_ref::<StringArray>())
+            .and_then(|a| if a.len() > 0 && a.is_valid(0) { Some(a.value(0).to_string()) } else { None })
+    }));
+
+    // Generate controls
+    let mut controls = Vec::new();
+    for (aid, data) in &artefacts {
+        let responsible: Vec<&str> = data.roles.iter()
+            .filter(|(_, t)| t == "R")
+            .map(|(r, _)| r.as_str())
+            .collect();
+        let owner = responsible.first().copied().unwrap_or("(unassigned)");
+
+        // Build indicative-mood control title from artefact type + obligation
+        let title = format!(
+            "A {} is maintained{}",
+            data.artefact_type,
+            if owner != "(unassigned)" { format!(" by the {owner}") } else { String::new() }
+        );
+
+        let control_json = serde_json::json!({
+            "title": title,
+            "description": data.obligation_text,
+            "what_it_checks": format!("The {} exists, is current, and addresses the specific hazards", data.artefact_type),
+            "control_type": match data.artefact_type.as_str() {
+                "Risk Assessment" | "Safety Case" | "Hazard Log" => "Preventive",
+                "Inspection Report" | "Audit Report" | "Occurrence Report" => "Detective",
+                "Emergency Plan" => "Corrective",
+                _ => "Directive",
+            },
+            "nature": "Manual",
+            "domain": match data.artefact_type.as_str() {
+                "Training Record" => "People",
+                "Inspection Report" | "Maintenance Record" => "Physical",
+                _ => "Organisational",
+            },
+            "linked_provisions": [data.section_id],
+            "mapping_strength": "Primary",
+            "artefact_type": data.artefact_type,
+            "responsible_role": owner,
+            "competence_requirements": data.competence,
+            "source": "jsp",
+        });
+
+        controls.push((aid.clone(), data, control_json));
+    }
+
+    // Print summary
+    println!("\nGenerated {} JSP controls:", controls.len());
+    for (_, data, json) in &controls {
+        println!("  [{}] {}", data.artefact_type, json["title"].as_str().unwrap_or("?"));
+    }
+
+    if dry_run {
+        println!("\n(dry run — not writing to DuckDB)");
+        return Ok(());
+    }
+
+    // Ensure columns exist
+    let _ = duck.execute("ALTER TABLE suggested_controls ADD COLUMN source_id TEXT");
+    let _ = duck.execute("ALTER TABLE suggested_controls ADD COLUMN related_control_ids TEXT");
+
+    // Clear existing JSP controls for this source
+    duck.execute(&format!("DELETE FROM suggested_controls WHERE source_id = '{safe}'"))?;
+
+    let esc = |s: &str| s.replace('\'', "''");
+    let mut count = 0usize;
+    for (aid, _data, json) in &controls {
+        let json_str = serde_json::to_string(json).unwrap_or_default();
+        let law = law_name.as_deref().unwrap_or("");
+
+        duck.execute(&format!(
+            "INSERT INTO suggested_controls (id, law_name, source_id, control_type, control_json, status, generated_at) \
+             VALUES ('{}', '{}', '{}', 'specific', '{}', 'generated', CURRENT_TIMESTAMP)",
+            esc(aid), esc(law), esc(source_id), esc(&json_str)
+        ))?;
+        count += 1;
+    }
+
+    println!("\nStaged {count} JSP controls in suggested_controls (source_id = {source_id})");
+    Ok(())
+}
+
+/// Gap analysis: find legislation referenced by this JSP that has obligations
+/// not covered by any JSP provision.
+fn cmd_gaps(duck: &DuckStore, source_id: &str) -> Result<()> {
+    let safe = source_id.replace('\'', "''");
+
+    // Step 1: Find all legislation law_names referenced by this JSP source
+    let laws_sql = format!(
+        "SELECT DISTINCT target_id FROM jsp_references \
+         WHERE source_id = '{safe}' AND target_type = 'legislation' AND resolved = TRUE"
+    );
+    let law_batches = match duck.query_arrow(&laws_sql) {
+        Ok(b) => b,
+        Err(_) => {
+            eprintln!("Table 'jsp_references' not found. Run 'fractalaw jsp extract-refs' first.");
+            return Ok(());
+        }
+    };
+
+    use arrow::array::{Array, StringArray};
+    let mut law_names = Vec::new();
+    for batch in &law_batches {
+        if let Some(col) = batch.column_by_name("target_id") {
+            if let Some(arr) = col.as_any().downcast_ref::<StringArray>() {
+                for i in 0..arr.len() {
+                    if arr.is_valid(i) {
+                        law_names.push(arr.value(i).to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    if law_names.is_empty() {
+        println!("No legislation references found for {source_id}. Run 'fractalaw jsp extract-refs' first.");
+        return Ok(());
+    }
+
+    println!("Legislation referenced by {source_id}: {} laws", law_names.len());
+    for ln in &law_names {
+        println!("  {ln}");
+    }
+
+    // Step 2: For each law, find HIGH/MEDIUM obligations not covered by any JSP reference
+    // "Covered" means a JSP provision references this specific law
+    // "Gap" means the law is referenced at law level but specific provisions aren't traced
+
+    // Get all JSP references to each law (provision-level)
+    let covered_sql = format!(
+        "SELECT DISTINCT target_id FROM jsp_references \
+         WHERE source_id = '{safe}' AND target_type = 'legislation' AND resolved = TRUE \
+         AND target_id LIKE '%:%'"  // section_id format has a colon
+    );
+    let covered_batches = duck.query_arrow(&covered_sql).unwrap_or_default();
+    let mut covered_sections = std::collections::HashSet::new();
+    for batch in &covered_batches {
+        if let Some(col) = batch.column_by_name("target_id") {
+            if let Some(arr) = col.as_any().downcast_ref::<StringArray>() {
+                for i in 0..arr.len() {
+                    if arr.is_valid(i) {
+                        covered_sections.insert(arr.value(i).to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    println!("\nLegislative provisions explicitly referenced: {}", covered_sections.len());
+    println!("(Gaps are laws referenced at document level but whose individual provisions are not traced)");
+    println!("\nNote: provision-level gap analysis requires legislation provisions in DuckDB.");
+    println!("This is a law-level summary. Full provision-level gaps need Postgres data.");
+
+    // Step 3: Check legislation table for obligation counts per referenced law
+    for ln in &law_names {
+        let safe_ln = ln.replace('\'', "''");
+        match duck.query_arrow(&format!(
+            "SELECT name, title, \
+                    COALESCE(json_array_length(duty_holder::JSON), 0) as duty_holders \
+             FROM legislation WHERE name = '{safe_ln}'"
+        )) {
+            Ok(batches) => {
+                for batch in &batches {
+                    let title_col: Option<&StringArray> = batch.column_by_name("title").and_then(|c| c.as_any().downcast_ref());
+                    for row in 0..batch.num_rows() {
+                        let title = title_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("?");
+                        // Count how many JSP provisions reference this law
+                        let ref_count = duck.query_arrow(&format!(
+                            "SELECT count(*) as n FROM jsp_references WHERE source_id = '{safe}' AND target_id = '{safe_ln}'"
+                        )).ok().and_then(|b| b.first().map(|b| b.num_rows())).unwrap_or(0);
+
+                        println!("\n  {ln}: {title}");
+                        println!("    JSP references: {ref_count}");
+                    }
+                }
+            }
+            Err(_) => {
+                println!("\n  {ln}: (not in DuckDB legislation table)");
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Trace: find JSP provisions that reference a given law or section.

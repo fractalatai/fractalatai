@@ -833,14 +833,15 @@ pub(crate) async fn cmd_sync_publish_secondary(
     for sid in &source_ids {
         let safe = sid.replace('\'', "''");
 
-        // Consolidated query: DRRP + references + obligations + RACI + mandated artefacts
+        // Consolidated query: DRRP + references + obligations + RACI + artefacts + terms
         let sql = format!(
             "SELECT e.section_id, e.drrp_types, e.governed_actors, e.government_actors, \
                     e.obligation_strength, e.modal_verb, e.clause_refined, \
                     refs.references_json, \
                     obs.obligations_json, \
                     raci.raci_json, \
-                    arts.mandated_artefacts_json \
+                    arts.mandated_artefacts_json, \
+                    trms.terms_json \
              FROM jsp_enrichment e \
              LEFT JOIN ( \
                  SELECT source_section_id, \
@@ -876,6 +877,13 @@ pub(crate) async fn cmd_sync_publish_secondary(
                  FROM jsp_mandated_artefacts \
                  GROUP BY section_id \
              ) arts ON arts.section_id = e.section_id \
+             LEFT JOIN ( \
+                 SELECT section_id, \
+                        list({{term: term, acronym: acronym, normalised: normalised}})::VARCHAR \
+                        AS terms_json \
+                 FROM jsp_terms \
+                 GROUP BY section_id \
+             ) trms ON trms.section_id = e.section_id \
              WHERE e.source_id = '{safe}'"
         );
 
