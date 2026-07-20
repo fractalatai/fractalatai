@@ -44,6 +44,22 @@ pub enum JspAction {
         role: String,
     },
 
+    /// Extract mandated artefacts (risk assessments, safety cases, permits, etc.) from obligations
+    ExtractArtefacts {
+        /// Source identifier (e.g., JSP-375-CH23)
+        source_id: String,
+        /// Show extracted artefacts without writing to DuckDB
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Query mandated artefacts by type across all JSP sources
+    Artefacts {
+        /// Filter by artefact type (e.g., "Risk Assessment", "Permit")
+        #[arg(long, name = "type")]
+        artefact_type: Option<String>,
+    },
+
     /// Trace: find which JSP provisions reference a given legislation provision or law
     Trace {
         /// Target identifier — a law_name (e.g., UK_uksi_1989_635) or section_id
@@ -61,6 +77,8 @@ pub fn cmd_jsp(action: JspAction, duck: &DuckStore) -> Result<()> {
         JspAction::ExtractRefs { source_id, dry_run } => cmd_extract_refs(duck, &source_id, dry_run),
         JspAction::ExtractObligations { source_id, dry_run } => cmd_extract_obligations(duck, &source_id, dry_run),
         JspAction::Raci { role } => cmd_raci(duck, &role),
+        JspAction::ExtractArtefacts { source_id, dry_run } => cmd_extract_artefacts(duck, &source_id, dry_run),
+        JspAction::Artefacts { artefact_type } => cmd_artefacts(duck, artefact_type.as_deref()),
         JspAction::Trace { target_id } => cmd_trace(duck, &target_id),
         JspAction::Stats => cmd_stats(duck),
     }
@@ -623,6 +641,162 @@ fn cmd_raci(duck: &DuckStore, role: &str) -> Result<()> {
         }
         Err(_) => {
             println!("Table 'jsp_raci' not found. Run 'fractalaw jsp extract-obligations' first.");
+            Ok(())
+        }
+    }
+}
+
+/// Extract mandated artefacts from JSP obligations.
+fn cmd_extract_artefacts(duck: &DuckStore, source_id: &str, dry_run: bool) -> Result<()> {
+    let safe = source_id.replace('\'', "''");
+    let sql = format!(
+        "SELECT obligation_id, section_id, text FROM jsp_obligations WHERE source_id = '{safe}' ORDER BY section_id, obligation_index"
+    );
+    let batches = match duck.query_arrow(&sql) {
+        Ok(b) => b,
+        Err(_) => {
+            eprintln!("Table 'jsp_obligations' not found. Run 'fractalaw jsp extract-obligations' first.");
+            return Ok(());
+        }
+    };
+
+    let total: usize = batches.iter().map(|b| b.num_rows()).sum();
+    if total == 0 {
+        println!("No obligations found for {source_id}. Run 'fractalaw jsp extract-obligations' first.");
+        return Ok(());
+    }
+
+    println!("Scanning {total} obligations in {source_id} for mandated artefacts...");
+
+    let mut all_artefacts: Vec<(String, String, jsp::artefacts::MandatedArtefact)> = Vec::new();
+    let mut by_type: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+
+    for batch in &batches {
+        use arrow::array::{Array, StringArray};
+
+        let oid_col: Option<&StringArray> = batch.column_by_name("obligation_id").and_then(|c| c.as_any().downcast_ref());
+        let sid_col: Option<&StringArray> = batch.column_by_name("section_id").and_then(|c| c.as_any().downcast_ref());
+        let text_col: Option<&StringArray> = batch.column_by_name("text").and_then(|c| c.as_any().downcast_ref());
+
+        for row in 0..batch.num_rows() {
+            let oid = oid_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("");
+            let sid = sid_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("");
+            let text = text_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("");
+
+            if text.is_empty() { continue; }
+
+            let arts = jsp::artefacts::extract_artefacts(text);
+            for art in arts {
+                *by_type.entry(art.artefact_type).or_default() += 1;
+                all_artefacts.push((oid.to_string(), sid.to_string(), art));
+            }
+        }
+    }
+
+    println!("\nMandated artefacts found: {}", all_artefacts.len());
+    if !by_type.is_empty() {
+        let mut sorted: Vec<_> = by_type.iter().collect();
+        sorted.sort_by(|a, b| b.1.cmp(a.1));
+        for (atype, count) in &sorted {
+            println!("  {atype}: {count}");
+        }
+    }
+
+    // Show samples
+    if !all_artefacts.is_empty() {
+        println!("\nSample artefacts:");
+        for (oid, _sid, art) in all_artefacts.iter().take(10) {
+            let short_oid = oid.rsplit_once(':').map(|(_, s)| s).unwrap_or(oid);
+            println!("  [{:>18}] {} — \"{}\"", art.artefact_type, short_oid, art.matched_text);
+        }
+        if all_artefacts.len() > 10 {
+            println!("  ... and {} more", all_artefacts.len() - 10);
+        }
+    }
+
+    if dry_run {
+        println!("\n(dry run — not writing to DuckDB)");
+        return Ok(());
+    }
+
+    duck.execute(
+        "CREATE TABLE IF NOT EXISTS jsp_mandated_artefacts (
+            artefact_id TEXT PRIMARY KEY,
+            obligation_id TEXT NOT NULL,
+            section_id TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            artefact_type TEXT NOT NULL,
+            matched_text TEXT,
+            extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )"
+    ).context("failed to create jsp_mandated_artefacts table")?;
+
+    duck.execute(&format!("DELETE FROM jsp_mandated_artefacts WHERE source_id = '{safe}'"))?;
+
+    let esc = |s: &str| s.replace('\'', "''");
+    let mut count = 0usize;
+
+    for (i, (oid, sid, art)) in all_artefacts.iter().enumerate() {
+        let art_id = format!("{oid}:art.{i}");
+        duck.execute(&format!(
+            "INSERT INTO jsp_mandated_artefacts (artefact_id, obligation_id, section_id, source_id, artefact_type, matched_text)
+             VALUES ('{}', '{}', '{}', '{}', '{}', '{}')",
+            esc(&art_id), esc(oid), esc(sid), esc(source_id), art.artefact_type, esc(&art.matched_text)
+        ))?;
+        count += 1;
+    }
+
+    println!("\nStaged {count} mandated artefacts in DuckDB (jsp_mandated_artefacts)");
+    Ok(())
+}
+
+/// Query mandated artefacts by type across all sources.
+fn cmd_artefacts(duck: &DuckStore, artefact_type: Option<&str>) -> Result<()> {
+    let where_clause = artefact_type
+        .map(|t| format!("WHERE a.artefact_type LIKE '%{}%'", t.replace('\'', "''")))
+        .unwrap_or_default();
+
+    let sql = format!(
+        "SELECT a.artefact_type, a.source_id, a.obligation_id, a.matched_text, o.text \
+         FROM jsp_mandated_artefacts a \
+         JOIN jsp_obligations o ON a.obligation_id = o.obligation_id \
+         {where_clause} \
+         ORDER BY a.artefact_type, a.source_id"
+    );
+
+    match duck.query_arrow(&sql) {
+        Ok(batches) => {
+            let total: usize = batches.iter().map(|b| b.num_rows()).sum();
+            if total == 0 {
+                println!("No mandated artefacts found. Run 'fractalaw jsp extract-artefacts' first.");
+                return Ok(());
+            }
+
+            use arrow::array::{Array, StringArray};
+
+            println!("Mandated artefacts{}: {total}\n",
+                artefact_type.map(|t| format!(" matching '{t}'")).unwrap_or_default());
+
+            for batch in &batches {
+                let type_col: Option<&StringArray> = batch.column_by_name("artefact_type").and_then(|c| c.as_any().downcast_ref());
+                let src_col: Option<&StringArray> = batch.column_by_name("source_id").and_then(|c| c.as_any().downcast_ref());
+                let text_col: Option<&StringArray> = batch.column_by_name("text").and_then(|c| c.as_any().downcast_ref());
+
+                for row in 0..batch.num_rows() {
+                    let atype = type_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("?");
+                    let src = src_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("?");
+                    let text = text_col.and_then(|c| if c.is_valid(row) { Some(c.value(row)) } else { None }).unwrap_or("");
+
+                    let truncated = if text.len() > 120 { format!("{}...", &text[..120]) } else { text.to_string() };
+                    println!("[{atype}] ({src})");
+                    println!("  {truncated}");
+                    println!();
+                }
+            }
+            Ok(())
+        }
+        Err(_) => {
+            println!("Table 'jsp_mandated_artefacts' not found. Run 'fractalaw jsp extract-artefacts' first.");
             Ok(())
         }
     }
