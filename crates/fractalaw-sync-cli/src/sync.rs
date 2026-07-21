@@ -902,10 +902,12 @@ pub(crate) async fn cmd_sync_publish_secondary(
     for sid in &source_ids {
         let safe = sid.replace('\'', "''");
 
-        // Consolidated query: DRRP + references + obligations + RACI + artefacts + terms
+        // Consolidated query: reconciled strength + references + obligations + RACI + artefacts + terms
+        // Reconciliation: classifier > regex (classifier has embedding context)
         let sql = format!(
             "SELECT e.section_id, e.drrp_types, e.governed_actors, e.government_actors, \
-                    e.obligation_strength, e.modal_verb, e.clause_refined, \
+                    COALESCE(e.cls_strength, e.obligation_strength) AS obligation_strength, \
+                    e.modal_verb, e.clause_refined, \
                     refs.references_json, \
                     obs.obligations_json, \
                     raci.raci_json, \

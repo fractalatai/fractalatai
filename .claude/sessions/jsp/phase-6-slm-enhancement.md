@@ -1,12 +1,10 @@
 ---
 session: JSP Phase 6 — SLM Enhancement
-status: suspended
+status: active
 opened: 2026-07-20
 ---
 
-# Session: JSP Phase 6 — SLM Enhancement (SUSPENDED)
-
-**Suspended:** Needs corpus-level data from Phase 7 before SLM work is viable. RACI fine-tuning needs hundreds of examples, not 32. Classifier evaluation needs cross-chapter coverage.
+# Session: JSP Phase 6 — SLM Enhancement (ACTIVE)
 
 ## Problem
 
@@ -14,13 +12,13 @@ Phases 1-5 built the JSP pipeline using regex extraction. The existing legislati
 
 ## Proposals
 
-### 1. DRRP + Obligation Strength (Tier 2: Classifier)
+### 1. Obligation Strength Classifier (Tier 2: Classifier)
 
 **Current state:** JSP obligation strength is classified by modal verb keyword only ("must" → Mandatory, "should" → Recommended). This misses context — "must not" is Mandatory but prohibitive, "will ensure" in a preamble is descriptive not mandatory.
 
-**Proposal:** Reuse the existing DRRP classifier (v8, logistic regression on 384-dim embedding + 13 modal indicators). JSP provisions get embedded via the same all-MiniLM-L6-v2 model. The classifier already handles the binary Obligation/Liberty/none — add a JSP-specific modal indicator for "will" and "is to" as supplementary features.
+**Proposal:** Train a strength classifier (logistic regression on 384-dim embedding + modal indicators) for JSP text. The existing DRRP classifier (v8) is trained on legislative text and its classes (Obligation/Liberty/none) don't map cleanly to JSP strength (Mandatory/Recommended/Permissive/None). A JSP-specific classifier trained on the 6,021 regex-classified provisions would be more accurate.
 
-**Approach:** Embed JSP provisions → run DRRP classifier → compare with regex Tier 1 → reconcile. No new model needed — reuse existing v8 weights with JSP-specific feature augmentation.
+**Approach:** Embed JSP provisions → train strength classifier on regex labels → evaluate against held-out set → deploy as `strength_classifier_v1.json`. Add JSP-specific modal indicators ("will", "is to") as features.
 
 **Expected gain:** Better precision on ambiguous provisions (preambles, descriptive "will", conditional "may need to").
 
@@ -28,11 +26,11 @@ Phases 1-5 built the JSP pipeline using regex extraction. The existing legislati
 
 **Current state:** RACI is inferred from narrative patterns (actor + modal → R; "accountable for" → A; "shall be informed" → I). Passive voice ("shall be conducted") produces no RACI — no actor identified.
 
-**Proposal:** Fine-tune a Gemma-3-4B RACI classifier on JSP text. Input: obligation text. Output: JSON array of `{role, assignment_type}`. Training data: the 32 RACI assignments from Phase 3 regex extraction (validated manually) plus the 117 obligations as negative/ambiguous examples.
+**Proposal:** Fine-tune a Gemma-3-4B RACI classifier on JSP text. Input: obligation text. Output: JSON array of `{role, assignment_type}`. Training data: 1,719 RACI assignments from corpus-level regex extraction plus 5,028 obligations (3,309 without RACI as negative/ambiguous examples).
 
 **Approach:** Same RunPod fine-tuning pipeline as gemma3-position. LoRA R=16. Export GGUF → Ollama. Batch inference on provisions where regex RACI is empty but obligation exists.
 
-**Expected gain:** RACI coverage on passive-voice obligations. Currently ~27% of obligations have RACI (32/117). SLM could increase to 60-80%.
+**Expected gain:** RACI coverage on passive-voice obligations. Currently 34% of obligations have RACI (1,719/5,028). SLM could increase to 60-80%.
 
 ### 3. Artefact Property Extraction (Tier 6: Gemini Batch)
 
@@ -40,7 +38,7 @@ Phases 1-5 built the JSP pipeline using regex extraction. The existing legislati
 
 **Proposal:** Gemini 2.5 Flash batch extraction. For each artefact, send the parent obligation text + surrounding context. Prompt for structured JSON: `{owner_role, approver_role, reviewer_role, review_frequency, required_content, acceptance_criterion, scope}`. Same batch pattern as `gemini_llm_batch.py`.
 
-**Approach:** Batch of 32 artefacts × 1 Gemini call each = 32 API calls. ~$0.02 total. Results write to `jsp_mandated_artefacts` DuckDB table (add columns for extracted properties).
+**Approach:** Batch of 922 artefacts. Can chunk by source (157 Gemini calls, one per chapter). ~$0.50 total. Results write to `jsp_mandated_artefacts` DuckDB table (add columns for extracted properties).
 
 **Expected gain:** The mandated artefact abstraction from the plan (JSP-SERVICE.md) becomes fully populated. Each artefact carries its operational properties → direct mapping to L3 Controls and L4 Evidence.
 
@@ -50,7 +48,7 @@ Phases 1-5 built the JSP pipeline using regex extraction. The existing legislati
 
 **Proposal:** Gemini 2.5 Flash generation with the same design constraints as the legislation controls pipeline (COMPLIANCE-CONTROLS.md): indicative mood, referent not paperwork, discriminating test, honest limits.
 
-**Approach:** For each of the 32 JSP controls, send: artefact type + obligation text + RACI assignments + competence requirements. Prompt for: title (indicative), description (what reality), what_it_checks (discriminating test). Same few-shot pattern as `generate_controls.py`.
+**Approach:** For each of the 922 JSP controls, send: artefact type + obligation text + RACI assignments + competence requirements. Prompt for: title (indicative), description (what reality), what_it_checks (discriminating test). Same few-shot pattern as `generate_controls.py`. Chunk by source.
 
 **Expected gain:** JSP controls reach the same quality standard as Gemini-generated legislation controls. The template titles are replaced with domain-specific, checkable statements.
 
@@ -66,7 +64,7 @@ Phases 1-5 built the JSP pipeline using regex extraction. The existing legislati
 
 ### 6. Unresolved Reference Resolution (Tier 6: Gemini Batch)
 
-**Current state:** 11/63 references (17%) unresolved in the pilot — mostly HSE guidance (HSG85, INDG139) and standards (BS 7671) which aren't in the fractalaw corpus.
+**Current state:** 227/1,969 references (12%) unresolved across the corpus — mostly HSE guidance and standards which aren't in the fractalaw corpus.
 
 **Proposal:** For genuinely unresolvable references (external standards/guidance), flag them as external and store the citation. For dense/implicit references ("in accordance with the relevant health and safety legislation"), use Gemini to identify which specific law(s) are meant.
 
@@ -76,7 +74,7 @@ Phases 1-5 built the JSP pipeline using regex extraction. The existing legislati
 
 | Proposal | Effort | Value | Priority |
 |----------|--------|-------|----------|
-| 1. DRRP classifier | Low (reuse v8 weights) | Medium | Do first |
+| 1. Strength classifier | Medium (train on JSP labels) | Medium | Do first |
 | 2. RACI SLM | Medium (fine-tune + batch) | High | Do second |
 | 3. Artefact properties | Low (32 Gemini calls) | High | Do third |
 | 4. Control titles | Low (32 Gemini calls) | Medium | Do fourth |
@@ -85,22 +83,39 @@ Phases 1-5 built the JSP pipeline using regex extraction. The existing legislati
 
 ## Todo
 
-- ⬜ Embed JSP provisions (all-MiniLM-L6-v2 via fractalaw-ai ONNX)
-- ⬜ Run DRRP classifier (v8) on JSP provisions — compare with regex Tier 1
-- ⬜ Reconcile classifier + regex DRRP — update jsp_enrichment
-- ⬜ Fine-tune Gemma-3-4B RACI classifier on JSP training data
-- ⬜ Batch RACI inference on passive-voice obligations (RunPod/Ollama)
-- ⬜ Gemini batch: artefact property extraction (owner, approver, frequency, criterion)
-- ⬜ Gemini batch: control title generation (indicative mood, domain-specific)
-- ⬜ Gemini batch: source traceability (JSP obligation → legislative provision)
-- ⬜ Gemini batch: unresolved reference resolution
+- ✅ Create `jsp_provisions` table in fractalaw PG (port 5433) — separate from legislation
+- ✅ Populate from DuckDB — 6,021 provisions with text
+- ✅ Embed all 6,021 provisions (all-MiniLM-L6-v2, 384-dim, stored in PG pgvector)
+- ✅ Train strength classifier — 97.7% accuracy (Mandatory 98 F1, None 98 F1, Recommended 97 F1, Permissive 95 F1)
+- ✅ Deploy `strength_classifier_v1.json` (399-dim: 384 embedding + 15 JSP modal indicators)
+- ✅ Add `cls_strength` + `cls_confidence` columns to `jsp_enrichment` DuckDB table
+- ✅ Batch classify 6,021 provisions — 97.1% agreement with regex (128 disagreements)
+- ✅ Reconciled publish: `COALESCE(cls_strength, obligation_strength)` — classifier wins, regex fallback
+- ✅ Prepare RACI training data — 1,763 examples (1,263 positive, 500 negative)
+- ✅ Create fine-tuning script (scripts/ml/finetune_raci.py — namespaced /workspace/raci/)
+- ✅ Create batch inference script (scripts/ml/runpod_raci_batch.py)
+- ✅ Create Modelfile (scripts/ml/Modelfile.raci)
+- ⬜ RunPod: fine-tune Gemma-3-4B on RACI training data
+- ⬜ RunPod: batch RACI inference on 3,765 obligations without RACI
+- ✅ Prepare artefact property training data — 922 examples (829 train, 93 val)
+- ✅ Create fine-tuning script (scripts/ml/finetune_artefact_props.py — namespaced /workspace/artefact-props/)
+- ✅ Prepare control title training data — 2,064 examples (1,000 legislation + 1,064 JSP)
+- ✅ Create fine-tuning script (scripts/ml/finetune_control_titles.py — namespaced /workspace/control-titles/)
+- ✅ Create Modelfiles for all three SLMs
+- ⬜ RunPod: fine-tune 3 models in one session (RACI → artefact props → control titles)
+- ⬜ Batch inference: RACI on 3,765 obligations without RACI
+- ⬜ Batch inference: artefact properties on 922 artefacts
+- ⬜ Batch inference: control titles on 922 JSP controls
+- ⬜ LLM (Gemini) for residual low-confidence cases
 - ⬜ Republish enriched data to sertantai
 
 ## Dependencies
 
 - ✅ Phase 1-5 complete — regex extraction pipeline operational
+- ✅ Phase 7 complete — full corpus enriched (11,351 provisions, 157 sources)
 - ✅ Embeddings infrastructure (all-MiniLM-L6-v2 ONNX in fractalaw-ai)
 - ✅ DRRP classifier v8 + position classifier v3 (JSON weights in fractalaw-cli/config/)
 - ✅ Gemini batch infrastructure (gemini_llm_batch.py pattern)
 - ✅ RunPod fine-tuning infrastructure (finetune_runpod.py pattern)
 - ✅ Ollama batch inference infrastructure (runpod_slm_batch.py pattern)
+- ✅ Corpus-level training data: 1,719 RACI, 5,028 obligations, 922 artefacts

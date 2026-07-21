@@ -14,10 +14,12 @@ Plan has full design detail; this tracks execution only.
 - [x] Phase 5: Semantics & Controls — [phase-5-semantics-controls.md](phase-5-semantics-controls.md) (CLOSED)
 
 - [x] Phase 7: Full Corpus Enrichment — [phase-7-corpus-enrichment.md](phase-7-corpus-enrichment.md) (CLOSED)
-- [ ] Phase 6: SLM Enhancement — [phase-6-slm-enhancement.md](phase-6-slm-enhancement.md) (SUSPENDED — needs corpus data from Phase 7)
+- [ ] Phase 6: SLM Enhancement — [phase-6-slm-enhancement.md](phase-6-slm-enhancement.md) (ACTIVE)
 
 ## Snagging List
-_(issues discovered during implementation)_
+- [ ] Rename `drrp_types` → `obligation_types` in `jsp_enrichment` DuckDB table and publish payload (schema change — coordinate with sertantai)
+- [ ] Rename `duty_types` → `obligation_types` on `JspRecord` struct and `drrp_type` → `obligation_type` on `ModalMatch`
+- [ ] Update doc comments referencing "DRRP" in `jsp/mod.rs`, `jsp/patterns.rs`, `commands/jsp.rs`
 
 ## Decisions Log
-_(decisions made during build that amend or clarify the plan)_
+- JSP provisions have **obligation strength** (Mandatory/Recommended/Permissive), not DRRP (Duty/Right/Responsibility/Power). DRRP is a legislative legal taxonomy. JSP vocabulary should use "obligation strength" and "obligation type" throughout. Rename deferred to avoid mid-session schema breaks.
