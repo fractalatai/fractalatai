@@ -951,6 +951,7 @@ pub(crate) async fn cmd_sync_publish_secondary(
                         list({{term: term, acronym: acronym, normalised: normalised}})::VARCHAR \
                         AS terms_json \
                  FROM jsp_terms \
+                 WHERE normalised IS NOT NULL AND normalised != '' \
                  GROUP BY section_id \
              ) trms ON trms.section_id = e.section_id \
              WHERE e.source_id = '{safe}'"

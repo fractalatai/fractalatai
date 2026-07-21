@@ -757,6 +757,7 @@ fn cmd_extract_terms(duck: &DuckStore, source_id: &str, dry_run: bool) -> Result
     let esc = |s: &str| s.replace('\'', "''");
     let mut count = 0usize;
     for (sid, t) in &all_terms {
+        if t.normalised.is_empty() { continue; }
         let term_id = format!("{source_id}:{}", t.normalised);
         let acr_sql = t.acronym.as_deref().map(|a| format!("'{}'", esc(a))).unwrap_or("NULL".into());
         duck.execute(&format!(
