@@ -168,6 +168,20 @@ enum Command {
         #[command(flatten)]
         zenoh: ZenohArgs,
     },
+    /// List secondary sources from sertantai (JSPs, ACoPs, standards)
+    ListSecondary {
+        #[command(flatten)]
+        zenoh: ZenohArgs,
+        /// Filter by source type (jsp, acop, guidance, standard)
+        #[arg(long)]
+        source_type: Option<String>,
+        /// Output source_ids only (one per line, for scripting)
+        #[arg(long)]
+        ids_only: bool,
+        /// Query timeout in seconds
+        #[arg(long, default_value_t = 15)]
+        timeout: u64,
+    },
     /// Pull secondary source provisions (JSP/ACoP) from sertantai into DuckDB staging
     PullSecondary {
         #[command(flatten)]
@@ -518,6 +532,14 @@ async fn main() -> anyhow::Result<()> {
             zenoh,
         } => {
             cmd_triage(&data_dir, laws, family, all, verbose, pg_url.as_deref(), publish, &zenoh).await
+        }
+        Command::ListSecondary {
+            zenoh,
+            source_type,
+            ids_only,
+            timeout,
+        } => {
+            sync::cmd_sync_list_secondary(&zenoh, source_type.as_deref(), ids_only, timeout).await
         }
         Command::PullSecondary {
             zenoh,

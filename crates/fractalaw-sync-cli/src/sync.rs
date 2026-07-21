@@ -656,6 +656,75 @@ pub(crate) async fn cmd_sync_publish_evidence(
 
 // ── Secondary source (JSP/ACoP) sync ────────────────────────────────
 
+/// List secondary sources from sertantai via Zenoh queryable.
+pub(crate) async fn cmd_sync_list_secondary(
+    zenoh: &ZenohArgs,
+    source_type: Option<&str>,
+    ids_only: bool,
+    timeout_secs: u64,
+) -> anyhow::Result<()> {
+    let config = zenoh.build_zenoh_config()?;
+    let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to open zenoh session: {e}"))?;
+
+    print!("Waiting for zenoh peer...");
+    let peers = sync
+        .wait_for_peers(std::time::Duration::from_secs(15))
+        .await;
+    if peers == 0 {
+        anyhow::bail!("no zenoh peers — is sertantai running?");
+    }
+    println!(" {peers} peer(s) connected.");
+
+    let json_bytes = sync
+        .query_secondary_sources(std::time::Duration::from_secs(timeout_secs))
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to query sources: {e}"))?;
+
+    if json_bytes.is_empty() {
+        println!("No secondary sources found.");
+        return Ok(());
+    }
+
+    let sources: Vec<serde_json::Value> = serde_json::from_slice(&json_bytes)?;
+
+    let filtered: Vec<&serde_json::Value> = if let Some(st) = source_type {
+        sources.iter().filter(|s| s["source_type"].as_str() == Some(st)).collect()
+    } else {
+        sources.iter().collect()
+    };
+
+    if ids_only {
+        // One source_id per line — for piping to other commands
+        for s in &filtered {
+            // Skip parent sources (no provisions) — only list chapters
+            if s["parent_source_id"].is_null() || s["parent_source_id"].as_str() == Some("") {
+                continue;
+            }
+            if let Some(sid) = s["source_id"].as_str() {
+                println!("{sid}");
+            }
+        }
+    } else {
+        println!("{:<25} {:<8} {:<10} {:<8} {}", "SOURCE_ID", "TYPE", "WEIGHT", "STATUS", "TITLE");
+        println!("{}", "-".repeat(95));
+        for s in &filtered {
+            println!(
+                "{:<25} {:<8} {:<10} {:<8} {}",
+                s["source_id"].as_str().unwrap_or("?"),
+                s["source_type"].as_str().unwrap_or("?"),
+                s["legal_weight"].as_str().unwrap_or("?"),
+                s["status"].as_str().unwrap_or("?"),
+                s["title"].as_str().unwrap_or("?"),
+            );
+        }
+        println!("\n{} sources", filtered.len());
+    }
+
+    Ok(())
+}
+
 /// Pull provisions for a secondary source from sertantai into DuckDB staging.
 ///
 /// Creates `jsp_provisions` table if it doesn't exist, then upserts provisions

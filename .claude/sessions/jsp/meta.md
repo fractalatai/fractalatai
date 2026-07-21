@@ -13,6 +13,9 @@ Plan has full design detail; this tracks execution only.
 - [x] Phase 4: Mandated Artefacts — [phase-4-mandated-artefacts.md](phase-4-mandated-artefacts.md) (CLOSED)
 - [x] Phase 5: Semantics & Controls — [phase-5-semantics-controls.md](phase-5-semantics-controls.md) (CLOSED)
 
+- [x] Phase 7: Full Corpus Enrichment — [phase-7-corpus-enrichment.md](phase-7-corpus-enrichment.md) (CLOSED)
+- [ ] Phase 6: SLM Enhancement — [phase-6-slm-enhancement.md](phase-6-slm-enhancement.md) (SUSPENDED — needs corpus data from Phase 7)
+
 ## Snagging List
 _(issues discovered during implementation)_
 
