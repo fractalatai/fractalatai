@@ -1,4 +1,4 @@
-FROM /workspace/artefact-props/output/gemma3-artefact-props-q4.gguf
+FROM /workspace/gemma3-artefact-props-q4.gguf
 
 PARAMETER temperature 0
 PARAMETER num_predict 300

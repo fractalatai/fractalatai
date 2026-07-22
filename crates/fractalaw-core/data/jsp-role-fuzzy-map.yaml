@@ -1,0 +1,121 @@
+# JSP Role Fuzzy Map — non-canonical SLM labels mapped to canonical roles
+#
+# When the SLM outputs a role not in the actor dictionary and not
+# blacklisted, this map normalises it to the nearest canonical label.
+#
+# Format: non-canonical label → canonical label
+
+# Generic person/worker labels → User
+"MoD: Employee": "MoD: User"
+"MoD: Worker": "MoD: User"
+"MoD: Outside Worker": "MoD: Contractor"
+"MoD: Personnel": "MoD: User"
+"MoD: Staff": "MoD: User"
+"MoD: Civilian": "MoD: User"
+"MoD: Civilian Staff": "MoD: User"
+"MoD: Soldier": "MoD: User"
+"MoD: Crew Member": "MoD: User"
+"MoD: Air Crew": "MoD: User"
+"MoD: Visitor": "MoD: User"
+"MoD: Wearer of PPE": "MoD: User"
+"MoD: Patient": "MoD: User"
+
+# Organisation-level labels → Defence Organisation
+"MoD: Organisation": "MoD: Defence Organisation"
+"MoD: Employer": "MoD: Defence Organisation"
+"MoD: Customer": "MoD: Defence Organisation"
+"MoD: Force Element": "MoD: Defence Organisation"
+"MoD: Force Generating Command": "MoD: Defence Organisation"
+"MoD: Defence Board": "MoD: Defence Organisation"
+"MoD: Defence Training Committee": "MoD: Defence Organisation"
+"MoD: Defence Training Estate": "MoD: Defence Organisation"
+"MoD: Defence Training Requirements Organisation": "MoD: Defence Organisation"
+"MoD: Defence Equipment & Support": "MoD: Defence Organisation"
+"MoD: Defence Equipment Sales Authority": "MoD: Defence Organisation"
+"MoD: Environmental Group": "MoD: Defence Organisation"
+"MoD: Trade Union": "MoD: Defence Organisation"
+"MoD: Local Authority": "MoD: Defence Organisation"
+"MoD: Civilian Emergency Services": "MoD: Defence Organisation"
+"MoD: Independent Organisation": "MoD: Defence Organisation"
+"MoD: Host Nation": "MoD: Defence Organisation"
+"MoD: Procurement Authority": "MoD: Defence Organisation"
+"MoD: Defence Logistics and Range Safety Committee": "MoD: Defence Organisation"
+"MoD: Defence Logistic Undersea Command Ship Systems": "MoD: Defence Organisation"
+"MoD: Defence Environmental and Energy Infrastructure Team": "MoD: Defence Organisation"
+"MoD: Defence Clinical Authority": "MoD: Defence Organisation"
+
+# Accountable Person variants
+"MoD: Accountable Officer": "MoD: Accountable Person"
+"MoD: Defence Accountable Person": "MoD: Accountable Person"
+
+# Duty Holder variants
+"MoD: Defence Duty Holder": "MoD: Duty Holder"
+"MoD: Targetry Duty Holder": "MoD: Duty Holder"
+
+# Budget holder variants
+"MoD: Defence Top Level Budget Holder": "MoD: Top Level Budget Holder"
+
+# Senior leadership → Commander/Manager
+"MoD: Senior Leader": "MoD: Commander/Manager"
+"MoD: Senior Manager": "MoD: Commander/Manager"
+"MoD: Senior Officer": "MoD: Commander/Manager"
+"MoD: Senior Person": "MoD: Commander/Manager"
+"MoD: Senior Management": "MoD: Commander/Manager"
+"MoD: Instructor": "MoD: Commander/Manager"
+"MoD: Activity Lead": "MoD: Commander/Manager"
+"MoD: Chief Executive Officer": "MoD: Commander/Manager"
+
+# Project/sponsor roles → Senior Responsible Owner
+"MoD: Sponsor": "MoD: Senior Responsible Owner"
+"MoD: Project / Delivery Team Leader": "MoD: Senior Responsible Owner"
+"MoD: Project Team": "MoD: Senior Responsible Owner"
+"MoD: Project Team Member": "MoD: Senior Responsible Owner"
+"MoD: Change Owner": "MoD: Senior Responsible Owner"
+"MoD: Owner": "MoD: Senior Responsible Owner"
+"MoD: Capability Holder": "MoD: Senior Responsible Owner"
+"MoD: Senior Equipment Holder": "MoD: Senior Responsible Owner"
+
+# Senior civil service → Permanent Under-Secretary
+"MoD: Permanent Secretary": "MoD: Permanent Under-Secretary"
+"MoD: Second Permanent Secretary": "MoD: Permanent Under-Secretary"
+
+# Military seniors → Chief of Defence Staff
+"MoD: Chief of Materiel": "MoD: Chief of Defence Staff"
+"MoD: Deputy Chief of Defence Staff": "MoD: Chief of Defence Staff"
+
+# Regulator/authority labels → Defence Safety Authority
+"MoD: Authority": "MoD: Defence Safety Authority"
+"MoD: Regulator": "MoD: Defence Safety Authority"
+"MoD: Statutory Regulator": "MoD: Defence Safety Authority"
+"MoD: Defence Regulator": "MoD: Defence Safety Authority"
+"MoD: Safety Authority": "MoD: Defence Safety Authority"
+"MoD: Regulatory Authorities": "MoD: Defence Safety Authority"
+"MoD: Defence Safety and Environmental Authorities": "MoD: Defence Safety Authority"
+
+# Safety committee variants
+"MoD: Defence Safety Committee": "MoD: Safety Committee"
+"MoD: Committee": "MoD: Safety Committee"
+"MoD: Safety Centre": "MoD: Defence Safety Authority"
+
+# Operating authority → Operating Duty Holder
+"MoD: Operating Authority": "MoD: Operating Duty Holder"
+"MoD: Responsible Operating Authority": "MoD: Operating Duty Holder"
+
+# Range authority → Range Authorising Officer
+"MoD: Range Authority": "MoD: Range Authorising Officer"
+
+# Establishment variants
+"MoD: Establishment": "MoD: Head of Establishment"
+"MoD: Establishment Official": "MoD: Head of Establishment"
+"MoD: Data Controller": "MoD: Head of Establishment"
+
+# Supply chain
+"MoD: Manufacturer": "MoD: Contractor"
+"MoD: Consignor": "MoD: Contractor"
+"MoD: System Integrator": "MoD: Contractor"
+
+# Fire regulators
+"MoD: Defence Fire Risk Management Organisation": "MoD: Defence Fire Safety Regulator"
+
+# Ordnance regulators
+"MoD: Defence Ordnance Safety Regulator": "MoD: Defence Ordnance Safety Group"

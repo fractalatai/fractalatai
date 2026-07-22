@@ -17,6 +17,8 @@ import duckdb
 import numpy as np
 import psycopg2
 
+# PG is needed for both reading embeddings and writing classifier results
+
 CLASSIFIER_PATH = "crates/fractalaw-cli/config/strength_classifier_v1.json"
 
 # Must match training script
@@ -110,56 +112,54 @@ def main():
     for cls, count in dist.most_common():
         print(f"  {cls}: {count}")
 
-    # Write to DuckDB
-    duck = duckdb.connect(args.db)
-
-    # Add classifier columns if missing
-    cols = duck.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'jsp_enrichment'").fetchall()
-    col_names = [c[0] for c in cols]
-    if "cls_strength" not in col_names:
-        duck.execute("ALTER TABLE jsp_enrichment ADD COLUMN cls_strength TEXT")
-        duck.execute("ALTER TABLE jsp_enrichment ADD COLUMN cls_confidence REAL")
-        print("Added cls_strength + cls_confidence columns to jsp_enrichment")
+    # Write to PG (inference store — all tier signals live here)
+    pg = psycopg2.connect(
+        host="localhost", port=5433, dbname="fractalaw",
+        user="fractalaw", password="fractalaw"
+    )
+    pg.autocommit = True
+    cur = pg.cursor()
 
     updated = 0
     for sid, src, pred, conf in predictions:
-        duck.execute("""
-            UPDATE jsp_enrichment
-            SET cls_strength = ?, cls_confidence = ?
-            WHERE section_id = ?
+        cur.execute("""
+            UPDATE jsp_provisions
+            SET cls_strength = %s, cls_confidence = %s, cls_classified_at = NOW()
+            WHERE section_id = %s
         """, [pred, conf, sid])
         updated += 1
 
-    duck.close()
-    print(f"\nUpdated {updated} rows in jsp_enrichment")
+    cur.close()
+    pg.close()
+    print(f"\nUpdated {updated} rows in PG jsp_provisions")
 
     # Show agreement between regex and classifier
+    # Regex labels are in DuckDB jsp_enrichment, classifier in PG
     duck = duckdb.connect(args.db, read_only=True)
-    agree = duck.execute("""
-        SELECT count(*) FROM jsp_enrichment
-        WHERE obligation_strength = cls_strength
-          AND cls_strength IS NOT NULL
-    """).fetchone()[0]
-    total_both = duck.execute("""
-        SELECT count(*) FROM jsp_enrichment
-        WHERE obligation_strength IS NOT NULL AND cls_strength IS NOT NULL
-    """).fetchone()[0]
-    disagree = duck.execute("""
-        SELECT obligation_strength as regex, cls_strength as classifier, count(*) as n
-        FROM jsp_enrichment
-        WHERE obligation_strength != cls_strength
-          AND obligation_strength IS NOT NULL AND cls_strength IS NOT NULL
-        GROUP BY obligation_strength, cls_strength
-        ORDER BY n DESC
-        LIMIT 10
-    """).fetchall()
+    pg = psycopg2.connect(host="localhost", port=5433, dbname="fractalaw", user="fractalaw", password="fractalaw")
+    pg_cur = pg.cursor()
+
+    pg_cur.execute("SELECT section_id, cls_strength FROM jsp_provisions WHERE cls_strength IS NOT NULL")
+    cls_map = {r[0]: r[1] for r in pg_cur.fetchall()}
+    pg_cur.close()
+    pg.close()
+
+    regex_rows = duck.execute("SELECT section_id, obligation_strength FROM jsp_enrichment WHERE obligation_strength IS NOT NULL").fetchall()
     duck.close()
 
+    agree = sum(1 for sid, regex_s in regex_rows if cls_map.get(sid) == regex_s)
+    total_both = sum(1 for sid, _ in regex_rows if sid in cls_map)
     if total_both > 0:
         print(f"\nAgreement: {agree}/{total_both} ({100*agree/total_both:.1f}%)")
+        from collections import Counter
+        disagree = Counter()
+        for sid, regex_s in regex_rows:
+            cls_s = cls_map.get(sid)
+            if cls_s and cls_s != regex_s:
+                disagree[(regex_s, cls_s)] += 1
         if disagree:
             print("Disagreements:")
-            for regex, cls, n in disagree:
+            for (regex, cls), n in disagree.most_common(10):
                 print(f"  regex={regex} → cls={cls}: {n}")
 
 

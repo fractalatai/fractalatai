@@ -1,0 +1,20 @@
+# JSP Role Blacklist — SLM hallucinations that are not organisational roles
+#
+# These labels appear in SLM RACI output but are not actors.
+# Applied as a post-filter: any RACI assignment with a blacklisted
+# role is dropped.
+
+- "MoD: Risk Assessment"
+- "MoD: Legislation"
+- "MoD: Workplace"
+- "MoD: Defence Standard"
+- "MoD: Defence Standard 05-10"
+- "MoD: Defence Training Regulations"
+- "MoD: Planning Policy Guidance"
+- "MoD: Explosive Component"
+- "MoD: Host Platform"
+- "MoD: Platform"
+- "MoD: Defence First Aid Workman's Reel"
+- "MoD: Risk Presentation Authority"
+- "MoD: Whole Life Asset Management"
+- "MoD: Infrastructure Enterprise"

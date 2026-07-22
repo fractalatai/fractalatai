@@ -902,12 +902,13 @@ pub(crate) async fn cmd_sync_publish_secondary(
     for sid in &source_ids {
         let safe = sid.replace('\'', "''");
 
-        // Consolidated query: reconciled strength + references + obligations + RACI + artefacts + terms
-        // Reconciliation: classifier > regex (classifier has embedding context)
+        // Consolidated query: obligation_strength is reconciled in DuckDB (classifier > regex).
+        // SLM columns are JSON strings backfilled from PG.
         let sql = format!(
             "SELECT e.section_id, e.drrp_types, e.governed_actors, e.government_actors, \
-                    COALESCE(e.cls_strength, e.obligation_strength) AS obligation_strength, \
+                    e.obligation_strength, \
                     e.modal_verb, e.clause_refined, \
+                    e.slm_raci_json, e.slm_artefact_props_json, e.slm_control_title_json, \
                     refs.references_json, \
                     obs.obligations_json, \
                     raci.raci_json, \

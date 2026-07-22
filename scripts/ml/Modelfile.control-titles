@@ -1,4 +1,4 @@
-FROM /workspace/control-titles/output/gemma3-control-titles-q4.gguf
+FROM /workspace/gemma3-control-titles-q4.gguf
 
 PARAMETER temperature 0
 PARAMETER num_predict 300

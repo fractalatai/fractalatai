@@ -1,4 +1,4 @@
-FROM /workspace/raci/output/gemma3-raci-q4.gguf
+FROM /workspace/gemma3-raci-q4.gguf
 
 PARAMETER temperature 0
 PARAMETER num_predict 200

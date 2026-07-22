@@ -178,6 +178,219 @@
     - "\\bPTA\\b"
   triggers: [project technical authority, pta]
 
+- label: "MoD: Design Authority"
+  type: governed
+  category: MoD-Technical
+  regex_patterns:
+    - "[Dd]esign [Aa]uthority"
+  triggers: [design authority]
+
+- label: "MoD: Design Organisation"
+  type: governed
+  category: MoD-Technical
+  regex_patterns:
+    - "[Dd]esign [Oo]rganisation"
+  triggers: [design organisation]
+
+- label: "MoD: Equipment Manager"
+  type: governed
+  category: MoD-Technical
+  regex_patterns:
+    - "[Ee]quipment [Mm]anager"
+  triggers: [equipment manager]
+
+- label: "MoD: Equipment Sponsor"
+  type: governed
+  category: MoD-Technical
+  regex_patterns:
+    - "[Ee]quipment [Ss]ponsor"
+  triggers: [equipment sponsor]
+
+# ── Radiation Protection (JSP-392 specialist) ──────────────────────
+
+- label: "MoD: Radiation Protection Supervisor"
+  type: governed
+  category: MoD-Radiation
+  regex_patterns:
+    - "[Rr]adiation [Pp]rotection [Ss]upervisor"
+    - "\\bRPS\\b"
+  triggers: [radiation protection supervisor, rps]
+
+- label: "MoD: Radiation Protection Adviser"
+  type: governed
+  category: MoD-Radiation
+  regex_patterns:
+    - "[Rr]adiation [Pp]rotection [Aa]dviser"
+    - "\\bRPA\\b"
+  triggers: [radiation protection adviser, rpa]
+
+- label: "MoD: Radiation Safety Officer"
+  type: governed
+  category: MoD-Radiation
+  regex_patterns:
+    - "[Rr]adiation [Ss]afety [Oo]fficer"
+    - "\\bRSO\\b"
+  triggers: [radiation safety officer, rso]
+
+- label: "MoD: Radioactive Waste Adviser"
+  type: governed
+  category: MoD-Radiation
+  regex_patterns:
+    - "[Rr]adioactive [Ww]aste [Aa]dviser"
+    - "\\bRWA\\b"
+  triggers: [radioactive waste adviser, rwa]
+
+- label: "MoD: Superintendent of Radiology"
+  type: governed
+  category: MoD-Radiation
+  regex_patterns:
+    - "[Ss]uperintendent of [Rr]adiology"
+  triggers: [superintendent of radiology]
+
+# ── Range Safety (JSP-403 specialist) ──────────────────────────────
+
+- label: "MoD: Range Authorising Officer"
+  type: governed
+  category: MoD-Range
+  regex_patterns:
+    - "[Rr]ange [Aa]uthoris(?:ing|ed) [Oo]fficer"
+    - "\\bRAO\\b"
+  triggers: [range authorising officer, rao]
+
+- label: "MoD: Range Conducting Officer"
+  type: governed
+  category: MoD-Range
+  regex_patterns:
+    - "[Rr]ange [Cc]onducting [Oo]fficer"
+    - "\\bRCO\\b"
+  triggers: [range conducting officer, rco]
+
+- label: "MoD: Range Safety Officer"
+  type: governed
+  category: MoD-Range
+  regex_patterns:
+    - "[Rr]ange [Ss]afety [Oo]fficer"
+  triggers: [range safety officer]
+
+- label: "MoD: Range Commander"
+  type: governed
+  category: MoD-Range
+  regex_patterns:
+    - "[Rr]ange [Cc]ommander"
+  triggers: [range commander]
+
+- label: "MoD: Range Warden"
+  type: governed
+  category: MoD-Range
+  regex_patterns:
+    - "[Rr]ange [Ww]arden"
+  triggers: [range warden]
+
+- label: "MoD: Range Administering Unit"
+  type: governed
+  category: MoD-Range
+  regex_patterns:
+    - "[Rr]ange [Aa]dministering [Uu]nit"
+    - "\\bRAU\\b"
+  triggers: [range administering unit, rau]
+
+- label: "MoD: Target Area Safety Officer"
+  type: governed
+  category: MoD-Range
+  regex_patterns:
+    - "[Tt]arget [Aa]rea [Ss]afety [Oo]fficer"
+    - "\\bTASO\\b"
+  triggers: [target area safety officer, taso]
+
+# ── Safety Roles (additional) ──────────────────────────────────────
+
+- label: "MoD: Chief Environment and Safety Officer"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Cc]hief [Ee]nviron(?:ment|mental) and [Ss]afety [Oo]fficer"
+    - "\\bCESO\\b"
+  triggers: [chief environment and safety officer, ceso]
+
+- label: "MoD: Senior Environmental Adviser"
+  type: governed
+  category: MoD-Environment
+  regex_patterns:
+    - "[Ss]enior [Ee]nvironmental [Aa]dviser"
+  triggers: [senior environmental adviser]
+
+- label: "MoD: Responsible Person"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Rr]esponsible [Pp]erson"
+  triggers: [responsible person]
+
+- label: "MoD: Competent Person"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Cc]ompetent [Pp]erson"
+  triggers: [competent person]
+
+- label: "MoD: Authorised Person"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Aa]uthoris(?:ed|ing) [Pp]erson"
+  triggers: [authorised person]
+
+- label: "MoD: Appointed Person"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Aa]ppointed [Pp]erson"
+  triggers: [appointed person]
+
+- label: "MoD: Independent Reviewer"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Ii]ndependent [Rr]eviewer"
+  triggers: [independent reviewer]
+
+- label: "MoD: Permit Issuer"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Pp]ermit [Ii]ssuer"
+  triggers: [permit issuer]
+
+- label: "MoD: Diving Supervisor"
+  type: governed
+  category: MoD-Safety
+  regex_patterns:
+    - "[Dd]iving [Ss]upervisor"
+  triggers: [diving supervisor]
+
+# ── Operational (additional) ───────────────────────────────────────
+
+- label: "MoD: Operational Commander"
+  type: governed
+  category: MoD-Operational
+  regex_patterns:
+    - "[Oo]perational [Cc]ommander"
+  triggers: [operational commander]
+
+- label: "MoD: Person in Charge"
+  type: governed
+  category: MoD-Operational
+  regex_patterns:
+    - "[Pp]erson in [Cc]harge"
+  triggers: [person in charge]
+
+- label: "MoD: Infrastructure Owner"
+  type: governed
+  category: MoD-Operational
+  regex_patterns:
+    - "[Ii]nfrastructure [Oo]wner"
+  triggers: [infrastructure owner]
+
 # ── Environment ─────────────────────────────────────────────────────
 
 - label: "MoD: Environmental Protection Adviser"
@@ -210,6 +423,53 @@
   regex_patterns:
     - "[Ii]nfrastructure [Pp]rovider"
   triggers: [infrastructure provider]
+
+- label: "MoD: Supplier"
+  type: governed
+  category: MoD-Supply
+  regex_patterns:
+    - "\\b[Ss]upplier\\b"
+  triggers: [supplier]
+
+- label: "MoD: Client"
+  type: governed
+  category: MoD-Supply
+  regex_patterns:
+    - "\\b[Cc]lient\\b"
+  triggers: [client]
+
+# ── Named Regulatory Bodies ────────────────────────────────────────
+
+- label: "MoD: Defence Infrastructure Organisation"
+  type: government
+  category: MoD-Org
+  regex_patterns:
+    - "Defence Infrastructure Organisation"
+    - "\\bDIO\\b"
+  triggers: [defence infrastructure organisation, dio]
+
+- label: "MoD: Defence Nuclear Safety Regulator"
+  type: government
+  category: MoD-Safety
+  regex_patterns:
+    - "Defence Nuclear Safety Regulator"
+    - "\\bDNSR\\b"
+  triggers: [defence nuclear safety regulator, dnsr]
+
+- label: "MoD: Defence Ordnance Safety Group"
+  type: government
+  category: MoD-Safety
+  regex_patterns:
+    - "Defence Ordnance Safety Group"
+    - "\\bDOSG\\b"
+  triggers: [defence ordnance safety group, dosg]
+
+- label: "MoD: Defence Fire Safety Regulator"
+  type: government
+  category: MoD-Safety
+  regex_patterns:
+    - "Defence Fire (?:Safety )?Regulator"
+  triggers: [defence fire safety regulator, defence fire regulator]
 
 # ── Organisational / Finance ────────────────────────────────────────
 

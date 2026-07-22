@@ -31,6 +31,7 @@ pub mod obligations;
 pub mod patterns;
 pub mod references;
 pub mod resolve;
+pub mod role_cleanup;
 pub mod terms;
 
 use crate::taxa::text_cleaner;

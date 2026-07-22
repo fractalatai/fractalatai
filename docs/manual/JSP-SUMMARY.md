@@ -56,30 +56,30 @@ When legislation changes, you can immediately see which JSP obligations are affe
 
 **4. Mandated Artefacts**
 
-JSPs mandate specific things — risk assessments, safety cases, permits, hazard logs. We detect these and classify them by type:
+JSPs mandate specific things — risk assessments, safety cases, permits, hazard logs. We detect these, classify them by type, and consolidate: multiple provisions referencing the same risk assessment in a chapter are merged into one artefact, distinguished by who owns it.
 
-| Artefact type | Count |
-|---------------|-------|
-| Risk Assessment | 554 |
-| Occurrence Report | 82 |
-| Procedure | 67 |
-| Safety Case | 59 |
-| Audit Report | 35 |
-| Training Record | 31 |
-| Emergency Plan | 25 |
-| Inspection Report | 22 |
-| Method Statement | 18 |
-| Permit | 14 |
-| Maintenance Record | 8 |
-| Hazard Log | 7 |
+| Artefact type | Raw mentions | Consolidated |
+|---------------|-------------|-------------|
+| Risk Assessment | 554 | 168 |
+| Procedure | 67 | 51 |
+| Occurrence Report | 82 | 38 |
+| Safety Case | 59 | 36 |
+| Training Record | 31 | 23 |
+| Audit Report | 35 | 21 |
+| Emergency Plan | 25 | 19 |
+| Inspection Report | 22 | 14 |
+| Method Statement | 18 | 13 |
+| Permit | 14 | 12 |
+| Maintenance Record | 8 | 7 |
+| Hazard Log | 7 | 4 |
 
-922 mandated artefacts detected. Each is linked to the obligation that requires it, the role responsible, and the JSP chapter. These map directly to compliance controls.
+922 raw mentions consolidate to **406 distinct mandated artefacts** — the actual things the JSP corpus requires to exist. Each is linked to the obligation that requires it, the role responsible, and the JSP chapter. These map directly to compliance controls.
 
 **5. Compliance Controls**
 
 Each mandated artefact generates a compliance control — an actionable statement of what must exist and who owns it. These sit alongside the 1,556 legislation-derived controls in the same control register, but are specific to the defence sector.
 
-922 JSP-derived controls, additive to the existing legislation controls. Defence customers see both; non-defence customers see only the legislation controls.
+406 JSP-derived controls (one per consolidated artefact), additive to the existing legislation controls. Defence customers see both; non-defence customers see only the legislation controls.
 
 **6. Terms and Definitions**
 
@@ -118,8 +118,9 @@ JSP obligations are more operationally detailed than legislation. Where the law 
 | Obligations extracted | 5,028 |
 | RACI assignments | 1,719 |
 | Cross-references | 1,969 (88% resolved) |
-| Mandated artefacts | 922 |
-| JSP controls | 922 |
+| Mandated artefact mentions | 922 |
+| Consolidated artefacts | 406 |
+| JSP controls | 406 |
 | Terms extracted | 1,351 |
 | Term conflicts | 1,670 |
 | Source PDFs processed | 167 |
@@ -147,8 +148,8 @@ PDF Documents          Structured Data              Enriched Intelligence
 167 JSP PDFs    →      11,351 provisions     →      6,021 obligations classified
                        (text, structure,             1,719 roles assigned (RACI)
                         hierarchy)                   1,969 legislation links (88% resolved)
-                                                     922 mandated artefacts detected
-                                                     922 compliance controls generated
+                                                     922 artefact mentions → 406 consolidated
+                                                     406 compliance controls generated
                                                      1,351 terms extracted
                                                      1,670 term conflicts surfaced
 ```
@@ -156,3 +157,102 @@ PDF Documents          Structured Data              Enriched Intelligence
 The system pulls JSP provisions from the database, runs them through a purpose-built parser that understands MoD policy language, and publishes enriched data back. The enrichment happens automatically — no manual tagging, no spreadsheets, no reading hundreds of pages.
 
 Results are queryable in the compliance platform alongside the legislation they implement. A single view shows the legal obligation, the JSP policy that implements it, the role responsible, the artefacts required, and the competence needed.
+
+---
+
+## Annex: MoD Organisational Roles
+
+55 organisational roles identified across the JSP corpus, with their RACI assignment counts. Each role can be queried to show every obligation they are responsible for, accountable for, consulted on, or informed about.
+
+### Command & Accountability
+
+| Role | R | A | C | I | Total |
+|------|---|---|---|---|-------|
+| Defence Organisation | 683 | | 2 | 4 | 689 |
+| Commander/Manager | 468 | | | | 468 |
+| Accountable Person | 329 | | | | 329 |
+| Commanding Officer | 239 | | 1 | | 240 |
+| Head of Establishment | 141 | | 1 | 1 | 145 |
+| Top Level Budget Holder | 79 | | 1 | 1 | 81 |
+| Senior Responsible Owner | 50 | | 5 | | 55 |
+| Operating Duty Holder | 52 | | | | 52 |
+| Duty Holder | 48 | | | | 48 |
+| Senior Duty Holder | 33 | | | | 33 |
+| Operational Commander | 3 | | | | 3 |
+| Person in Charge | 1 | | | | 1 |
+
+### Users & Workforce
+
+| Role | R | A | C | I | Total |
+|------|---|---|---|---|-------|
+| User | 300 | | | | 300 |
+| Operator | 39 | | | | 39 |
+| Responsible Person | 10 | | | | 10 |
+| Competent Person | 1 | | | | 1 |
+| Appointed Person | 1 | | | | 1 |
+| Authorised Person | 1 | | | | 1 |
+| Diving Supervisor | 1 | | | | 1 |
+
+### Safety Governance & Regulation
+
+| Role | R | A | C | I | Total |
+|------|---|---|---|---|-------|
+| Defence Safety Authority | 6 | | 1 | 425 | 432 |
+| Secretary of State for Defence | | | | 83 | 83 |
+| Independent Safety Adviser | 18 | | 4 | | 22 |
+| Permanent Under-Secretary | | | | 9 | 9 |
+| Chief of Defence Staff | 2 | | | 3 | 5 |
+| Chief Environment and Safety Officer | 1 | | 3 | | 4 |
+| Senior Environmental Adviser | | | 1 | | 1 |
+| Safety Committee | 2 | | | 1 | 3 |
+| Defence Nuclear Safety Regulator | 1 | | | | 1 |
+| Defence Ordnance Safety Group | 1 | | | 1 | 2 |
+| Defence Fire Safety Regulator | | | | 2 | 2 |
+| Defence Fire Regulator | | | 1 | | 1 |
+| Independent Reviewer | 2 | | | | 2 |
+| Permit Issuer | 1 | | | | 1 |
+
+### Supply Chain
+
+| Role | R | A | C | I | Total |
+|------|---|---|---|---|-------|
+| Contractor | 330 | | 2 | | 332 |
+| Client | 9 | | | | 9 |
+| Supplier | 7 | | | | 7 |
+| Infrastructure Provider | 4 | | | | 4 |
+| Infrastructure Owner | 4 | | | | 4 |
+| Design Authority | 1 | | | | 1 |
+| Design Organisation | 1 | | | | 1 |
+| Equipment Manager | 2 | | | | 2 |
+| Equipment Sponsor | 1 | | | | 1 |
+
+### Radiation Protection (JSP-392)
+
+| Role | R | A | C | I | Total |
+|------|---|---|---|---|-------|
+| Radiation Protection Supervisor | 7 | | | | 7 |
+| Radiation Safety Officer | 3 | | | | 3 |
+| Radiation Protection Adviser | 1 | | | | 1 |
+| Radioactive Waste Adviser | 1 | | | | 1 |
+| Superintendent of Radiology | 1 | | | | 1 |
+
+### Range Safety (JSP-403)
+
+| Role | R | A | C | I | Total |
+|------|---|---|---|---|-------|
+| Range Authorising Officer | 4 | | | | 4 |
+| Range Warden | 2 | | | | 2 |
+| Defence Infrastructure Organisation | 3 | | | | 3 |
+| Range Safety Officer | 1 | | | | 1 |
+| Range Commander | 1 | | | | 1 |
+| Range Administering Unit | 1 | | | | 1 |
+| Range Conducting Officer | 1 | | | | 1 |
+| Target Area Safety Officer | 1 | | | | 1 |
+
+### Key Observations
+
+- **Defence Safety Authority** is overwhelmingly Informed (425 of 432 assignments) — the regulator that must be notified, not the doer.
+- **Commander/Manager** and **Accountable Person** carry the bulk of Responsible assignments — the operational duty bearers.
+- **Contractor** has 330 Responsible assignments — significant obligations on the supply chain, directly queryable for QQ.
+- **Secretary of State** and **Permanent Under-Secretary** are Informed only — ministerial oversight, no direct operational role.
+- **Specialist roles** (radiation, range safety) emerge from domain-specific JSPs — a diving supervisor's obligations are as queryable as a commanding officer's.
