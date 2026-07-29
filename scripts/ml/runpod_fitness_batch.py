@@ -3,11 +3,11 @@
 
 Connects to Postgres (via SSH tunnel on RunPod, or directly locally),
 queries polarity-only provisions (no dictionary entities), extracts
-applicability entities via gemma3:4b, writes to fitness_mentions.
+applicability entities via gemma3-fitness, writes to fitness_mentions.
 
 Prerequisites on RunPod:
     1. Ollama installed + serving
-    2. gemma3:4b loaded: ollama pull gemma3:4b
+    2. gemma3-fitness loaded: ollama pull gemma3-fitness
     3. SSH reverse tunnel: ssh -R 5433:localhost:5433 -p <PORT> root@<IP> -N
     4. OLLAMA_NUM_PARALLEL=4 set before ollama serve
 
@@ -31,7 +31,7 @@ import requests
 # ── Config ──────────────────────────────────────────────────────────────
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL = "gemma3:4b"
+MODEL = "gemma3-fitness"
 PG_DSN = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 
 SYSTEM_PROMPT = """Extract applicability entities from this UK legislation provision. Return ONLY a JSON array.

@@ -26,7 +26,7 @@ decisions:
 
   - what: Significance sequencing fix
     why: Ran significance before derive_hierarchy → backfill set significance_overall = NULL despite 4/5 dimensions present. derive_hierarchy provides the 5th dimension.
-    result: Documented in skill: backfill → significance → derive_hierarchy → backfill.
+    result: "Documented in skill: backfill → significance → derive_hierarchy → backfill."
 
 metrics:
   controls_published: { controls: 1341, predicates: 218, laws: 219 }

@@ -69,7 +69,7 @@ lessons:
     detail: Gemini identified that the gap between extracted mentions and compiled expression trees is the hardest unsolved problem. Inferring logical connectives (OR vs AND) between co-occurring mentions requires sentence structure analysis. Design spike needed before implementation.
     tag: architecture
 
-  - title: "Any person" in legislation is a wildcard on personal scope
+  - title: '"Any person" in legislation is a wildcard on personal scope'
     detail: Criminal offence provisions using "any person who..." have universal personal scope — they match all customers unless negated by a DisappliesTo clause. This is not a special case; it's the most common applicability pattern.
     tag: data
 

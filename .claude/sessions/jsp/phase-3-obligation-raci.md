@@ -16,7 +16,7 @@ decisions:
     why: JSP-375-CH23 has no `table` section_type. PDF parser captures tables as flat paragraph text. All RACI must be inferred from narrative patterns.
     result: Mode B (actor + modal verb → R; accountable/consulted/informed markers → A/C/I)
   - what: Separate relational tables for obligations and RACI in sertantai, not JSONB
-    why: "All obligations for Commanding Officer across applicable JSPs" is a JOIN query that doesn't work with JSONB. Baserow sync needs row-per-obligation.
+    why: '"All obligations for Commanding Officer across applicable JSPs" is a JOIN query that doesn''t work with JSONB. Baserow sync needs row-per-obligation.'
     result: Raised sertantai-legal#126 for secondary_obligations + secondary_raci tables
   - what: Obligations and RACI travel in the consolidated publish-secondary payload
     why: Phase 2 established single-publisher architecture. Adding obligations_json + raci_json columns follows the same pattern — no new publishers.

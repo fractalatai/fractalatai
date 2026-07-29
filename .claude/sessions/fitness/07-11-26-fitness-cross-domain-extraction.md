@@ -18,7 +18,7 @@ decisions:
     result: 17 new core Person entries, biggest single contributor to gap closure
 
   - what: Family-scope specialist dictionaries for domain-specific terms
-    why: "Marine conservation zone" is only relevant in MARINE family, "listed building" in HISTORIC/PLANNING. Matches the OH&S/FIRE specialist pattern already proven.
+    why: '"Marine conservation zone" is only relevant in MARINE family, "listed building" in HISTORIC/PLANNING. Matches the OH&S/FIRE specialist pattern already proven.'
     result: 10 new specialist dictionaries covering Wildlife, Marine, Environmental Protection, Planning, Water, Energy, Climate, Nuclear
 
   - what: Fitness extract loads law→family mapping from DuckDB
@@ -41,7 +41,7 @@ metrics:
 
 lessons:
   - title: Cross-domain actor terms deliver more value than domain-specific terms
-    detail: "Secretary of State" alone hit 747 gap provisions. The 17 core Person entries (government actors, institutional authorities) closed more of the gap than all 10 specialist dictionaries combined, because they appear across every family.
+    detail: '"Secretary of State" alone hit 747 gap provisions. The 17 core Person entries (government actors, institutional authorities) closed more of the gap than all 10 specialist dictionaries combined, because they appear across every family.'
     tag: data
 
   - title: Dictionary expansion before NER closes 32% of the gap at zero cost

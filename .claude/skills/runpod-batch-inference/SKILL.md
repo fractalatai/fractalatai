@@ -159,6 +159,12 @@ AND regex_entities IS NOT NULL;
 
 ## Known Issues
 
+### NEVER run multiple models in parallel on one GPU
+
+Ollama already parallelises inference within a single model (`OLLAMA_NUM_PARALLEL`). Running two different models simultaneously (e.g. significance + fitness) causes GPU contention that makes both ~5x slower. Serial total: ~7 min. Parallel total: ~30 min.
+
+**Always run models one at a time**: position → significance → fitness. Wait for each to complete before starting the next.
+
 ### Python output buffering with nohup
 
 `nohup python3 script.py > log 2>&1` buffers stdout — the log file appears empty or frozen. Use `python3 -u` (unbuffered) to see progress in real-time:

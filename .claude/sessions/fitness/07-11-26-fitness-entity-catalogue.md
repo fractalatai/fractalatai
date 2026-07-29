@@ -47,7 +47,7 @@ lessons:
     tag: data
 
   - title: Legal designations are inherently multi-dimensional
-    detail: "Marine conservation zone" is both territorial (it's a place) and material (it's a legal concept that triggers specific duties). The catalogue supports this via scope_dimensions[] array — an entity can span multiple dimensions. This validates the v0.3 decision to separate extraction from classification.
+    detail: '"Marine conservation zone" is both territorial (it''s a place) and material (it''s a legal concept that triggers specific duties). The catalogue supports this via scope_dimensions[] array — an entity can span multiple dimensions. This validates the v0.3 decision to separate extraction from classification.'
     tag: architecture
 
 artifacts:

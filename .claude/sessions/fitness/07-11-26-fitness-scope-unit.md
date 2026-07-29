@@ -13,7 +13,7 @@ summary: >
 
 decisions:
   - what: Scope unit determined by legislative unit as SUBJECT of applicability verb, not qualifiers
-    why: "Subject to the provisions of this Part, any person who..." has "this Part" in a qualifier, not as the scope subject. Only "This Part applies to..." means Part-level scope. Prevents over-broadening.
+    why: '"Subject to the provisions of this Part, any person who..." has "this Part" in a qualifier, not as the scope subject. Only "This Part applies to..." means Part-level scope. Prevents over-broadening.'
     result: Conservative assignment — 92.5% provision-level. Only explicit "This Part/Act/Chapter applies" gets broader scope.
 
   - what: Provision-level as default scope for all unmatched patterns
@@ -30,7 +30,7 @@ metrics:
 
 lessons:
   - title: Legislative self-references serve dual roles — scope declaration vs qualifier
-    detail: "This Part" in "This Part applies to employers" is a scope declaration (Part-level). "This Part" in "Subject to the provisions of this Part" is a qualifier (the provision is scoped to itself, with Part-wide exceptions). The regex must match the legislative unit as the SUBJECT of the applicability verb to distinguish these.
+    detail: '"This Part" in "This Part applies to employers" is a scope declaration (Part-level). "This Part" in "Subject to the provisions of this Part" is a qualifier (the provision is scoped to itself, with Part-wide exceptions). The regex must match the legislative unit as the SUBJECT of the applicability verb to distinguish these.'
     tag: data
 
 artifacts:

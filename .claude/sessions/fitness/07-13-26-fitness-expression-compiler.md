@@ -14,7 +14,7 @@ summary: >
 
 decisions:
   - what: ApplicabilityNode as tagged union with serde JSON
-    why: Sertantai (Elixir) needs to decode and walk the tree. Tagged JSON ({"op": "Match", ...}) is natural for pattern matching in Elixir and self-describing for debugging.
+    why: 'Sertantai (Elixir) needs to decode and walk the tree. Tagged JSON ({"op": "Match", ...}) is natural for pattern matching in Elixir and self-describing for debugging.'
     result: 6 node types (Match, And, Or, Not, Conditional, TimeWindow). Roundtrip JSON serialisation tested.
 
   - what: TimeWindow is a leaf gate, not a wrapper with inner node

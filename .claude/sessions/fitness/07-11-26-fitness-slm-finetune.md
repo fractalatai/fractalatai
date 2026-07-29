@@ -26,7 +26,7 @@ decisions:
 
   - what: All RunPod artifacts must be on /workspace (network volume), never /tmp
     why: GGUF written to /tmp was lost when pod stopped. BF16 on /workspace survived, requiring re-quantise on next pod.
-    result: Skills updated. Network volume namespaced: models/drrp/, models/fitness/, models/significance/.
+    result: "Skills updated. Network volume namespaced: models/drrp/, models/fitness/, models/significance/."
 
 metrics:
   fine_tuning:

@@ -13,13 +13,13 @@ summary: >
 
 decisions:
   - what: JSP parser is a separate module from taxa, not a mode flag on parse_v2
-    why: Different modal conventions (will/is to as mandatory), different actor dictionary, different output type. Polluting the legislation pipeline risks regressions.
+    why: "Different modal conventions (will/is to as mandatory), different actor dictionary, different output type. Polluting the legislation pipeline risks regressions."
     result: fractalaw-core/src/jsp/ with own actors.rs, patterns.rs, mod.rs
   - what: Zenoh code stays in fractalaw-sync-cli, not fractalaw-cli
     why: fractalaw-cli is local-only (DuckDB/LanceDB/PG). All Zenoh operations live in fractalaw-sync-cli. Violated this initially, backed out.
     result: pull-secondary and publish-secondary in fractalaw-sync-cli
   - what: --all-chapters not --family for JSP parent/child grouping
-    why: "family" means regulatory domain classification for legislation. JSP parent/child is document grouping — different concept, different name.
+    why: '"family" means regulatory domain classification for legislation. JSP parent/child is document grouping — different concept, different name.'
     result: fractalaw jsp enrich JSP-375 --all-chapters
   - what: Arrow batch ingestion via Parquet temp file (CTAS), not row-by-row SQL insert
     why: Row-by-row INSERT with string escaping fails on provision text containing quotes. DuckDB CTAS from Parquet handles all data types safely.

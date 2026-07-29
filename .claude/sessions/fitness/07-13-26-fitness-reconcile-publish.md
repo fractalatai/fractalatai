@@ -22,7 +22,7 @@ decisions:
 
   - what: AppliesTo mentions are OR'd, DisappliesTo are Not(Or(...)) with conflict filtering
     why: Each provision's applicability is a disjunctive path (any one = law applies). Provision-level exceptions that conflict with AppliesTo codes are section-specific overrides, not law-wide exclusions.
-    result: Trees evaluate correctly. NERC Act: 10→6 disapplies after filtering conflicts.
+    result: "Trees evaluate correctly. NERC Act: 10→6 disapplies after filtering conflicts."
 
   - what: Orphan law names renamed to canonical (not deleted)
     why: Provisions only existed under orphan names (UK_YYYY_NNN). Canonical names (UK_uksi_YYYY_NNN) had DuckDB LRT but no provisions. Rename preserves the data.
@@ -56,7 +56,7 @@ lessons:
     tag: architecture
 
   - title: Provision-level DisappliesTo must not become law-level exclusions
-    detail: "Section 42 does not apply to construction on Crown land" is a section-specific exception. Promoting it to a law-level Not(construction) prevents the law from ever matching a construction customer, even though other sections DO apply to construction. Heuristic filter: drop DisappliesTo codes that also appear in AppliesTo.
+    detail: '"Section 42 does not apply to construction on Crown land" is a section-specific exception. Promoting it to a law-level Not(construction) prevents the law from ever matching a construction customer, even though other sections DO apply to construction. Heuristic filter: drop DisappliesTo codes that also appear in AppliesTo.'
     tag: data
 
   - title: Non-standard law names from batch imports cause orphan records

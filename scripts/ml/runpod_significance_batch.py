@@ -180,7 +180,7 @@ def rate_provision(text, section_id, section_type, timeout=60):
         parsed = json.loads(content)
         result = {}
         for d in DIMS:
-            v = parsed.get(d, "").upper()
+            v = (parsed.get(d) or "").upper()
             if v not in VALID:
                 return None
             result[d] = v

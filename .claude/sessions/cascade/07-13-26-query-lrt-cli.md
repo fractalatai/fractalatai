@@ -21,7 +21,7 @@ lessons:
     tag: tooling
 
   - title: Arrow IPC decode failures usually mean the law doesn't exist on sertantai's side
-    detail: "failed to fill whole buffer" means sertantai returned bytes that aren't valid Arrow IPC — likely an error message or empty response for a law it doesn't know about.
+    detail: '"failed to fill whole buffer" means sertantai returned bytes that aren''t valid Arrow IPC — likely an error message or empty response for a law it doesn''t know about.'
     tag: infrastructure
 
 artifacts:
