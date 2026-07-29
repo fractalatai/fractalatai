@@ -20,6 +20,8 @@ Usage:
     python3 /workspace/runpod_slm_batch.py                 # full run
     python3 /workspace/runpod_slm_batch.py --workers 8     # more concurrency
     python3 /workspace/runpod_slm_batch.py --dry-run       # query only
+    python3 /workspace/runpod_slm_batch.py --laws "UK_ukpga_2018_12,UK_ukpga_2015_30"  # scope to laws
+    python3 /workspace/runpod_slm_batch.py --laws data/sertantai/qq-applicable-laws.csv  # from file
 """
 
 import argparse
@@ -124,7 +126,7 @@ def preflight():
 
 # ── Query ───────────────────────────────────────────────────────────────
 
-def query_pending_slm(conn, limit=None):
+def query_pending_slm(conn, limit=None, law_names=None):
     """Fetch actors needing SLM classification (all actors without slm_position on substantive provisions)."""
     sql = """
         SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text
@@ -133,8 +135,11 @@ def query_pending_slm(conn, limit=None):
         WHERE pa.slm_position IS NULL
         AND pa.regex_position IS NOT NULL
         AND lt.scope = 'substantive'
-        ORDER BY pa.section_id, pa.actor_label
     """
+    if law_names:
+        placeholders = ",".join(f"'{n}'" for n in law_names)
+        sql += f" AND lt.law_name IN ({placeholders})"
+    sql += " ORDER BY pa.section_id, pa.actor_label"
     if limit:
         sql += f" LIMIT {limit}"
     cur = conn.cursor()
@@ -252,7 +257,19 @@ def main():
                         help="Number of concurrent Ollama workers (default: 4)")
     parser.add_argument("--batch-size", type=int, default=100,
                         help="Write to Postgres every N results (default: 100)")
+    parser.add_argument("--laws", help="Comma-separated law names or path to a file to scope extraction")
     args = parser.parse_args()
+
+    # Parse --laws: comma-separated string or file path
+    law_names = None
+    if args.laws:
+        import os
+        if os.path.isfile(args.laws):
+            with open(args.laws) as f:
+                law_names = [line.strip() for line in f if line.strip()]
+        else:
+            law_names = [n.strip() for n in args.laws.split(",") if n.strip()]
+        print(f"Scoped to {len(law_names)} laws")
 
     ok, pending_count = preflight()
     if not ok:
@@ -264,7 +281,7 @@ def main():
         print(f"\nTEST MODE: processing {limit:,} of {pending_count:,} actors (5%)")
 
     conn = psycopg2.connect(PG_DSN)
-    actors = query_pending_slm(conn, limit=limit)
+    actors = query_pending_slm(conn, limit=limit, law_names=law_names)
     total = len(actors)
     print(f"Loaded {total:,} pending_slm actors, {args.workers} workers\n")
 

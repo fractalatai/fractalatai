@@ -768,13 +768,6 @@ mod tests {
             &[],
             &[],
             &[],
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &[],
         );
         let h2 = compute_taxa_hash(
             &dh,
@@ -787,13 +780,6 @@ mod tests {
             &duties,
             &[],
             &[],
-            &[],
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &empty_set,
             &[],
         );
         assert_eq!(h1, h2, "same input must produce same hash");
@@ -817,13 +803,6 @@ mod tests {
             &[],
             &[],
             &[],
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &[],
         );
 
         let dh2: BTreeSet<String> = ["employee".into()].into();
@@ -838,13 +817,6 @@ mod tests {
             &[],
             &[],
             &[],
-            &[],
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &empty_set,
-            &empty_set,
             &[],
         );
         assert_ne!(h1, h2, "different input must produce different hash");

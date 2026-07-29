@@ -89,11 +89,12 @@ pub trait ProvisionStore: Send + Sync {
     }
 
     /// Upsert per-actor signals into provision_actors table.
-    /// Each tuple: (section_id, actor_label, actor_category, drrp, position, tier)
-    /// tier = "regex" | "classifier" | "llm" | "inferred"
+    /// Each tuple: (section_id, actor_label, actor_category, drrp, position, tier, confidence)
+    /// tier = "regex" | "classifier" | "slm" | "llm" | "inferred"
+    /// confidence is written to {tier}_confidence when Some (classifier/slm tiers).
     async fn upsert_provision_actors(
         &self,
-        _actors: &[(String, String, String, Option<String>, String, String)],
+        _actors: &[(String, String, String, Option<String>, String, String, Option<f32>)],
     ) -> Result<(), StoreError> {
         Ok(())
     }

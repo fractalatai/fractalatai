@@ -83,8 +83,9 @@ GROUP BY 1;
 "
 
 # Step 3: Only if Step 2 shows data → run full batch
+# Use --laws to scope to a specific batch (all 3 scripts support this)
 ssh -p <PORT> -i ~/.ssh/id_ed25519 root@<IP> \
-  'nohup python3 -u /workspace/<script>.py --workers 4 > /workspace/batch.log 2>&1 &'
+  'nohup python3 -u /workspace/<script>.py --workers 4 --laws "law1,law2,..." > /workspace/batch.log 2>&1 &'
 ```
 
 If you skip Step 2 and the write path is broken, you burn GPU time for nothing.
@@ -340,8 +341,10 @@ ls -lh /workspace/*.gguf /workspace/output/
 
 ## Scripts
 
-| Script | Table | Method | Purpose |
-|--------|-------|--------|---------|
-| `runpod_slm_batch.py` | `provision_actors` | `slm` | DRRP position classification |
-| `runpod_significance_batch.py` | `legislation_text` | significance columns | Obligation significance rating |
-| `runpod_fitness_batch.py` | `fitness_mentions` | `slm` | Fitness entity extraction |
+All scripts support `--laws` to scope to specific laws (comma-separated or path to a file). Without `--laws`, they process the full global queue.
+
+| Script | Table | Method | `--laws` | Purpose |
+|--------|-------|--------|----------|---------|
+| `runpod_slm_batch.py` | `provision_actors` | `slm` | Yes | DRRP position classification |
+| `runpod_significance_batch.py` | `legislation_text` | significance columns | Yes | Obligation significance rating |
+| `runpod_fitness_batch.py` | `fitness_mentions` | `slm` | Yes | Fitness entity extraction |

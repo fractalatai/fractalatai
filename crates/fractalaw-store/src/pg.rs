@@ -207,12 +207,12 @@ impl PgStore {
     }
 
     /// Upsert per-actor signals into provision_actors.
-    /// Each tuple: (section_id, actor_label, actor_category, drrp, position, tier)
+    /// Each tuple: (section_id, actor_label, actor_category, drrp, position, tier, confidence)
     pub async fn upsert_provision_actors(
         &self,
-        actors: &[(String, String, String, Option<String>, String, String)],
+        actors: &[(String, String, String, Option<String>, String, String, Option<f32>)],
     ) -> Result<(), StoreError> {
-        for (sid, label, category, drrp, position, tier) in actors {
+        for (sid, label, category, drrp, position, tier, confidence) in actors {
             let (drrp_col, pos_col) = match tier.as_str() {
                 "regex" => ("regex_drrp", "regex_position"),
                 "classifier" => ("cls_drrp", "cls_position"),
@@ -221,20 +221,40 @@ impl PgStore {
                 "inferred" => ("inferred_drrp", "inferred_position"),
                 _ => continue,
             };
-            let sql = format!(
-                "INSERT INTO provision_actors (section_id, actor_label, actor_category, {drrp_col}, {pos_col}) \
-                 VALUES ($1, $2, $3, $4, $5) \
-                 ON CONFLICT (section_id, actor_label) DO UPDATE SET \
-                 actor_category = COALESCE(EXCLUDED.actor_category, provision_actors.actor_category), \
-                 {drrp_col} = EXCLUDED.{drrp_col}, {pos_col} = EXCLUDED.{pos_col}"
-            );
-            sqlx::query(&sql)
+            let conf_col = match tier.as_str() {
+                "classifier" => Some("cls_confidence"),
+                "slm" => Some("slm_confidence"),
+                _ => None,
+            };
+            let sql = if let Some(cc) = conf_col {
+                format!(
+                    "INSERT INTO provision_actors (section_id, actor_label, actor_category, {drrp_col}, {pos_col}, {cc}) \
+                     VALUES ($1, $2, $3, $4, $5, $6) \
+                     ON CONFLICT (section_id, actor_label) DO UPDATE SET \
+                     actor_category = COALESCE(EXCLUDED.actor_category, provision_actors.actor_category), \
+                     {drrp_col} = EXCLUDED.{drrp_col}, {pos_col} = EXCLUDED.{pos_col}, {cc} = EXCLUDED.{cc}"
+                )
+            } else {
+                format!(
+                    "INSERT INTO provision_actors (section_id, actor_label, actor_category, {drrp_col}, {pos_col}) \
+                     VALUES ($1, $2, $3, $4, $5) \
+                     ON CONFLICT (section_id, actor_label) DO UPDATE SET \
+                     actor_category = COALESCE(EXCLUDED.actor_category, provision_actors.actor_category), \
+                     {drrp_col} = EXCLUDED.{drrp_col}, {pos_col} = EXCLUDED.{pos_col}"
+                )
+            };
+            let q = sqlx::query(&sql)
                 .bind(sid)
                 .bind(label)
                 .bind(category)
                 .bind(drrp.as_deref())
-                .bind(position)
-                .execute(&self.pool)
+                .bind(position);
+            let q = if conf_col.is_some() {
+                q.bind(*confidence)
+            } else {
+                q
+            };
+            q.execute(&self.pool)
                 .await
                 .map_err(|e| StoreError::Other(format!("upsert_provision_actors: {e}")))?;
         }
@@ -1027,7 +1047,7 @@ impl crate::ProvisionStore for PgStore {
 
     async fn upsert_provision_actors(
         &self,
-        actors: &[(String, String, String, Option<String>, String, String)],
+        actors: &[(String, String, String, Option<String>, String, String, Option<f32>)],
     ) -> Result<(), StoreError> {
         self.upsert_provision_actors(actors).await
     }

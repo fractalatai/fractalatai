@@ -218,6 +218,7 @@ pub(crate) async fn enrich_single_law(
                     drrp.clone(),
                     actor.position.clone(),
                     "regex".to_string(),
+                    None,
                 ));
             }
         }

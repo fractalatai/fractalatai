@@ -223,7 +223,7 @@ pub(crate) async fn cmd_taxa_infer(
         }
 
         // Build upsert tuples
-        let rows: Vec<(String, String, String, Option<String>, String, String)> = inferred
+        let rows: Vec<(String, String, String, Option<String>, String, String, Option<f32>)> = inferred
             .iter()
             .map(|a| {
                 (
@@ -233,6 +233,7 @@ pub(crate) async fn cmd_taxa_infer(
                     a.drrp.clone(),
                     a.position.clone(),
                     "inferred".to_string(),
+                    None,
                 )
             })
             .collect();
@@ -251,11 +252,75 @@ pub(crate) async fn cmd_taxa_infer(
     Ok(())
 }
 
+/// Reconcile a single actor's position from multi-tier signals.
+///
+/// Returns (position, method, confidence) or None if no signal available.
+/// Priority: LLM > inferred > SLM@>=0.9 > agree > classifier@>=0.7 > pending_slm > regex-only.
+fn reconcile_position(
+    regex_pos: &Option<String>,
+    cls_pos: &Option<String>,
+    cls_conf: &Option<f32>,
+    inferred_pos: &Option<String>,
+    slm_pos: &Option<String>,
+    slm_conf: &Option<f32>,
+    llm_pos: &Option<String>,
+) -> Option<(String, &'static str, &'static str)> {
+    if let Some(pos) = llm_pos {
+        // Rule 1: LLM (Gemini) wins (~95%)
+        Some((pos.clone(), "llm", "HIGHEST"))
+    } else if let Some(pos) = inferred_pos {
+        // Rule 2: Inferred (86.7% — correlative rules)
+        Some((pos.clone(), "inferred", "HIGH"))
+    } else if let Some(pos) = slm_pos {
+        // Rule 3: SLM — confidence-based gating at 0.9
+        let conf = slm_conf.unwrap_or(0.0);
+        if conf >= 0.9 {
+            Some((pos.clone(), "slm", "HIGH"))
+        } else {
+            // SLM not confident — flag for human-triggered LLM
+            Some((pos.clone(), "pending_llm", "LOW"))
+        }
+    } else if let (Some(rp), Some(cp)) = (regex_pos, cls_pos) {
+        // Rule 4: Both regex and classifier available — compare
+        if rp == cp {
+            // Rule 4a: Agree — no SLM needed
+            Some((rp.clone(), "agree", "HIGH"))
+        } else {
+            let conf = cls_conf.unwrap_or(0.0);
+            if conf >= 0.7 {
+                // Rule 4b: Classifier confident, disagrees — use classifier
+                Some((cp.clone(), "classifier", "MEDIUM"))
+            } else {
+                // Rule 4c: Disagree, classifier not confident — flag for SLM
+                Some((rp.clone(), "pending_slm", "LOW"))
+            }
+        }
+    } else if let Some(rp) = regex_pos {
+        // Rule 5: Only regex (no classifier signal)
+        Some((rp.clone(), "regex", "MEDIUM"))
+    } else {
+        None
+    }
+}
+
+/// Reconcile DRRP type from multi-tier signals: LLM > SLM > regex.
+fn reconcile_drrp(
+    regex_drrp: &Option<String>,
+    slm_drrp: &Option<String>,
+    llm_drrp: &Option<String>,
+) -> Option<String> {
+    if llm_drrp.is_some() {
+        llm_drrp.clone()
+    } else if slm_drrp.is_some() {
+        slm_drrp.clone()
+    } else {
+        regex_drrp.clone()
+    }
+}
+
 /// Reconcile per-tier signals into final drrp + position per actor.
 ///
 /// Reads from provision_actors (all tier columns).
-/// DRRP: LLM wins, else regex.
-/// Position: LLM > inferred > agree > classifier\@>=0.7 > pending_llm > regex-only.
 pub(crate) async fn cmd_taxa_reconcile(
     lance: &dyn ProvisionStore,
     law_names: &[String],
@@ -271,47 +336,18 @@ pub(crate) async fn cmd_taxa_reconcile(
 
         let mut updates: Vec<(String, String, Option<String>, String, String, String)> = Vec::new();
 
-        for (sid, label, regex_drrp, regex_pos, _cls_drrp, _cls_pos, _cls_conf,
+        for (sid, label, regex_drrp, regex_pos, _cls_drrp, cls_pos, cls_conf,
              _inferred_drrp, inferred_pos, slm_drrp, slm_pos, slm_conf,
              llm_drrp, llm_pos) in &signals
         {
-            // === DRRP reconciliation: LLM > SLM > regex ===
-            let final_drrp = if llm_drrp.is_some() {
-                llm_drrp.clone()
-            } else if slm_drrp.is_some() {
-                slm_drrp.clone()
-            } else {
-                regex_drrp.clone()
-            };
+            let final_drrp = reconcile_drrp(regex_drrp, slm_drrp, llm_drrp);
 
-            // === Position reconciliation (confidence-based) ===
-            let (final_pos, method, confidence) = if let Some(pos) = llm_pos {
-                // Rule 1: LLM (Gemini) wins (~95%)
-                *counts.entry("llm").or_default() += 1;
-                (pos.clone(), "llm", "HIGHEST")
-            } else if let Some(pos) = inferred_pos {
-                // Rule 2: Inferred (86.7% — correlative rules)
-                *counts.entry("inferred").or_default() += 1;
-                (pos.clone(), "inferred", "HIGH")
-            } else if let Some(pos) = slm_pos {
-                // Rule 3: SLM — confidence-based gating at 0.9
-                let conf = slm_conf.unwrap_or(0.0);
-                if conf >= 0.9 {
-                    // SLM confident (94.9% accurate at ≥0.99, still strong at 0.9+)
-                    *counts.entry("slm").or_default() += 1;
-                    (pos.clone(), "slm", "HIGH")
-                } else {
-                    // SLM not confident — flag for human-triggered LLM
-                    *counts.entry("pending_llm").or_default() += 1;
-                    (pos.clone(), "pending_llm", "LOW")
-                }
-            } else if let Some(rp) = regex_pos {
-                // Rule 4: Only regex (no SLM signal)
-                *counts.entry("regex_only").or_default() += 1;
-                (rp.clone(), "regex", "MEDIUM")
-            } else {
+            let Some((final_pos, method, confidence)) = reconcile_position(
+                regex_pos, cls_pos, cls_conf, inferred_pos, slm_pos, slm_conf, llm_pos,
+            ) else {
                 continue;
             };
+            *counts.entry(method).or_default() += 1;
 
             updates.push((
                 sid.clone(),
@@ -394,7 +430,7 @@ pub(crate) async fn cmd_taxa_slm(
             continue;
         }
 
-        let mut updates: Vec<(String, String, String, Option<String>, String, String)> = Vec::new();
+        let mut updates: Vec<(String, String, String, Option<String>, String, String, Option<f32>)> = Vec::new();
 
         for (sid, label, regex_drrp, text) in &actors {
             let user_msg = format!(
@@ -467,6 +503,7 @@ pub(crate) async fn cmd_taxa_slm(
                         regex_drrp.clone(),
                         pos,
                         "slm".to_string(),
+                        None, // SLM confidence written by RunPod script directly
                     ));
                     classified += 1;
                 }
@@ -3051,7 +3088,7 @@ pub(crate) async fn cmd_taxa_classify(
                 let mut pos_skipped = 0usize;
                 type ActorTuple = (String, String, Option<String>, String, Option<String>);
                 let mut pos_updates: Vec<(String, Vec<ActorTuple>)> = Vec::new();
-                let mut cls_actor_rows: Vec<(String, String, String, Option<String>, String, String)> = Vec::new();
+                let mut cls_actor_rows: Vec<(String, String, String, Option<String>, String, String, Option<f32>)> = Vec::new();
 
                 // Load dep features from provision_actors for this law
                 let dep_features_map: std::collections::HashMap<(String, String), fractalaw_ai::position_classifier::DepFeatures> = {
@@ -3248,6 +3285,7 @@ pub(crate) async fn cmd_taxa_classify(
                                 cls_drrp_for_actor,
                                 cls_pos.to_string(),
                                 "classifier".to_string(),
+                                Some(pred.confidence),
                             ));
 
                             #[allow(unused)]
@@ -3733,4 +3771,219 @@ pub(crate) async fn cmd_taxa_enrich(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn s(v: &str) -> Option<String> {
+        Some(v.to_string())
+    }
+
+    // --- reconcile_position tests ---
+
+    #[test]
+    fn llm_wins_over_everything() {
+        let result = reconcile_position(
+            &s("mentioned"), &s("active"), &Some(0.95),
+            &s("counterparty"), &s("beneficiary"), &Some(0.99),
+            &s("active"),
+        );
+        let (pos, method, conf) = result.unwrap();
+        assert_eq!(pos, "active");
+        assert_eq!(method, "llm");
+        assert_eq!(conf, "HIGHEST");
+    }
+
+    #[test]
+    fn inferred_wins_over_slm_and_classifier() {
+        let result = reconcile_position(
+            &s("mentioned"), &s("active"), &Some(0.9),
+            &s("counterparty"), &s("active"), &Some(0.99),
+            &None,
+        );
+        let (pos, method, _) = result.unwrap();
+        assert_eq!(pos, "counterparty");
+        assert_eq!(method, "inferred");
+    }
+
+    #[test]
+    fn slm_confident_wins() {
+        let result = reconcile_position(
+            &s("mentioned"), &s("active"), &Some(0.8),
+            &None, &s("beneficiary"), &Some(0.95),
+            &None,
+        );
+        let (pos, method, conf) = result.unwrap();
+        assert_eq!(pos, "beneficiary");
+        assert_eq!(method, "slm");
+        assert_eq!(conf, "HIGH");
+    }
+
+    #[test]
+    fn slm_low_confidence_flags_pending_llm() {
+        let result = reconcile_position(
+            &s("mentioned"), &s("active"), &Some(0.8),
+            &None, &s("beneficiary"), &Some(0.5),
+            &None,
+        );
+        let (pos, method, conf) = result.unwrap();
+        assert_eq!(pos, "beneficiary");
+        assert_eq!(method, "pending_llm");
+        assert_eq!(conf, "LOW");
+    }
+
+    #[test]
+    fn regex_and_classifier_agree() {
+        let result = reconcile_position(
+            &s("active"), &s("active"), &Some(0.4),
+            &None, &None, &None,
+            &None,
+        );
+        let (pos, method, conf) = result.unwrap();
+        assert_eq!(pos, "active");
+        assert_eq!(method, "agree");
+        assert_eq!(conf, "HIGH");
+    }
+
+    #[test]
+    fn classifier_confident_disagree_uses_classifier() {
+        let result = reconcile_position(
+            &s("mentioned"), &s("active"), &Some(0.85),
+            &None, &None, &None,
+            &None,
+        );
+        let (pos, method, conf) = result.unwrap();
+        assert_eq!(pos, "active");
+        assert_eq!(method, "classifier");
+        assert_eq!(conf, "MEDIUM");
+    }
+
+    #[test]
+    fn classifier_low_confidence_disagree_flags_pending_slm() {
+        let result = reconcile_position(
+            &s("mentioned"), &s("active"), &Some(0.4),
+            &None, &None, &None,
+            &None,
+        );
+        let (pos, method, conf) = result.unwrap();
+        assert_eq!(pos, "mentioned"); // keeps regex position
+        assert_eq!(method, "pending_slm");
+        assert_eq!(conf, "LOW");
+    }
+
+    #[test]
+    fn classifier_no_confidence_disagree_flags_pending_slm() {
+        // cls_confidence is NULL — should default to 0.0, triggering pending_slm
+        let result = reconcile_position(
+            &s("mentioned"), &s("active"), &None,
+            &None, &None, &None,
+            &None,
+        );
+        let (pos, method, conf) = result.unwrap();
+        assert_eq!(pos, "mentioned");
+        assert_eq!(method, "pending_slm");
+        assert_eq!(conf, "LOW");
+    }
+
+    #[test]
+    fn regex_only_no_classifier() {
+        let result = reconcile_position(
+            &s("active"), &None, &None,
+            &None, &None, &None,
+            &None,
+        );
+        let (pos, method, conf) = result.unwrap();
+        assert_eq!(pos, "active");
+        assert_eq!(method, "regex");
+        assert_eq!(conf, "MEDIUM");
+    }
+
+    #[test]
+    fn no_signals_returns_none() {
+        let result = reconcile_position(
+            &None, &None, &None,
+            &None, &None, &None,
+            &None,
+        );
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn classifier_at_threshold_boundary() {
+        // Exactly 0.7 should use classifier
+        let result = reconcile_position(
+            &s("mentioned"), &s("active"), &Some(0.7),
+            &None, &None, &None,
+            &None,
+        );
+        let (pos, method, _) = result.unwrap();
+        assert_eq!(pos, "active");
+        assert_eq!(method, "classifier");
+
+        // Just below 0.7 should flag pending_slm
+        let result = reconcile_position(
+            &s("mentioned"), &s("active"), &Some(0.699),
+            &None, &None, &None,
+            &None,
+        );
+        let (pos, method, _) = result.unwrap();
+        assert_eq!(pos, "mentioned");
+        assert_eq!(method, "pending_slm");
+    }
+
+    #[test]
+    fn slm_at_threshold_boundary() {
+        // Exactly 0.9 should be HIGH
+        let result = reconcile_position(
+            &s("mentioned"), &None, &None,
+            &None, &s("active"), &Some(0.9),
+            &None,
+        );
+        let (_, method, conf) = result.unwrap();
+        assert_eq!(method, "slm");
+        assert_eq!(conf, "HIGH");
+
+        // Just below 0.9 should be pending_llm
+        let result = reconcile_position(
+            &s("mentioned"), &None, &None,
+            &None, &s("active"), &Some(0.899),
+            &None,
+        );
+        let (_, method, conf) = result.unwrap();
+        assert_eq!(method, "pending_llm");
+        assert_eq!(conf, "LOW");
+    }
+
+    // --- reconcile_drrp tests ---
+
+    #[test]
+    fn drrp_llm_wins() {
+        assert_eq!(
+            reconcile_drrp(&s("Obligation"), &s("Liberty"), &s("Power")),
+            s("Power")
+        );
+    }
+
+    #[test]
+    fn drrp_slm_wins_over_regex() {
+        assert_eq!(
+            reconcile_drrp(&s("Obligation"), &s("Liberty"), &None),
+            s("Liberty")
+        );
+    }
+
+    #[test]
+    fn drrp_falls_back_to_regex() {
+        assert_eq!(
+            reconcile_drrp(&s("Obligation"), &None, &None),
+            s("Obligation")
+        );
+    }
+
+    #[test]
+    fn drrp_all_none() {
+        assert_eq!(reconcile_drrp(&None, &None, &None), None);
+    }
 }

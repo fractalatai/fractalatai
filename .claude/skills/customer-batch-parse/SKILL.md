@@ -22,25 +22,45 @@ Run in order. Each step depends on the previous. Use `customer-stats` skill betw
 
 ### Step 0: Identify the batch from DuckDB queue
 
-Laws triaged as `making` or `uncertain` by sync watch have `enrichment_pending = true` in DuckDB. Use this to identify the batch rather than manually querying Postgres for gaps:
+Use **`triaged_at`** to identify a new batch. Sync-watch stamps every law with `triaged_at = CURRENT_TIMESTAMP` during triage, so laws from the same sync-watch run share a tight time window (typically a few minutes). Query by date to find the batch, then narrow by time window if needed to isolate one run from another on the same day.
 
 ```bash
 /usr/bin/python3 -c "
 import duckdb
 conn = duckdb.connect('data/fractalaw.duckdb', read_only=True)
+
+# Today's batch — group by triage result
+rows = conn.execute(\"\"\"
+    SELECT triage_classification, count(*),
+           min(triaged_at::VARCHAR)[:19] as first,
+           max(triaged_at::VARCHAR)[:19] as last
+    FROM legislation
+    WHERE triaged_at::DATE = CURRENT_DATE
+    GROUP BY triage_classification
+    ORDER BY count(*) DESC
+\"\"\").fetchall()
+
+total = 0
+print('=== TRIAGED TODAY ===')
+for r in rows:
+    print(f'  {r[0] or \"(null)\":15s} {r[1]:4d}  ({r[2]} to {r[3]})')
+    total += r[1]
+print(f'  Total: {total}')
+
+# Also show overall queue depth
 pending = conn.execute(\"SELECT count(*) FROM legislation WHERE enrichment_pending = true\").fetchone()[0]
-not_making = conn.execute(\"SELECT count(*) FROM legislation WHERE triage_classification = 'not_making'\").fetchone()[0]
-print(f'Queued for enrichment: {pending}')
-print(f'Triaged not_making: {not_making}')
+print(f'\nTotal enrichment queue (all batches): {pending}')
 conn.close()
 "
 ```
+
+> **Scoping to a batch**: All subsequent steps in this pipeline should filter by `triaged_at::DATE = CURRENT_DATE` (or a specific date/time window) to process only the current batch, not the entire enrichment queue. If multiple batches were triaged on the same day, narrow with `triaged_at BETWEEN '...' AND '...'` using the timestamps shown above.
 
 ### Step 0a: Remove LAT for not_making laws
 
 Laws triaged as `not_making` should have their LAT provisions removed from Postgres to prevent wasted enrichment. This was previously automatic but is now a manual authorised step.
 
-**Review the list before deleting.** Use DuckDB `is_amending` and `is_commencing` flags plus the title to identify obvious non-making candidates:
+**Review the list before deleting.** Scope to the current batch using `triaged_at`. Use DuckDB `is_amending` and `is_commencing` flags plus the title to identify obvious non-making candidates:
 
 ```bash
 /usr/bin/python3 -c "
@@ -51,6 +71,7 @@ rows = conn.execute(\"\"\"
            is_amending, is_commencing, is_making
     FROM legislation 
     WHERE triage_classification = 'not_making'
+      AND triaged_at::DATE = CURRENT_DATE
     ORDER BY is_amending DESC, is_commencing DESC, name
 \"\"\").fetchall()
 
@@ -85,11 +106,11 @@ conn.close()
 After review, delete from Postgres. **CASCADE FKs** on `legislation_text` automatically clean `provision_actors` and `fitness_mentions`:
 
 ```bash
-# Export law names from DuckDB, delete from Postgres (CASCADE handles child tables)
+# Export law names from DuckDB (scoped to current batch), delete from Postgres (CASCADE handles child tables)
 NOT_MAKING=$(/usr/bin/python3 -c "
 import duckdb
 conn = duckdb.connect('data/fractalaw.duckdb', read_only=True)
-rows = conn.execute(\"SELECT name FROM legislation WHERE triage_classification = 'not_making'\").fetchall()
+rows = conn.execute(\"SELECT name FROM legislation WHERE triage_classification = 'not_making' AND triaged_at::DATE = CURRENT_DATE\").fetchall()
 print(','.join(f\"'{r[0]}'\" for r in rows))
 conn.close()
 ")
@@ -268,42 +289,40 @@ Note the `pending_slm` count — this is the SLM workload. At ~0.3 actors/s, est
 
 ### Step 7: SLM (RunPod)
 
-Classify pending_slm actors via RunPod GPU. Both position and significance run on the same pod.
+Classify pending_slm actors via RunPod GPU. Position, significance, and fitness all run on the same pod.
 
-**See `/runpod-batch-inference` skill for pod setup, SSH tunnel, Ollama configuration, and known issues.**
+**See `/runpod-batch-inference` skill for pod setup, SSH tunnel, Ollama configuration, verification, and known issues.** Models and scripts persist on `/workspace` — no upload needed.
 
-#### Run position SLM
-
-```bash
-# Upload script + verify writes with --limit 10 first (see runpod-batch-inference skill)
-python3 -u /workspace/runpod_slm_batch.py --workers 8
-```
-
-~10 actors/s on RTX 4090. 10K actors ≈ 17 min.
-
-#### Run significance SLM
+All three scripts support `--laws` to scope to this batch. **Always pass `--laws`** — without it, the scripts process the entire global queue.
 
 ```bash
-# Load significance model:
-ollama create gemma3-significance -f /workspace/Modelfile.significance
-
-# Verify writes with --limit 10 first
-python3 -u /workspace/runpod_significance_batch.py --workers 4
+LAWS=$(cat data/sertantai/<customer>-applicable-laws.csv)
 ```
 
-~6 provisions/s on RTX 5090.
-
-#### Run fitness SLM
-
-Fitness extraction is an independent pipeline. See `/fitness-pipeline` skill for full details including pod setup, model loading, and verification.
+#### 7a. Position SLM
 
 ```bash
-# On RunPod — load fitness model and run batch
-ollama create gemma3-fitness -f /workspace/Modelfile.fitness
-python3 -u /workspace/scripts/runpod_fitness_batch.py --workers 4
+ollama create gemma3-position -f /workspace/models/drrp/Modelfile
+python3 -u /workspace/scripts/runpod_slm_batch.py --workers 8 --laws "$LAWS"
 ```
 
-~6 provisions/s on RTX 5090. Runs on all provisions (not gated by DRRP type). After batch completes, compile expression trees locally:
+#### 7b. Significance SLM
+
+```bash
+ollama create gemma3-significance -f /workspace/models/significance/Modelfile
+python3 -u /workspace/scripts/runpod_significance_batch.py --workers 4 --laws "$LAWS"
+```
+
+#### 7c. Fitness SLM
+
+See `/fitness-pipeline` skill for full details.
+
+```bash
+ollama create gemma3-fitness -f /workspace/models/fitness/Modelfile
+python3 -u /workspace/scripts/runpod_fitness_batch.py --workers 4 --laws "$LAWS"
+```
+
+After fitness completes, compile expression trees locally:
 
 ```bash
 cargo run -p fractalaw-cli -- fitness compile --laws "$(cat data/sertantai/<customer>-applicable-laws.csv)"
