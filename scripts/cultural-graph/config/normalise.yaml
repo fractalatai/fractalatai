@@ -1,0 +1,112 @@
+# Cultural graph edge type and entity type normalisation rules.
+# Used by ingest, load, and production inference pipelines.
+# Update this file when the model produces new hallucination patterns.
+
+# Canonical cultural edge types (12 active)
+valid_edge_types:
+  - shares-information-with
+  - monitors
+  - learns-from
+  - cooperates-with
+  - speaks-up-to
+  - recognises
+  - adapts-to
+  - responds-to-failure-of
+  - normalises
+  - directs
+  - cares-for
+  - protects
+  - operational
+
+# Canonical entity types (5P)
+valid_entity_types:
+  - People
+  - Plant
+  - Process
+  - Place
+  - Provision
+
+# Edge type normalisation map: hallucinated variant → canonical type
+edge_normalise:
+  # operational variants
+  operative: operational
+  "oper,ational": operational
+  "oper,ative": operational
+  "oper,operational": operational
+  operates: operational
+  operates-for: operational
+  operates-by: operational
+  operates-with: operational
+  transports: operational
+  contains: operational
+  processes: operational
+  replaces: operational
+  detects: operational
+  identifies: operational
+  plans: operational
+  references: operational
+  recommences: operational
+  "oper: providing resources for": operational
+  "oper, returns property to": operational
+
+  # shares-information-with variants
+  shares-information_with: shares-information-with
+  briefs: shares-information-with
+  advises: shares-information-with
+  exchanges-information-with: shares-information-with
+  attempts-to-contact: shares-information-with
+
+  # speaks-up-to variants
+  speaks-up-up: speaks-up-to
+  speaks-to: speaks-up-to
+  speaks-to-with-discrimination: speaks-up-to
+  speaks-to-with-inappropriateness: speaks-up-to
+  raises: speaks-up-to
+  stops: speaks-up-to
+  stops-work-in: speaks-up-to
+
+  # cooperates-with variants
+  cooperates_with: cooperates-with
+
+  # responds-to-failure-of variants
+  responds-failure-of: responds-to-failure-of
+  "responds-to, failure-of": responds-to-failure-of
+  responds-to-failure-of/learns-from: responds-to-failure-of
+  receives-failure-of: responds-to-failure-of
+  "oper,responds-to-failure-of": responds-to-failure-of
+  "oper, responds-to-failure-of": responds-to-failure-of
+  anticipates-failure-of: responds-to-failure-of
+
+  # normalises variants
+  "oper,normalises": normalises
+  pushes-through: normalises
+  conflicts-with: normalises
+  judges: normalises
+
+  # recognises variants
+  "oper,recognises": recognises
+
+  # adapts-to variants
+  "ad, adapts-to": adapts-to
+
+  # learns-from variants
+  learns-from/adapts-to: learns-from
+
+  # directs variants
+  directs/cares-for: directs
+  leads-by-example: directs
+  authorises: directs
+
+  # cares-for variants
+  offers-help-to: cares-for
+  offers-help-with: cares-for
+  apologises-to: cares-for
+
+# Entity type normalisation map: non-5P type → nearest 5P
+entity_normalise:
+  Animal: Plant
+  Chemical: Plant
+  Time: Process
+  Document: Process
+  Data: Process
+  Protect: Process

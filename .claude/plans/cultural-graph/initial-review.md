@@ -487,3 +487,72 @@ These map directly from the schema's Section 8, computed by the Graph Aggregator
 **Build the Reporting Data Extractor first.** It's a batch processor — simpler runtime, no conversational component, no real-time model inference during user interaction. It validates the core extraction pipeline (SLM + triad classifier + back-channel + hub sync) on known data. Once that works, the Culture Survey adds the conversational facilitation layer on top of the same extraction stack. Don't attempt both simultaneously.
 
 This slots into the fractalaw roadmap after Phase 3 (micro-app runtime) and overlaps with Phase 4 (distribution/sync), which is when the hub-edge data flow becomes operational.
+
+---
+
+## 10. Lessons from Implementation (July 2026)
+
+This section records what we learned during the first implementation cycle (sessions `07-29-26` through `07-31-26`). These findings update or override earlier assumptions in this document.
+
+### 10.1 One Model, Not Per-Source-Type Models
+
+**Original assumption (Section 6.3, Section 9):** Each report type (positive observations, hazards, near-misses, injuries) trains a separate SLM specialised in its narrative register.
+
+**What we found:** A single model trained on all four source types outperforms any single-source model. The PO-only model achieved F1=0.558; the combined 4-source model achieved F1=0.612. Per-source models are *worse* because rare edge types (normalises, cares-for, learns-from) only have enough examples when all sources are pooled.
+
+The edge types are the same across all sources — speaks-up-to is speaks-up-to whether in a positive observation or a near-miss. Source type is metadata on the output, not a model boundary. Per-source adapters are not needed.
+
+### 10.2 Revised Edge Type Schema
+
+**Original assumption (Section 5):** 14 cultural edge types.
+
+**Implemented schema:** 12 active cultural types + "operational" label.
+
+Changes from the original:
+- **Added:** `directs` (115 occurrences — authority/command, distinct from shares-information-with), `cares-for` (225 — welfare gestures, safety culture maturity indicator), `protects` (239 — proactive safeguarding)
+- **Shelved:** `defers-to-by-rank` — military-specific, only 8 instances across 1,200 contractor narratives. Retained in schema library for military organisation deployments.
+- **Still absent from reporter-authored sources:** `trusts` (inferred state, not extractable verb), `works-around`, `blames`, `silences` (these require investigation reports — different author perspective, see 10.5)
+- **Added:** `operational` as an explicit non-cultural label. 64% of extracted relationships are task actions (inspected, wore, cleaned) not interpersonal dynamics. The model must learn to distinguish these.
+
+### 10.3 Each Source Type Has a Signature Signal
+
+| Source | Signature edge type | Cultural signal |
+|--------|-------------------|----------------|
+| Positive observations | recognises (215) | What the organisation values |
+| Hazard reports | speaks-up-to (326) | How people identify and escalate risks |
+| Near-miss reports | directs (152) | How authority intervenes |
+| Injury reports | cares-for (145) | How people respond when someone is hurt |
+
+No single source captures the full cultural picture. The four sources form a complete cycle: recognition → challenge → intervention → care.
+
+### 10.4 Class Balancing Matters More Than Data Volume
+
+The most important training insight: oversampling rare edge types consistently outperforms adding more data. An unbalanced combined set (1,060 examples, 4 sources) scored F1=0.484. The same data balanced via oversampling to 6,292 examples scored F1=0.612. Class imbalance collapses rare types regardless of total data volume.
+
+### 10.5 Investigation Reports Are a Missing Source
+
+`blames` and `silences` remain absent across all four reporter-authored sources. This is not a schema problem — reporters culturally avoid blame in UK safety reporting. Investigation reports are written by investigators in third-person analytical language ("the supervisor failed to ensure", "the concern had been raised previously but not actioned"). This is a different author perspective that should surface blame and silence dynamics. Pending data source.
+
+### 10.6 Deployment Architecture: Two Paths
+
+**Original assumption (Section 2.2):** Edge SLM runs on site devices.
+
+**Revised:** Two deployment paths under consideration:
+
+- **Path A — Edge:** 32GB corporate laptop (Intel Core Ultra 5 135H). Qwen 3 8B via Ollama, Q4_K_M GGUF. Requires 16-bit retrain for clean GGUF merge (4-bit LoRA weights are lost during quantisation). Monthly batch processing of ~300 narratives in 2-4 hours. Potential IT blockers for Ollama installation on managed devices.
+- **Path B — Cloud:** RunPod GPU + self-hosted Baserow. Safety team uploads CSV to self-hosted Baserow (data sovereignty preserved), RunPod pod processes with 4-bit adapter (no GGUF needed), results pushed back. No model size constraint. Pragmatic stepping stone while edge deployment is negotiated with IT.
+
+Both paths use the same trained model (Qwen 3 8B); the difference is the deployment format (GGUF vs adapter).
+
+### 10.7 Training Data Summary
+
+| Metric | Value |
+|--------|-------|
+| Source types | 4 (positive obs, hazards, near-misses, injuries) |
+| Total narratives | 1,199 |
+| Cultural edges (Gemini silver labels) | 5,066 |
+| Active edge types | 12 |
+| Balanced training examples | 7,231 (incl. 200 negatives, 154 LLM-augmented) |
+| Test examples | 139 |
+| Best model | Qwen 3 8B, balanced combined v2, F1=0.581 (v1 F1=0.612) |
+| Models tested | Qwen 3 8B, Qwen 2.5 7B, Llama 3.1 8B |
