@@ -29,6 +29,7 @@ from datetime import datetime
 from pathlib import Path
 
 import duckdb
+from scipy.stats import chi2, linregress, norm
 
 DUCKDB_PATH = Path("data/cultural-graph.duckdb")
 OUTPUT_DIR = Path("data/qq/cultural-graph/outputs/reports")
@@ -57,6 +58,192 @@ FLAG_HIGH = 1.3
 
 def get_connection():
     return duckdb.connect(str(DUCKDB_PATH), read_only=True)
+
+
+def smr_poisson_ci(observed, expected, phi=1.0, alpha=0.05):
+    """Quasi-Poisson confidence interval for SMR = observed/expected.
+
+    When phi > 1 (overdispersion), the Poisson CI is inflated by sqrt(phi).
+    This is the standard quasi-Poisson correction used in epidemiology.
+    """
+    if expected <= 0:
+        return (float('nan'), float('nan'), float('nan'))
+    smr = observed / expected
+    if observed == 0:
+        p_lo = 0.0
+        p_hi = chi2.ppf(1 - alpha / 2, 2) / (2 * expected)
+    else:
+        p_lo = chi2.ppf(alpha / 2, 2 * observed) / (2 * expected)
+        p_hi = chi2.ppf(1 - alpha / 2, 2 * (observed + 1)) / (2 * expected)
+    # Inflate CI by sqrt(phi) for quasi-Poisson correction
+    if phi > 1.0:
+        hw = (p_hi - p_lo) / 2 * (phi ** 0.5)
+        lo = max(0, smr - hw)
+        hi = smr + hw
+    else:
+        lo, hi = p_lo, p_hi
+    return (smr, lo, hi)
+
+
+def compute_overdispersion(con, composites_sql, narr_filter="", fy_filter=""):
+    """Compute Pearson overdispersion factor (phi) per composite.
+
+    phi = Pearson chi2 / df from a Poisson model with report_type as sole covariate.
+    phi > 1 indicates overdispersion; Poisson CIs should be inflated by sqrt(phi).
+    """
+    import numpy as np
+
+    comp_keys = ["voice", "leadership", "drift", "care", "growth"]
+    comp_tuples = [VOICE, LEADERSHIP, DRIFT, CARE, GROWTH]
+    phis = {}
+
+    for key, types in zip(comp_keys, comp_tuples):
+        cells = con.execute(f"""
+            SELECT n.site, n.report_type, COUNT(*) AS n_narr,
+                COUNT(*) FILTER (e.edge_type IN {types}) AS observed
+            FROM narratives n
+            LEFT JOIN edges e ON e.narrative_id = n.id AND e.is_cultural
+            {"WHERE " + narr_filter.lstrip("WHERE ").lstrip("AND ") if narr_filter else ""}
+            GROUP BY n.site, n.report_type
+            HAVING COUNT(*) >= 3
+        """).fetchdf()
+
+        rt_rates = {}
+        for rt, grp in cells.groupby("report_type"):
+            total_obs = grp["observed"].sum()
+            total_n = grp["n_narr"].sum()
+            rt_rates[rt] = total_obs / total_n if total_n > 0 else 0
+
+        chi2_val = 0.0
+        for _, row in cells.iterrows():
+            fitted = row["n_narr"] * rt_rates.get(row["report_type"], 0)
+            if fitted > 0:
+                chi2_val += (row["observed"] - fitted) ** 2 / fitted
+
+        df = len(cells) - len(rt_rates)
+        phis[key] = chi2_val / df if df > 0 else 1.0
+
+    return phis
+
+
+def apply_fdr(site_cis, composites, alpha=0.05):
+    """Apply Benjamini-Hochberg FDR correction to SMR significance tests.
+
+    Converts quasi-Poisson CIs to z-scores and p-values, then applies BH-FDR.
+    Returns {site: [flag_strings]} for sites that remain significant.
+    """
+    import numpy as np
+
+    tests = []
+    for site, cis in site_cis.items():
+        for c in composites:
+            ci = cis.get(c)
+            if ci:
+                smr, lo, hi = ci[0], ci[1], ci[2]
+                ci_width = hi - lo
+                se = ci_width / (2 * 1.96) if ci_width > 0 else 0
+                if se > 0 and not np.isnan(smr):
+                    z = abs(smr - 1.0) / se
+                    p = 2 * (1 - norm.cdf(z))
+                else:
+                    p = 1.0
+                tests.append((site, c, smr, p))
+
+    if not tests:
+        return {}
+
+    # Benjamini-Hochberg procedure
+    pvals = np.array([t[3] for t in tests])
+    n = len(pvals)
+    sorted_idx = np.argsort(pvals)
+    thresholds = (np.arange(1, n + 1) / n) * alpha
+    rejected = np.zeros(n, dtype=bool)
+    below = pvals[sorted_idx] <= thresholds
+    if below.any():
+        max_k = int(np.max(np.where(below)))
+        rejected[sorted_idx[: max_k + 1]] = True
+
+    fdr_flags = {}
+    for i, (site, c, smr, p) in enumerate(tests):
+        if rejected[i]:
+            direction = "HIGH" if smr > 1.0 else "LOW"
+            fdr_flags.setdefault(site, []).append(f"{c}:{direction}")
+
+    return fdr_flags
+
+
+def compute_temporal_trends(con, narr_filter="", min_years=3, min_n_per_year=5):
+    """Compute per-site year-on-year trends via OLS, with BH-FDR correction.
+
+    Returns list of significant trends: [(site, composite, slope, p_adj, n_years, direction)]
+    sorted by absolute slope descending.
+    """
+    import numpy as np
+
+    site_fy = con.execute(f"""
+        WITH sfy AS (
+            SELECT site, fy, COUNT(*) AS n_narr
+            FROM narratives {narr_filter}
+            GROUP BY site, fy
+            HAVING COUNT(*) >= {min_n_per_year}
+        ),
+        sfy_edges AS (
+            SELECT n.site, n.fy,
+                COUNT(*) FILTER (e.edge_type IN {VOICE}) AS voice_e,
+                COUNT(*) FILTER (e.edge_type IN {LEADERSHIP}) AS leadership_e,
+                COUNT(*) FILTER (e.edge_type IN {DRIFT}) AS drift_e,
+                COUNT(*) FILTER (e.edge_type IN {CARE}) AS care_e,
+                COUNT(*) FILTER (e.edge_type IN {GROWTH}) AS growth_e
+            FROM narratives n
+            JOIN edges e ON e.narrative_id = n.id
+            WHERE e.is_cultural = true
+            GROUP BY n.site, n.fy
+        )
+        SELECT s.site, s.fy, s.n_narr,
+            COALESCE(se.voice_e, 0)::FLOAT / s.n_narr AS voice,
+            COALESCE(se.leadership_e, 0)::FLOAT / s.n_narr AS leadership,
+            COALESCE(se.drift_e, 0)::FLOAT / s.n_narr AS drift,
+            COALESCE(se.care_e, 0)::FLOAT / s.n_narr AS care,
+            COALESCE(se.growth_e, 0)::FLOAT / s.n_narr AS growth
+        FROM sfy s
+        LEFT JOIN sfy_edges se ON s.site = se.site AND s.fy = se.fy
+        ORDER BY s.site, s.fy
+    """).fetchdf()
+
+    composites = ["voice", "leadership", "drift", "care", "growth"]
+    all_trends = []
+
+    for site, grp in site_fy.groupby("site"):
+        if len(grp) < min_years:
+            continue
+        fys = grp["fy"].values.astype(float)
+        for c in composites:
+            rates = grp[c].values.astype(float)
+            result = linregress(fys, rates)
+            all_trends.append((site, c, result.slope, result.pvalue, len(grp)))
+
+    if not all_trends:
+        return []
+
+    # BH-FDR correction
+    pvals = np.array([t[3] for t in all_trends])
+    n = len(pvals)
+    sorted_idx = np.argsort(pvals)
+    thresholds = (np.arange(1, n + 1) / n) * 0.05
+    rejected = np.zeros(n, dtype=bool)
+    below = pvals[sorted_idx] <= thresholds
+    if below.any():
+        max_k = int(np.max(np.where(below)))
+        rejected[sorted_idx[: max_k + 1]] = True
+
+    sig = []
+    for i, (site, c, slope, p, n_years) in enumerate(all_trends):
+        if rejected[i]:
+            direction = "rising" if slope > 0 else "falling"
+            sig.append((site, c, slope, p, n_years, direction))
+
+    sig.sort(key=lambda x: abs(x[2]), reverse=True)
+    return sig
 
 
 def generate_template(con, fy=None, report_type=None, raw=False):
@@ -153,8 +340,10 @@ def generate_template(con, fy=None, report_type=None, raw=False):
     avgs = dict(zip(["voice", "leadership", "drift", "care", "growth"], org_avg))
     composites = ["voice", "leadership", "drift", "care", "growth"]
 
-    # Report-type adjustment: compute expected rate per site from report type mix,
-    # then replace dashboard values with residuals (observed - expected)
+    # Report-type adjustment: compute SMR (observed/expected) per site, with Poisson CIs.
+    # SMR = 1.0 means site is exactly as expected given its report type mix.
+    # site_cis stores {site: {composite: (smr, ci_lo, ci_hi)}} for flagging.
+    site_cis = {}
     if adjusted:
         baselines = con.execute(f"""
             WITH rt_narr AS (
@@ -194,19 +383,29 @@ def generate_template(con, fy=None, report_type=None, raw=False):
                 c: float(bl_row[f"{c}_bl"]) for c in composites
             }
 
-        # Upcast to float64 so residuals can be stored back
+        # Compute overdispersion factors (quasi-Poisson correction)
+        phis = compute_overdispersion(con, composites, narr_filter, fy_filter)
+
         for c in composites:
             dashboard[c] = dashboard[c].astype(float)
 
         for idx, row in dashboard.iterrows():
-            site_data = site_rt[site_rt["site"] == row["site"]]
+            site = row["site"]
+            n = float(row["n"])
+            site_data = site_rt[site_rt["site"] == site]
             site_total = site_data["n"].sum()
+            cis = {}
             for c in composites:
-                expected = sum(
+                observed = round(float(row[c]) * n)
+                expected_rate = sum(
                     (sr["n"] / site_total) * bl_lookup.get(sr["report_type"], {}).get(c, 0.0)
                     for _, sr in site_data.iterrows()
                 )
-                dashboard.at[idx, c] = round(row[c] - expected, 2)
+                expected = expected_rate * n
+                smr, lo, hi = smr_poisson_ci(observed, expected, phi=phis.get(c, 1.0))
+                dashboard.at[idx, c] = round(smr, 2)
+                cis[c] = (smr, lo, hi, observed, expected)
+            site_cis[site] = cis
 
     # Temporal trajectory — rates per narrative by FY (filtered by report_type but not fy)
     temporal = con.execute(f"""
@@ -238,17 +437,16 @@ def generate_template(con, fy=None, report_type=None, raw=False):
 
     # Flag outlier sites
     if adjusted:
-        # For adjusted rates, flag based on magnitude of residual vs 30% of org avg
+        # BH-FDR correction across all site×composite tests
+        fdr_flags = apply_fdr(site_cis, composites)
+
         def flag(row):
-            flags = []
-            for name in composites:
-                threshold = avgs[name] * 0.3
-                if threshold > 0:
-                    if row[name] < -threshold:
-                        flags.append(f"{name}:LOW")
-                    elif row[name] > threshold:
-                        flags.append(f"{name}:HIGH")
-            return flags
+            return fdr_flags.get(row["site"], [])
+
+        sig_high_drift = {s for s, flags in fdr_flags.items() if "drift:HIGH" in flags}
+        sig_low_voice = {s for s, flags in fdr_flags.items() if "voice:LOW" in flags}
+        high_drift = dashboard[dashboard["site"].isin(sig_high_drift)].sort_values("drift", ascending=False)
+        low_voice = dashboard[dashboard["site"].isin(sig_low_voice)].sort_values("voice")
     else:
         def flag(row):
             flags = []
@@ -261,8 +459,8 @@ def generate_template(con, fy=None, report_type=None, raw=False):
                         flags.append(f"{name}:HIGH")
             return flags
 
-    high_drift = dashboard[dashboard["drift"] > (avgs["drift"] * 0.3 if adjusted else avg_drift * FLAG_HIGH)].sort_values("drift", ascending=False)
-    low_voice = dashboard[dashboard["voice"] < (-avgs["voice"] * 0.3 if adjusted else avg_voice * FLAG_LOW)].sort_values("voice")
+        high_drift = dashboard[dashboard["drift"] > avg_drift * FLAG_HIGH].sort_values("drift", ascending=False)
+        low_voice = dashboard[dashboard["voice"] < avg_voice * FLAG_LOW].sort_values("voice")
 
     # Build report
     report = []
@@ -279,13 +477,13 @@ def generate_template(con, fy=None, report_type=None, raw=False):
 
     report.append("\n## Executive Dashboard")
     if adjusted:
-        report.append("\nReport-type-adjusted residuals per site (observed rate minus expected rate given report type mix).")
-        report.append("Positive = more than expected, negative = less. Flags at ±30% of org average rate:")
-        report.append(f"- **Voice** (baseline {avg_voice:.2f}) — communication signal vs expected")
-        report.append(f"- **Leadership** (baseline {avg_leadership:.2f}) — directing/overseeing vs expected")
-        report.append(f"- **Drift** (baseline {avg_drift:.2f}) — procedural bypass vs expected")
-        report.append(f"- **Care** (baseline {avg_care:.2f}) — failure response vs expected")
-        report.append(f"- **Growth** (baseline {avg_growth:.2f}) — learning signal vs expected")
+        report.append("\nStandardised ratios per site (observed / expected given report type mix).")
+        report.append("1.00 = as expected. Flagged at FDR<0.05 (Benjamini-Hochberg, quasi-Poisson):")
+        report.append(f"- **Voice** (baseline {avg_voice:.2f}/narr) — communication signal vs expected")
+        report.append(f"- **Leadership** (baseline {avg_leadership:.2f}/narr) — directing/overseeing vs expected")
+        report.append(f"- **Drift** (baseline {avg_drift:.2f}/narr) — procedural bypass vs expected")
+        report.append(f"- **Care** (baseline {avg_care:.2f}/narr) — failure response vs expected")
+        report.append(f"- **Growth** (baseline {avg_growth:.2f}/narr) — learning signal vs expected")
     else:
         report.append("\nFive indicators per site — cultural edges per narrative, compared to org average:")
         report.append(f"- **Voice** ({avg_voice:.2f}) — are people communicating?")
@@ -295,14 +493,13 @@ def generate_template(con, fy=None, report_type=None, raw=False):
         report.append(f"- **Growth** ({avg_growth:.2f}) — is the site building on what it learns?")
     report.append("\n| Site | N | Voice | Leadership | Drift | Care | Growth |")
     report.append("|------|---|-------|------------|-------|------|--------|")
-    fmt = "+.2f" if adjusted else ".2f"
     for _, row in dashboard.iterrows():
         site_flags = flag(row)
         flag_str = f" **{', '.join(site_flags)}**" if site_flags else ""
         report.append(
-            f"| {row['site']} | {row['n']:.0f} | {row['voice']:{fmt}} | "
-            f"{row['leadership']:{fmt}} | {row['drift']:{fmt}} | "
-            f"{row['care']:{fmt}} | {row['growth']:{fmt}} |{flag_str}"
+            f"| {row['site']} | {row['n']:.0f} | {row['voice']:.2f} | "
+            f"{row['leadership']:.2f} | {row['drift']:.2f} | "
+            f"{row['care']:.2f} | {row['growth']:.2f} |{flag_str}"
         )
 
     report.append("\n## Sites to Watch")
@@ -311,9 +508,11 @@ def generate_template(con, fy=None, report_type=None, raw=False):
         for _, row in high_drift.head(2).iterrows():
             watch_count += 1
             if adjusted:
+                ci = site_cis.get(row["site"], {}).get("drift", (0, 0, 0))
                 report.append(
-                    f"\n{watch_count}. **{row['site']}** — Drift adjusted {row['drift']:+.2f} "
-                    f"(genuine excess after controlling for report type mix)."
+                    f"\n{watch_count}. **{row['site']}** — Drift SMR {row['drift']:.2f} "
+                    f"(95% CI: {ci[1]:.2f}–{ci[2]:.2f}). "
+                    f"Statistically significant excess after controlling for report type mix."
                 )
             else:
                 report.append(
@@ -324,15 +523,36 @@ def generate_template(con, fy=None, report_type=None, raw=False):
         for _, row in low_voice.head(1).iterrows():
             watch_count += 1
             if adjusted:
+                ci = site_cis.get(row["site"], {}).get("voice", (0, 0, 0))
                 report.append(
-                    f"\n{watch_count}. **{row['site']}** — Voice adjusted {row['voice']:+.2f} "
-                    f"(genuine deficit after controlling for report type mix)."
+                    f"\n{watch_count}. **{row['site']}** — Voice SMR {row['voice']:.2f} "
+                    f"(95% CI: {ci[1]:.2f}–{ci[2]:.2f}). "
+                    f"Statistically significant deficit after controlling for report type mix."
                 )
             else:
                 report.append(
                     f"\n{watch_count}. **{row['site']}** — Voice at {row['voice']:.2f} "
                     f"(org avg {avg_voice:.2f}). Low communication signal."
                 )
+
+    # Temporal trends — per-site OLS slopes (only when not filtering to single FY)
+    if not fy:
+        trends = compute_temporal_trends(con, narr_filter)
+        if trends:
+            report.append("\n## Temporal Trends")
+            report.append("\nSites with statistically significant year-on-year trends "
+                          "(OLS slope, FDR<0.05):")
+            report.append("\n| Site | Indicator | Slope/yr | Years | Direction |")
+            report.append("|------|-----------|----------|-------|-----------|")
+            for site, c, slope, p, n_years, direction in trends:
+                arrow = "\u2191" if direction == "rising" else "\u2193"
+                report.append(
+                    f"| {site} | {c.capitalize()} | {slope:+.3f} | {n_years} | "
+                    f"{arrow} {direction} |"
+                )
+        else:
+            report.append("\n## Temporal Trends")
+            report.append("\nNo statistically significant site-level trends detected (FDR<0.05).")
 
     report.append("\n## Temporal Trajectory")
     report.append("\nRates per narrative by financial year:")
@@ -347,14 +567,15 @@ def generate_template(con, fy=None, report_type=None, raw=False):
 
     report.append("\n---")
     if adjusted:
-        report.append(f"\n*Report generated from {DUCKDB_PATH}. Values = adjusted residuals "
-                      f"(observed rate minus expected rate given report type mix). "
+        report.append(f"\n*Report generated from {DUCKDB_PATH}. Values = standardised ratios "
+                      f"(observed / expected given report type mix). Flagged at FDR<0.05 "
+                      f"(Benjamini-Hochberg, quasi-Poisson CIs). "
                       f"Cultural relationships extracted by Qwen 3 8B fine-tuned model.*")
     else:
         report.append(f"\n*Report generated from {DUCKDB_PATH}. Rates = cultural edges per narrative. "
                       f"Cultural relationships extracted by Qwen 3 8B fine-tuned model.*")
 
-    return "\n".join(report)
+    return "\n".join(report), site_cis
 
 
 def generate_csv(con, output_path):
@@ -423,6 +644,93 @@ def generate_csv(con, output_path):
     df.to_csv(output_path, index=False)
     print(f"CSV export: {output_path} ({len(df)} rows)")
     return df
+
+
+def generate_funnel(site_cis, output_dir, phis=None):
+    """Generate funnel plots — SMR vs expected count with 95%/99.8% control limits.
+
+    Standard NHS-style funnel: sites within the funnel are consistent with chance
+    variation; sites outside have statistically significant deviation from expected.
+    When phis is provided, control limits are widened by sqrt(phi) per composite.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    composites = ["voice", "leadership", "drift", "care", "growth"]
+    titles = ["Voice", "Leadership", "Drift", "Care", "Growth"]
+    if phis is None:
+        phis = {c: 1.0 for c in composites}
+
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+    axes = axes.flatten()
+
+    for i, (c, title) in enumerate(zip(composites, titles)):
+        ax = axes[i]
+        phi = phis.get(c, 1.0)
+        phi_sqrt = phi ** 0.5
+        es, smrs, labels = [], [], []
+        for site, cis in site_cis.items():
+            ci = cis.get(c)
+            if ci and ci[4] > 0 and not np.isnan(ci[0]):
+                es.append(ci[4])       # expected count
+                smrs.append(ci[0])     # SMR
+                labels.append(site)
+
+        es = np.array(es)
+        smrs = np.array(smrs)
+
+        # Funnel curves (quasi-Poisson: SMR ≈ 1 ± z·√φ/√E)
+        e_range = np.linspace(max(1, es.min() * 0.8), es.max() * 1.1, 300)
+        upper_95 = 1 + 1.96 * phi_sqrt / np.sqrt(e_range)
+        lower_95 = np.maximum(0, 1 - 1.96 * phi_sqrt / np.sqrt(e_range))
+        upper_998 = 1 + 3.09 * phi_sqrt / np.sqrt(e_range)
+        lower_998 = np.maximum(0, 1 - 3.09 * phi_sqrt / np.sqrt(e_range))
+
+        ax.fill_between(e_range, lower_998, upper_998, alpha=0.08, color="steelblue")
+        ax.fill_between(e_range, lower_95, upper_95, alpha=0.15, color="steelblue")
+        ax.plot(e_range, upper_95, color="steelblue", linewidth=0.8, linestyle="--")
+        ax.plot(e_range, lower_95, color="steelblue", linewidth=0.8, linestyle="--")
+        ax.plot(e_range, upper_998, color="steelblue", linewidth=0.5, linestyle=":")
+        ax.plot(e_range, lower_998, color="steelblue", linewidth=0.5, linestyle=":")
+        ax.axhline(y=1.0, color="grey", linestyle="-", linewidth=0.8)
+
+        # Plot sites — red if outside 95% funnel, blue if inside
+        for j in range(len(es)):
+            ul = 1 + 1.96 * phi_sqrt / np.sqrt(es[j])
+            ll = max(0, 1 - 1.96 * phi_sqrt / np.sqrt(es[j]))
+            outside = smrs[j] > ul or smrs[j] < ll
+            color = "red" if outside else "steelblue"
+            alpha = 0.9 if outside else 0.5
+            ax.scatter(es[j], smrs[j], c=color, s=18, alpha=alpha, zorder=5, edgecolors="none")
+            if outside:
+                short = labels[j].split(" ")[-1] if " " in labels[j] else labels[j]
+                ax.annotate(short, (es[j], smrs[j]), fontsize=5.5,
+                            ha="left", va="bottom", xytext=(3, 3),
+                            textcoords="offset points", color="red")
+
+        phi_label = f" (φ={phi:.1f})" if phi > 1.05 else ""
+        ax.set_title(f"{title}{phi_label}", fontweight="bold", fontsize=11)
+        ax.set_xlabel("Expected count", fontsize=9)
+        ax.set_ylabel("SMR", fontsize=9)
+        ax.set_ylim(bottom=0)
+        ax.tick_params(labelsize=8)
+
+    # Hide 6th subplot
+    ax6 = axes[5]
+    ax6.set_visible(False)
+
+    fig.suptitle("Cultural Graph — Funnel Plots (SMR vs Expected Count, quasi-Poisson)",
+                 fontweight="bold", fontsize=13)
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / "funnel-plots.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Funnel plots: {out_path}")
+    return out_path
 
 
 def generate_monthly_tracker(con, report_type=None, raw=False):
@@ -552,6 +860,8 @@ def generate_monthly_tracker(con, report_type=None, raw=False):
     """).fetchdf()
 
     # Report-type adjustment for flags (default when aggregating across types)
+    # Uses SMR (observed/expected) with Poisson CIs — flag when CI excludes 1.0
+    site_cis = {}
     if adjusted:
         baselines = con.execute(f"""
             WITH rt_narr AS (
@@ -591,32 +901,38 @@ def generate_monthly_tracker(con, report_type=None, raw=False):
                 c: float(bl_row[f"{c}_bl"]) for c in composites
             }
 
+        phis = compute_overdispersion(con, composites, narr_filter, join_filter)
+
         for c in composites:
             dashboard[c] = dashboard[c].astype(float)
 
         for idx, row in dashboard.iterrows():
-            site_data = site_rt[site_rt["site"] == row["site"]]
+            site = row["site"]
+            n = float(row["n"])
+            site_data = site_rt[site_rt["site"] == site]
             site_total = site_data["n"].sum()
+            cis = {}
             for c in composites:
-                expected = sum(
+                observed = round(float(row[c]) * n)
+                expected_rate = sum(
                     (sr["n"] / site_total) * bl_lookup.get(sr["report_type"], {}).get(c, 0.0)
                     for _, sr in site_data.iterrows()
                 )
-                dashboard.at[idx, c] = round(float(row[c]) - expected, 2)
+                expected = expected_rate * n
+                smr, lo, hi = smr_poisson_ci(observed, expected, phi=phis.get(c, 1.0))
+                dashboard.at[idx, c] = round(smr, 2)
+                cis[c] = (smr, lo, hi, observed, expected)
+            site_cis[site] = cis
 
     # Compute current flags
     current_flags = {}
-    for _, row in dashboard.iterrows():
-        flags = []
-        if adjusted:
-            for name in composites:
-                threshold = avgs[name] * 0.3
-                if threshold > 0:
-                    if row[name] < -threshold:
-                        flags.append(f"{name}:LOW")
-                    elif row[name] > threshold:
-                        flags.append(f"{name}:HIGH")
-        else:
+    if adjusted:
+        fdr_flags = apply_fdr(site_cis, composites)
+        for site, flags in fdr_flags.items():
+            current_flags[site] = flags
+    else:
+        for _, row in dashboard.iterrows():
+            flags = []
             for name in composites:
                 avg = avgs[name]
                 if avg > 0:
@@ -624,8 +940,8 @@ def generate_monthly_tracker(con, report_type=None, raw=False):
                         flags.append(f"{name}:LOW")
                     elif row[name] > avg * FLAG_HIGH:
                         flags.append(f"{name}:HIGH")
-        if flags:
-            current_flags[row["site"]] = flags
+            if flags:
+                current_flags[row["site"]] = flags
 
     # Detect flag changes against previous state
     flag_changes = []
@@ -733,17 +1049,25 @@ def main():
     parser.add_argument("--report-type", help="Filter to specific report type (e.g. 'Hazard & Observations')")
     parser.add_argument("--raw", action="store_true",
                         help="Unadjusted blended rates (default adjusts for report type mix)")
+    parser.add_argument("--funnel", action="store_true",
+                        help="Generate funnel plots (PNG) from adjusted SMR data")
     parser.add_argument("--output", help="Output file path (default: auto-named)")
     args = parser.parse_args()
 
-    if not args.template and not args.csv and not args.monthly_tracker:
-        parser.error("Specify --template, --csv, or --monthly-tracker")
+    if not args.template and not args.csv and not args.monthly_tracker and not args.funnel:
+        parser.error("Specify --template, --csv, --monthly-tracker, or --funnel")
+
+    if args.funnel and args.raw:
+        parser.error("--funnel requires adjusted SMR data (incompatible with --raw)")
 
     con = get_connection()
 
+    # Generate template first if needed (funnel needs its site_cis output)
+    site_cis = {}
+    if args.template or args.funnel:
+        report, site_cis = generate_template(con, fy=args.fy, report_type=args.report_type,
+                                              raw=args.raw)
     if args.template:
-        report = generate_template(con, fy=args.fy, report_type=args.report_type,
-                                    raw=args.raw)
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         if args.output:
             out_path = Path(args.output)
@@ -759,6 +1083,12 @@ def main():
             out_path = OUTPUT_DIR / f"cultural-graph-report{suffix}.md"
         out_path.write_text(report)
         print(f"Report: {out_path}")
+
+    if args.funnel:
+        if not site_cis:
+            parser.error("--funnel requires adjusted SMR data (no site_cis computed — check flags)")
+        phis = compute_overdispersion(con, ["voice", "leadership", "drift", "care", "growth"])
+        generate_funnel(site_cis, OUTPUT_DIR, phis=phis)
 
     if args.csv:
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

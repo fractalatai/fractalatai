@@ -60,25 +60,33 @@ Standard Voice/Drift/Care dashboard, "Sites to Watch", temporal trajectory.
 
 # Raw unadjusted — blended rates without controlling for report type mix
 /usr/bin/python3 scripts/cultural-graph/generate_report.py --template --raw
+
+# Funnel plots — NHS-style SMR vs expected count with control limits (PNG)
+/usr/bin/python3 scripts/cultural-graph/generate_report.py --funnel
+
+# Template + funnel in one run
+/usr/bin/python3 scripts/cultural-graph/generate_report.py --template --funnel
 ```
 
-Output: `data/qq/cultural-graph/outputs/reports/cultural-graph-report-{suffix}.md`
+Output: `data/qq/cultural-graph/outputs/reports/cultural-graph-report-{suffix}.md` and optionally `funnel-plots.png`
 
 The report auto-generates:
 - Overview stats (narratives, sites, cultural edges)
-- Executive dashboard with Voice/Leadership/Drift/Care/Growth per site, outliers flagged as **HIGH** or **LOW**
-- "Sites to Watch" — top outliers with one-sentence explanations
-- Temporal trajectory — composite trends by FY
+- Executive dashboard — SMR per site, flagged at FDR<0.05 (quasi-Poisson CIs, Benjamini-Hochberg)
+- "Sites to Watch" — top outliers with SMR and 95% CI
+- Temporal trends — sites with significant year-on-year slope (OLS, FDR-corrected)
+- Temporal trajectory — org-wide composite rates by FY
 
 #### Which view to use
 
 | View | Flag | Use case |
 |------|------|----------|
-| **Adjusted** | (default) | Cross-site comparison controlling for report type mix. Shows residuals (observed − expected). The correct default when aggregating across report types. |
-| **Per report type** | `--report-type "X"` | Site-level deep dives. Compares like with like (e.g. "how do our hazard reports compare?"). No adjustment needed — single type = no mix to control for. |
-| **Raw** | `--raw` | Unadjusted blended rates. Not recommended for cross-site comparison — confounded by report type mix (Growth differs 42x across report types). Useful for debugging or backward compatibility. |
+| **Adjusted** | (default) | Cross-site comparison. SMR (observed/expected) controlling for report type mix. Flagged at FDR<0.05 with quasi-Poisson CIs. |
+| **Per report type** | `--report-type "X"` | Site-level deep dives. Compares like with like. No adjustment needed — single type = no mix. |
+| **Raw** | `--raw` | Unadjusted blended rates with 30% threshold flags. Not recommended for cross-site comparison — confounded by report type mix. |
+| **Funnel** | `--funnel` | NHS-style funnel plot (PNG). Shows SMR vs expected count with 95%/99.8% control limits. Visually explains why small sites aren't flagged. |
 
-When `--report-type` is set, adjustment is skipped automatically (nothing to adjust for). `--raw` and `--report-type` can be combined but the result is the same as without `--raw`.
+When `--report-type` is set, adjustment is skipped automatically. `--funnel` requires adjusted data (incompatible with `--raw`).
 
 ### Part C: Bespoke analysis
 
@@ -130,7 +138,20 @@ Five composites covering all 12 cultural edge types, expressed as **rates per na
 | **Care** | cares-for + responds-to-failure + protects | ~0.53 | Does the site respond when things go wrong? |
 | **Growth** | learns-from + recognises | ~0.12 | Is the site building on what it learns? |
 
-Org average = population mean (total edges / total narratives). Flagging thresholds: LOW < avg×0.7, HIGH > avg×1.3 (30% deviation). Thresholds are dynamic, recomputed each run.
+Org average = population mean (total edges / total narratives).
+
+### Statistical methodology (default adjusted view)
+
+The default report uses **Standardised Morbidity Ratios (SMR)**: observed edge count / expected count given the site's report type mix. SMR = 1.0 means as expected; >1.0 = more; <1.0 = less.
+
+Three layers of statistical correction:
+1. **Indirect standardisation** — controls for report type mix (Growth differs 42x across report types)
+2. **Quasi-Poisson CIs** — corrects for overdispersion (variance > mean in edge counts; φ ranges 1.2–2.2 across composites)
+3. **Benjamini-Hochberg FDR** — corrects for multiple comparisons (5 composites × ~44 sites ≈ 220 tests)
+
+A site is flagged HIGH/LOW only when its FDR-adjusted p-value < 0.05. This replaced the original ad-hoc ±30% threshold and reduced false flags by ~49%.
+
+The report also includes **temporal trend analysis**: per-site OLS slope of raw rates over financial years, FDR-corrected. Sites with statistically significant trends are listed.
 
 Per-capita rates (edges per headcount) are computed downstream in PowerBI by joining headcount data against the CSV export.
 
@@ -141,7 +162,8 @@ Per-capita rates (edges per headcount) are computed downstream in PowerBI by joi
 | `scripts/cultural-graph/generate_report.py` | Report generation script |
 | `data/qq/cultural-graph/outputs/reports/monthly-tracker.md` | Append-only monthly scorecard |
 | `data/qq/cultural-graph/outputs/reports/.monthly-tracker-state.json` | Flag state for change detection |
-| `data/qq/cultural-graph/outputs/reports/` | Output directory for reports and CSVs |
+| `data/qq/cultural-graph/outputs/reports/funnel-plots.png` | Funnel plots (generated by `--funnel`) |
+| `data/qq/cultural-graph/outputs/reports/` | Output directory for reports, CSVs, and PNGs |
 | `data/cultural-graph.duckdb` | Source data |
 
 ## Notes
@@ -149,8 +171,9 @@ Per-capita rates (edges per headcount) are computed downstream in PowerBI by joi
 - Reports are generated from DuckDB, not from raw JSONL — always run `/cultural-graph-load` first
 - **Monthly workflow**: after each `/cultural-graph-load`, run `--monthly-tracker` to append the latest scorecard. This replaces manually updating the prose briefs each month.
 - The prose briefs (`site-cultural-profiles-brief.md`, `cultural-graph-executive-summary.md`) are static explainer documents — update only on structural changes (schema version, new edge types, methodology changes)
-- The templated report is designed for C-suite consumption — three numbers per site, traffic-light outlier flagging, one-sentence explanations
+- The templated report is designed for C-suite consumption — SMR ratios per site, statistically rigorous flagging, funnel plots for visual communication
 - The PowerBI CSV is one row per site-year-report_type combination — pivot/filter in PowerBI
 - Bespoke analysis uses DuckDB SQL directly — no script needed, just query
-- **Report type confound**: blended rates confound genuine cultural differences with report type mix (Growth differs 42x between Positive Observations and Injury reports). Use `--report-type` for like-with-like comparison or `--adjusted` for cross-site ranking that controls for report type mix. Analysis documented in `data/qq/cultural-graph/outputs/reports/monthly-tracker-options.md` (section "Report type confound — v0.3")
-- Design options for the tracker are documented in `data/qq/cultural-graph/outputs/reports/monthly-tracker-options.md`
+- **Report type confound**: blended rates confound genuine cultural differences with report type mix (Growth differs 42x between Positive Observations and Injury reports). The default view controls for this via SMR (indirect standardisation). Use `--report-type` for per-type deep dives, `--raw` for unadjusted view
+- **Funnel plots** (`--funnel`): the standard NHS/CQC visualisation for comparing institutional rates. Visually explains why small sites aren't flagged — the funnel is wide at low expected counts. Quasi-Poisson-corrected control limits (φ shown per composite)
+- Design options and statistical research documented in `.claude/plans/cultural-graph/monthly-tracker-options.md`
