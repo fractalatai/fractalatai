@@ -80,7 +80,7 @@ depends_on:
 
 enables:
   - Sertantai customer applicability matching (695 laws with compiled trees)
-  - Customer onboarding: "does this law apply to me?" answered from expression tree evaluation
+  - 'Customer onboarding: "does this law apply to me?" answered from expression tree evaluation'
   - Fitness data live in sertantai for all enriched laws
 ---
 
