@@ -597,10 +597,13 @@ def generate_template(con, fy=None, report_type=None, raw=False):
                             lo, hi = old[1], old[2]
                         site_cis[site][c] = (smr_shrunk, lo, hi, O, E)
 
-    # Temporal trajectory — rates per narrative by FY (filtered by report_type but not fy)
+    # Temporal trajectory — prevalence + intensity by FY (filtered by report_type but not fy)
     temporal = con.execute(f"""
         WITH fy_narr AS (
-            SELECT fy, COUNT(*) AS n_narr FROM narratives {temporal_narr_filter} GROUP BY fy
+            SELECT fy,
+                COUNT(*) AS n_narr,
+                COUNT(*) FILTER (cultural_edge_count > 0) AS n_signal
+            FROM narratives {temporal_narr_filter} GROUP BY fy
         ),
         fy_edges AS (
             SELECT n.fy,
@@ -611,15 +614,21 @@ def generate_template(con, fy=None, report_type=None, raw=False):
                 COUNT(*) FILTER (e.edge_type IN {GROWTH}) AS growth_e
             FROM narratives n
             JOIN edges e ON e.narrative_id = n.id
-            WHERE e.is_cultural = true {temporal_join_filter}
+            WHERE e.is_cultural = true AND n.cultural_edge_count > 0 {temporal_join_filter}
             GROUP BY n.fy
         )
         SELECT fn.fy, fn.n_narr AS narratives,
-            ROUND(COALESCE(fe.voice_e, 0)::FLOAT / fn.n_narr, 2) AS voice,
-            ROUND(COALESCE(fe.leadership_e, 0)::FLOAT / fn.n_narr, 2) AS leadership,
-            ROUND(COALESCE(fe.drift_e, 0)::FLOAT / fn.n_narr, 2) AS drift,
-            ROUND(COALESCE(fe.care_e, 0)::FLOAT / fn.n_narr, 2) AS care,
-            ROUND(COALESCE(fe.growth_e, 0)::FLOAT / fn.n_narr, 2) AS growth
+            ROUND(fn.n_signal::FLOAT / fn.n_narr * 100, 0) AS signal_pct,
+            CASE WHEN fn.n_signal > 0
+                THEN ROUND(COALESCE(fe.voice_e, 0)::FLOAT / fn.n_signal, 2) ELSE 0 END AS voice,
+            CASE WHEN fn.n_signal > 0
+                THEN ROUND(COALESCE(fe.leadership_e, 0)::FLOAT / fn.n_signal, 2) ELSE 0 END AS leadership,
+            CASE WHEN fn.n_signal > 0
+                THEN ROUND(COALESCE(fe.drift_e, 0)::FLOAT / fn.n_signal, 2) ELSE 0 END AS drift,
+            CASE WHEN fn.n_signal > 0
+                THEN ROUND(COALESCE(fe.care_e, 0)::FLOAT / fn.n_signal, 2) ELSE 0 END AS care,
+            CASE WHEN fn.n_signal > 0
+                THEN ROUND(COALESCE(fe.growth_e, 0)::FLOAT / fn.n_signal, 2) ELSE 0 END AS growth
         FROM fy_narr fn
         LEFT JOIN fy_edges fe ON fn.fy = fe.fy
         ORDER BY fn.fy
@@ -779,13 +788,13 @@ def generate_template(con, fy=None, report_type=None, raw=False):
             report.append("\nNo statistically significant site-level trends detected (FDR<0.05).")
 
     report.append("\n## Temporal Trajectory")
-    report.append("\nRates per narrative by financial year:")
-    report.append("\n| FY | N | Voice | Leadership | Drift | Care | Growth |")
-    report.append("|---|---|-------|------------|-------|------|--------|")
+    report.append("\nPrevalence and intensity (edges per signal-bearing narrative) by financial year:")
+    report.append("\n| FY | N | Signal % | Voice | Leadership | Drift | Care | Growth |")
+    report.append("|---|---|---------|-------|------------|-------|------|--------|")
     for _, row in temporal.iterrows():
         report.append(
-            f"| {row['fy']:.0f} | {row['narratives']:,.0f} | {row['voice']:.2f} | "
-            f"{row['leadership']:.2f} | {row['drift']:.2f} | "
+            f"| {row['fy']:.0f} | {row['narratives']:,.0f} | {row['signal_pct']:.0f}% | "
+            f"{row['voice']:.2f} | {row['leadership']:.2f} | {row['drift']:.2f} | "
             f"{row['care']:.2f} | {row['growth']:.2f} |"
         )
 
@@ -1478,10 +1487,13 @@ def generate_monthly_tracker(con, report_type=None, raw=False):
         ORDER BY sn.n_narr DESC
     """).fetchdf()
 
-    # Temporal trajectory — rates per narrative by FY
+    # Temporal trajectory — prevalence + intensity by FY
     temporal = con.execute(f"""
         WITH fy_narr AS (
-            SELECT fy, COUNT(*) AS n_narr FROM narratives {narr_filter} GROUP BY fy
+            SELECT fy,
+                COUNT(*) AS n_narr,
+                COUNT(*) FILTER (cultural_edge_count > 0) AS n_signal
+            FROM narratives {narr_filter} GROUP BY fy
         ),
         fy_edges AS (
             SELECT n.fy,
@@ -1492,15 +1504,21 @@ def generate_monthly_tracker(con, report_type=None, raw=False):
                 COUNT(*) FILTER (e.edge_type IN {GROWTH}) AS growth_e
             FROM narratives n
             JOIN edges e ON e.narrative_id = n.id
-            WHERE e.is_cultural = true {join_filter}
+            WHERE e.is_cultural = true AND n.cultural_edge_count > 0 {join_filter}
             GROUP BY n.fy
         )
         SELECT fn.fy, fn.n_narr AS narratives,
-            ROUND(COALESCE(fe.voice_e, 0)::FLOAT / fn.n_narr, 2) AS voice,
-            ROUND(COALESCE(fe.leadership_e, 0)::FLOAT / fn.n_narr, 2) AS leadership,
-            ROUND(COALESCE(fe.drift_e, 0)::FLOAT / fn.n_narr, 2) AS drift,
-            ROUND(COALESCE(fe.care_e, 0)::FLOAT / fn.n_narr, 2) AS care,
-            ROUND(COALESCE(fe.growth_e, 0)::FLOAT / fn.n_narr, 2) AS growth
+            ROUND(fn.n_signal::FLOAT / fn.n_narr * 100, 0) AS signal_pct,
+            CASE WHEN fn.n_signal > 0
+                THEN ROUND(COALESCE(fe.voice_e, 0)::FLOAT / fn.n_signal, 2) ELSE 0 END AS voice,
+            CASE WHEN fn.n_signal > 0
+                THEN ROUND(COALESCE(fe.leadership_e, 0)::FLOAT / fn.n_signal, 2) ELSE 0 END AS leadership,
+            CASE WHEN fn.n_signal > 0
+                THEN ROUND(COALESCE(fe.drift_e, 0)::FLOAT / fn.n_signal, 2) ELSE 0 END AS drift,
+            CASE WHEN fn.n_signal > 0
+                THEN ROUND(COALESCE(fe.care_e, 0)::FLOAT / fn.n_signal, 2) ELSE 0 END AS care,
+            CASE WHEN fn.n_signal > 0
+                THEN ROUND(COALESCE(fe.growth_e, 0)::FLOAT / fn.n_signal, 2) ELSE 0 END AS growth
         FROM fy_narr fn
         LEFT JOIN fy_edges fe ON fn.fy = fe.fy
         ORDER BY fn.fy
@@ -1658,13 +1676,13 @@ def generate_monthly_tracker(con, report_type=None, raw=False):
     entry.append("")
     entry.append("### Temporal Trajectory")
     entry.append("")
-    entry.append("| FY | N | Voice | Leadership | Drift | Care | Growth |")
-    entry.append("|---|---|-------|------------|-------|------|--------|")
+    entry.append("| FY | N | Signal % | Voice | Leadership | Drift | Care | Growth |")
+    entry.append("|---|---|---------|-------|------------|-------|------|--------|")
     for _, row in temporal.iterrows():
         entry.append(
-            f"| {row['fy']:.0f} | {row['narratives']:,.0f} | "
-            f"{row['voice']:.2f} | {row['leadership']:.2f} | "
-            f"{row['drift']:.2f} | {row['care']:.2f} | {row['growth']:.2f} |"
+            f"| {row['fy']:.0f} | {row['narratives']:,.0f} | {row['signal_pct']:.0f}% | "
+            f"{row['voice']:.2f} | {row['leadership']:.2f} | {row['drift']:.2f} | "
+            f"{row['care']:.2f} | {row['growth']:.2f} |"
         )
     entry.append("")
 

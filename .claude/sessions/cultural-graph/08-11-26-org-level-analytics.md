@@ -132,6 +132,7 @@ Org-level headline numbers (Voice 1.09, Leadership 0.33, etc.) were raw blended 
 - ✅ Standardise sector rates — prevalence + intensity per sector, equal-weighted by RT within each sector (N≥20 per sector×RT cell)
 - ✅ Add 95% CIs to aggregated prevalence and intensity — bootstrap across 7 report-type estimates (2000 resamples)
 - ✅ Add EB shrinkage perturbation to sensitivity analysis — EB ×0.5 and EB ×2.0, flags 89-100% stable
+- ✅ Update temporal trajectory to prevalence + intensity (was raw blended rates — inconsistent with org averages)
 - 🅿️ Equal-weighting vs inverse-variance weighting for report-type standardisation — Gemini prefers IV weighting; equal-weighting answers "rate across types" without volume dominance. Needs stakeholder input on which question to answer
 - 🅿️ N≥50 threshold excludes Occupational Illness (N=49, highest prevalence 80%) — consider lowering to 30 or pooling small-N types into "Other"
 - 🅿️ Drift monitoring: EWMA/CUSUM instead of simple z-score — correct but premature with only 2 batches
@@ -192,3 +193,7 @@ Bootstrap 95% CIs (2000 resamples across 7 eligible report types):
 Flags 89-100% stable under EB ×0.5 / ×2.0:
 - EB ×0.5 (half shrinkage): 40 flags (+4, −0) — weaker shrinkage lets marginal sites through
 - EB ×2.0 (double shrinkage): 32 flags (+0, −4) — stronger shrinkage absorbs more small-site noise
+
+### Temporal trajectory
+
+Updated template and monthly tracker temporal trajectory from raw blended rates to prevalence + intensity by FY. Signal % column added (ranges 54%–63% across FYs). Intensity numbers are now scoped to signal-bearing narratives, consistent with org-level headline metrics. All reports and both tracker variants (default + Hazard & Observations) regenerated.
