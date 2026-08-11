@@ -20,7 +20,7 @@ from pathlib import Path
 import requests
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
-TEST_PATH = Path("data/qq/cultural-graph/outputs/training/positive-observations-slm-test.jsonl")
+TEST_PATH = Path("data/qq/cultural-graph/training/positive-observations-slm-test.jsonl")
 
 CULTURAL_TYPES = {
     "shares-information-with", "monitors", "learns-from", "cooperates-with",

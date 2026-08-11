@@ -18,7 +18,7 @@ Usage:
     /usr/bin/python3 scripts/cultural-graph/generate_report.py --template
     /usr/bin/python3 scripts/cultural-graph/generate_report.py --template --fy 2027
     /usr/bin/python3 scripts/cultural-graph/generate_report.py --csv
-    /usr/bin/python3 scripts/cultural-graph/generate_report.py --csv --output data/qq/cultural-graph/exports/dashboard.csv
+    /usr/bin/python3 scripts/cultural-graph/generate_report.py --csv --output data/qq/cultural-graph/reports/dashboard.csv
     /usr/bin/python3 scripts/cultural-graph/generate_report.py --monthly-tracker
 """
 
@@ -32,7 +32,7 @@ import duckdb
 from scipy.stats import chi2, norm
 
 DUCKDB_PATH = Path("data/cultural-graph.duckdb")
-OUTPUT_DIR = Path("data/qq/cultural-graph/outputs/reports")
+OUTPUT_DIR = Path("data/qq/cultural-graph/reports")
 TRACKER_PATH = OUTPUT_DIR / "monthly-tracker.md"
 TRACKER_STATE_PATH = OUTPUT_DIR / ".monthly-tracker-state.json"
 

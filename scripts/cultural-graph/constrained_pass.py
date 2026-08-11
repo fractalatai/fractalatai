@@ -25,8 +25,8 @@ import requests
 GEMINI_MODEL = "gemini-2.5-flash"
 GEMINI_DELAY = 1.5  # seconds between calls (rate limit)
 DATA_DIR = Path("data/qq/cultural-graph")
-INPUT_CSV = DATA_DIR / "Positive_Observations_Redacted(ReportTable).csv"
-OUTPUT_DIR = DATA_DIR / "constrained"
+INPUT_CSV = DATA_DIR / "raw/Positive_Observations_Redacted(ReportTable).csv"
+OUTPUT_DIR = DATA_DIR / "archive/constrained"
 PROMPTS_DIR = Path("scripts/cultural-graph/prompts")
 
 VALID_EDGE_TYPES = {

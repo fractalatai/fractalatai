@@ -21,7 +21,7 @@ import pyarrow.parquet as pq
 
 warnings.filterwarnings("ignore")
 
-DATA_PATH = Path("data/qq/cultural-graph/outputs/training/classifier-voice-drift-care.parquet")
+DATA_PATH = Path("data/qq/cultural-graph/training/classifier-voice-drift-care.parquet")
 OUTPUT_DIR = Path("data/cultural-graph-models/classifier")
 ENCODER_MODEL = "all-MiniLM-L6-v2"  # 22MB, 384-dim
 

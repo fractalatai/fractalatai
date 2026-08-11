@@ -18,8 +18,8 @@ from pathlib import Path
 
 DATA_DIR = Path("data/qq/cultural-graph")
 CONSTRAINED_DIR = DATA_DIR / "constrained"
-INPUT_CSV = DATA_DIR / "Positive_Observations_Redacted(ReportTable).csv"
-OUTPUT_DIR = DATA_DIR / "outputs/training"
+INPUT_CSV = DATA_DIR / "raw/Positive_Observations_Redacted(ReportTable).csv"
+OUTPUT_DIR = DATA_DIR / "training"
 
 SYSTEM_INSTRUCTION = (
     "You are a safety culture analyst. Given a workplace safety narrative, "
