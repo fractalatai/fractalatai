@@ -60,6 +60,82 @@ def get_connection():
     return duckdb.connect(str(DUCKDB_PATH), read_only=True)
 
 
+def compute_standardised_averages(con, narr_filter="", fy_filter="", min_rt_n=50):
+    """Compute report-type-standardised org averages as prevalence + intensity.
+
+    Prevalence = proportion of narratives with any cultural edges (per RT, then
+    equal-weighted across RTs).
+    Intensity = edges per signal-bearing narrative (per RT, then equal-weighted).
+
+    Returns (prevalence, intensity_dict, rt_baselines_df) where:
+      - prevalence: float (standardised proportion, e.g. 0.57)
+      - intensity_dict: {composite: standardised rate among signal-bearing narratives}
+      - rt_baselines_df: per-report-type detail (n_narr, n_signal, prevalence,
+        and intensity per composite)
+    Only report types with >= min_rt_n narratives contribute to the averages.
+    """
+    composites = ["voice", "leadership", "drift", "care", "growth"]
+    rt_df = con.execute(f"""
+        WITH rt_narr AS (
+            SELECT report_type,
+                COUNT(*) AS n_narr,
+                COUNT(*) FILTER (cultural_edge_count > 0) AS n_signal
+            FROM narratives {narr_filter} GROUP BY report_type
+        ),
+        rt_edges AS (
+            SELECT n.report_type,
+                COUNT(*) FILTER (e.edge_type IN {VOICE}) AS voice_e,
+                COUNT(*) FILTER (e.edge_type IN {LEADERSHIP}) AS leadership_e,
+                COUNT(*) FILTER (e.edge_type IN {DRIFT}) AS drift_e,
+                COUNT(*) FILTER (e.edge_type IN {CARE}) AS care_e,
+                COUNT(*) FILTER (e.edge_type IN {GROWTH}) AS growth_e
+            FROM narratives n
+            JOIN edges e ON e.narrative_id = n.id
+            WHERE e.is_cultural = true AND n.cultural_edge_count > 0 {fy_filter}
+            GROUP BY n.report_type
+        )
+        SELECT rn.report_type, rn.n_narr, rn.n_signal,
+            ROUND(rn.n_signal::FLOAT / rn.n_narr, 3) AS prevalence,
+            CASE WHEN rn.n_signal > 0
+                THEN COALESCE(re.voice_e, 0)::FLOAT / rn.n_signal ELSE 0 END AS voice,
+            CASE WHEN rn.n_signal > 0
+                THEN COALESCE(re.leadership_e, 0)::FLOAT / rn.n_signal ELSE 0 END AS leadership,
+            CASE WHEN rn.n_signal > 0
+                THEN COALESCE(re.drift_e, 0)::FLOAT / rn.n_signal ELSE 0 END AS drift,
+            CASE WHEN rn.n_signal > 0
+                THEN COALESCE(re.care_e, 0)::FLOAT / rn.n_signal ELSE 0 END AS care,
+            CASE WHEN rn.n_signal > 0
+                THEN COALESCE(re.growth_e, 0)::FLOAT / rn.n_signal ELSE 0 END AS growth
+        FROM rt_narr rn
+        LEFT JOIN rt_edges re ON rn.report_type = re.report_type
+        ORDER BY rn.n_narr DESC
+    """).fetchdf()
+
+    eligible = rt_df[rt_df["n_narr"] >= min_rt_n]
+    prevalence = round(float(eligible["prevalence"].mean()), 2) if len(eligible) > 0 else 0.0
+    intensity = {}
+    for c in composites:
+        intensity[c] = round(float(eligible[c].mean()), 2) if len(eligible) > 0 else 0.0
+
+    # Bootstrap 95% CIs across report-type estimates
+    import numpy as np
+    cis = {}
+    n_boot = 2000
+    rng = np.random.default_rng(42)
+    if len(eligible) >= 3:
+        prev_vals = eligible["prevalence"].values.astype(float)
+        boot_prev = [np.mean(rng.choice(prev_vals, len(prev_vals))) for _ in range(n_boot)]
+        cis["prevalence"] = (round(float(np.percentile(boot_prev, 2.5)), 2),
+                             round(float(np.percentile(boot_prev, 97.5)), 2))
+        for c in composites:
+            c_vals = eligible[c].values.astype(float)
+            boot_c = [np.mean(rng.choice(c_vals, len(c_vals))) for _ in range(n_boot)]
+            cis[c] = (round(float(np.percentile(boot_c, 2.5)), 2),
+                      round(float(np.percentile(boot_c, 97.5)), 2))
+
+    return prevalence, intensity, rt_df, cis
+
+
 def smr_poisson_ci(observed, expected, phi=1.0, alpha=0.05):
     """Log-scale quasi-Poisson confidence interval for SMR = observed/expected.
 
@@ -420,22 +496,15 @@ def generate_template(con, fy=None, report_type=None, raw=False):
         ORDER BY sn.n_narr DESC
     """).fetchdf()
 
-    # Org averages — population mean (total edges / total narratives)
-    total_narr = stats[0]
-    org_avg = con.execute(f"""
-        SELECT
-            ROUND(COUNT(*) FILTER (e.edge_type IN {VOICE})::FLOAT / {total_narr}, 2),
-            ROUND(COUNT(*) FILTER (e.edge_type IN {LEADERSHIP})::FLOAT / {total_narr}, 2),
-            ROUND(COUNT(*) FILTER (e.edge_type IN {DRIFT})::FLOAT / {total_narr}, 2),
-            ROUND(COUNT(*) FILTER (e.edge_type IN {CARE})::FLOAT / {total_narr}, 2),
-            ROUND(COUNT(*) FILTER (e.edge_type IN {GROWTH})::FLOAT / {total_narr}, 2)
-        FROM narratives n
-        JOIN edges e ON e.narrative_id = n.id
-        WHERE e.is_cultural = true {fy_filter}
-    """).fetchone()
-    avg_voice, avg_leadership, avg_drift, avg_care, avg_growth = org_avg
-    avgs = dict(zip(["voice", "leadership", "drift", "care", "growth"], org_avg))
+    # Org averages — standardised prevalence + intensity (equal-weighted across report types, N≥50)
     composites = ["voice", "leadership", "drift", "care", "growth"]
+    prevalence, intensity, rt_baselines, org_cis = compute_standardised_averages(con, narr_filter, fy_filter)
+    avgs = intensity  # intensity is the per-composite dict used downstream
+    avg_voice = intensity["voice"]
+    avg_leadership = intensity["leadership"]
+    avg_drift = intensity["drift"]
+    avg_care = intensity["care"]
+    avg_growth = intensity["growth"]
 
     # Report-type adjustment: compute SMR (observed/expected) per site, with Poisson CIs.
     # SMR = 1.0 means site is exactly as expected given its report type mix.
@@ -596,16 +665,47 @@ def generate_template(con, fy=None, report_type=None, raw=False):
     report.append(f"| Cultural relationships | {cultural_edges:,} |")
     report.append(f"| Report types | {stats[2]} |")
 
+    report.append("\n## Org Averages")
+    report.append("\nStandardised across report types (equal-weighted, removing mix confound)."
+                  " 95% CIs from bootstrap across report types.")
+    if "prevalence" in org_cis:
+        prev_ci = org_cis["prevalence"]
+        report.append(f"\n**Prevalence**: {prevalence:.0%} of narratives contain cultural signal "
+                      f"(95% CI: {prev_ci[0]:.0%}–{prev_ci[1]:.0%})")
+    else:
+        report.append(f"\n**Prevalence**: {prevalence:.0%} of narratives contain cultural signal")
+    report.append(f"\n**Intensity** (edges per signal-bearing narrative):")
+    if org_cis:
+        ci_parts = []
+        for c, label in zip(composites, COMPOSITE_NAMES):
+            val = intensity[c]
+            if c in org_cis:
+                lo, hi = org_cis[c]
+                ci_parts.append(f"**{label} {val:.2f}** ({lo:.2f}–{hi:.2f})")
+            else:
+                ci_parts.append(f"**{label} {val:.2f}**")
+        report.append(f"\n> {' | '.join(ci_parts)}")
+    else:
+        report.append(f"\n> **Voice {avg_voice:.2f}** | **Leadership {avg_leadership:.2f}** "
+                      f"| **Drift {avg_drift:.2f}** | **Care {avg_care:.2f}** "
+                      f"| **Growth {avg_growth:.2f}**")
+    report.append("\nPer-report-type baselines:")
+    report.append("\n| Report Type | N | Signal % | Voice | Leadership | Drift | Care | Growth |")
+    report.append("|-------------|---|---------|-------|------------|-------|------|--------|")
+    for _, rt_row in rt_baselines.iterrows():
+        rt_name = rt_row["report_type"] if rt_row["report_type"] else "Unknown"
+        pct = rt_row["prevalence"] * 100
+        report.append(
+            f"| {rt_name} | {rt_row['n_narr']:,.0f} | {pct:.0f}% | "
+            f"{rt_row['voice']:.2f} | {rt_row['leadership']:.2f} | "
+            f"{rt_row['drift']:.2f} | {rt_row['care']:.2f} | {rt_row['growth']:.2f} |"
+        )
+
     report.append("\n## Executive Dashboard")
     if adjusted:
         report.append("\nStandardised ratios per site (observed / expected given report type mix).")
         report.append("Empirical Bayes shrinkage applied — small-site estimates pulled toward the org mean.")
-        report.append("1.00 = as expected. Flagged at FDR<0.05 (Benjamini-Hochberg, quasi-Poisson):")
-        report.append(f"- **Voice** (baseline {avg_voice:.2f}/narr) — communication signal vs expected")
-        report.append(f"- **Leadership** (baseline {avg_leadership:.2f}/narr) — directing/overseeing vs expected")
-        report.append(f"- **Drift** (baseline {avg_drift:.2f}/narr) — procedural bypass vs expected")
-        report.append(f"- **Care** (baseline {avg_care:.2f}/narr) — failure response vs expected")
-        report.append(f"- **Growth** (baseline {avg_growth:.2f}/narr) — learning signal vs expected")
+        report.append("1.00 = as expected. Flagged at FDR<0.05 (Benjamini-Hochberg, quasi-Poisson).")
     else:
         report.append("\nFive indicators per site — cultural edges per narrative, compared to org average:")
         report.append(f"- **Voice** ({avg_voice:.2f}) — are people communicating?")
@@ -692,7 +792,15 @@ def generate_template(con, fy=None, report_type=None, raw=False):
     # Power analysis — minimum detectable SMR per site size (adjusted view only)
     if adjusted:
         import math
-        baselines_avg = {c: float(avgs[c]) for c in composites}
+        # Power analysis needs all-narrative baselines (SMR denominator), not signal-only intensity
+        baselines_avg = {}
+        for c in composites:
+            eligible = rt_baselines[rt_baselines["n_narr"] >= 50]
+            if len(eligible) > 0:
+                # all-narrative rate = prevalence × intensity
+                baselines_avg[c] = float(eligible["prevalence"].mean() * eligible[c].mean())
+            else:
+                baselines_avg[c] = 0.5
         power = compute_power_analysis(phis, eb_params, baselines_avg)
         report.append("\n## Detectable Effect Sizes")
         report.append("\nMinimum SMR deviation detectable at each site size "
@@ -706,52 +814,73 @@ def generate_template(con, fy=None, report_type=None, raw=False):
                       f"{power[3][1]['voice'][0]:.2f} or above "
                       f"{power[3][1]['voice'][1]:.2f} are detectable.*")
 
-        # Sector confound analysis
-        sector_rates = con.execute("""
-            WITH sect_narr AS (
-                SELECT sector, COUNT(*) AS n_narr FROM narratives GROUP BY sector
+        # Sector confound analysis — standardised (prevalence + intensity per sector)
+        sector_srt = con.execute(f"""
+            WITH srt_narr AS (
+                SELECT sector, report_type,
+                    COUNT(*) AS n_narr,
+                    COUNT(*) FILTER (cultural_edge_count > 0) AS n_signal
+                FROM narratives GROUP BY sector, report_type
             ),
-            sect_edges AS (
-                SELECT n.sector,
-                    COUNT(*) FILTER (e.edge_type IN ('speaks-up-to', 'cooperates-with',
-                        'shares-information-with')) AS voice_e,
-                    COUNT(*) FILTER (e.edge_type IN ('directs', 'monitors')) AS leadership_e,
-                    COUNT(*) FILTER (e.edge_type IN ('normalises',
-                        'adapts-to')) AS drift_e,
-                    COUNT(*) FILTER (e.edge_type IN ('cares-for', 'responds-to-failure-of',
-                        'protects')) AS care_e,
-                    COUNT(*) FILTER (e.edge_type IN ('learns-from',
-                        'recognises')) AS growth_e
+            srt_edges AS (
+                SELECT n.sector, n.report_type,
+                    COUNT(*) FILTER (e.edge_type IN {VOICE}) AS voice_e,
+                    COUNT(*) FILTER (e.edge_type IN {LEADERSHIP}) AS leadership_e,
+                    COUNT(*) FILTER (e.edge_type IN {DRIFT}) AS drift_e,
+                    COUNT(*) FILTER (e.edge_type IN {CARE}) AS care_e,
+                    COUNT(*) FILTER (e.edge_type IN {GROWTH}) AS growth_e
                 FROM narratives n JOIN edges e ON e.narrative_id = n.id
-                WHERE e.is_cultural = true GROUP BY n.sector
+                WHERE e.is_cultural = true AND n.cultural_edge_count > 0
+                GROUP BY n.sector, n.report_type
             )
-            SELECT sn.sector, sn.n_narr,
-                ROUND(COALESCE(se.voice_e, 0)::FLOAT / sn.n_narr, 3) AS voice,
-                ROUND(COALESCE(se.leadership_e, 0)::FLOAT / sn.n_narr, 3) AS leadership,
-                ROUND(COALESCE(se.drift_e, 0)::FLOAT / sn.n_narr, 3) AS drift,
-                ROUND(COALESCE(se.care_e, 0)::FLOAT / sn.n_narr, 3) AS care,
-                ROUND(COALESCE(se.growth_e, 0)::FLOAT / sn.n_narr, 3) AS growth
-            FROM sect_narr sn
-            LEFT JOIN sect_edges se ON sn.sector = se.sector
-            ORDER BY sn.n_narr DESC
+            SELECT sn.sector, sn.report_type, sn.n_narr, sn.n_signal,
+                sn.n_signal::FLOAT / sn.n_narr AS prevalence,
+                CASE WHEN sn.n_signal > 0
+                    THEN COALESCE(se.voice_e, 0)::FLOAT / sn.n_signal ELSE 0 END AS voice,
+                CASE WHEN sn.n_signal > 0
+                    THEN COALESCE(se.leadership_e, 0)::FLOAT / sn.n_signal ELSE 0 END AS leadership,
+                CASE WHEN sn.n_signal > 0
+                    THEN COALESCE(se.drift_e, 0)::FLOAT / sn.n_signal ELSE 0 END AS drift,
+                CASE WHEN sn.n_signal > 0
+                    THEN COALESCE(se.care_e, 0)::FLOAT / sn.n_signal ELSE 0 END AS care,
+                CASE WHEN sn.n_signal > 0
+                    THEN COALESCE(se.growth_e, 0)::FLOAT / sn.n_signal ELSE 0 END AS growth
+            FROM srt_narr sn
+            LEFT JOIN srt_edges se ON sn.sector = se.sector AND sn.report_type = se.report_type
         """).fetchdf()
-        if len(sector_rates) > 1:
-            report.append("\n## Sector Analysis")
-            report.append("")
-            report.append("\nEdges per narrative by sector:")
-            report.append("\n| Sector | N | Voice | Leadership | Drift | Care | Growth |")
-            report.append("|--------|---|-------|------------|-------|------|--------|")
-            for _, sr in sector_rates.iterrows():
-                sector_name = sr["sector"] if sr["sector"] else "Unknown"
-                report.append(
-                    f"| {sector_name} | {sr['n_narr']:,.0f} | "
-                    f"{sr['voice']:.3f} | {sr['leadership']:.3f} | "
-                    f"{sr['drift']:.3f} | {sr['care']:.3f} | {sr['growth']:.3f} |"
-                )
-            report.append("\n*Note: current SMRs use org-wide report-type baselines "
-                          "(dominated by largest sector). Sector-level baselines "
-                          "differ substantially — consider `--sector-adjust` if "
-                          "within-sector comparison is needed.*")
+
+        sectors = [s for s in sector_srt["sector"].unique() if s is not None]
+        if len(sectors) > 1:
+            sector_rows = []
+            for sector in sectors:
+                s_data = sector_srt[sector_srt["sector"] == sector]
+                s_total = int(s_data["n_narr"].sum())
+                # Equal-weight across report types with N≥20 within this sector
+                eligible = s_data[s_data["n_narr"] >= 20]
+                if len(eligible) == 0:
+                    continue
+                s_prev = round(float(eligible["prevalence"].mean()) * 100)
+                s_int = {c: round(float(eligible[c].mean()), 2) for c in composites}
+                sector_rows.append((sector, s_total, s_prev, s_int))
+
+            if sector_rows:
+                report.append("\n## Sector Analysis")
+                report.append("\nStandardised prevalence + intensity by sector "
+                              "(equal-weighted across report types within each sector):")
+                report.append("\n| Sector | N | Signal % | Voice | Leadership "
+                              "| Drift | Care | Growth |")
+                report.append("|--------|---|---------|-------|------------|"
+                              "-------|------|--------|")
+                for sector, n, prev, si in sorted(sector_rows, key=lambda x: -x[1]):
+                    report.append(
+                        f"| {sector} | {n:,} | {prev}% | "
+                        f"{si['voice']:.2f} | {si['leadership']:.2f} | "
+                        f"{si['drift']:.2f} | {si['care']:.2f} | {si['growth']:.2f} |"
+                    )
+                report.append("\n*Note: current SMRs use org-wide report-type baselines "
+                              "(dominated by largest sector). Sector-level baselines "
+                              "differ substantially — consider `--sector-adjust` if "
+                              "within-sector comparison is needed.*")
 
         # Sensitivity analysis
         sens, n_base, s_base = compute_sensitivity(con, site_cis, composites, phis, eb_params)
@@ -1011,9 +1140,25 @@ def compute_sensitivity(con, site_cis, composites, phis, eb_params):
     import numpy as np
     from scipy.stats import norm as _norm
 
-    def _flag_set_from_cis(site_cis_in, composites_in, phis_in):
-        """Compute FDR flags and return as set of (site, flag) tuples."""
+    def _flag_set_from_cis(site_cis_in, composites_in, phis_in, eb_scale=1.0):
+        """Compute FDR flags and return as set of (site, flag) tuples.
+        eb_scale multiplies the EB prior alpha/beta (>1 = stronger shrinkage)."""
         eb_r, eb_p = empirical_bayes_shrinkage(site_cis_in, composites_in)
+        # Scale EB priors
+        if eb_scale != 1.0:
+            eb_p = {c: (a * eb_scale, b * eb_scale) for c, (a, b) in eb_p.items()}
+            # Recompute shrunken estimates with scaled priors
+            eb_r = {}
+            for site, cis_site in site_cis_in.items():
+                for c in composites_in:
+                    ci = cis_site.get(c)
+                    if ci and ci[4] > 0:
+                        O, E = ci[3], ci[4]
+                        a_p, b_p = eb_p[c]
+                        smr_s = (O + a_p) / (E + b_p)
+                        if site not in eb_r:
+                            eb_r[site] = {}
+                        eb_r[site][c] = (smr_s, ci[0], O, E, 0)
         cis_copy = {}
         for site in site_cis_in:
             cis_copy[site] = dict(site_cis_in[site])
@@ -1109,20 +1254,26 @@ def compute_sensitivity(con, site_cis, composites, phis, eb_params):
     # Baseline
     base_flags, base_sites = _flag_set_from_cis(site_cis, composites, phis)
 
+    # Tests: (name, rebuild_kwargs, eb_scale)
     tests = [
-        ("phi ×0.8",      {"phi_scale": 0.8}),
-        ("phi ×1.2",      {"phi_scale": 1.2}),
-        ("baseline +5%",  {"baseline_perturb": 0.05}),
-        ("baseline −5%",  {"baseline_perturb": -0.05}),
-        ("baseline +10%", {"baseline_perturb": 0.10}),
-        ("baseline −10%", {"baseline_perturb": -0.10}),
-        ("N≥5",           {"min_n": 5}),
-        ("N≥20",          {"min_n": 20}),
+        ("phi ×0.8",      {"phi_scale": 0.8},    1.0),
+        ("phi ×1.2",      {"phi_scale": 1.2},    1.0),
+        ("baseline +5%",  {"baseline_perturb": 0.05}, 1.0),
+        ("baseline −5%",  {"baseline_perturb": -0.05}, 1.0),
+        ("baseline +10%", {"baseline_perturb": 0.10}, 1.0),
+        ("baseline −10%", {"baseline_perturb": -0.10}, 1.0),
+        ("N≥5",           {"min_n": 5},          1.0),
+        ("N≥20",          {"min_n": 20},         1.0),
+        ("EB ×0.5",       {},                    0.5),
+        ("EB ×2.0",       {},                    2.0),
     ]
     results = []
-    for name, kwargs in tests:
-        cis_t, phis_t = _rebuild_cis(**kwargs)
-        flags_t, sites_t = _flag_set_from_cis(cis_t, composites, phis_t)
+    for name, kwargs, eb_s in tests:
+        if kwargs:
+            cis_t, phis_t = _rebuild_cis(**kwargs)
+        else:
+            cis_t, phis_t = site_cis, phis
+        flags_t, sites_t = _flag_set_from_cis(cis_t, composites, phis_t, eb_scale=eb_s)
         gained = len(flags_t - base_flags)
         lost = len(base_flags - flags_t)
         stable = len(base_flags & flags_t)
@@ -1289,20 +1440,14 @@ def generate_monthly_tracker(con, report_type=None, raw=False):
     """).fetchone()
     total_narr = cum[0]
 
-    # Org averages — population mean
-    org_avg = con.execute(f"""
-        SELECT
-            ROUND(COUNT(*) FILTER (e.edge_type IN {VOICE})::FLOAT / {total_narr}, 2),
-            ROUND(COUNT(*) FILTER (e.edge_type IN {LEADERSHIP})::FLOAT / {total_narr}, 2),
-            ROUND(COUNT(*) FILTER (e.edge_type IN {DRIFT})::FLOAT / {total_narr}, 2),
-            ROUND(COUNT(*) FILTER (e.edge_type IN {CARE})::FLOAT / {total_narr}, 2),
-            ROUND(COUNT(*) FILTER (e.edge_type IN {GROWTH})::FLOAT / {total_narr}, 2)
-        FROM narratives n
-        JOIN edges e ON e.narrative_id = n.id
-        WHERE e.is_cultural = true {join_filter}
-    """).fetchone()
-    avg_voice, avg_leadership, avg_drift, avg_care, avg_growth = org_avg
-    avgs = dict(zip(["voice", "leadership", "drift", "care", "growth"], org_avg))
+    # Org averages — standardised prevalence + intensity (equal-weighted across report types, N≥50)
+    prevalence, intensity, _rt_bl, _cis = compute_standardised_averages(con, narr_filter, join_filter)
+    avgs = intensity
+    avg_voice = intensity["voice"]
+    avg_leadership = intensity["leadership"]
+    avg_drift = intensity["drift"]
+    avg_care = intensity["care"]
+    avg_growth = intensity["growth"]
 
     # Site dashboard — rates per narrative
     dashboard = con.execute(f"""
@@ -1503,8 +1648,10 @@ def generate_monthly_tracker(con, report_type=None, raw=False):
     entry.append(f"| Sites | {batch_detail[2]} | {cum[1]} |")
     entry.append(f"| Years | | {cum[3]} |")
     entry.append("")
+    entry.append(f"**Prevalence**: {prevalence:.0%} of narratives contain cultural signal")
+    entry.append("")
     entry.append(
-        f"**Org averages** (edges per narrative): "
+        f"**Intensity** (standardised, edges per signal-bearing narrative): "
         f"Voice {avg_voice:.2f} | Leadership {avg_leadership:.2f} | "
         f"Drift {avg_drift:.2f} | Care {avg_care:.2f} | Growth {avg_growth:.2f}"
     )
