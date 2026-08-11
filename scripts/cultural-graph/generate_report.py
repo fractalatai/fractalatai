@@ -689,6 +689,100 @@ def generate_template(con, fy=None, report_type=None, raw=False):
             f"{row['care']:.2f} | {row['growth']:.2f} |"
         )
 
+    # Power analysis — minimum detectable SMR per site size (adjusted view only)
+    if adjusted:
+        import math
+        baselines_avg = {c: float(avgs[c]) for c in composites}
+        power = compute_power_analysis(phis, eb_params, baselines_avg)
+        report.append("\n## Detectable Effect Sizes")
+        report.append("\nMinimum SMR deviation detectable at each site size "
+                      "(95% CI excludes 1.0, quasi-Poisson + EB shrinkage):")
+        report.append("\n| N | Voice | Leadership | Drift | Care | Growth |")
+        report.append("|---|-------|------------|-------|------|--------|")
+        for N, row in power:
+            cols = " | ".join(f"{row[c][0]:.2f}–{row[c][1]:.2f}" for c in composites)
+            report.append(f"| {N} | {cols} |")
+        report.append("\n*Read: at N=50, only Voice SMRs below "
+                      f"{power[3][1]['voice'][0]:.2f} or above "
+                      f"{power[3][1]['voice'][1]:.2f} are detectable.*")
+
+        # Sector confound analysis
+        sector_rates = con.execute("""
+            WITH sect_narr AS (
+                SELECT sector, COUNT(*) AS n_narr FROM narratives GROUP BY sector
+            ),
+            sect_edges AS (
+                SELECT n.sector,
+                    COUNT(*) FILTER (e.edge_type IN ('speaks-up-to', 'cooperates-with',
+                        'shares-information-with')) AS voice_e,
+                    COUNT(*) FILTER (e.edge_type IN ('directs', 'monitors')) AS leadership_e,
+                    COUNT(*) FILTER (e.edge_type IN ('normalises',
+                        'adapts-to')) AS drift_e,
+                    COUNT(*) FILTER (e.edge_type IN ('cares-for', 'responds-to-failure-of',
+                        'protects')) AS care_e,
+                    COUNT(*) FILTER (e.edge_type IN ('learns-from',
+                        'recognises')) AS growth_e
+                FROM narratives n JOIN edges e ON e.narrative_id = n.id
+                WHERE e.is_cultural = true GROUP BY n.sector
+            )
+            SELECT sn.sector, sn.n_narr,
+                ROUND(COALESCE(se.voice_e, 0)::FLOAT / sn.n_narr, 3) AS voice,
+                ROUND(COALESCE(se.leadership_e, 0)::FLOAT / sn.n_narr, 3) AS leadership,
+                ROUND(COALESCE(se.drift_e, 0)::FLOAT / sn.n_narr, 3) AS drift,
+                ROUND(COALESCE(se.care_e, 0)::FLOAT / sn.n_narr, 3) AS care,
+                ROUND(COALESCE(se.growth_e, 0)::FLOAT / sn.n_narr, 3) AS growth
+            FROM sect_narr sn
+            LEFT JOIN sect_edges se ON sn.sector = se.sector
+            ORDER BY sn.n_narr DESC
+        """).fetchdf()
+        if len(sector_rates) > 1:
+            report.append("\n## Sector Analysis")
+            report.append("")
+            report.append("\nEdges per narrative by sector:")
+            report.append("\n| Sector | N | Voice | Leadership | Drift | Care | Growth |")
+            report.append("|--------|---|-------|------------|-------|------|--------|")
+            for _, sr in sector_rates.iterrows():
+                sector_name = sr["sector"] if sr["sector"] else "Unknown"
+                report.append(
+                    f"| {sector_name} | {sr['n_narr']:,.0f} | "
+                    f"{sr['voice']:.3f} | {sr['leadership']:.3f} | "
+                    f"{sr['drift']:.3f} | {sr['care']:.3f} | {sr['growth']:.3f} |"
+                )
+            report.append("\n*Note: current SMRs use org-wide report-type baselines "
+                          "(dominated by largest sector). Sector-level baselines "
+                          "differ substantially — consider `--sector-adjust` if "
+                          "within-sector comparison is needed.*")
+
+        # Sensitivity analysis
+        sens, n_base, s_base = compute_sensitivity(con, site_cis, composites, phis, eb_params)
+        report.append("\n## Sensitivity Analysis")
+        report.append(f"\nBaseline: {n_base} flags on {s_base} sites. "
+                      "Stability under perturbations:")
+        report.append("\n| Perturbation | Flags | Gained | Lost | Stable |")
+        report.append("|-------------|-------|--------|------|--------|")
+        for name, nf, ns, ng, nl, pct in sens:
+            report.append(f"| {name} | {nf} | +{ng} | −{nl} | {pct:.0f}% |")
+
+    # Batch drift monitoring
+    batch_df, drift_alerts = compute_batch_drift(con)
+    if len(batch_df) > 0:
+        report.append("\n## Extraction Quality")
+        report.append("\nCultural edges per narrative by extraction batch:")
+        report.append("\n| Batch | Narratives | Edges/narr | Sites |")
+        report.append("|-------|------------|------------|-------|")
+        for _, br in batch_df.iterrows():
+            bd = str(br['batch_date'])[:10]
+            report.append(
+                f"| {bd} | {br['n_narr']:,} | "
+                f"{br['edges_per_narr']:.2f} | {br['sites']} |"
+            )
+        if drift_alerts:
+            report.append("\n**Drift alerts:**")
+            for alert in drift_alerts:
+                report.append(f"- {alert}")
+        elif len(batch_df) >= 3:
+            report.append("\nNo extraction drift detected (all batches within 2σ).")
+
     report.append("\n---")
     if adjusted:
         report.append(f"\n*Report generated from {DUCKDB_PATH}. Values = standardised ratios "
@@ -861,6 +955,283 @@ def generate_funnel(site_cis, output_dir, phis=None):
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"Funnel plots: {out_path}")
+    return out_path
+
+
+def compute_batch_drift(con, z_threshold=2.0):
+    """Monitor AI model drift across extraction batches.
+
+    Compares per-batch cultural edge rates against the historical mean.
+    Flags batches where the rate deviates by more than z_threshold standard
+    deviations. Returns (batch_df, alerts) where alerts is a list of strings.
+    """
+    import numpy as np
+
+    batch_df = con.execute("""
+        SELECT extracted_at::DATE AS batch_date,
+            COUNT(*) AS n_narr,
+            SUM(cultural_edge_count) AS total_edges,
+            ROUND(SUM(cultural_edge_count)::FLOAT / COUNT(*), 3) AS edges_per_narr,
+            COUNT(DISTINCT site) AS sites
+        FROM narratives
+        GROUP BY extracted_at::DATE
+        ORDER BY batch_date
+    """).fetchdf()
+
+    alerts = []
+    if len(batch_df) < 2:
+        return batch_df, alerts
+
+    rates = batch_df["edges_per_narr"].values.astype(float)
+    mean_rate = np.mean(rates)
+    std_rate = np.std(rates, ddof=1) if len(rates) > 2 else np.std(rates)
+
+    if std_rate > 0:
+        for _, row in batch_df.iterrows():
+            z = abs(row["edges_per_narr"] - mean_rate) / std_rate
+            if z > z_threshold:
+                direction = "above" if row["edges_per_narr"] > mean_rate else "below"
+                alerts.append(
+                    f"Batch {row['batch_date']}: {row['edges_per_narr']:.2f} edges/narr "
+                    f"({z:.1f}σ {direction} mean {mean_rate:.2f})"
+                )
+
+    return batch_df, alerts
+
+
+def compute_sensitivity(con, site_cis, composites, phis, eb_params):
+    """Test flag robustness under perturbations.
+
+    Runs the full pipeline under altered assumptions and reports how many
+    flags are stable vs gained/lost. Tests: phi scaling (±20%), baseline
+    perturbation (±5%, ±10%), N threshold changes (5, 15, 20).
+    Returns list of (name, n_flags, n_sites, n_gained, n_lost, stable_pct).
+    """
+    import math
+    import numpy as np
+    from scipy.stats import norm as _norm
+
+    def _flag_set_from_cis(site_cis_in, composites_in, phis_in):
+        """Compute FDR flags and return as set of (site, flag) tuples."""
+        eb_r, eb_p = empirical_bayes_shrinkage(site_cis_in, composites_in)
+        cis_copy = {}
+        for site in site_cis_in:
+            cis_copy[site] = dict(site_cis_in[site])
+        for site in eb_r:
+            for c in composites_in:
+                if c in eb_r[site]:
+                    smr_s = eb_r[site][c][0]
+                    old = cis_copy[site][c]
+                    O, E = old[3], old[4]
+                    phi = phis_in.get(c, 1.0)
+                    a_p = eb_p[c][0]
+                    if O > 0:
+                        se = math.sqrt(phi / (O + a_p))
+                        z_v = _norm.ppf(0.975)
+                        lo = smr_s * math.exp(-z_v * se)
+                        hi = smr_s * math.exp(z_v * se)
+                    else:
+                        lo, hi = old[1], old[2]
+                    cis_copy[site][c] = (smr_s, lo, hi, O, E)
+        fdr = apply_fdr(cis_copy, composites_in, phis=phis_in)
+        fs = set()
+        for s, fl in fdr.items():
+            for f in fl:
+                fs.add((s, f))
+        return fs, len(fdr)
+
+    def _rebuild_cis(phi_scale=1.0, baseline_perturb=0.0, min_n=10):
+        baselines_df = con.execute("""
+            WITH rt_narr AS (SELECT report_type, COUNT(*) AS n_narr FROM narratives GROUP BY report_type),
+            rt_edges AS (
+                SELECT n.report_type,
+                    COUNT(*) FILTER (e.edge_type IN ('speaks-up-to', 'cooperates-with', 'shares-information-with')) AS voice_e,
+                    COUNT(*) FILTER (e.edge_type IN ('directs', 'monitors')) AS leadership_e,
+                    COUNT(*) FILTER (e.edge_type IN ('normalises', 'adapts-to')) AS drift_e,
+                    COUNT(*) FILTER (e.edge_type IN ('cares-for', 'responds-to-failure-of', 'protects')) AS care_e,
+                    COUNT(*) FILTER (e.edge_type IN ('learns-from', 'recognises')) AS growth_e
+                FROM narratives n JOIN edges e ON e.narrative_id = n.id WHERE e.is_cultural = true GROUP BY n.report_type)
+            SELECT rn.report_type,
+                COALESCE(re.voice_e, 0)::FLOAT / rn.n_narr AS voice_bl,
+                COALESCE(re.leadership_e, 0)::FLOAT / rn.n_narr AS leadership_bl,
+                COALESCE(re.drift_e, 0)::FLOAT / rn.n_narr AS drift_bl,
+                COALESCE(re.care_e, 0)::FLOAT / rn.n_narr AS care_bl,
+                COALESCE(re.growth_e, 0)::FLOAT / rn.n_narr AS growth_bl
+            FROM rt_narr rn LEFT JOIN rt_edges re ON rn.report_type = re.report_type
+        """).fetchdf()
+        site_rt = con.execute(
+            "SELECT site, report_type, COUNT(*) AS n FROM narratives GROUP BY site, report_type"
+        ).fetchdf()
+        bl_lookup = {}
+        for _, r in baselines_df.iterrows():
+            bl_lookup[r["report_type"]] = {
+                c: float(r[f"{c}_bl"]) * (1.0 + baseline_perturb) for c in composites
+            }
+        dashboard = con.execute(f"""
+            WITH site_narr AS (SELECT site, COUNT(*) AS n_narr FROM narratives GROUP BY site),
+            site_edges AS (
+                SELECT n.site,
+                    COUNT(*) FILTER (e.edge_type IN ('speaks-up-to', 'cooperates-with', 'shares-information-with')) AS voice_e,
+                    COUNT(*) FILTER (e.edge_type IN ('directs', 'monitors')) AS leadership_e,
+                    COUNT(*) FILTER (e.edge_type IN ('normalises', 'adapts-to')) AS drift_e,
+                    COUNT(*) FILTER (e.edge_type IN ('cares-for', 'responds-to-failure-of', 'protects')) AS care_e,
+                    COUNT(*) FILTER (e.edge_type IN ('learns-from', 'recognises')) AS growth_e
+                FROM narratives n JOIN edges e ON e.narrative_id = n.id WHERE e.is_cultural = true GROUP BY n.site)
+            SELECT sn.site, sn.n_narr AS n,
+                COALESCE(se.voice_e, 0)::FLOAT / sn.n_narr AS voice,
+                COALESCE(se.leadership_e, 0)::FLOAT / sn.n_narr AS leadership,
+                COALESCE(se.drift_e, 0)::FLOAT / sn.n_narr AS drift,
+                COALESCE(se.care_e, 0)::FLOAT / sn.n_narr AS care,
+                COALESCE(se.growth_e, 0)::FLOAT / sn.n_narr AS growth
+            FROM site_narr sn LEFT JOIN site_edges se ON sn.site = se.site
+            WHERE sn.n_narr >= {min_n} ORDER BY sn.n_narr DESC
+        """).fetchdf()
+        scaled = {k: v * phi_scale for k, v in phis.items()}
+        cis = {}
+        for idx, r in dashboard.iterrows():
+            site = r["site"]
+            n = float(r["n"])
+            sd = site_rt[site_rt["site"] == site]
+            st = sd["n"].sum()
+            c_dict = {}
+            for c in composites:
+                obs = round(float(r[c]) * n)
+                er = sum(
+                    (sr["n"] / st) * bl_lookup.get(sr["report_type"], {}).get(c, 0.0)
+                    for _, sr in sd.iterrows()
+                )
+                exp = er * n
+                smr, lo, hi = smr_poisson_ci(obs, exp, phi=scaled.get(c, 1.0))
+                c_dict[c] = (smr, lo, hi, obs, exp)
+            cis[site] = c_dict
+        return cis, scaled
+
+    # Baseline
+    base_flags, base_sites = _flag_set_from_cis(site_cis, composites, phis)
+
+    tests = [
+        ("phi ×0.8",      {"phi_scale": 0.8}),
+        ("phi ×1.2",      {"phi_scale": 1.2}),
+        ("baseline +5%",  {"baseline_perturb": 0.05}),
+        ("baseline −5%",  {"baseline_perturb": -0.05}),
+        ("baseline +10%", {"baseline_perturb": 0.10}),
+        ("baseline −10%", {"baseline_perturb": -0.10}),
+        ("N≥5",           {"min_n": 5}),
+        ("N≥20",          {"min_n": 20}),
+    ]
+    results = []
+    for name, kwargs in tests:
+        cis_t, phis_t = _rebuild_cis(**kwargs)
+        flags_t, sites_t = _flag_set_from_cis(cis_t, composites, phis_t)
+        gained = len(flags_t - base_flags)
+        lost = len(base_flags - flags_t)
+        stable = len(base_flags & flags_t)
+        pct = stable / len(base_flags) * 100 if base_flags else 100
+        results.append((name, len(flags_t), sites_t, gained, lost, round(pct, 1)))
+    return results, len(base_flags), base_sites
+
+
+def compute_power_analysis(phis, eb_params, baselines_avg,
+                           site_sizes=(10, 20, 30, 50, 100, 200, 500, 1000)):
+    """Compute minimum detectable SMR at various site sizes.
+
+    For quasi-Poisson with EB shrinkage:
+      SE(log(SMR)) = sqrt(phi / (E + alpha))
+      Detectable when |log(SMR)| > z * SE
+      => SMR must be outside [exp(-z*SE), exp(z*SE)]
+
+    Returns list of (N, {composite: (smr_lo, smr_hi)}).
+    """
+    import math
+
+    z = norm.ppf(0.975)
+    composites = ["voice", "leadership", "drift", "care", "growth"]
+    results = []
+    for N in site_sizes:
+        row = {}
+        for c in composites:
+            phi = phis.get(c, 1.0)
+            alpha_p = eb_params[c][0] if eb_params else 0
+            bl = baselines_avg.get(c, 0.5)
+            E = bl * N
+            se = math.sqrt(phi / (E + alpha_p))
+            row[c] = (math.exp(-z * se), math.exp(z * se))
+        results.append((N, row))
+    return results
+
+
+def generate_caterpillar(site_cis, output_dir, phis=None, eb_params=None):
+    """Generate caterpillar plots — SMRs with CIs ordered by value.
+
+    One subplot per composite. Sites ordered by SMR (ascending), horizontal
+    error bars showing 95% CI. Sites where CI excludes 1.0 are coloured red.
+    Complements funnel plots: funnel shows the volume effect, caterpillar
+    shows the ranking and precision of each site.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    composites = ["voice", "leadership", "drift", "care", "growth"]
+    titles = ["Voice", "Leadership", "Drift", "Care", "Growth"]
+    if phis is None:
+        phis = {c: 1.0 for c in composites}
+
+    fig, axes = plt.subplots(1, 5, figsize=(22, 10), sharey=False)
+
+    for i, (c, title) in enumerate(zip(composites, titles)):
+        ax = axes[i]
+        entries = []
+        for site, cis in site_cis.items():
+            ci = cis.get(c)
+            if ci and not np.isnan(ci[0]) and ci[4] > 0:
+                smr, lo, hi = ci[0], ci[1], ci[2]
+                short = site.split(" ")[-1] if " " in site else site
+                entries.append((smr, lo, hi, short))
+
+        if not entries:
+            ax.set_visible(False)
+            continue
+
+        # Sort by SMR ascending
+        entries.sort(key=lambda x: x[0])
+        smrs = [e[0] for e in entries]
+        los = [e[1] for e in entries]
+        his = [e[2] for e in entries]
+        labels = [e[3] for e in entries]
+        ys = np.arange(len(entries))
+
+        for j in range(len(entries)):
+            # Red if CI excludes 1.0
+            sig = his[j] < 1.0 or los[j] > 1.0
+            color = "firebrick" if sig else "steelblue"
+            ax.plot([los[j], his[j]], [ys[j], ys[j]], color=color,
+                    linewidth=1.2, alpha=0.7, solid_capstyle="round")
+            ax.plot(smrs[j], ys[j], "o", color=color, markersize=3.5,
+                    zorder=5)
+
+        ax.axvline(x=1.0, color="grey", linestyle="-", linewidth=0.8)
+        ax.set_yticks(ys)
+        ax.set_yticklabels(labels, fontsize=6)
+        ax.set_xlabel("SMR", fontsize=9)
+        phi = phis.get(c, 1.0)
+        phi_label = f" (φ={phi:.1f})" if phi > 1.05 else ""
+        ax.set_title(f"{title}{phi_label}", fontweight="bold", fontsize=11)
+        ax.tick_params(axis="x", labelsize=8)
+        # Clip x-axis to reasonable range
+        xmax = min(max(his) * 1.1, 5.0)
+        ax.set_xlim(left=0, right=max(xmax, 2.5))
+
+    fig.suptitle("Cultural Graph — Caterpillar Plots (SMR with 95% CI, ordered by value)",
+                 fontweight="bold", fontsize=13)
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / "caterpillar-plots.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Caterpillar plots: {out_path}")
     return out_path
 
 
@@ -1205,20 +1576,22 @@ def main():
                         help="Unadjusted blended rates (default adjusts for report type mix)")
     parser.add_argument("--funnel", action="store_true",
                         help="Generate funnel plots (PNG) from adjusted SMR data")
+    parser.add_argument("--caterpillar", action="store_true",
+                        help="Generate caterpillar plots (PNG) — SMRs with CIs ordered by value")
     parser.add_argument("--output", help="Output file path (default: auto-named)")
     args = parser.parse_args()
 
-    if not args.template and not args.csv and not args.monthly_tracker and not args.funnel:
-        parser.error("Specify --template, --csv, --monthly-tracker, or --funnel")
+    if not args.template and not args.csv and not args.monthly_tracker and not args.funnel and not args.caterpillar:
+        parser.error("Specify --template, --csv, --monthly-tracker, --funnel, or --caterpillar")
 
-    if args.funnel and args.raw:
-        parser.error("--funnel requires adjusted SMR data (incompatible with --raw)")
+    if (args.funnel or args.caterpillar) and args.raw:
+        parser.error("--funnel/--caterpillar require adjusted SMR data (incompatible with --raw)")
 
     con = get_connection()
 
     # Generate template first if needed (funnel needs its site_cis output)
     site_cis = {}
-    if args.template or args.funnel:
+    if args.template or args.funnel or args.caterpillar:
         report, site_cis = generate_template(con, fy=args.fy, report_type=args.report_type,
                                               raw=args.raw)
     if args.template:
@@ -1238,11 +1611,14 @@ def main():
         out_path.write_text(report)
         print(f"Report: {out_path}")
 
-    if args.funnel:
+    if args.funnel or args.caterpillar:
         if not site_cis:
-            parser.error("--funnel requires adjusted SMR data (no site_cis computed — check flags)")
+            parser.error("--funnel/--caterpillar require adjusted SMR data (no site_cis computed)")
         phis = compute_overdispersion(con, ["voice", "leadership", "drift", "care", "growth"])
-        generate_funnel(site_cis, OUTPUT_DIR, phis=phis)
+        if args.funnel:
+            generate_funnel(site_cis, OUTPUT_DIR, phis=phis)
+        if args.caterpillar:
+            generate_caterpillar(site_cis, OUTPUT_DIR, phis=phis)
 
     if args.csv:
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
