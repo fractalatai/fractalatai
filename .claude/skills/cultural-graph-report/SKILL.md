@@ -144,14 +144,15 @@ Org average = population mean (total edges / total narratives).
 
 The default report uses **Standardised Morbidity Ratios (SMR)**: observed edge count / expected count given the site's report type mix. SMR = 1.0 means as expected; >1.0 = more; <1.0 = less.
 
-Three layers of statistical correction:
+Four layers of statistical correction:
 1. **Indirect standardisation** — controls for report type mix (Growth differs 42x across report types)
-2. **Quasi-Poisson CIs** — corrects for overdispersion (variance > mean in edge counts; φ ranges 1.2–2.2 across composites)
-3. **Benjamini-Hochberg FDR** — corrects for multiple comparisons (5 composites × ~44 sites ≈ 220 tests)
+2. **Log-scale quasi-Poisson CIs** — SE(log(SMR)) = √(φ/O), CI = exp(log(SMR) ± z·SE). Naturally asymmetric; corrects for overdispersion (φ ranges 1.2–2.2 across composites)
+3. **Empirical Bayes shrinkage** — gamma-Poisson prior estimated via method of moments. SMR_shrunk = (O + α) / (E + β). Small sites pulled toward org mean; large sites barely change. Prevents C-suite overreaction to noisy small-site estimates (same approach as CMS Hospital Compare, NHS hospital profiling)
+4. **Benjamini-Hochberg FDR** — corrects for multiple comparisons (5 composites × ~44 sites ≈ 220 tests). P-values derived on log scale: z = |log(SMR)| / SE(log(SMR))
 
-A site is flagged HIGH/LOW only when its FDR-adjusted p-value < 0.05. This replaced the original ad-hoc ±30% threshold and reduced false flags by ~49%.
+A site is flagged HIGH/LOW only when its FDR-adjusted p-value < 0.05. Sites with N < 10 narratives are excluded (estimates would be >60% prior-driven).
 
-The report also includes **temporal trend analysis**: per-site OLS slope of raw rates over financial years, FDR-corrected. Sites with statistically significant trends are listed.
+**Temporal trend analysis**: per-site quasi-Poisson GLM (count ~ FY + offset(log(N)), quasipoisson family), FDR-corrected. Results shown as rate ratios per year (RR > 1 = rising, < 1 = falling).
 
 Per-capita rates (edges per headcount) are computed downstream in PowerBI by joining headcount data against the CSV export.
 
@@ -175,5 +176,5 @@ Per-capita rates (edges per headcount) are computed downstream in PowerBI by joi
 - The PowerBI CSV is one row per site-year-report_type combination — pivot/filter in PowerBI
 - Bespoke analysis uses DuckDB SQL directly — no script needed, just query
 - **Report type confound**: blended rates confound genuine cultural differences with report type mix (Growth differs 42x between Positive Observations and Injury reports). The default view controls for this via SMR (indirect standardisation). Use `--report-type` for per-type deep dives, `--raw` for unadjusted view
-- **Funnel plots** (`--funnel`): the standard NHS/CQC visualisation for comparing institutional rates. Visually explains why small sites aren't flagged — the funnel is wide at low expected counts. Quasi-Poisson-corrected control limits (φ shown per composite)
+- **Funnel plots** (`--funnel`): the standard NHS/CQC visualisation for comparing institutional rates. Visually explains why small sites aren't flagged — the funnel is wide at low expected counts. Log-scale quasi-Poisson control limits: exp(±z·√φ/√E), naturally asymmetric (φ shown per composite)
 - Design options and statistical research documented in `.claude/plans/cultural-graph/monthly-tracker-options.md`

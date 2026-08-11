@@ -29,7 +29,7 @@ from datetime import datetime
 from pathlib import Path
 
 import duckdb
-from scipy.stats import chi2, linregress, norm
+from scipy.stats import chi2, norm
 
 DUCKDB_PATH = Path("data/cultural-graph.duckdb")
 OUTPUT_DIR = Path("data/qq/cultural-graph/outputs/reports")
@@ -61,27 +61,34 @@ def get_connection():
 
 
 def smr_poisson_ci(observed, expected, phi=1.0, alpha=0.05):
-    """Quasi-Poisson confidence interval for SMR = observed/expected.
+    """Log-scale quasi-Poisson confidence interval for SMR = observed/expected.
 
-    When phi > 1 (overdispersion), the Poisson CI is inflated by sqrt(phi).
-    This is the standard quasi-Poisson correction used in epidemiology.
+    Works on the log scale where the distribution is symmetric:
+      SE(log(SMR)) = sqrt(phi / O)
+      CI = exp(log(SMR) ± z * SE)
+
+    This naturally produces asymmetric CIs on the SMR scale without the
+    inconsistency of inflating exact Poisson CIs symmetrically.
+
+    For O=0, falls back to exact Poisson upper bound (log undefined).
     """
+    import math
+
     if expected <= 0:
         return (float('nan'), float('nan'), float('nan'))
     smr = observed / expected
+    z = norm.ppf(1 - alpha / 2)  # 1.96 for alpha=0.05
+
     if observed == 0:
-        p_lo = 0.0
-        p_hi = chi2.ppf(1 - alpha / 2, 2) / (2 * expected)
-    else:
-        p_lo = chi2.ppf(alpha / 2, 2 * observed) / (2 * expected)
-        p_hi = chi2.ppf(1 - alpha / 2, 2 * (observed + 1)) / (2 * expected)
-    # Inflate CI by sqrt(phi) for quasi-Poisson correction
-    if phi > 1.0:
-        hw = (p_hi - p_lo) / 2 * (phi ** 0.5)
-        lo = max(0, smr - hw)
-        hi = smr + hw
-    else:
-        lo, hi = p_lo, p_hi
+        # O=0: log undefined — use exact Poisson upper bound
+        lo = 0.0
+        hi = chi2.ppf(1 - alpha / 2, 2) / (2 * expected)
+        return (smr, lo, hi)
+
+    log_smr = math.log(smr)
+    se_log = math.sqrt(phi / observed)
+    lo = math.exp(log_smr - z * se_log)
+    hi = math.exp(log_smr + z * se_log)
     return (smr, lo, hi)
 
 
@@ -126,24 +133,89 @@ def compute_overdispersion(con, composites_sql, narr_filter="", fy_filter=""):
     return phis
 
 
-def apply_fdr(site_cis, composites, alpha=0.05):
-    """Apply Benjamini-Hochberg FDR correction to SMR significance tests.
+def empirical_bayes_shrinkage(site_cis, composites):
+    """Gamma-Poisson empirical Bayes shrinkage for SMRs.
 
-    Converts quasi-Poisson CIs to z-scores and p-values, then applies BH-FDR.
-    Returns {site: [flag_strings]} for sites that remain significant.
+    Models observed counts as Poisson(E·θ) where θ ~ Gamma(α, β).
+    Estimates α, β per composite via method of moments on (O, E) pairs.
+    Posterior mean: θ_shrunk = (O + α) / (E + β).
+
+    Returns {site: {composite: (smr_shrunk, smr_raw, O, E, shrinkage_pct)}}.
     """
     import numpy as np
+
+    eb_results = {}
+    eb_params = {}
+
+    for c in composites:
+        # Collect (O, E) pairs for all sites with E > 0
+        pairs = []
+        for site, cis in site_cis.items():
+            ci = cis.get(c)
+            if ci and ci[4] > 0:  # expected > 0
+                pairs.append((ci[3], ci[4], site))  # (observed, expected, site)
+
+        if len(pairs) < 3:
+            eb_params[c] = (1.0, 1.0)
+            continue
+
+        Os = np.array([p[0] for p in pairs], dtype=float)
+        Es = np.array([p[1] for p in pairs], dtype=float)
+        smrs = Os / Es
+
+        # Method of moments for gamma prior on θ (the true SMR):
+        # E[θ] = α/β, Var[θ] = α/β²
+        # But observed SMR variance includes sampling variance:
+        # Var(O/E) = Var(θ) + E[1/E_i] (Poisson sampling var)
+        # So: Var(θ) = Var(O/E) - mean(1/E_i)
+        mean_smr = np.mean(smrs)
+        var_smr = np.var(smrs, ddof=1)
+        sampling_var = np.mean(1.0 / Es)  # average Poisson sampling variance
+
+        var_theta = max(var_smr - sampling_var, 0.01 * var_smr)
+
+        # Gamma params from moments: α = μ²/σ², β = μ/σ²
+        alpha_prior = mean_smr ** 2 / var_theta
+        beta_prior = mean_smr / var_theta
+        eb_params[c] = (alpha_prior, beta_prior)
+
+        # Compute shrunken estimates
+        for O, E, site in pairs:
+            smr_raw = O / E
+            smr_shrunk = (O + alpha_prior) / (E + beta_prior)
+            shrinkage_pct = abs(smr_shrunk - smr_raw) / max(abs(smr_raw - 1.0), 0.001) * 100
+            if site not in eb_results:
+                eb_results[site] = {}
+            eb_results[site][c] = (smr_shrunk, smr_raw, O, E, shrinkage_pct)
+
+    return eb_results, eb_params
+
+
+def apply_fdr(site_cis, composites, phis=None, alpha=0.05):
+    """Apply Benjamini-Hochberg FDR correction to SMR significance tests.
+
+    Derives p-values on the log scale (consistent with quasi-Poisson):
+      z = |log(SMR)| / SE(log(SMR)),  SE = sqrt(phi/O)
+    Then applies BH-FDR.
+    Returns {site: [flag_strings]} for sites that remain significant.
+    """
+    import math
+    import numpy as np
+
+    if phis is None:
+        phis = {}
 
     tests = []
     for site, cis in site_cis.items():
         for c in composites:
             ci = cis.get(c)
             if ci:
-                smr, lo, hi = ci[0], ci[1], ci[2]
-                ci_width = hi - lo
-                se = ci_width / (2 * 1.96) if ci_width > 0 else 0
-                if se > 0 and not np.isnan(smr):
-                    z = abs(smr - 1.0) / se
+                smr, lo, hi, observed, expected = ci[0], ci[1], ci[2], ci[3], ci[4]
+                if observed > 0 and expected > 0 and not np.isnan(smr):
+                    phi = phis.get(c, 1.0)
+                    log_smr = math.log(smr)
+                    se_log = math.sqrt(phi / observed)
+                    z = abs(log_smr) / se_log
                     p = 2 * (1 - norm.cdf(z))
                 else:
                     p = 1.0
@@ -173,12 +245,17 @@ def apply_fdr(site_cis, composites, alpha=0.05):
 
 
 def compute_temporal_trends(con, narr_filter="", min_years=3, min_n_per_year=5):
-    """Compute per-site year-on-year trends via OLS, with BH-FDR correction.
+    """Compute per-site year-on-year trends via quasi-Poisson GLM, with BH-FDR.
 
+    Models count ~ FY + offset(log(n_narratives)) with Poisson family, then
+    applies quasi-Poisson correction (scale p-values by Pearson phi).
     Returns list of significant trends: [(site, composite, slope, p_adj, n_years, direction)]
     sorted by absolute slope descending.
     """
+    import math
+    import warnings
     import numpy as np
+    import statsmodels.api as sm
 
     site_fy = con.execute(f"""
         WITH sfy AS (
@@ -189,22 +266,22 @@ def compute_temporal_trends(con, narr_filter="", min_years=3, min_n_per_year=5):
         ),
         sfy_edges AS (
             SELECT n.site, n.fy,
-                COUNT(*) FILTER (e.edge_type IN {VOICE}) AS voice_e,
-                COUNT(*) FILTER (e.edge_type IN {LEADERSHIP}) AS leadership_e,
-                COUNT(*) FILTER (e.edge_type IN {DRIFT}) AS drift_e,
-                COUNT(*) FILTER (e.edge_type IN {CARE}) AS care_e,
-                COUNT(*) FILTER (e.edge_type IN {GROWTH}) AS growth_e
+                COALESCE(COUNT(*) FILTER (e.edge_type IN {VOICE}), 0) AS voice_ct,
+                COALESCE(COUNT(*) FILTER (e.edge_type IN {LEADERSHIP}), 0) AS leadership_ct,
+                COALESCE(COUNT(*) FILTER (e.edge_type IN {DRIFT}), 0) AS drift_ct,
+                COALESCE(COUNT(*) FILTER (e.edge_type IN {CARE}), 0) AS care_ct,
+                COALESCE(COUNT(*) FILTER (e.edge_type IN {GROWTH}), 0) AS growth_ct
             FROM narratives n
             JOIN edges e ON e.narrative_id = n.id
             WHERE e.is_cultural = true
             GROUP BY n.site, n.fy
         )
         SELECT s.site, s.fy, s.n_narr,
-            COALESCE(se.voice_e, 0)::FLOAT / s.n_narr AS voice,
-            COALESCE(se.leadership_e, 0)::FLOAT / s.n_narr AS leadership,
-            COALESCE(se.drift_e, 0)::FLOAT / s.n_narr AS drift,
-            COALESCE(se.care_e, 0)::FLOAT / s.n_narr AS care,
-            COALESCE(se.growth_e, 0)::FLOAT / s.n_narr AS growth
+            COALESCE(se.voice_ct, 0) AS voice,
+            COALESCE(se.leadership_ct, 0) AS leadership,
+            COALESCE(se.drift_ct, 0) AS drift,
+            COALESCE(se.care_ct, 0) AS care,
+            COALESCE(se.growth_ct, 0) AS growth
         FROM sfy s
         LEFT JOIN sfy_edges se ON s.site = se.site AND s.fy = se.fy
         ORDER BY s.site, s.fy
@@ -217,10 +294,30 @@ def compute_temporal_trends(con, narr_filter="", min_years=3, min_n_per_year=5):
         if len(grp) < min_years:
             continue
         fys = grp["fy"].values.astype(float)
+        # Centre FY for numerical stability
+        fy_centred = fys - fys.mean()
+        log_exposure = np.log(grp["n_narr"].values.astype(float))
+        X = sm.add_constant(fy_centred)
         for c in composites:
-            rates = grp[c].values.astype(float)
-            result = linregress(fys, rates)
-            all_trends.append((site, c, result.slope, result.pvalue, len(grp)))
+            counts = grp[c].values.astype(float)
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    model = sm.GLM(counts, X, family=sm.families.Poisson(),
+                                   offset=log_exposure)
+                    result = model.fit()
+                # Quasi-Poisson: scale deviance by Pearson chi2/df
+                phi = result.pearson_chi2 / result.df_resid if result.df_resid > 0 else 1.0
+                phi = max(phi, 1.0)  # don't under-disperse
+                # FY coefficient is index 1; quasi-Poisson t-test
+                beta = result.params[1]
+                se = result.bse[1] * math.sqrt(phi)
+                z = abs(beta) / se if se > 0 else 0
+                p = 2 * (1 - norm.cdf(z))
+                all_trends.append((site, c, beta, p, len(grp)))
+            except Exception:
+                # Convergence failure (rare) — skip this site×composite
+                continue
 
     if not all_trends:
         return []
@@ -407,6 +504,30 @@ def generate_template(con, fy=None, report_type=None, raw=False):
                 cis[c] = (smr, lo, hi, observed, expected)
             site_cis[site] = cis
 
+        # Empirical Bayes shrinkage — pull noisy small-site SMRs toward the mean
+        import math
+        eb_results, eb_params = empirical_bayes_shrinkage(site_cis, composites)
+        for idx, row in dashboard.iterrows():
+            site = row["site"]
+            if site in eb_results:
+                for c in composites:
+                    if c in eb_results[site]:
+                        smr_shrunk = eb_results[site][c][0]
+                        old = site_cis[site][c]
+                        dashboard.at[idx, c] = round(smr_shrunk, 2)
+                        # Recompute CI around shrunken estimate on log scale
+                        O, E = old[3], old[4]
+                        phi = phis.get(c, 1.0)
+                        alpha_p, beta_p = eb_params[c]
+                        if O > 0:
+                            se_log = math.sqrt(phi / (O + alpha_p))
+                            z_val = norm.ppf(0.975)
+                            lo = smr_shrunk * math.exp(-z_val * se_log)
+                            hi = smr_shrunk * math.exp(z_val * se_log)
+                        else:
+                            lo, hi = old[1], old[2]
+                        site_cis[site][c] = (smr_shrunk, lo, hi, O, E)
+
     # Temporal trajectory — rates per narrative by FY (filtered by report_type but not fy)
     temporal = con.execute(f"""
         WITH fy_narr AS (
@@ -438,7 +559,7 @@ def generate_template(con, fy=None, report_type=None, raw=False):
     # Flag outlier sites
     if adjusted:
         # BH-FDR correction across all site×composite tests
-        fdr_flags = apply_fdr(site_cis, composites)
+        fdr_flags = apply_fdr(site_cis, composites, phis=phis)
 
         def flag(row):
             return fdr_flags.get(row["site"], [])
@@ -478,6 +599,7 @@ def generate_template(con, fy=None, report_type=None, raw=False):
     report.append("\n## Executive Dashboard")
     if adjusted:
         report.append("\nStandardised ratios per site (observed / expected given report type mix).")
+        report.append("Empirical Bayes shrinkage applied — small-site estimates pulled toward the org mean.")
         report.append("1.00 = as expected. Flagged at FDR<0.05 (Benjamini-Hochberg, quasi-Poisson):")
         report.append(f"- **Voice** (baseline {avg_voice:.2f}/narr) — communication signal vs expected")
         report.append(f"- **Leadership** (baseline {avg_leadership:.2f}/narr) — directing/overseeing vs expected")
@@ -535,19 +657,21 @@ def generate_template(con, fy=None, report_type=None, raw=False):
                     f"(org avg {avg_voice:.2f}). Low communication signal."
                 )
 
-    # Temporal trends — per-site OLS slopes (only when not filtering to single FY)
+    # Temporal trends — per-site quasi-Poisson GLM (only when not filtering to single FY)
     if not fy:
         trends = compute_temporal_trends(con, narr_filter)
         if trends:
             report.append("\n## Temporal Trends")
             report.append("\nSites with statistically significant year-on-year trends "
-                          "(OLS slope, FDR<0.05):")
-            report.append("\n| Site | Indicator | Slope/yr | Years | Direction |")
-            report.append("|------|-----------|----------|-------|-----------|")
-            for site, c, slope, p, n_years, direction in trends:
+                          "(quasi-Poisson GLM, FDR<0.05). RR = rate ratio per year.")
+            report.append("\n| Site | Indicator | RR/yr | Years | Direction |")
+            report.append("|------|-----------|-------|-------|-----------|")
+            import math
+            for site, c, beta, p, n_years, direction in trends:
+                rr = math.exp(beta)
                 arrow = "\u2191" if direction == "rising" else "\u2193"
                 report.append(
-                    f"| {site} | {c.capitalize()} | {slope:+.3f} | {n_years} | "
+                    f"| {site} | {c.capitalize()} | {rr:.2f} | {n_years} | "
                     f"{arrow} {direction} |"
                 )
         else:
@@ -681,12 +805,13 @@ def generate_funnel(site_cis, output_dir, phis=None):
         es = np.array(es)
         smrs = np.array(smrs)
 
-        # Funnel curves (quasi-Poisson: SMR ≈ 1 ± z·√φ/√E)
+        # Funnel curves on log scale: SE(log(SMR)) = √(φ/E), limits = exp(±z·SE)
         e_range = np.linspace(max(1, es.min() * 0.8), es.max() * 1.1, 300)
-        upper_95 = 1 + 1.96 * phi_sqrt / np.sqrt(e_range)
-        lower_95 = np.maximum(0, 1 - 1.96 * phi_sqrt / np.sqrt(e_range))
-        upper_998 = 1 + 3.09 * phi_sqrt / np.sqrt(e_range)
-        lower_998 = np.maximum(0, 1 - 3.09 * phi_sqrt / np.sqrt(e_range))
+        se_log = phi_sqrt / np.sqrt(e_range)
+        upper_95 = np.exp(1.96 * se_log)
+        lower_95 = np.exp(-1.96 * se_log)
+        upper_998 = np.exp(3.09 * se_log)
+        lower_998 = np.exp(-3.09 * se_log)
 
         ax.fill_between(e_range, lower_998, upper_998, alpha=0.08, color="steelblue")
         ax.fill_between(e_range, lower_95, upper_95, alpha=0.15, color="steelblue")
@@ -698,8 +823,9 @@ def generate_funnel(site_cis, output_dir, phis=None):
 
         # Plot sites — red if outside 95% funnel, blue if inside
         for j in range(len(es)):
-            ul = 1 + 1.96 * phi_sqrt / np.sqrt(es[j])
-            ll = max(0, 1 - 1.96 * phi_sqrt / np.sqrt(es[j]))
+            se_j = phi_sqrt / np.sqrt(es[j])
+            ul = np.exp(1.96 * se_j)
+            ll = np.exp(-1.96 * se_j)
             outside = smrs[j] > ul or smrs[j] < ll
             color = "red" if outside else "steelblue"
             alpha = 0.9 if outside else 0.5
@@ -714,14 +840,19 @@ def generate_funnel(site_cis, output_dir, phis=None):
         ax.set_title(f"{title}{phi_label}", fontweight="bold", fontsize=11)
         ax.set_xlabel("Expected count", fontsize=9)
         ax.set_ylabel("SMR", fontsize=9)
-        ax.set_ylim(bottom=0)
+        # Clip y-axis to data range (log-scale limits blow up at small E)
+        if len(smrs) > 0:
+            ymax = min(max(smrs) * 1.3, upper_95[0] * 1.1)
+            ax.set_ylim(bottom=0, top=max(ymax, 2.5))
+        else:
+            ax.set_ylim(bottom=0)
         ax.tick_params(labelsize=8)
 
     # Hide 6th subplot
     ax6 = axes[5]
     ax6.set_visible(False)
 
-    fig.suptitle("Cultural Graph — Funnel Plots (SMR vs Expected Count, quasi-Poisson)",
+    fig.suptitle("Cultural Graph — Funnel Plots (SMR vs Expected Count, log-scale quasi-Poisson)",
                  fontweight="bold", fontsize=13)
     fig.tight_layout(rect=[0, 0, 1, 0.95])
 
@@ -924,10 +1055,33 @@ def generate_monthly_tracker(con, report_type=None, raw=False):
                 cis[c] = (smr, lo, hi, observed, expected)
             site_cis[site] = cis
 
+        # Empirical Bayes shrinkage
+        import math
+        eb_results, eb_params = empirical_bayes_shrinkage(site_cis, composites)
+        for idx, row in dashboard.iterrows():
+            site = row["site"]
+            if site in eb_results:
+                for c in composites:
+                    if c in eb_results[site]:
+                        smr_shrunk = eb_results[site][c][0]
+                        old = site_cis[site][c]
+                        dashboard.at[idx, c] = round(smr_shrunk, 2)
+                        O, E = old[3], old[4]
+                        phi = phis.get(c, 1.0)
+                        alpha_p, beta_p = eb_params[c]
+                        if O > 0:
+                            se_log = math.sqrt(phi / (O + alpha_p))
+                            z_val = norm.ppf(0.975)
+                            lo = smr_shrunk * math.exp(-z_val * se_log)
+                            hi = smr_shrunk * math.exp(z_val * se_log)
+                        else:
+                            lo, hi = old[1], old[2]
+                        site_cis[site][c] = (smr_shrunk, lo, hi, O, E)
+
     # Compute current flags
     current_flags = {}
     if adjusted:
-        fdr_flags = apply_fdr(site_cis, composites)
+        fdr_flags = apply_fdr(site_cis, composites, phis=phis)
         for site, flags in fdr_flags.items():
             current_flags[site] = flags
     else:
