@@ -1395,6 +1395,150 @@ def generate_caterpillar(site_cis, output_dir, phis=None, eb_params=None):
     return out_path
 
 
+def generate_trend_caterpillar(con, output_dir, narr_filter="",
+                               min_years=3, min_n_per_year=5):
+    """Generate trend caterpillar plots — rate ratios with CIs ordered by magnitude.
+
+    Fits quasi-Poisson GLM (count ~ FY + offset(log(N))) per site×composite,
+    then plots all trends (not just FDR-significant) as rate ratios with 95% CIs.
+    Red = FDR-significant trend. Blue = consistent with no trend.
+    """
+    import math
+    import warnings
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import statsmodels.api as sm
+
+    site_fy = con.execute(f"""
+        WITH sfy AS (
+            SELECT site, fy, COUNT(*) AS n_narr
+            FROM narratives {narr_filter}
+            GROUP BY site, fy
+            HAVING COUNT(*) >= {min_n_per_year}
+        ),
+        sfy_edges AS (
+            SELECT n.site, n.fy,
+                COALESCE(COUNT(*) FILTER (e.edge_type IN {VOICE}), 0) AS voice_ct,
+                COALESCE(COUNT(*) FILTER (e.edge_type IN {LEADERSHIP}), 0) AS leadership_ct,
+                COALESCE(COUNT(*) FILTER (e.edge_type IN {DRIFT}), 0) AS drift_ct,
+                COALESCE(COUNT(*) FILTER (e.edge_type IN {CARE}), 0) AS care_ct,
+                COALESCE(COUNT(*) FILTER (e.edge_type IN {GROWTH}), 0) AS growth_ct
+            FROM narratives n
+            JOIN edges e ON e.narrative_id = n.id
+            WHERE e.is_cultural = true
+            GROUP BY n.site, n.fy
+        )
+        SELECT s.site, s.fy, s.n_narr,
+            COALESCE(se.voice_ct, 0) AS voice,
+            COALESCE(se.leadership_ct, 0) AS leadership,
+            COALESCE(se.drift_ct, 0) AS drift,
+            COALESCE(se.care_ct, 0) AS care,
+            COALESCE(se.growth_ct, 0) AS growth
+        FROM sfy s
+        LEFT JOIN sfy_edges se ON s.site = se.site AND s.fy = se.fy
+        ORDER BY s.site, s.fy
+    """).fetchdf()
+
+    composites = ["voice", "leadership", "drift", "care", "growth"]
+    titles = ["Voice", "Leadership", "Drift", "Care", "Growth"]
+
+    # Fit all trends (not just significant)
+    all_trends = []  # (site, composite, beta, se, p, n_years)
+    for site, grp in site_fy.groupby("site"):
+        if len(grp) < min_years:
+            continue
+        fys = grp["fy"].values.astype(float)
+        fy_centred = fys - fys.mean()
+        log_exposure = np.log(grp["n_narr"].values.astype(float))
+        X = sm.add_constant(fy_centred)
+        for c in composites:
+            counts = grp[c].values.astype(float)
+            try:
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    model = sm.GLM(counts, X, family=sm.families.Poisson(),
+                                   offset=log_exposure)
+                    result = model.fit()
+                phi = max(result.pearson_chi2 / result.df_resid, 1.0) if result.df_resid > 0 else 1.0
+                beta = result.params[1]
+                se = result.bse[1] * math.sqrt(phi)
+                p = 2 * (1 - norm.cdf(abs(beta) / se)) if se > 0 else 1.0
+                all_trends.append((site, c, beta, se, p, len(grp)))
+            except Exception:
+                continue
+
+    if not all_trends:
+        return None
+
+    # BH-FDR across all tests
+    pvals = np.array([t[4] for t in all_trends])
+    n_tests = len(pvals)
+    sorted_idx = np.argsort(pvals)
+    thresholds = (np.arange(1, n_tests + 1) / n_tests) * 0.05
+    rejected = np.zeros(n_tests, dtype=bool)
+    below = pvals[sorted_idx] <= thresholds
+    if below.any():
+        max_k = int(np.max(np.where(below)))
+        rejected[sorted_idx[: max_k + 1]] = True
+
+    # Group by composite
+    by_comp = {c: [] for c in composites}
+    for i, (site, c, beta, se, p, n_years) in enumerate(all_trends):
+        rr = math.exp(max(min(beta, 5), -5))
+        rr_lo = math.exp(max(beta - 1.96 * se, -5))
+        rr_hi = math.exp(min(beta + 1.96 * se, 5))
+        short = site.split(" ")[-1] if " " in site else site
+        by_comp[c].append((rr, rr_lo, rr_hi, short, rejected[i]))
+
+    fig, axes = plt.subplots(1, 5, figsize=(22, 10), sharey=False)
+
+    for i, (c, title) in enumerate(zip(composites, titles)):
+        ax = axes[i]
+        entries = by_comp[c]
+        if not entries:
+            ax.set_visible(False)
+            continue
+
+        # Sort by RR ascending
+        entries.sort(key=lambda x: x[0])
+        rrs = [e[0] for e in entries]
+        los = [e[1] for e in entries]
+        his = [e[2] for e in entries]
+        labels = [e[3] for e in entries]
+        sigs = [e[4] for e in entries]
+        ys = np.arange(len(entries))
+
+        for j in range(len(entries)):
+            color = "firebrick" if sigs[j] else "steelblue"
+            ax.plot([los[j], his[j]], [ys[j], ys[j]], color=color,
+                    linewidth=1.2, alpha=0.7, solid_capstyle="round")
+            ax.plot(rrs[j], ys[j], "o", color=color, markersize=3.5, zorder=5)
+
+        ax.axvline(x=1.0, color="grey", linestyle="-", linewidth=0.8)
+        ax.set_yticks(ys)
+        ax.set_yticklabels(labels, fontsize=6)
+        ax.set_xlabel("Rate ratio / year", fontsize=9)
+        ax.set_title(title, fontweight="bold", fontsize=11)
+        ax.tick_params(axis="x", labelsize=8)
+        # Clip x-axis
+        xmin = max(min(los) * 0.9, 0.1)
+        xmax = min(max(his) * 1.1, 5.0)
+        ax.set_xlim(left=min(xmin, 0.5), right=max(xmax, 2.0))
+
+    fig.suptitle("Cultural Graph — Trend Caterpillar (Rate Ratio/year with 95% CI, FDR-corrected)",
+                 fontweight="bold", fontsize=13)
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = output_dir / "trend-caterpillar-plots.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Trend caterpillar plots: {out_path}")
+    return out_path
+
+
 def generate_monthly_tracker(con, report_type=None, raw=False):
     """Generate monthly tracker entry with flag change detection.
 
@@ -1784,6 +1928,7 @@ def main():
             generate_funnel(site_cis, OUTPUT_DIR, phis=phis)
         if args.caterpillar:
             generate_caterpillar(site_cis, OUTPUT_DIR, phis=phis)
+            generate_trend_caterpillar(con, OUTPUT_DIR)
 
     if args.csv:
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
