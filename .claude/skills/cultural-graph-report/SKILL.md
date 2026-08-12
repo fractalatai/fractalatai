@@ -61,10 +61,10 @@ Standard Voice/Drift/Care dashboard, "Sites to Watch", temporal trajectory.
 # Raw unadjusted — blended rates without controlling for report type mix
 /usr/bin/python3 scripts/cultural-graph/generate_report.py --template --raw
 
-# Funnel plots — NHS-style SMR vs expected count with control limits (PNG)
+# Funnel plots — NHS-style SRR vs expected count with control limits (PNG)
 /usr/bin/python3 scripts/cultural-graph/generate_report.py --funnel
 
-# Caterpillar plots — SMRs with CIs ordered by value (PNG)
+# Caterpillar plots — SRRs with CIs ordered by value (PNG)
 /usr/bin/python3 scripts/cultural-graph/generate_report.py --caterpillar
 
 # Template + both plots in one run
@@ -75,11 +75,11 @@ Output: `data/qq/cultural-graph/reports/cultural-graph-report-{suffix}.md` and o
 
 The report auto-generates:
 - Overview stats (narratives, sites, cultural edges)
-- Executive dashboard — SMR per site with EB shrinkage, flagged at FDR<0.05 (log-scale quasi-Poisson CIs, BH)
-- "Sites to Watch" — top outliers with SMR and 95% CI
+- Executive dashboard — SRR per site with EB shrinkage, flagged at FDR<0.05 (log-scale quasi-Poisson CIs, BH)
+- "Sites to Watch" — top outliers with SRR and 95% CI
 - Temporal trends — sites with significant year-on-year rate ratios (quasi-Poisson GLM, FDR-corrected)
 - Temporal trajectory — org-wide composite rates by FY
-- Detectable effect sizes — power analysis showing minimum SMR deviation per site size
+- Detectable effect sizes — power analysis showing minimum SRR deviation per site size
 - Sector analysis — cross-sector rate comparison (flags potential confound)
 - Sensitivity analysis — flag robustness under phi/baseline/threshold perturbations
 - Extraction quality — per-batch edge rates with drift alerting
@@ -88,11 +88,11 @@ The report auto-generates:
 
 | View | Flag | Use case |
 |------|------|----------|
-| **Adjusted** | (default) | Cross-site comparison. SMR (observed/expected) controlling for report type mix, with EB shrinkage. Flagged at FDR<0.05. |
+| **Adjusted** | (default) | Cross-site comparison. SRR (observed/expected) controlling for report type mix, with EB shrinkage. Flagged at FDR<0.05. |
 | **Per report type** | `--report-type "X"` | Site-level deep dives. Compares like with like. No adjustment needed — single type = no mix. |
 | **Raw** | `--raw` | Unadjusted blended rates with 30% threshold flags. Not recommended for cross-site comparison — confounded by report type mix. |
-| **Funnel** | `--funnel` | NHS-style funnel plot (PNG). Shows SMR vs expected count with log-scale quasi-Poisson control limits. Visually explains why small sites aren't flagged. |
-| **Caterpillar** | `--caterpillar` | SMRs with CIs ordered by value (PNG). Shows ranking and precision per site. Red = CI excludes 1.0. |
+| **Funnel** | `--funnel` | NHS-style funnel plot (PNG). Shows SRR vs expected count with log-scale quasi-Poisson control limits. Visually explains why small sites aren't flagged. |
+| **Caterpillar** | `--caterpillar` | SRRs with CIs ordered by value (PNG). Shows ranking and precision per site. Red = CI excludes 1.0. |
 
 When `--report-type` is set, adjustment is skipped automatically. `--funnel`/`--caterpillar` require adjusted data (incompatible with `--raw`).
 
@@ -150,13 +150,13 @@ Org average = population mean (total edges / total narratives).
 
 ### Statistical methodology (default adjusted view)
 
-The default report uses **Standardised Morbidity Ratios (SMR)**: observed edge count / expected count given the site's report type mix. SMR = 1.0 means as expected; >1.0 = more; <1.0 = less.
+The default report uses **Standardised Morbidity Ratios (SRR)**: observed edge count / expected count given the site's report type mix. SRR = 1.0 means as expected; >1.0 = more; <1.0 = less.
 
 Four layers of statistical correction:
 1. **Indirect standardisation** — controls for report type mix (Growth differs 42x across report types)
-2. **Log-scale quasi-Poisson CIs** — SE(log(SMR)) = √(φ/O), CI = exp(log(SMR) ± z·SE). Naturally asymmetric; corrects for overdispersion (φ ranges 1.2–2.2 across composites)
-3. **Empirical Bayes shrinkage** — gamma-Poisson prior estimated via method of moments. SMR_shrunk = (O + α) / (E + β). Small sites pulled toward org mean; large sites barely change. Prevents C-suite overreaction to noisy small-site estimates (same approach as CMS Hospital Compare, NHS hospital profiling)
-4. **Benjamini-Hochberg FDR** — corrects for multiple comparisons (5 composites × ~44 sites ≈ 220 tests). P-values derived on log scale: z = |log(SMR)| / SE(log(SMR))
+2. **Log-scale quasi-Poisson CIs** — SE(log(SRR)) = √(φ/O), CI = exp(log(SRR) ± z·SE). Naturally asymmetric; corrects for overdispersion (φ ranges 1.2–2.2 across composites)
+3. **Empirical Bayes shrinkage** — gamma-Poisson prior estimated via method of moments. SRR_shrunk = (O + α) / (E + β). Small sites pulled toward org mean; large sites barely change. Prevents C-suite overreaction to noisy small-site estimates (same approach as CMS Hospital Compare, NHS hospital profiling)
+4. **Benjamini-Hochberg FDR** — corrects for multiple comparisons (5 composites × ~44 sites ≈ 220 tests). P-values derived on log scale: z = |log(SRR)| / SE(log(SRR))
 
 A site is flagged HIGH/LOW only when its FDR-adjusted p-value < 0.05. Sites with N < 10 narratives are excluded (estimates would be >60% prior-driven).
 
@@ -181,12 +181,12 @@ Per-capita rates (edges per headcount) are computed downstream in PowerBI by joi
 - Reports are generated from DuckDB, not from raw JSONL — always run `/cultural-graph-load` first
 - **Monthly workflow**: after each `/cultural-graph-load`, run `--monthly-tracker` to append the latest scorecard. This replaces manually updating the prose briefs each month.
 - The prose briefs (`site-cultural-profiles-brief.md`, `cultural-graph-executive-summary.md`) are static explainer documents — update only on structural changes (schema version, new edge types, methodology changes)
-- The templated report is designed for C-suite consumption — SMR ratios per site, statistically rigorous flagging, funnel plots for visual communication
+- The templated report is designed for C-suite consumption — SRR ratios per site, statistically rigorous flagging, funnel plots for visual communication
 - The PowerBI CSV is one row per site-year-report_type combination — pivot/filter in PowerBI
 - Bespoke analysis uses DuckDB SQL directly — no script needed, just query
-- **Report type confound**: blended rates confound genuine cultural differences with report type mix (Growth differs 42x between Positive Observations and Injury reports). The default view controls for this via SMR (indirect standardisation). Use `--report-type` for per-type deep dives, `--raw` for unadjusted view
+- **Report type confound**: blended rates confound genuine cultural differences with report type mix (Growth differs 42x between Positive Observations and Injury reports). The default view controls for this via SRR (indirect standardisation). Use `--report-type` for per-type deep dives, `--raw` for unadjusted view
 - **Funnel plots** (`--funnel`): the standard NHS/CQC visualisation for comparing institutional rates. Visually explains why small sites aren't flagged — the funnel is wide at low expected counts. Log-scale quasi-Poisson control limits: exp(±z·√φ/√E), naturally asymmetric (φ shown per composite)
-- **Caterpillar plots** (`--caterpillar`): SMRs with 95% CIs ordered by value. One subplot per composite. Red = CI excludes 1.0. Shows site ranking and precision at a glance
+- **Caterpillar plots** (`--caterpillar`): SRRs with 95% CIs ordered by value. One subplot per composite. Red = CI excludes 1.0. Shows site ranking and precision at a glance
 - **Sector confound**: AUS sites have ~50% lower edge rates per narrative than UKD. Current baselines are org-wide (dominated by UKD) — AUS sites may be unfairly flagged LOW. The Sector Analysis section in the report makes this visible. A `--sector-adjust` flag may be needed in future
 - **Extraction drift**: report includes per-batch edge rates. With ≥3 batches, alerts on batches >2σ from historical mean
 - Design options and statistical research documented in `.claude/plans/cultural-graph/monthly-tracker-options.md`

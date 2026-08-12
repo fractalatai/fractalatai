@@ -712,7 +712,7 @@ def generate_template(con, fy=None, report_type=None, raw=False):
 
     report.append("\n## Executive Dashboard")
     if adjusted:
-        report.append("\nStandardised ratios per site (observed / expected given report type mix).")
+        report.append("\nStandardised rate ratios (SRR) per site (observed / expected given report type mix).")
         report.append("Empirical Bayes shrinkage applied — small-site estimates pulled toward the org mean.")
         report.append("1.00 = as expected. Flagged at FDR<0.05 (Benjamini-Hochberg, quasi-Poisson).")
     else:
@@ -741,7 +741,7 @@ def generate_template(con, fy=None, report_type=None, raw=False):
             if adjusted:
                 ci = site_cis.get(row["site"], {}).get("drift", (0, 0, 0))
                 report.append(
-                    f"\n{watch_count}. **{row['site']}** — Drift SMR {row['drift']:.2f} "
+                    f"\n{watch_count}. **{row['site']}** — Drift SRR {row['drift']:.2f} "
                     f"(95% CI: {ci[1]:.2f}–{ci[2]:.2f}). "
                     f"Statistically significant excess after controlling for report type mix."
                 )
@@ -756,7 +756,7 @@ def generate_template(con, fy=None, report_type=None, raw=False):
             if adjusted:
                 ci = site_cis.get(row["site"], {}).get("voice", (0, 0, 0))
                 report.append(
-                    f"\n{watch_count}. **{row['site']}** — Voice SMR {row['voice']:.2f} "
+                    f"\n{watch_count}. **{row['site']}** — Voice SRR {row['voice']:.2f} "
                     f"(95% CI: {ci[1]:.2f}–{ci[2]:.2f}). "
                     f"Statistically significant deficit after controlling for report type mix."
                 )
@@ -812,14 +812,14 @@ def generate_template(con, fy=None, report_type=None, raw=False):
                 baselines_avg[c] = 0.5
         power = compute_power_analysis(phis, eb_params, baselines_avg)
         report.append("\n## Detectable Effect Sizes")
-        report.append("\nMinimum SMR deviation detectable at each site size "
+        report.append("\nMinimum SRR deviation detectable at each site size "
                       "(95% CI excludes 1.0, quasi-Poisson + EB shrinkage):")
         report.append("\n| N | Voice | Leadership | Drift | Care | Growth |")
         report.append("|---|-------|------------|-------|------|--------|")
         for N, row in power:
             cols = " | ".join(f"{row[c][0]:.2f}–{row[c][1]:.2f}" for c in composites)
             report.append(f"| {N} | {cols} |")
-        report.append("\n*Read: at N=50, only Voice SMRs below "
+        report.append("\n*Read: at N=50, only Voice SRRs below "
                       f"{power[3][1]['voice'][0]:.2f} or above "
                       f"{power[3][1]['voice'][1]:.2f} are detectable.*")
 
@@ -886,7 +886,7 @@ def generate_template(con, fy=None, report_type=None, raw=False):
                         f"{si['voice']:.2f} | {si['leadership']:.2f} | "
                         f"{si['drift']:.2f} | {si['care']:.2f} | {si['growth']:.2f} |"
                     )
-                report.append("\n*Note: current SMRs use org-wide report-type baselines "
+                report.append("\n*Note: current SRRs use org-wide report-type baselines "
                               "(dominated by largest sector). Sector-level baselines "
                               "differ substantially — consider `--sector-adjust` if "
                               "within-sector comparison is needed.*")
@@ -923,7 +923,7 @@ def generate_template(con, fy=None, report_type=None, raw=False):
 
     report.append("\n---")
     if adjusted:
-        report.append(f"\n*Report generated from {DUCKDB_PATH}. Values = standardised ratios "
+        report.append(f"\n*Report generated from {DUCKDB_PATH}. Values = standardised rate ratios "
                       f"(observed / expected given report type mix). Flagged at FDR<0.05 "
                       f"(Benjamini-Hochberg, quasi-Poisson CIs). "
                       f"Cultural relationships extracted by Qwen 3 8B fine-tuned model.*")
@@ -1071,7 +1071,7 @@ def generate_funnel(site_cis, output_dir, phis=None):
         phi_label = f" (φ={phi:.1f})" if phi > 1.05 else ""
         ax.set_title(f"{title}{phi_label}", fontweight="bold", fontsize=11)
         ax.set_xlabel("Expected count", fontsize=9)
-        ax.set_ylabel("SMR", fontsize=9)
+        ax.set_ylabel("SRR", fontsize=9)
         # Clip y-axis to data range (log-scale limits blow up at small E)
         if len(smrs) > 0:
             ymax = min(max(smrs) * 1.3, upper_95[0] * 1.1)
@@ -1084,7 +1084,7 @@ def generate_funnel(site_cis, output_dir, phis=None):
     ax6 = axes[5]
     ax6.set_visible(False)
 
-    fig.suptitle("Cultural Graph — Funnel Plots (SMR vs Expected Count, log-scale quasi-Poisson)",
+    fig.suptitle("Cultural Graph — Funnel Plots (SRR vs Expected Count, log-scale quasi-Poisson)",
                  fontweight="bold", fontsize=13)
     fig.tight_layout(rect=[0, 0, 1, 0.95])
 
@@ -1321,7 +1321,7 @@ def compute_power_analysis(phis, eb_params, baselines_avg,
 
 
 def generate_caterpillar(site_cis, output_dir, phis=None, eb_params=None):
-    """Generate caterpillar plots — SMRs with CIs ordered by value.
+    """Generate caterpillar plots — SRRs with CIs ordered by value.
 
     One subplot per composite. Sites ordered by SMR (ascending), horizontal
     error bars showing 95% CI. Sites where CI excludes 1.0 are coloured red.
@@ -1374,7 +1374,7 @@ def generate_caterpillar(site_cis, output_dir, phis=None, eb_params=None):
         ax.axvline(x=1.0, color="grey", linestyle="-", linewidth=0.8)
         ax.set_yticks(ys)
         ax.set_yticklabels(labels, fontsize=6)
-        ax.set_xlabel("SMR", fontsize=9)
+        ax.set_xlabel("SRR", fontsize=9)
         phi = phis.get(c, 1.0)
         phi_label = f" (φ={phi:.1f})" if phi > 1.05 else ""
         ax.set_title(f"{title}{phi_label}", fontweight="bold", fontsize=11)
@@ -1383,7 +1383,7 @@ def generate_caterpillar(site_cis, output_dir, phis=None, eb_params=None):
         xmax = min(max(his) * 1.1, 5.0)
         ax.set_xlim(left=0, right=max(xmax, 2.5))
 
-    fig.suptitle("Cultural Graph — Caterpillar Plots (SMR with 95% CI, ordered by value)",
+    fig.suptitle("Cultural Graph — Caterpillar Plots (SRR with 95% CI, ordered by value)",
                  fontweight="bold", fontsize=13)
     fig.tight_layout(rect=[0, 0, 1, 0.95])
 
@@ -1884,9 +1884,9 @@ def main():
     parser.add_argument("--raw", action="store_true",
                         help="Unadjusted blended rates (default adjusts for report type mix)")
     parser.add_argument("--funnel", action="store_true",
-                        help="Generate funnel plots (PNG) from adjusted SMR data")
+                        help="Generate funnel plots (PNG) from adjusted SRR data")
     parser.add_argument("--caterpillar", action="store_true",
-                        help="Generate caterpillar plots (PNG) — SMRs with CIs ordered by value")
+                        help="Generate caterpillar plots (PNG) — SRRs with CIs ordered by value")
     parser.add_argument("--output", help="Output file path (default: auto-named)")
     args = parser.parse_args()
 
@@ -1894,7 +1894,7 @@ def main():
         parser.error("Specify --template, --csv, --monthly-tracker, --funnel, or --caterpillar")
 
     if (args.funnel or args.caterpillar) and args.raw:
-        parser.error("--funnel/--caterpillar require adjusted SMR data (incompatible with --raw)")
+        parser.error("--funnel/--caterpillar require adjusted SRR data (incompatible with --raw)")
 
     con = get_connection()
 
@@ -1922,7 +1922,7 @@ def main():
 
     if args.funnel or args.caterpillar:
         if not site_cis:
-            parser.error("--funnel/--caterpillar require adjusted SMR data (no site_cis computed)")
+            parser.error("--funnel/--caterpillar require adjusted SRR data (no site_cis computed)")
         phis = compute_overdispersion(con, ["voice", "leadership", "drift", "care", "growth"])
         if args.funnel:
             generate_funnel(site_cis, OUTPUT_DIR, phis=phis)
