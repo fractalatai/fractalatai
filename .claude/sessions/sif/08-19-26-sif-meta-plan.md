@@ -12,7 +12,7 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 
 ## Todo
 
-- ⬜ S1: SIPmath engine — `fractalaw-sipmath` crate (metalog, HDR, SIP composition, SIPmath 3.0 JSON)
+- ✅ S1: SIPmath engine — `fractalaw-sipmath` crate (1,055 lines, 21 tests, zero math deps)
 - ⬜ S2: Taxonomy & data — ICD-11 taxonomy, OSHA data, calibration curves, mitigation library, benchmark set
 - ⬜ S3: SIF simulator — Product 2, CLI + WASM, energy params → severity → mitigations → residual P(SIF)
 - ⬜ S4: Mechanism classifier — Stage 1, Qwen 3 0.6B fine-tune, ONNX, multi-label mechanism + object
@@ -29,7 +29,7 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 
 | # | Session | Phase | Depends On | Status | Deliverable |
 |---|---------|-------|------------|--------|-------------|
-| S1 | `sipmath-engine` | 0 | — | PENDING | Publishable `fractalaw-sipmath` crate, ~500 lines, WASM |
+| S1 | `sipmath-engine` | 0 | — | **CLOSED** | `fractalaw-sipmath` crate, 1,055 lines, 21 tests. WASM deferred to S3 |
 | S2 | `taxonomy-and-data` | 1 | S1 (metalog for calibration) | PENDING | ICD-11 labels, OSHA data, calibration curves, mitigation library, 2K benchmark |
 | S3 | `simulator` | 2 | S1, S2 | PENDING | CLI `sif sim` + WASM prototype, validates calibration curves |
 | S4 | `mechanism-classifier` | 3 | S2 (training data) | PENDING | Stage 1 ONNX classifier, CLI `sif classify`, F1 ≥ 0.85 |
