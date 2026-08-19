@@ -26,7 +26,7 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 |---------|------|--------|-----|
 | OSHA ITA Case Detail | **TRAINING** | 1.6M rows (2023+2024) | Narratives + OIICS event codes = mechanism labels. The OIICS codes ARE the training labels via the mapping table. |
 | Synthetic (Gemini) | **TRAINING (balance)** | ~1,680 events | Only for 5 underrepresented high-SIF classes (pressure, water, collapse, oxygen, fires). <30% of any class. Generated during S4. |
-| QQ SIF events | **TEST/BENCHMARK ONLY** | 2,747 events | Human SIFp labels. NEVER train on this. Measures classifier–human agreement vs 65% baseline. |
+| QQ SIF events | **CORRELATION TEST** | 2,747 events | Human SIFp labels (subjective, ~65% inter-rater agreement). NEVER train on this. Measures classifier–human correlation and explores where/why they differ — NOT gold standard, NOT scored as accuracy. |
 | OSHA (held-out split) | **VALIDATION** | ~10% of OSHA | Standard train/val split from OSHA data. Used during fine-tuning for early stopping. |
 
 ## Dependencies
