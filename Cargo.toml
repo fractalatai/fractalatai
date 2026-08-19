@@ -8,6 +8,7 @@ members = [
     "crates/fractalaw-host",
     "crates/fractalaw-cli",
     "crates/fractalaw-sync-cli",
+    "crates/fractalaw-sipmath",
 ]
 
 [workspace.package]

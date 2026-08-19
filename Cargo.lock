@@ -3490,6 +3490,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "fractalaw-sipmath"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "fractalaw-store"
 version = "0.1.0"
 dependencies = [
