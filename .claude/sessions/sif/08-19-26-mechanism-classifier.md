@@ -17,13 +17,14 @@ Stage 1 of the SIF classifier: single-label text classification from incident na
 - ✅ Supplementary real data: MSHA (274K mine accidents) + OSHA SIR (79K severe injuries) — no synthetic needed
 - ✅ Build test sets: OSHA held-out 1,940 + QQ correlation test 2,744
 - ✅ Training data v2: 15,151 train + 1,683 val (stratified 90/10), MSHA merged, pre-processed, instruction format
-- ⬜ Fine-tune Qwen 3 0.6B on RunPod — LoRA, weighted loss, instruction-tuning format. Inference on QQ data also on RunPod (bulk).
-- ⬜ Export to ONNX
-- ⬜ Evaluate against OSHA held-out (macro F1 by mechanism) + QQ correlation test
+- ✅ Fine-tune run 1: Qwen 3 0.6B / 20 labels — macro F1 = 0.742. Fall and struck pairs confused.
+- ✅ Fine-tune run 2: Qwen 3 1.7B / 18 labels (merged fall, struck) — macro F1 = 0.810. Gate accuracy 92.5%.
+- ⬜ Fine-tune run 3: single-model approach (mechanism + energy in one pass) — Gemini suggestion, compare to two-stage
+- ⬜ Export best model to ONNX
+- ⬜ Evaluate against QQ correlation test (bulk inference on RunPod)
 - ⬜ Implement `fractalaw-ai::sif::classifier` — ONNX inference wrapper
 - ⬜ Add auto-non-SIF gate logic
 - ⬜ CLI command `sif classify` — single event or batch
-- ⬜ If 0.6B insufficient, try 1.7B and document trade-off
 
 ## Dependencies
 
@@ -92,3 +93,42 @@ Informed by two Gemini reviews (`data/code-review/sif-training-plan-review.md`, 
 - Interesting findings will be in the disagreements: where the classifier flags SIF potential that humans missed (energy was present but outcome was lucky), or where humans flag SIF that the classifier doesn't see (humans picking up on context the narrative doesn't capture)
 
 **Future enhancement:** A 1-2K event human-annotated gold set (50-100 per class, domain expert curated) would provide a true accuracy baseline. Currently not available.
+
+## Training Run Results
+
+### Run 1: Qwen 3 0.6B / 20 labels
+
+- Model: Qwen/Qwen3-0.6B, LoRA r=16 α=32, 3 epochs, lr=2e-4, batch 16, bf16
+- Labels: 20 (15 NEEDS_ASSESSMENT + 5 AUTO_NON_SIF) with fall_height and fall_same_level separate, struck_by and struck_against separate
+- Training: 15,151 train + 1,683 val
+- **Macro F1: 0.742** | Micro F1: 0.740
+- Strong: breathing 0.985, radiation_noise 0.970, thermal 0.966, electrical 0.965
+- Weak: abrasion 0.330, fall_height 0.389, struck_by 0.459, fall_same_level 0.544
+- **Decision:** Merge confusable pairs (fall_height + fall_same_level → fall, struck_by + struck_against → struck), try 1.7B
+
+### Run 2: Qwen 3 1.7B / 18 labels (merged)
+
+- Model: Qwen/Qwen3-1.7B, LoRA r=16 α=32, 3 epochs, lr=2e-4, batch 8 + grad_accum 2, bf16
+- Labels: 18 (13 NEEDS_ASSESSMENT + 5 AUTO_NON_SIF) with merged fall and struck
+- Training: 13,351 train + 1,483 val
+- **Macro F1: 0.810** | Micro F1: 0.815
+- Strong: electrical 0.975, chemical 0.971, breathing 0.970, radiation_noise 0.969
+- Weak: abrasion 0.384, struck 0.449, caught_in 0.585
+- Note: 0.6B OOM'd at batch 16 on 4090 24GB; batch 8 + grad_accum 2 fixed it (16GB VRAM)
+
+**SIF gate analysis (the metric that matters for safety):**
+- Gate accuracy: 92.5%
+- False negatives (SIF→non-SIF): 4.2% (63/1483) — struck→abrasion (19), fall→slip (13) are main leaks
+- False positives (non-SIF→SIF): 3.2% (48/1483) — harmless, just unnecessary Stage 2 analysis
+- Within-NEEDS_ASSESSMENT confusion: fire↔explosion (36), struck↔caught_in↔structural_collapse — all still go to Stage 2, so no safety impact
+
+### Run 3: Single-model (planned)
+
+Per Gemini v0.1 review suggestion — try a single larger model that does mechanism + energy analysis in one pass. Compare end-to-end SIF classification accuracy against the two-stage pipeline. This combines S4 and S5 scope into one experiment.
+
+### RunPod workspace
+
+All artefacts persist on `/workspace/sif/` (network volume, survives pod stop):
+- `/workspace/sif/data/` — training parquet, val parquet, labels, benchmarks
+- `/workspace/sif/models/mechanism-classifier/` — LoRA adapter, tokenizer, meta, report
+- `/workspace/sif/scripts/` — finetune_mechanism.py
