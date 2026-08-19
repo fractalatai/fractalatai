@@ -13,7 +13,8 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 ## Todo
 
 - ✅ S1: SIPmath engine — `fractalaw-sipmath` crate (1,055 lines, 21 tests, zero math deps)
-- ⬜ S2: Taxonomy & data — ICD-11 taxonomy, OSHA data, calibration curves, mitigation library, benchmark set
+- ⬜ S2: Taxonomy & data — ICD-11 taxonomy, OSHA data, QQ ingest, synthetic gen, benchmark set
+- ⬜ S2a: Calibration curves — energy × magnitude → severity metalog, mitigation effectiveness library
 - ⬜ S3: SIF simulator — Product 2, CLI + WASM, energy params → severity → mitigations → residual P(SIF)
 - ⬜ S4: Mechanism classifier — Stage 1, Qwen 3 0.6B fine-tune, ONNX, multi-label mechanism + object
 - ⬜ S5: Energy analyser — Stage 2, Qwen 3 4B fine-tune, structured JSON extraction, severity quantiles

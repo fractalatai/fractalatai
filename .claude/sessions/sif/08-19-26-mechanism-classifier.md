@@ -12,6 +12,9 @@ Stage 1 of the SIF classifier: multi-label text classification from incident nar
 
 ## Todo
 
+- ⬜ Finalise classifier label set: which OIICS→mechanism groupings become training labels
+- ⬜ Generate synthetic training data (Gemini) for underrepresented classes (~1,680 events, <30% of mix)
+- ⬜ Build benchmark set (~2,000 events, 100% real-world from OSHA + QQ)
 - ⬜ Prepare training data: OSHA narratives + ICD-11 labels + synthetic balance data
 - ⬜ Fine-tune Qwen 3 0.6B on RunPod — multi-label classification head
 - ⬜ Export to ONNX

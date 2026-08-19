@@ -22,8 +22,12 @@ Backs up everything. Takes ~5 minutes.
 | Source | Size | Changes when |
 |--------|------|-------------|
 | Postgres (pg_dump) | ~400 MB | Every pipeline run |
-| DuckDB | ~200 MB | Every enrich/publish |
+| DuckDB (fractalaw) | ~200 MB | Every enrich/publish |
+| DuckDB (cultural-graph) | ~50 MB | Monthly cultural graph load |
+| DuckDB (sif) | ~TBD | SIF classification runs |
 | LanceDB | 370 MB–1.4 GB | New law ingestion, re-embed |
+| SIF taxonomy + sources | ~220 MB | ICD-11 download, OSHA data acquisition |
+| SIF calibration + models | ~TBD | Calibration curve fitting, model training |
 | Classifiers | ~60 KB (JSON in crates/fractalaw-cli/config/) | Retrain classifier |
 | SLM adapter | ~125 MB | Retrain SLM on RunPod |
 | GGUF model | ~2.4 GB | Retrain SLM on RunPod |
@@ -61,7 +65,7 @@ du -sh "$BACKUP_DIR/fractalaw.pgdump" "$BACKUP_DIR/fractalaw.duckdb"
 ls /mnt/nas/sertantai-data/data/
 
 # Check local data sizes
-du -sh data/fractalaw.duckdb data/lancedb/
+du -sh data/fractalaw.duckdb data/lancedb/ data/cultural-graph.duckdb data/sif/ 2>/dev/null
 
 # Check Postgres size
 PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -c "SELECT pg_size_pretty(pg_database_size('fractalaw'));"
@@ -88,6 +92,18 @@ cp -r data/lancedb/ "$BACKUP_DIR/lancedb/"
 # Classifier models (now JSON in crates/fractalaw-cli/config/)
 # Active versions: drrp_classifier_v8.json, position_classifier_v3.json
 # No longer shipped as .pkl — skip classifier backup
+
+# Cultural graph DuckDB
+[ -f data/cultural-graph.duckdb ] && cp data/cultural-graph.duckdb "$BACKUP_DIR/"
+
+# SIF data (taxonomy, sources, calibration, models, DuckDB)
+mkdir -p "$BACKUP_DIR/sif"
+[ -f data/sif.duckdb ] && cp data/sif.duckdb "$BACKUP_DIR/sif/"
+[ -d data/sif/taxonomy ] && cp -r data/sif/taxonomy/ "$BACKUP_DIR/sif/taxonomy/"
+[ -d data/sif/sources ] && rsync -a data/sif/sources/ "$BACKUP_DIR/sif/sources/"
+[ -d data/sif/calibration ] && cp -r data/sif/calibration/ "$BACKUP_DIR/sif/calibration/"
+[ -d data/sif/models ] && cp -r data/sif/models/ "$BACKUP_DIR/sif/models/"
+[ -d data/sif/benchmarks ] && cp -r data/sif/benchmarks/ "$BACKUP_DIR/sif/benchmarks/"
 
 # SLM adapter (only if exists)
 [ -d data/slm-adapter ] && cp -r data/slm-adapter/ "$BACKUP_DIR/slm-adapter/"
@@ -126,6 +142,13 @@ cp -r "$BACKUP_DIR/lancedb/" data/lancedb/
 
 # Restore Postgres from pg_dump
 PGPASSWORD=fractalaw pg_restore -h localhost -p 5433 -U fractalaw -d fractalaw --clean --if-exists "$BACKUP_DIR/fractalaw.pgdump"
+
+# Restore cultural graph DuckDB
+[ -f "$BACKUP_DIR/cultural-graph.duckdb" ] && cp "$BACKUP_DIR/cultural-graph.duckdb" data/
+
+# Restore SIF data
+[ -d "$BACKUP_DIR/sif" ] && rsync -a "$BACKUP_DIR/sif/" data/sif/
+[ -f "$BACKUP_DIR/sif/sif.duckdb" ] && cp "$BACKUP_DIR/sif/sif.duckdb" data/
 
 # Restore SLM adapter + GGUF (if needed)
 [ -d "$BACKUP_DIR/slm-adapter" ] && cp -r "$BACKUP_DIR/slm-adapter/" data/slm-adapter/
