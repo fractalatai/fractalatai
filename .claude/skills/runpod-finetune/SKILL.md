@@ -191,6 +191,77 @@ ollama create gemma3-position -f Modelfile
 5. **Back up to NAS**: `cp models/gemma3-position-q4.gguf /mnt/nas/sertantai-data/data/fractalaw-backups/YYYYMMDD/`
 6. **Back up adapter**: `cp -r data/slm-adapter/ /mnt/nas/sertantai-data/data/fractalaw-backups/YYYYMMDD/slm-adapter/`
 
+## Workspace Discipline
+
+### Namespace all projects on /workspace
+
+The `/workspace` network volume is shared across projects. ALWAYS create a project namespace:
+
+```bash
+mkdir -p /workspace/<project>/{data,models,output,scripts}
+```
+
+Current namespaces:
+- `/workspace/sif/` — SIF classifier/simulator
+- `/workspace/cultural-graph/` — cultural graph extraction
+- `/workspace/models/` — shared GGUF models (legacy, pre-namespacing)
+- `/workspace/scripts/` — shared scripts (legacy)
+
+**NEVER write to `/workspace/` root.** Everything goes in a project namespace.
+
+### Namespace model runs within a project
+
+Each training run gets its own directory. NEVER overwrite a previous run:
+
+```bash
+/workspace/sif/models/mechanism-run1/   # Qwen 0.6B, 20 labels
+/workspace/sif/models/mechanism-run2/   # Qwen 1.7B, 18 labels
+/workspace/sif/models/mechanism-run5/   # Qwen 1.7B, narrative only
+```
+
+Training scripts MUST take a `--run` argument:
+
+```bash
+python3 scripts/finetune.py --run run5
+python3 scripts/export_and_infer.py --run run5
+```
+
+### Check /workspace disk usage regularly
+
+Failed runs, checkpoints, and merged models accumulate. Check before and after each run:
+
+```bash
+du -sh /workspace/*/
+du -sh /workspace/<project>/models/*/
+```
+
+Clean up failed runs and intermediate checkpoints:
+
+```bash
+# Remove failed run (no training_meta.json = didn't complete)
+rm -rf /workspace/sif/models/mechanism-run3/
+
+# Remove checkpoints from completed runs (adapter is what matters)
+rm -rf /workspace/sif/models/mechanism-run5/checkpoint-*/
+```
+
+### Confirm GPU before training
+
+Packages are lost on pod restart (ephemeral system Python). ALWAYS verify before starting a run:
+
+```bash
+# GPU check
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+
+# Package check — reinstall if missing
+python3 -c 'import transformers, peft, torch; print("OK")' 2>/dev/null || \
+  pip3 install --break-system-packages -q transformers peft datasets accelerate pyarrow scikit-learn
+
+# Match batch size to GPU VRAM
+# RTX 4090 (24GB): batch_size=8 for 1.7B, batch_size=16 for 0.6B
+# RTX 5090 (32GB): batch_size=16 for 1.7B, batch_size=32 for 0.6B
+```
+
 ## Critical Lessons
 
 - **16-bit training for GGUF**: 4-bit LoRA works great on GPU but LoRA weights get rounded away during GGUF quantisation. Always use `load_in_4bit=False` if the goal is a GGUF file.

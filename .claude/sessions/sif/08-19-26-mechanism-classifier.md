@@ -122,13 +122,69 @@ Informed by two Gemini reviews (`data/code-review/sif-training-plan-review.md`, 
 - False positives (non-SIF→SIF): 3.2% (48/1483) — harmless, just unnecessary Stage 2 analysis
 - Within-NEEDS_ASSESSMENT confusion: fire↔explosion (36), struck↔caught_in↔structural_collapse — all still go to Stage 2, so no safety impact
 
-### Run 3: Single-model (planned)
+### Run 3: Qwen 3 1.7B / 18 labels + labelled structured context
 
-Per Gemini v0.1 review suggestion — try a single larger model that does mechanism + energy analysis in one pass. Compare end-to-end SIF classification accuracy against the two-stage pipeline. This combines S4 and S5 scope into one experiment.
+- Same as run 2 but with `Hazard category:` and `Event type:` prepended as labelled fields
+- **Macro F1: 0.990** on OSHA val — but illusory
+- **QQ inference: 95.2% predicted as "breathing"** — model learned the OIICS field label format as a shortcut. Without it, collapses to one class.
+- **Verdict: BROKEN.** Structured context as labelled fields doesn't generalise.
 
-### RunPod workspace
+### Run 4: Qwen 3 1.7B / 18 labels + appended text (no labels)
+
+- Same as run 3 but OIICS text appended as plain text, no `Hazard category:` prefix
+- **Macro F1: 0.998** on OSHA val — still illusory
+- **QQ inference: 95.2% predicted as "breathing"** — same failure. The appended OIICS text (event title, source, nature, body part) is too strong a signal. Model learns it instead of narrative.
+- **Verdict: BROKEN.** Any OIICS text in training dominates — model can't function without it.
+
+### Run 5: Qwen 3 1.7B / 18 labels / narrative only (revert to run 2 approach)
+
+- Narrative only, no structured context. Namespaced as `mechanism-run5` on workspace.
+- Batch 16 on RTX 5090 (32GB).
+- **Macro F1: 0.799** on OSHA val
+- **QQ inference results:**
+  - Gate: 88.2% NEEDS_ASSESSMENT, 11.8% AUTO_NON_SIF
+  - Mechanism distribution is diverse and plausible (no single-class collapse)
+  - SIFp events sent to Stage 2: 90.6% (37/395 missed = 9.4% false negative)
+  - Not-SIFp events gated out: 12.3% (288/2349)
+  - **Random baseline comparison:** random would miss ~46 SIFp vs actual 37 — gate is only marginally better than random
+- **Verdict: WORKS but marginal value.** The gate filters 12% of events, mostly overexertion and slips. But 88% of non-SIF events still pass through. The 9.4% false negative rate on SIFp is a safety concern.
+
+### Key Finding: Domain Gap Kills Stage 1
+
+The fundamental problem is not the model architecture or the label set — it's the training data. OSHA narratives are US workplace English. QQ narratives are UK defence/industrial English. The model learned to classify American incident reports, not British ones.
+
+Evidence:
+- QQ "Manual Handling" (123 events) maps to OSHA "Overexertion" — but the narratives read differently. "I was carrying radio equipment 500 metres" vs "employee was lifting boxes and felt a pop".
+- The model correctly classifies OSHA-style text (0.80 F1 on held-out OSHA) but doesn't transfer to QQ.
+- The gate's marginal-over-random performance confirms the model isn't learning generalisable mechanism patterns — it's learning OSHA narrative style.
+
+**For Stage 1 to add value, the training data needs a thorough mix of narrative styles**: US/UK/AU, multiple industries (construction, mining, defence, manufacturing, logistics), multiple reporting cultures. Single-source training produces single-domain performance.
+
+### What Works and Should Be Retained
+
+1. **SIPmath engine** — solid, independently valuable, no changes needed
+2. **Label set** (18 labels, merged pairs) — the right granularity
+3. **Training pipeline** — extraction, MSHA supplements, stratified sampling, LoRA fine-tuning all work
+4. **Model architecture** — 1.7B LoRA fits on edge (16GB VRAM), trains in ~20 min
+5. **Taxonomy** — ICD-11 Chapter 23, ICECI mapping, severity scale, OIICS mapping all valid
+6. **Supplementary data sources** — MSHA, PHMSA, NFIRS, etc. documented and ready
+7. **QQ ingest** — DuckDB schema, join pipeline, SIFp labels
+8. **P(death) severity scale** — AIS-based, principled
+9. **Chance P vs Outcome P** — foundational conceptual frame
+
+### What Needs to Change
+
+- **Training data diversity** — need UK (RIDDOR narratives if accessible), Australian (Safe Work Australia), multi-industry sources
+- **Or skip Stage 1** — go straight to single-model approach (mechanism + energy in one pass), where the model can be trained on a different task that may generalise better
+- **Customer-specific fine-tuning** — the base model handles one domain; each customer needs adaptation
+
+### RunPod workspace (namespaced)
 
 All artefacts persist on `/workspace/sif/` (network volume, survives pod stop):
-- `/workspace/sif/data/` — training parquet, val parquet, labels, benchmarks
-- `/workspace/sif/models/mechanism-classifier/` — LoRA adapter, tokenizer, meta, report
-- `/workspace/sif/scripts/` — finetune_mechanism.py
+- `/workspace/sif/data/` — training parquet, val parquet, labels, benchmarks, qq_benchmark
+- `/workspace/sif/models/mechanism-run5/` — run 5 LoRA adapter (production candidate)
+- `/workspace/sif/models/mechanism-run5-merged/` — merged model for inference
+- `/workspace/sif/models/mechanism-classifier/` — run 4 (broken, can clean up)
+- `/workspace/sif/models/mechanism-classifier-merged/` — run 4 merged (broken, can clean up)
+- `/workspace/sif/output/run5/` — QQ inference results
+- `/workspace/sif/scripts/` — finetune_mechanism.py, export_and_infer.py

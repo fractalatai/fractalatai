@@ -28,7 +28,7 @@ from transformers import (
 )
 
 DATA_DIR = "/workspace/sif/data"
-OUTPUT_DIR = "/workspace/sif/models/mechanism-classifier"
+OUTPUT_BASE = "/workspace/sif/models"
 LABELS_FILE = f"{DATA_DIR}/classifier-labels.json"
 
 # Model
@@ -100,14 +100,17 @@ class WeightedTrainer(Trainer):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--run", type=str, required=True, help="Run name for output namespace (e.g. run5)")
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--lr", type=float, default=2e-4)
-    parser.add_argument("--batch-size", type=int, default=8)
+    parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--lora-r", type=int, default=16)
     parser.add_argument("--lora-alpha", type=int, default=32)
     parser.add_argument("--no-weighted-loss", action="store_true")
     args = parser.parse_args()
 
+    OUTPUT_DIR = f"{OUTPUT_BASE}/mechanism-{args.run}"
+    print(f"Run: {args.run} → {OUTPUT_DIR}")
     print(f"GPU: {torch.cuda.get_device_name(0)}")
     print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
     print()
@@ -188,7 +191,7 @@ def main():
         output_dir=OUTPUT_DIR,
         num_train_epochs=args.epochs,
         per_device_train_batch_size=args.batch_size,
-        gradient_accumulation_steps=2,  # effective batch = batch_size * 2
+        gradient_accumulation_steps=1,  # batch_size=16 fits in 32GB VRAM (RTX 5090)
         per_device_eval_batch_size=args.batch_size,
         learning_rate=args.lr,
         weight_decay=0.01,

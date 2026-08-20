@@ -38,6 +38,10 @@ MSHA_MAX_PER_CLASS = 1000
 # Instruction prefix for every training example
 INSTRUCTION = "Classify the following workplace incident narrative. The mechanism of injury is:"
 
+# OSHA columns for structured context
+COL_EVENT_TITLE = 44         # event_title_pred (OIICS event description)
+COL_SOURCE_TITLE = 46        # source_title_pred (object/substance)
+
 # OSHA CSV column indices
 COL_NARRATIVE_WHAT = 33
 COL_INCIDENT_DESC = 38
@@ -132,6 +136,8 @@ def extract_osha(oiics_to_label: dict, label_info: dict) -> tuple[dict, dict]:
                         "narrative": preprocess(narrative),
                         "label": label,
                         "source": "osha",
+                        "hazard_category": "",
+                        "event_type_class": "",
                     }
 
                     if n <= cap:
@@ -192,6 +198,8 @@ def load_msha_supplements(
                     "narrative": narrative,
                     "label": label_id,
                     "source": "msha",
+                    "hazard_category": preprocess(rec.get("classification", "")),
+                    "event_type_class": "",
                 })
 
         supplements[label_id] = records
@@ -215,7 +223,7 @@ def build_training_set(
         combined = osha + msha
         all_records.extend(combined)
 
-    # Add instruction prefix to every narrative
+    # Build model input: instruction + narrative only
     for rec in all_records:
         rec["text"] = f"{INSTRUCTION}\n{rec['narrative']}"
 
@@ -229,10 +237,12 @@ def write_parquet(records: list[dict], path: Path):
     import pyarrow.parquet as pq
 
     schema = pa.schema([
-        ("text", pa.utf8()),         # instruction + narrative (model input)
-        ("label", pa.utf8()),        # mechanism label (model target)
-        ("narrative", pa.utf8()),    # raw narrative (for debugging)
-        ("source", pa.utf8()),       # osha or msha
+        ("text", pa.utf8()),              # instruction + context + narrative (model input)
+        ("label", pa.utf8()),             # mechanism label (model target)
+        ("narrative", pa.utf8()),         # raw narrative (for debugging)
+        ("source", pa.utf8()),            # osha or msha
+        ("hazard_category", pa.utf8()),   # structured context (OIICS event title or MSHA classification)
+        ("event_type_class", pa.utf8()),  # structured context (QQ only)
     ])
 
     arrays = {

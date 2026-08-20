@@ -257,6 +257,41 @@ PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -t -A -
   "SELECT count(*) FROM legislation_text WHERE significance_overall IS NULL AND 'Obligation' = ANY(drrp_types)"
 ```
 
+### Namespace all work on /workspace
+
+The `/workspace` network volume is shared across projects. ALWAYS use a project namespace:
+
+```bash
+/workspace/sif/          # SIF classifier project
+/workspace/cultural-graph/  # Cultural graph extraction
+/workspace/models/       # Shared models (legacy)
+```
+
+Within a project, namespace model runs and outputs:
+
+```bash
+/workspace/sif/models/mechanism-run5/      # specific training run
+/workspace/sif/output/run5/                # inference output for that run
+```
+
+### Confirm GPU and packages on pod start
+
+Packages are lost on pod restart (ephemeral system Python). ALWAYS verify:
+
+```bash
+nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
+python3 -c 'import transformers, peft, torch; print("OK")' 2>/dev/null || \
+  pip3 install --break-system-packages -q transformers peft datasets accelerate pyarrow scikit-learn
+```
+
+### Check /workspace disk before and after runs
+
+```bash
+du -sh /workspace/*/
+```
+
+Failed runs and intermediate checkpoints accumulate. Clean up runs that have no `training_meta.json` (didn't complete successfully).
+
 ### Scripts and models persist on /workspace
 
 All artefacts (scripts, Modelfiles, GGUF models) are on the RunPod network volume at `/workspace/scripts/`, `/workspace/models/`. They survive pod stop/start. **No upload needed** for repeat runs — just create the ollama models from the existing Modelfiles:
