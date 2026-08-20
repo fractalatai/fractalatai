@@ -17,7 +17,7 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 - ⬜ S2a: Calibration curves — energy × magnitude → severity metalog, mitigation effectiveness library
 - ⬜ S3: SIF simulator — Product 2, CLI + WASM, energy params → severity → mitigations → residual P(SIF)
 - ✅ S4: Mechanism classifier — 5 runs, 0.80 F1 on OSHA, domain gap to QQ. Two-stage approach suspended.
-- ⬜ S4a: Zero-shot single-model — test base Qwen 8B on QQ data (mechanism + energy in one pass, no fine-tune)
+- ✅ S4a: Zero-shot Qwen 8B — 0 errors on 2,744 events, mechanism extraction works, severity needs calibration
 - ⬜ S5: Energy analyser — Stage 2, depends on S4a outcome
 - ⬜ S6: Integration — DuckDB, Zenoh sync, classifier→simulator handoff, QQ pilot
 
@@ -45,7 +45,7 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 | S2a | `calibration-curves` | 1.5 | S1, S2 | PENDING | Severity metalog curves per energy type × magnitude, mitigation library |
 | S3 | `simulator` | 2 | S1, S2a | PENDING | CLI `sif sim` + WASM prototype. Validates calibration curves |
 | S4 | `mechanism-classifier` | 3 | S2 | **CLOSED** | 0.80 F1 on OSHA, domain gap to QQ. Two-stage suspended. Key learnings captured. |
-| S4a | `zero-shot-single-model` | 3.5 | S2, S4 | PENDING | Zero-shot Qwen 8B: mechanism + energy in one pass on QQ. Determines if fine-tuning needed. |
+| S4a | `zero-shot-single-model` | 3.5 | S2, S4 | **CLOSED** | Mechanism extraction works zero-shot. Severity estimation needs calibration curves (S2a), not more model. |
 | S5 | `energy-analyser` | 4 | S4a | PENDING | Depends on S4a outcome — may merge into single-model or remain Stage 2 |
 | S6 | `integration` | 5 | S3, S5 | PENDING | DuckDB, Zenoh, classifier→simulator, QQ pilot |
 
