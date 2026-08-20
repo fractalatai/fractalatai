@@ -16,7 +16,7 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 - ✅ S2: Taxonomy & data — ICD-11, OSHA 1.6M rows, QQ 2,747 events ingested, P(death) scale
 - ✅ S2a: Calibration curves — 18 files, 87 bands, all metalog-feasible, STKY validated, ICD-11 reconciled
 - ✅ S2b: Band selection — 2,740 events, 0.70s/event, calibrated SIF 10.4% (was 45.9% default-to-middle, human 14.3%)
-- ⬜ S2c: OSHA magnitude extraction & curve validation — extract heights/speeds/voltages from OSHA narratives, cross-tab vs outcomes
+- ✅ S2c: OSHA validation — 4,815 events, 4/5 mechanisms monotonic, transport matches Tefft 2013, no curve adjustments needed
 - ✅ S2d: Mitigation library — 12 files, 74 mitigations, 3×3 matrix (exposure/chance/severity × design/engineered/managed), STKY validated
 - ⬜ S3: SIF simulator — Product 2, CLI + WASM, energy params → severity → mitigations → residual P(SIF)
 - ✅ S4: Mechanism classifier — 5 runs, 0.80 F1 on OSHA, domain gap to QQ. Two-stage approach suspended.
@@ -47,7 +47,7 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 | S2 | `taxonomy-and-data` | 1 | S1 | **CLOSED** | ICD-11 taxonomy, OSHA 1.6M rows, QQ 2,747 events, P(death) scale |
 | S2a | `calibration-curves` | 1.5 | S1, S2, S4a | **CLOSED** | 18 calibration files, 87 bands, STKY validated, ICD-11 reconciled. Band selection identified as bottleneck. |
 | S2b | `band-selection` | 1.6 | S2a, S4a | **CLOSED** | 2,740 events at 0.70s/event. Calibrated SIF rate 10.4% (vs 45.9% baseline, 14.3% human). End-to-end pipeline validated. |
-| S2c | `osha-validation` | 1.7 | S2a, S2b | PENDING | Extract magnitudes from OSHA narratives, cross-tab vs outcomes, validate/adjust literature curves |
+| S2c | `osha-validation` | 1.7 | S2a, S2b | **CLOSED** | 4,815 events, 4/5 mechanisms monotonic severity increase. Transport matches Tefft 2013. No curve adjustments. |
 | S2d | `mitigation-library` | 1.8 | S2a | **CLOSED** | 12 files, 74 mitigations, 3×3 matrix. Exposure/chance/severity correctly separated. STKY validated with Monte Carlo. |
 | S3 | `simulator` | 2 | S1, S2a, S2d | PENDING | CLI `sif sim` + WASM prototype. Needs calibration curves + mitigation library |
 | S4 | `mechanism-classifier` | 3 | S2 | **CLOSED** | 0.80 F1 on OSHA, domain gap to QQ. Two-stage suspended. Key learnings captured. |
