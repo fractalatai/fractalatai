@@ -1,0 +1,120 @@
+{
+  "energy_type": "chemical",
+  "mechanism": "breathing",
+  "description": "Severity distribution for breathing hazards — oxygen deprivation, toxic atmosphere, drowning/submersion, and asphyxiation. Distinct from chemical (skin/ingestion exposure) and structural_collapse (burial). The common thread is interruption of breathing — whether by absence of oxygen, presence of toxic gas, or submersion. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No respiratory protection (SCBA, respirator, airline)",
+    "No atmospheric monitoring or alarm",
+    "No rescue team standing by"
+  ],
+  "magnitude_unit": "breathing_hazard_type",
+  "magnitude_note": "Breathing hazards are binary in a way other mechanisms are not — consciousness is lost within seconds to minutes of oxygen deprivation, and death follows within minutes if not rescued. The dose-response is less about magnitude and more about exposure duration and rescue speed. Bands are by hazard type because the onset speed and rescue window differ.",
+  "magnitude_bands": [
+    {
+      "band": "nuisance_dust_fume",
+      "description": "Nuisance dust, welding fume, mild irritant gas below acute threshold. Causes coughing, eye/throat irritation but no acute life threat. Chronic exposure causes occupational disease but that's not an acute SIF event.",
+      "published_mortality": 0.0001,
+      "mortality_source": "Occupational hygiene literature: nuisance exposure below OEL/WEL causes irritation, not acute injury. Chronic disease (silicosis, COPD) is a different risk framework.",
+      "p10": 0.0001,
+      "p50": 0.0005,
+      "p90": 0.001,
+      "p10_label": "no_injury",
+      "p50_label": "no_injury",
+      "p90_label": "first_aid",
+      "rationale": "Below acute thresholds, breathing hazards cause irritation only. P90=first_aid reflects eye washing, fresh air recovery. Not an acute SIF event. Chronic disease risk is real but outside the SIF framework (it's an occupational health issue, not a safety event)."
+    },
+    {
+      "band": "toxic_gas_acute",
+      "description": "Acute toxic gas or vapour exposure above IDLH. H2S, CO, chlorine, ammonia, HCN, phosgene. Rapid onset of symptoms, can cause collapse within breaths at high concentrations.",
+      "published_mortality": 0.15,
+      "mortality_source": "NIOSH IDLH documentation; CSB toxic release investigations; H2S fatality data (OSHA: H2S is the leading cause of acute inhalation death in the workplace). CO poisoning mortality ~1-3% for those reaching hospital, much higher for unrescued.",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "H2S at >100ppm causes olfactory fatigue (can't smell it), at >500ppm causes immediate collapse. CO is insidious — no warning, progressive incapacitation. Chlorine/ammonia cause pulmonary oedema. P50=serious_injury reflects hospitalisation for inhalation injury. P90=fatality from sustained exposure without rescue. IDLH means 'immediately dangerous to life' — the name says it."
+    },
+    {
+      "band": "oxygen_deficient",
+      "description": "Oxygen-deficient atmosphere (<19.5% O2). Confined space with inert gas displacement (N2, CO2, Ar), biological oxygen consumption (fermentation, decomposition), or simple displacement. The classic confined space killer.",
+      "published_mortality": 0.30,
+      "mortality_source": "HSE confined space fatality data; OSHA permit-required confined space incidents. Oxygen-deficient atmospheres cause ~60% of confined space fatalities. At <16% O2 impaired judgement, <10% unconsciousness in seconds, <6% death within minutes.",
+      "p10": 0.01,
+      "p50": 0.50,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "fatal_range",
+      "p90_label": "fatality",
+      "rationale": "Oxygen-deficient atmospheres are lethally deceptive — no smell, no warning. At <10% O2, unconsciousness occurs in 1-2 breaths. The victim collapses, rescuers enter without SCBA and collapse too (multiple-fatality cascade is the signature pattern). P10=medical_treatment reflects momentary exposure with rapid self-rescue. P50 reflects the high fatality rate once incapacitation occurs — rescue requires SCBA-equipped team."
+    },
+    {
+      "band": "drowning_submersion",
+      "description": "Drowning or submersion. Fall into water, flooding, working over/near water without PFD. Also includes engulfment in grain, sand, or other flowable material (similar mechanism — material fills airway).",
+      "published_mortality": 0.35,
+      "mortality_source": "WHO drowning data; OSHA maritime/construction fatality data; grain engulfment studies (Purdue University: ~50% fatality rate for grain engulfment). Drowning is the 3rd leading cause of unintentional death globally.",
+      "p10": 0.01,
+      "p50": 0.50,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "fatal_range",
+      "p90_label": "fatality",
+      "rationale": "Submersion produces unconsciousness in 1-3 minutes, brain death in 4-6 minutes. Survival depends entirely on rescue speed and water temperature (cold water extends the window slightly). Grain engulfment is worse — no buoyancy, victim sinks. P10 reflects near-drowning with rapid rescue. P50 reflects the narrow rescue window."
+    },
+    {
+      "band": "confined_space_combined",
+      "description": "Confined space with combined hazards — oxygen deficiency + toxic gas + limited escape. Tanks, vessels, sewers, manholes, silos, ship holds. The worst-case breathing scenario: multiple hazards, limited access, cascading rescuer casualties.",
+      "published_mortality": 0.50,
+      "mortality_source": "HSE confined space fatality data: 15-20 confined space deaths/year in UK. OSHA: confined space entry is the #1 cause of multiple-fatality events in general industry. 60% of confined space deaths are would-be rescuers.",
+      "p10": 0.10,
+      "p50": 0.90,
+      "p90": 0.999,
+      "p10_label": "serious_injury",
+      "p50_label": "fatality",
+      "p90_label": "fatality",
+      "rationale": "Confined spaces combine every breathing hazard with limited escape and delayed rescue. The cascade pattern (worker enters → collapses → colleague enters to rescue → also collapses) makes these disproportionately multi-fatality events. P10=serious_injury reflects the rare case where atmospheric monitoring triggers alarm before full exposure. Without monitoring, entry into a toxic/oxygen-deficient confined space is near-uniformly fatal."
+    }
+  ],
+  "modifiers": {
+    "warning_properties": {
+      "strong_odour_irritation": 0.5,
+      "mild_odour": 0.8,
+      "odourless": 1.5,
+      "description": "Multiplier on P(death). Gases with strong warning properties (ammonia, chlorine) prompt self-rescue. Odourless gases (CO, N2, CO2, inert gases) give no warning — olfactory fatigue with H2S makes it odourless at high concentrations despite strong smell at low concentrations."
+    },
+    "rescue_capability": {
+      "scba_team_standby": 0.1,
+      "trained_rescue_available": 0.3,
+      "untrained_bystander": 1.0,
+      "lone_worker": 2.0,
+      "description": "Multiplier on P(death). Breathing hazards are uniquely time-critical — brain damage begins at 4 minutes without oxygen. SCBA-equipped rescue team on standby transforms the survival probability. Untrained bystander rescue attempts frequently produce additional casualties."
+    },
+    "concentration_duration": {
+      "brief_seconds": 0.3,
+      "minutes_1_5": 1.0,
+      "sustained_gt5min": 2.0,
+      "description": "Multiplier on P(death). For toxic gases, dose = concentration × time. Brief exposure may cause symptoms without incapacitation. Sustained exposure at IDLH+ is almost always fatal without respiratory protection."
+    }
+  },
+  "sources": [
+    {"author": "HSE", "year": 2024, "relevance": "Confined Spaces Regulations 1997 guidance. 15-20 UK confined space deaths/year. 60% of deaths are would-be rescuers."},
+    {"author": "OSHA", "year": 2023, "relevance": "Permit-Required Confined Spaces standard (29 CFR 1910.146). Confined space is #1 cause of multiple-fatality events in general industry."},
+    {"author": "NIOSH", "year": 2022, "relevance": "IDLH documentation for toxic gases. Worker Deaths in Confined Spaces report. Criteria for immediately dangerous concentrations."},
+    {"author": "Purdue University", "year": 2019, "relevance": "Grain engulfment data — ~50% fatality rate. Entrapment in flowing grain behaves like quicksand."},
+    {"author": "WHO", "year": 2023, "relevance": "Global drowning data — 3rd leading cause of unintentional death. Submersion survival times by water temperature."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: confined space entry without monitoring should give P(SIF) near 1.0 — confined_space_combined P(SIF)=0.90 ✓",
+    "STKY check: H2S exposure above IDLH should give P(SIF) > 0.50 — toxic_gas_acute P(SIF)=0.50 ✓",
+    "STKY check: fall into water without PFD should give P(SIF) > 0.50 — drowning_submersion P(SIF)=0.72 ✓",
+    "Cross-check: welding fume exposure is NON_SIF — nuisance_dust_fume P(SIF)=0.000 ✓",
+    "Key insight: 60% of confined space deaths are rescuers, not the original entrant. The cascade rescue pattern is THE signature of confined space fatalities. This is why permit-to-work and standby rescue exist.",
+    "Overlap note: trench collapse burial → use structural_collapse (mechanism is burial/crush). Confined space with toxic atmosphere → use this (mechanism is breathing). Some real events involve both — the model picks the dominant mechanism from the narrative.",
+    "Overlap note: cryogenic oxygen displacement (LN2, CO2) → could be classified as thermal (cryogenic) or breathing (O2 deficiency). The lethal mechanism is usually the O2 displacement, not the cold."
+  ]
+}

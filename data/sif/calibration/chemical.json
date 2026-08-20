@@ -1,0 +1,132 @@
+{
+  "energy_type": "chemical",
+  "mechanism": "chemical",
+  "description": "Severity distribution for chemical contact and ingestion — skin/eye contact with corrosives, toxic absorption through skin, and accidental ingestion. Distinct from breathing (inhalation of toxic gas/vapour is under breathing mechanism). Chemical mechanism covers the direct tissue damage from chemical contact or systemic toxicity from dermal absorption/ingestion. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No PPE (chemical-resistant gloves, goggles, face shield, suit)",
+    "No emergency decontamination/shower within first minutes",
+    "Inhalation hazard is under breathing mechanism — this covers skin, eye, and ingestion routes only"
+  ],
+  "magnitude_unit": "chemical_hazard_type",
+  "magnitude_note": "Chemical severity depends on substance toxicity, concentration, body surface area contacted, and exposure duration. The two SIF pathways are: (1) severe corrosive burns to large BSA or eyes, and (2) systemic toxicity from dermal absorption or ingestion of acutely toxic substances. Bands by hazard type rather than specific chemical because the model identifies the scenario, not the substance.",
+  "magnitude_bands": [
+    {
+      "band": "irritant_mild",
+      "description": "Mild irritant or sensitiser. Dilute cleaning products, solvents below OEL, mild acids/alkalis (pH 4-10), detergents. Skin/eye irritation without tissue destruction.",
+      "published_mortality": 0.0001,
+      "mortality_source": "Poison control data: mild irritant exposure produces redness, irritation, self-limiting. No fatality mechanism from skin contact with dilute irritants.",
+      "p10": 0.0001,
+      "p50": 0.0005,
+      "p90": 0.001,
+      "p10_label": "no_injury",
+      "p50_label": "no_injury",
+      "p90_label": "first_aid",
+      "rationale": "Dilute irritants cause redness and discomfort, resolved with washing. P90=first_aid reflects eye irrigation or skin washing. Not SIF. The vast majority of workplace chemical contacts fall in this band."
+    },
+    {
+      "band": "corrosive_localised",
+      "description": "Corrosive contact to localised area. Concentrated acid (HCl, H2SO4), alkali (NaOH, KOH), oxidiser splash to hand/arm/face. pH <2 or >12. Tissue destruction on contact.",
+      "published_mortality": 0.005,
+      "mortality_source": "Burn centre data: chemical burns are ~3% of burn admissions. Localised chemical burns have similar outcomes to thermal burns of equivalent BSA. Alkali burns are deeper than acid (saponification penetrates tissue).",
+      "p10": 0.001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Concentrated corrosive on exposed skin causes chemical burn progressing with contact duration. P50=medical_treatment for localised burn needing hospital. P90=serious_injury from facial/eye exposure — alkali to eyes can cause permanent blindness. Crosses SIF threshold at P90. Immediate decontamination is the critical intervention."
+    },
+    {
+      "band": "corrosive_large_area",
+      "description": "Corrosive contact to large body area. Tank/pipe rupture, chemical shower failure, immersion, splash from bulk transfer. Large BSA chemical burn. Same tissue damage as localised but scaled up.",
+      "published_mortality": 0.10,
+      "mortality_source": "Burn centre chemical burn data: large BSA chemical burns have similar mortality to equivalent thermal burns (Baux rule applies). HF (hydrofluoric acid) is especially dangerous — systemic fluoride toxicity from even small BSA exposure.",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Large-area corrosive burns follow thermal burn mortality patterns (Baux rule). P50=serious_injury from extensive chemical burns requiring skin grafting. P90=fatality from large BSA strong alkali (deep penetrating burns) or HF exposure (systemic cardiac toxicity from fluoride even with small BSA). HF is the standout — a hand-sized HF burn can be fatal from hypocalcaemia."
+    },
+    {
+      "band": "acute_toxic_dermal",
+      "description": "Acute systemic toxicity from skin absorption. Organophosphate pesticide, cyanide solution, phenol, DMSO-dissolved toxins, aniline. Substance crosses skin barrier and causes systemic poisoning.",
+      "published_mortality": 0.10,
+      "mortality_source": "Poison control data; NIOSH skin notation chemicals; pesticide poisoning epidemiology. Organophosphate dermal absorption is a leading cause of occupational poisoning death globally (WHO: ~300,000 pesticide deaths/year, mostly deliberate but many occupational).",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Dermally absorbed toxins produce systemic effects — cholinergic crisis (organophosphates), cyanide poisoning, methaemoglobinaemia (aniline). P50=serious_injury reflects hospitalisation with antidote treatment. P90=fatality from delayed recognition or high-dose exposure. The skin notation in safety data sheets (H310, H311) flags these substances."
+    },
+    {
+      "band": "acute_toxic_ingestion",
+      "description": "Accidental ingestion of acutely toxic substance. Decanting into unlabelled containers, mistaken identity, contaminated food/drink, splash into mouth. Methanol, ethylene glycol, strong acid/alkali, pesticide.",
+      "published_mortality": 0.15,
+      "mortality_source": "Poison control data; NPDS annual report. Acute poisoning from occupational ingestion is uncommon but has high case fatality when it occurs — the GI tract absorbs rapidly.",
+      "p10": 0.01,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Ingestion produces rapid systemic absorption. Methanol causes blindness then death. Ethylene glycol causes renal failure. Strong acid/alkali causes oesophageal perforation. P50=serious_injury reflects hospital treatment with antidote/lavage. P90=fatality from delayed treatment or high-dose ingestion. Mostly preventable by labelling and decanting controls."
+    },
+    {
+      "band": "hf_special",
+      "description": "Hydrofluoric acid exposure — any concentration, any route. HF is uniquely dangerous because fluoride ion causes systemic hypocalcaemia and cardiac arrest from even small BSA exposure. A 2.5% BSA burn with concentrated HF can be fatal.",
+      "published_mortality": 0.15,
+      "mortality_source": "Toxicology literature: HF burns >1% BSA with concentrated (>50%) HF have significant mortality. Kirkpatrick et al. (1995): 2.5% BSA HF burn fatal from cardiac arrest. Systemic fluoride toxicity, not the burn, is the killer.",
+      "p10": 0.01,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "HF is the most dangerous common industrial acid. The burn itself may look minor (HF is a weak acid, slow tissue damage) but fluoride ions penetrate and bind calcium systemically. Even a palm-sized concentrated HF burn can cause fatal cardiac arrhythmia from hypocalcaemia. Calcium gluconate gel is the critical first aid — delay is lethal. Warrants its own band because no other chemical has this combination of common industrial use and disproportionate lethality."
+    }
+  ],
+  "modifiers": {
+    "decontamination_speed": {
+      "immediate_lt1min": 0.3,
+      "prompt_1_5min": 0.7,
+      "delayed_gt5min": 1.0,
+      "very_delayed_gt30min": 2.0,
+      "description": "Multiplier on P(death). For corrosive and dermal-absorption chemicals, decontamination speed is the primary survival determinant. Emergency showers within 1 minute dramatically reduce burn depth. For HF, calcium gluconate application within minutes is critical."
+    },
+    "concentration": {
+      "dilute": 0.3,
+      "working_strength": 1.0,
+      "concentrated": 2.0,
+      "description": "Multiplier on P(death). Dilute solutions cause irritation; concentrated solutions cause immediate tissue destruction. Applies mainly to corrosive bands."
+    },
+    "body_surface_area": {
+      "localised_lt5pct": 0.3,
+      "moderate_5_20pct": 1.0,
+      "large_gt20pct": 2.5,
+      "description": "Multiplier on P(death) for corrosive burns. Same Baux-rule relationship as thermal burns. For systemic toxins (dermal absorption, ingestion), BSA correlates with dose absorbed."
+    }
+  },
+  "sources": [
+    {"author": "ABA", "year": 2023, "relevance": "National Burn Repository — chemical burn outcomes, BSA-mortality relationship for chemical burns."},
+    {"author": "NPDS", "year": 2023, "relevance": "National Poison Data System annual report — ingestion/exposure outcomes by substance class."},
+    {"author": "Kirkpatrick et al.", "year": 1995, "relevance": "HF burn mortality — 2.5% BSA concentrated HF exposure fatal from hypocalcaemia."},
+    {"author": "WHO", "year": 2020, "relevance": "Pesticide poisoning epidemiology — organophosphate dermal absorption mortality data."},
+    {"author": "NIOSH", "year": 2022, "relevance": "Skin notation profiles — chemicals flagged for significant dermal absorption risk."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: concentrated acid splash to face/eyes should give P(SIF) > 0.50 — corrosive_localised P(SIF)=0.10, escalates to corrosive_large_area if extensive ✓",
+    "STKY check: HF exposure should give P(SIF) > 0.50 — hf_special P(SIF)=0.50 ✓",
+    "STKY check: organophosphate skin exposure should give P(SIF) > 0.50 — acute_toxic_dermal P(SIF)=0.50 ✓",
+    "Cross-check: mild cleaning product splash is NON_SIF — irritant_mild P(SIF)=0.000 ✓",
+    "Overlap note: chemical inhalation (toxic gas, vapour) → use breathing mechanism. Chemical calibration covers skin, eye, and ingestion routes only.",
+    "Key insight: HF warrants its own band because of its disproportionate lethality relative to burn area. A palm-sized HF burn that looks trivial can kill from cardiac arrest. No other common industrial chemical has this property."
+  ]
+}

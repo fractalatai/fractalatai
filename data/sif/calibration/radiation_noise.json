@@ -1,0 +1,170 @@
+{
+  "energy_type": "radiation",
+  "mechanism": "radiation_noise",
+  "description": "Severity distribution for radiation and noise exposure. Covers ionising radiation (gamma, X-ray, neutron, contamination), non-ionising radiation (UV, laser, RF/microwave), and impulse noise (blast, gunshot). Chronic occupational exposure (cumulative dose, hearing loss) is an occupational health issue, not an acute SIF event — only acute high-dose/high-energy exposures are calibrated here. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No shielding, PPE, or distance controls",
+    "Acute single exposure — not cumulative occupational dose",
+    "Whole-body exposure assumed for ionising radiation worst-case"
+  ],
+  "magnitude_unit": "exposure_type",
+  "magnitude_note": "Ionising radiation has well-defined dose-response thresholds (Sv). Non-ionising and noise have different physics entirely — grouped under one mechanism label in the taxonomy but calibrated as distinct sub-mechanisms.",
+  "magnitude_bands": [
+    {
+      "band": "chronic_low_dose",
+      "sub_mechanism": "ionising_radiation",
+      "description": "Chronic low-level ionising radiation. Occupational exposure within or slightly above dose limits (<100 mSv/year). Industrial radiography, medical imaging, nuclear industry routine. Cancer risk is stochastic, not deterministic.",
+      "published_mortality": 0.0001,
+      "mortality_source": "ICRP 103 (2007): stochastic risk coefficient ~5% per Sv for cancer mortality. At 20 mSv/year dose limit, lifetime excess cancer risk is ~0.1%. No acute deterministic effects below ~250 mSv.",
+      "p10": 0.0001,
+      "p50": 0.0003,
+      "p90": 0.001,
+      "p10_label": "no_injury",
+      "p50_label": "no_injury",
+      "p90_label": "first_aid",
+      "rationale": "Below ~250 mSv, no acute clinical effects. Cancer risk is stochastic and delayed (years-decades). Not an acute SIF event. P90=first_aid reflects nausea from exposure near 250 mSv threshold. The real risk is cancer, which is outside the SIF framework."
+    },
+    {
+      "band": "acute_moderate",
+      "sub_mechanism": "ionising_radiation",
+      "description": "Acute moderate ionising radiation dose (0.25-1 Sv). Lost/orphan source, shielding failure, radiography incident. Prodromal syndrome (nausea, vomiting). Haematopoietic damage begins.",
+      "published_mortality": 0.01,
+      "mortality_source": "UNSCEAR: acute radiation syndrome thresholds well-characterised from Hiroshima/Nagasaki, Chernobyl, Goiânia, industrial accidents. 0.25-1 Sv = mild ARS, <5% mortality with treatment.",
+      "p10": 0.001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Acute radiation syndrome begins at ~0.25 Sv. Nausea, vomiting, haematopoietic depression. Treatable with supportive care. P50=medical_treatment (blood monitoring, possible transfusion). P90=serious_injury from dose near 1 Sv causing significant bone marrow suppression. Crosses SIF threshold at P90."
+    },
+    {
+      "band": "acute_high",
+      "sub_mechanism": "ionising_radiation",
+      "description": "Acute high ionising radiation dose (1-6 Sv). Criticality event, unshielded high-activity source, severe radiography accident. Full ARS — haematopoietic syndrome (1-2 Sv), gastrointestinal syndrome (>6 Sv).",
+      "published_mortality": 0.30,
+      "mortality_source": "UNSCEAR/REAC/TS data: LD50 for acute whole-body exposure is ~3.5-4.5 Sv without treatment, ~5-6 Sv with treatment. Goiânia (1987): 4 deaths from 4.5-6 Sv exposures. Tokaimura (1999): 2 deaths from 6-17 Sv.",
+      "p10": 0.01,
+      "p50": 0.50,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "fatal_range",
+      "p90_label": "fatality",
+      "rationale": "LD50 at ~4 Sv without treatment. At 1 Sv, haematopoietic syndrome is survivable with transfusion. At 6 Sv, gastrointestinal syndrome begins — survival unlikely even with treatment. P50=0.50 reflects the LD50 midpoint of this band. P90=fatality from dose >4 Sv."
+    },
+    {
+      "band": "acute_lethal",
+      "sub_mechanism": "ionising_radiation",
+      "description": "Acute lethal ionising radiation dose (>6 Sv). Criticality excursion at close range, unshielded spent fuel, nuclear accident. Gastrointestinal and cerebrovascular syndrome. Death within days to weeks.",
+      "published_mortality": 0.90,
+      "mortality_source": "REAC/TS radiation accident registry. Above 6 Sv, GI syndrome is almost always fatal. Above 10 Sv, cerebrovascular syndrome — death within 48 hours. Tokaimura worker received ~17 Sv, survived 83 days with intensive care.",
+      "p10": 0.10,
+      "p50": 0.90,
+      "p90": 0.999,
+      "p10_label": "serious_injury",
+      "p50_label": "fatality",
+      "p90_label": "fatality",
+      "rationale": "Above 6 Sv whole-body, survival is the exception even with the best available medical care. GI syndrome destroys the gut lining. Cerebrovascular syndrome (>10 Sv) causes brain oedema and death within days. P10=serious_injury reflects partial-body exposure or rapid shielding limiting dose to the survivable range."
+    },
+    {
+      "band": "laser_high_power",
+      "sub_mechanism": "non_ionising_radiation",
+      "description": "High-power laser exposure (Class 3B/4). Industrial cutting/welding laser, military/research laser, laser show equipment. Eye damage is immediate and permanent. Skin burns from Class 4.",
+      "published_mortality": 0.001,
+      "mortality_source": "IEC 60825 laser safety data; Rockwell Laser Industries incident database. Laser injuries are almost exclusively eye injuries (retinal burns, corneal damage). Fatality only from high-power industrial laser direct torso contact (extremely rare).",
+      "p10": 0.0001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "no_injury",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Class 3B/4 lasers cause permanent eye damage on momentary exposure — retinal burn, corneal damage, blindness. P50=medical_treatment reflects partial vision loss. P90=serious_injury reflects permanent bilateral blindness from direct beam exposure. Not typically fatal but permanent disabling injury = serious. Crosses SIF threshold at P90."
+    },
+    {
+      "band": "uv_arc_flash",
+      "sub_mechanism": "non_ionising_radiation",
+      "description": "Intense UV exposure. Welding arc without eye protection (arc eye), UV sterilisation lamp, solar exposure at altitude. Acute keratitis, skin burns.",
+      "published_mortality": 0.0001,
+      "mortality_source": "Occupational ophthalmology data: arc eye (photokeratitis) is painful but self-limiting (24-72 hours). UV skin burns are superficial. No fatality mechanism.",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.005,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Arc eye is intensely painful but self-healing within 72 hours. UV skin burns are superficial (sunburn equivalent). P90=medical_treatment reflects severe bilateral arc eye requiring ophthalmology review. Not SIF."
+    },
+    {
+      "band": "rf_microwave",
+      "sub_mechanism": "non_ionising_radiation",
+      "description": "RF/microwave exposure above occupational limits. Telecommunications tower, radar, industrial RF heater, microwave drying. Thermal tissue damage from dielectric heating.",
+      "published_mortality": 0.001,
+      "mortality_source": "IEEE C95.1 RF safety standard; ICNIRP guidelines. RF thermal injury is rare — requires close proximity to high-power source. Documented cases from radar and industrial RF heaters.",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.01,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "RF/microwave at occupational power levels causes warming, not burning. Injury requires prolonged exposure to high-power source at close range. P90=medical_treatment reflects deep tissue thermal injury from industrial RF heater contact. Not typically SIF."
+    },
+    {
+      "band": "impulse_noise",
+      "sub_mechanism": "noise",
+      "description": "Impulse noise above 140 dB peak. Explosive detonation, gunshot, pneumatic hammer, piling, steam release. Single-event acoustic trauma causing permanent hearing damage.",
+      "published_mortality": 0.0001,
+      "mortality_source": "Military audiology data; construction noise exposure studies. Impulse noise >140 dB causes immediate permanent sensorineural hearing loss. >185 dB can cause blast lung (but at that level, blast overpressure is the mechanism, not noise).",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.005,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Impulse noise causes permanent hearing loss (serious but not life-threatening). P50=first_aid (tinnitus, temporary threshold shift). P90=medical_treatment (permanent sensorineural hearing loss requiring audiology). At sound levels that could cause death (>185 dB), the mechanism is blast overpressure — use explosion calibration. Chronic NIHL from occupational noise is an occupational health issue, not an acute SIF event."
+    }
+  ],
+  "modifiers": {
+    "shielding": {
+      "applies_to": "ionising_radiation",
+      "none": 1.0,
+      "partial_distance": 0.3,
+      "lead_concrete": 0.05,
+      "description": "Multiplier on dose for ionising radiation. Inverse square law means distance is highly effective. Listed for reference — mitigations handled by simulator."
+    },
+    "exposure_geometry": {
+      "applies_to": "ionising_radiation",
+      "whole_body": 1.0,
+      "partial_body": 0.3,
+      "extremity_only": 0.1,
+      "description": "Multiplier on P(death). Whole-body irradiation is far more lethal than partial-body at the same dose. Extremity doses cause local tissue damage but not systemic ARS."
+    },
+    "eye_protection": {
+      "applies_to": "non_ionising_radiation",
+      "none": 1.0,
+      "safety_glasses": 0.3,
+      "laser_goggles_rated": 0.01,
+      "welding_filter": 0.01,
+      "description": "Multiplier on P(serious injury) for laser/UV. Appropriate eye protection virtually eliminates the injury. Listed for reference — mitigations handled by simulator."
+    }
+  },
+  "sources": [
+    {"author": "ICRP", "year": 2007, "relevance": "Publication 103 — fundamental radiation protection framework. Dose limits, stochastic risk coefficients, tissue weighting factors."},
+    {"author": "UNSCEAR", "year": 2020, "relevance": "Acute radiation syndrome dose-response data from nuclear/radiation accidents. LD50, syndrome thresholds."},
+    {"author": "REAC/TS", "year": 2023, "relevance": "Radiation Emergency Assistance Center/Training Site — radiation accident registry with clinical outcomes."},
+    {"author": "IEC 60825", "year": 2014, "relevance": "Safety of laser products — classification, hazard assessment, exposure limits."},
+    {"author": "ICNIRP", "year": 2020, "relevance": "Guidelines for Limiting Exposure to Electromagnetic Fields — RF/microwave exposure limits."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: unshielded high-activity source (>1 Sv) should give P(SIF) > 0.50 — acute_high P(SIF)=0.72 ✓",
+    "STKY check: criticality event should give P(SIF) near 1.0 — acute_lethal P(SIF)=0.90 ✓",
+    "STKY check: Class 4 laser to eyes should be ELEVATED — laser_high_power P(SIF)=0.10 ✓",
+    "Cross-check: welding arc eye is NON_SIF — uv_arc_flash P(SIF)=0.001 ✓",
+    "Cross-check: occupational noise exposure is NON_SIF — impulse_noise P(SIF)=0.001 ✓",
+    "Key insight: ionising radiation has the clearest dose-response of any hazard — LD50 at ~4 Sv is one of the best-characterised thresholds in toxicology. The four ionising bands map directly to ARS syndrome progression.",
+    "Overlap note: at sound levels >185 dB, the mechanism is blast overpressure (explosion), not noise. The impulse_noise band covers acoustic trauma only."
+  ]
+}

@@ -1,0 +1,117 @@
+{
+  "energy_type": "biological",
+  "mechanism": "assault",
+  "description": "Severity distribution for workplace violence and assault. Physical attack by another person — punches, kicks, weapons, restraint. Covers workplace violence from co-workers, clients, patients, members of the public, and intruders. Distinct from struck (unintentional impact) because intent changes the energy delivery pattern — targeted, sustained, escalating. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65) as victim",
+    "No security measures (barriers, alarms, body-worn cameras, panic buttons)",
+    "No security/police response during the event",
+    "Workplace context — not military or law enforcement operational duties"
+  ],
+  "magnitude_unit": "assault_type",
+  "magnitude_note": "Assault severity depends on the weapon/method, the attacker's intent (intimidation vs intent to harm), and whether the victim can disengage. Bands by escalation level. Workplace assault spans healthcare (patient violence), retail (robbery), lone worker (public-facing), and industrial (co-worker dispute).",
+  "magnitude_bands": [
+    {
+      "band": "verbal_threat",
+      "description": "Verbal abuse, threats, intimidation without physical contact. Aggressive patient, abusive customer, threatening co-worker. No physical energy transfer.",
+      "published_mortality": 0.0001,
+      "mortality_source": "BLS workplace violence data: verbal threats are the most common form, rarely escalate to physical harm in the same event. Psychological harm is real but outside the acute SIF framework.",
+      "p10": 0.0001,
+      "p50": 0.0003,
+      "p90": 0.001,
+      "p10_label": "no_injury",
+      "p50_label": "no_injury",
+      "p90_label": "first_aid",
+      "rationale": "No physical energy transfer. P90=first_aid reflects stress response or minor injury from evasive action. The real harm is psychological (PTSD, anxiety) which is outside the SIF framework. Included because the model will classify these narratives as assault."
+    },
+    {
+      "band": "unarmed_physical",
+      "description": "Unarmed physical assault — punches, kicks, pushing, biting, scratching, restraint. Patient violence in healthcare, pub/retail confrontation, co-worker fight. No weapon.",
+      "published_mortality": 0.002,
+      "mortality_source": "BLS workplace violence data; NHS staff violence statistics. Unarmed assaults rarely produce SIF — human fists and feet are limited energy sources. Fatal from single punch (head hits ground) is documented but rare.",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.01,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Unarmed assault is self-limiting energy — a punch delivers ~50-100J, far less than a fall from 2m. P50=first_aid (bruising, minor laceration). P90=medical_treatment (facial fracture, concussion from head hitting ground after punch). The 'one punch kill' is real but rare — typically secondary head strike on concrete, not the punch itself."
+    },
+    {
+      "band": "blunt_weapon",
+      "description": "Assault with blunt weapon or improvised weapon. Club, bat, tool used as weapon, thrown object, vehicle used as weapon (deliberate ramming). Significantly more energy than unarmed.",
+      "published_mortality": 0.05,
+      "mortality_source": "FBI workplace homicide data; BLS Census of Fatal Occupational Injuries. Blunt weapon assaults produce more severe injuries than unarmed but are less lethal than edged/firearm.",
+      "p10": 0.001,
+      "p50": 0.01,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "A weapon multiplies the energy and concentrates impact. Baseball bat to head delivers ~150J on small area — skull fracture likely. P50=medical_treatment (fractures, deep lacerations). P90=serious_injury from sustained attack or head strike with heavy weapon. Crosses SIF threshold at P90."
+    },
+    {
+      "band": "edged_weapon",
+      "description": "Assault with knife, blade, or sharp weapon. Stabbing, slashing. Common in retail robbery, healthcare (concealed weapon), domestic violence spillover to workplace.",
+      "published_mortality": 0.15,
+      "mortality_source": "Trauma registry data: stab wounds to torso have ~5-15% mortality depending on organs hit. NHS trauma data; FBI workplace homicide data.",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Knife wounds penetrate body cavities. Torso stab wounds have 5-15% mortality (higher for neck, cardiac). P50=serious_injury reflects surgical repair of stab wound. P90=fatality from cardiac/major vessel penetration. Unambiguously SIF."
+    },
+    {
+      "band": "firearm",
+      "description": "Assault with firearm. Shooting incident — robbery, active shooter, workplace dispute escalation. The dominant cause of workplace homicide in the US.",
+      "published_mortality": 0.30,
+      "mortality_source": "BLS CFOI: ~400 workplace homicides/year in US, ~75% by firearm. Trauma registry: gunshot wound mortality ~15-30% depending on location (torso ~20%, head ~80%).",
+      "p10": 0.01,
+      "p50": 0.50,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "fatal_range",
+      "p90_label": "fatality",
+      "rationale": "Firearms deliver concentrated kinetic energy to internal organs. Handgun (~500J) to torso causes cavitation and organ damage. P50 reflects ~30% overall mortality. P90=fatality from head/cardiac shot or multiple wounds. The dominant mechanism for US workplace homicide. Less relevant in UK/EU workplace context but the model will see these in US data."
+    }
+  ],
+  "modifiers": {
+    "intent": {
+      "intimidation": 0.3,
+      "impulsive": 1.0,
+      "premeditated": 2.0,
+      "description": "Multiplier on P(death). Intimidation rarely involves full-force attack. Premeditated assault (active shooter, targeted attack) involves weapons and sustained intent to harm."
+    },
+    "victim_escape": {
+      "can_flee": 0.5,
+      "restricted": 1.0,
+      "trapped": 2.0,
+      "description": "Multiplier on P(death). Ability to disengage is the primary survival factor. Lone workers, locked environments, and night shift are highest risk."
+    },
+    "sector": {
+      "healthcare": 1.5,
+      "retail_night": 1.5,
+      "lone_worker": 2.0,
+      "office": 0.5,
+      "description": "Relative assault frequency multiplier. Healthcare workers face the highest frequency of patient violence. This doesn't change per-event severity but affects how often the calibration is exercised."
+    }
+  },
+  "sources": [
+    {"author": "BLS", "year": 2023, "relevance": "Census of Fatal Occupational Injuries — ~400 workplace homicides/year in US, ~75% firearm. Workplace violence is the #2 cause of workplace death for women."},
+    {"author": "NHS", "year": 2024, "relevance": "NHS Staff Survey violence data — ~15% of NHS staff report physical assault annually. Patient violence in healthcare is the highest-frequency assault context."},
+    {"author": "FBI", "year": 2023, "relevance": "Workplace violence typology — Type I (criminal intent/robbery), Type II (client/patient), Type III (co-worker), Type IV (domestic spillover)."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: knife attack should give P(SIF) > 0.50 — edged_weapon P(SIF)=0.50 ✓",
+    "STKY check: workplace shooting should give P(SIF) > 0.50 — firearm P(SIF)=0.72 ✓",
+    "Cross-check: patient pushing nurse is NON_SIF — unarmed_physical P(SIF)=0.01 ✓",
+    "Cross-check: verbal abuse is NON_SIF — verbal_threat P(SIF)=0.000 ✓",
+    "Context note: firearm band is primarily relevant to US/high-firearm jurisdictions. In UK/EU workplace context, edged_weapon is the dominant lethal assault mechanism. The model will select the appropriate band from narrative context.",
+    "Key insight: workplace violence severity is highly bimodal — the vast majority of events are verbal/unarmed (NON_SIF) but the rare armed attack has very high lethality. The calibration captures both ends."
+  ]
+}

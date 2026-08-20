@@ -1,0 +1,180 @@
+{
+  "labels": [
+    {
+      "id": "transport",
+      "name": "Transport (all modes)",
+      "oiics": [
+        "21",
+        "22",
+        "24",
+        "25",
+        "26",
+        "27"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "count_2023": 22557
+    },
+    {
+      "id": "caught_in",
+      "name": "Caught in/compressed by",
+      "oiics": [
+        "64"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "count_2023": 31520
+    },
+    {
+      "id": "explosion",
+      "name": "Explosion",
+      "oiics": [
+        "32"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "count_2023": 316
+    },
+    {
+      "id": "fire",
+      "name": "Fire",
+      "oiics": [
+        "31"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "count_2023": 296
+    },
+    {
+      "id": "electrical",
+      "name": "Electrical contact",
+      "oiics": [
+        "51"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "count_2023": 978
+    },
+    {
+      "id": "thermal",
+      "name": "Thermal exposure",
+      "oiics": [
+        "53"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "count_2023": 10748
+    },
+    {
+      "id": "chemical",
+      "name": "Chemical/substance exposure",
+      "oiics": [
+        "55"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "count_2023": 64691
+    },
+    {
+      "id": "breathing",
+      "name": "Threat to breathing / O2",
+      "oiics": [
+        "56"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "count_2023": 26
+    },
+    {
+      "id": "pressure",
+      "name": "Pressure change",
+      "oiics": [
+        "54"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "count_2023": 144
+    },
+    {
+      "id": "assault",
+      "name": "Intentional injury by person",
+      "oiics": [
+        "11",
+        "12"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "count_2023": 34990
+    },
+    {
+      "id": "structural_collapse",
+      "name": "Structural collapse",
+      "oiics": [
+        "65"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "count_2023": 29
+    },
+    {
+      "id": "overexertion",
+      "name": "Overexertion",
+      "oiics": [
+        "71",
+        "72",
+        "73"
+      ],
+      "gate": "AUTO_NON_SIF",
+      "count_2023": 271800
+    },
+    {
+      "id": "slip_no_fall",
+      "name": "Slip/trip without fall",
+      "oiics": [
+        "41"
+      ],
+      "gate": "AUTO_NON_SIF",
+      "count_2023": 22265
+    },
+    {
+      "id": "abrasion",
+      "name": "Abrasion/friction/vibration",
+      "oiics": [
+        "66",
+        "67"
+      ],
+      "gate": "AUTO_NON_SIF",
+      "count_2023": 11413
+    },
+    {
+      "id": "radiation_noise",
+      "name": "Radiation/noise exposure",
+      "oiics": [
+        "52"
+      ],
+      "gate": "AUTO_NON_SIF",
+      "count_2023": 6473
+    },
+    {
+      "id": "animal_insect",
+      "name": "Animal/insect contact",
+      "oiics": [
+        "13"
+      ],
+      "gate": "AUTO_NON_SIF",
+      "count_2023": 9587
+    },
+    {
+      "id": "fall",
+      "name": "Fall (any level)",
+      "oiics": [
+        "42",
+        "43",
+        "44"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "notes": "Merged from fall_height + fall_same_level. Stage 2 discriminates height."
+    },
+    {
+      "id": "struck",
+      "name": "Struck by/against object",
+      "oiics": [
+        "62",
+        "63"
+      ],
+      "gate": "NEEDS_ASSESSMENT",
+      "notes": "Merged from struck_by + struck_against. Stage 2 discriminates energy."
+    }
+  ],
+  "version": "1.1",
+  "notes": "v1.1: Merged fall_height+fall_same_level\u2192fall, struck_by+struck_against\u2192struck. 18 labels."
+}

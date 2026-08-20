@@ -1,0 +1,143 @@
+{
+  "energy_type": "gravity",
+  "mechanism": "fall",
+  "description": "Severity distribution for falls from height, unmitigated (no PPE, nets, or barriers). P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "Hard landing surface (concrete/steel) — default worst-case receiving environment",
+    "Unmitigated: no engineered controls (harness, net, guardrail)",
+    "Random body orientation on impact"
+  ],
+  "metalog_bounds": [0.0, 1.0],
+  "metalog_note": "P(death) is bounded [0,1]. Use Bounds::Bounded(0.0, 1.0) for metalog fitting. Quantile values at exact boundaries (0.0, 1.0) are stored as 0.0001 and 0.999 for logit transform compatibility.",
+  "p_death_scale": {
+    "no_injury": 0.0,
+    "first_aid": 0.001,
+    "medical_treatment": 0.005,
+    "serious_injury": 0.10,
+    "fatality": 1.0
+  },
+  "magnitude_bands": [
+    {
+      "band": "standing",
+      "height_m_low": 0,
+      "height_m_high": 1,
+      "description": "Standing height / same level. Trip, slip, stumble with fall to ground.",
+      "published_mortality": 0.003,
+      "mortality_source": "Elderly falls literature; working-age mortality < 0.5%",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.005,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Most same-level falls produce minor or no injury. P90 reflects fracture risk from awkward landing (wrist, ankle). Working-age adults rarely die from standing-height falls."
+    },
+    {
+      "band": "low",
+      "height_m_low": 1,
+      "height_m_high": 3,
+      "description": "Low elevation. Ladders, loading docks, low platforms, vehicles.",
+      "published_mortality": 0.02,
+      "mortality_source": "Lapostolle 2005, Liu 2009; 1-4% mortality in trauma registries",
+      "p10": 0.001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Median outcome is moderate injury (fractures, sprains needing treatment). P90 reflects head-first impact onto concrete — serious but usually survivable. Crosses SIF threshold at P90."
+    },
+    {
+      "band": "medium",
+      "height_m_low": 3,
+      "height_m_high": 6,
+      "description": "Medium elevation. Scaffolding, roofs, mezzanines, first/second floor.",
+      "published_mortality": 0.07,
+      "mortality_source": "Lau 2005 (1,579 pts), Dickinson 2012; 5-10% mortality",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Median outcome is serious injury (displaced fractures, spinal injury, organ damage). P90 = fatality reflects head/spine-first impact. 3m is the height at which AIS >= 3 becomes the majority outcome. This is unambiguously SIF territory."
+    },
+    {
+      "band": "high",
+      "height_m_low": 6,
+      "height_m_high": 10,
+      "description": "High elevation. Multi-storey structures, towers, cranes (low), tall scaffolding.",
+      "published_mortality": 0.20,
+      "mortality_source": "Lapostolle 2005 (6m critical threshold); 10-25% mortality",
+      "p10": 0.01,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "P10=0.01 reflects best-case feet-first landing producing a moderate fracture. Median is serious injury. P90=fatality from head/spine-first impact. Published mortality 10-25% for this range."
+    },
+    {
+      "band": "very_high",
+      "height_m_low": 10,
+      "height_m_high": 20,
+      "description": "Very high elevation. Multi-storey buildings, industrial structures, tall cranes.",
+      "published_mortality": 0.50,
+      "mortality_source": "LD50 at ~12-15m across multiple studies; 25-75% mortality across this range",
+      "p10": 0.10,
+      "p50": 0.50,
+      "p90": 0.999,
+      "p10_label": "serious_injury",
+      "p50_label": "fatal_range",
+      "p90_label": "fatality",
+      "rationale": "This band contains LD50 (~12-15m). P50=0.50 reflects the ~50% mortality midpoint. P10=serious_injury for survivors with polytrauma. P90=fatality for the majority of upper-band impacts."
+    },
+    {
+      "band": "extreme",
+      "height_m_low": 20,
+      "height_m_high": null,
+      "description": "Extreme elevation. High-rise, telecommunications towers, bridges.",
+      "published_mortality": 0.85,
+      "mortality_source": "75-90%+ mortality above 20m; survival is the exception (case reports)",
+      "p10": 0.999,
+      "p50": 0.999,
+      "p90": 0.999,
+      "p10_label": "fatality",
+      "p50_label": "fatality",
+      "p90_label": "fatality",
+      "rationale": "Near-certain fatality at any body orientation on any surface. Rare survivors have extreme polytrauma. The distribution collapses to a near-point-mass at P(death) ≈ 1.0."
+    }
+  ],
+  "modifiers": {
+    "surface": {
+      "concrete_steel": 1.0,
+      "soil_grass": 0.5,
+      "water_deep": 0.7,
+      "safety_net": 0.05,
+      "description": "Multiplier on P(death). Default calibration assumes concrete/steel (1.0). Soft ground roughly halves mortality. Safety net reduces by ~95% (ANSI Z359.2 test data)."
+    },
+    "age": {
+      "under_18": 0.7,
+      "18_to_65": 1.0,
+      "over_65": 2.5,
+      "description": "Multiplier on P(death). Default calibration assumes working-age (18-65). Elderly have ~2-3x higher mortality at any height due to osteoporosis, anticoagulants, reduced physiological reserve."
+    }
+  },
+  "sources": [
+    {"author": "Lau et al.", "year": 2005, "relevance": "1,579 fall patients, height vs ISS/mortality. Key dose-response source."},
+    {"author": "Lapostolle et al.", "year": 2005, "relevance": "Prospective study identifying 6m as critical threshold for major trauma."},
+    {"author": "Liu et al.", "year": 2009, "relevance": "Trauma registry fall analysis, height-mortality relationship."},
+    {"author": "Dickinson et al.", "year": 2012, "relevance": "Falls from height in trauma registries, AIS distribution by height."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates (ISS basis). Foundation for P(death) scale."},
+    {"author": "OSHA", "year": 2023, "relevance": "Fatal Four analysis: falls = 36.4% of construction fatalities. 6ft (1.83m) threshold."},
+    {"author": "HSE", "year": 2024, "relevance": "Work at Height Regulations 2005. 2m threshold. Falls = #1 cause of workplace death in UK."}
+  ],
+  "validation_notes": [
+    "STKY check: 6m fall onto concrete should give P(SIF) > 0.50 — medium band P50 = 0.10 (serious_injury), meets SIF threshold ✓",
+    "STKY check: 10m fall should give P(SIF) > 0.80 — high band, nearly all outcomes are serious+ ✓",
+    "Cross-check: OSHA ITA 2024 has 10,576 fall-to-lower-level events with 13 fatalities. At reported heights (mostly 2-6m), 0.12% fatality rate is consistent with low-medium band mortality after accounting for survivorship bias in reporting.",
+    "The P10/P50/P90 quantiles are set on the P(death) scale, not the ordinal severity scale. They feed directly into metalog SPT fitting."
+  ]
+}

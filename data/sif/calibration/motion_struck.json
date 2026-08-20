@@ -1,0 +1,111 @@
+{
+  "energy_type": "motion",
+  "mechanism": "struck",
+  "description": "Severity distribution for struck-by events (object hits person), unmitigated. Falling objects, projectiles, swinging loads, flying debris. Does NOT include vehicle strikes — see transport mechanism. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No PPE (hard hat, high-vis, barriers)",
+    "Object strikes person (not person strikes object — that's 'struck_against')",
+    "Head/torso exposure assumed for worst-case"
+  ],
+  "magnitude_unit": "object_mass_x_velocity",
+  "magnitude_note": "Struck-by severity depends on momentum transfer (mass × velocity) and impact area. Bands are defined by typical scenario rather than pure physics because mass and velocity vary independently.",
+  "magnitude_bands": [
+    {
+      "band": "hand_tool",
+      "description": "Hand tool, small falling object (<2kg from <3m), low-speed contact. Hammer, wrench, dropped fitting.",
+      "kinetic_energy_j": "< 60",
+      "published_mortality": 0.001,
+      "mortality_source": "Trauma registry data: small-object impacts rarely fatal unless to unprotected head/temple",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.01,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Low kinetic energy, small impact area. P90 reflects head strike producing concussion or facial laceration needing treatment. Fatal only with direct temple/eye strike — rare enough to not reach P90."
+    },
+    {
+      "band": "light_dropped",
+      "description": "Light object from low-moderate height (<5kg from <5m). Dropped hand tool, fitting, bolt, phone, small component.",
+      "kinetic_energy_j": "< 250",
+      "published_mortality": 0.005,
+      "mortality_source": "Trauma registry data; small-object head strikes. Fatal on temple/fontanelle strike but uncommon.",
+      "p10": 0.0001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "no_injury",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Without hard hat, a 2kg wrench from 5m delivers ~100J to the skull — enough for concussion or depressed fracture. Median is medical treatment (laceration, simple fracture). P90 serious injury from direct crown/temple strike. Crosses SIF threshold at P90."
+    },
+    {
+      "band": "heavy_dropped",
+      "description": "Heavy object from height (5-50kg from 3-15m). Scaffold tube, brick, tool bag, steel fitting, loose cladding panel.",
+      "kinetic_energy_j": "250-5000",
+      "published_mortality": 0.15,
+      "mortality_source": "OSHA Focus Four: struck-by falling objects ~10% of construction fatalities. Scaffold tube from 10m is a known killer.",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "A 10kg scaffold tube from 10m delivers ~1kJ to the skull — fatal without hard hat. Median is serious injury. P90 fatality from direct head/spine strike. This is a primary SIF mechanism in construction. Hard hat is the critical mitigation (handled by simulator, not here)."
+    },
+    {
+      "band": "swinging_projectile",
+      "description": "Swinging load, pressurised release, high-speed projectile. Crane load swing, snapped cable, compressed spring, nail gun, grinder disc fragment.",
+      "kinetic_energy_j": "100-10000",
+      "published_mortality": 0.10,
+      "mortality_source": "OSHA struck-by fatality data; crane swing and snapped cable/sling incidents. High velocity + concentrated impact area.",
+      "p10": 0.005,
+      "p50": 0.05,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "High velocity on small impact area produces penetrating or severe blunt trauma. Snapped cable whip, crane load swing, and projectiles (nail gun, disc fragment) are known SIF mechanisms. P90 fatality from head/chest penetration."
+    },
+    {
+      "band": "heavy_object_fall",
+      "description": "Heavy object from height (>50kg from >3m). Steel beam, concrete slab, crane load. Combines gravity and mass.",
+      "kinetic_energy_j": "> 5000",
+      "published_mortality": 0.40,
+      "mortality_source": "OSHA construction fatality data: struck-by crane loads, steel erection. Crane-related struck-by is one of the highest-fatality workplace scenarios.",
+      "p10": 0.01,
+      "p50": 0.50,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "fatal_range",
+      "p90_label": "fatality",
+      "rationale": "Heavy objects from height combine gravitational PE with large mass. A 100kg steel beam from 5m has ~5kJ of kinetic energy. Direct hit to head/torso is almost always fatal. P10 reflects glancing/peripheral contact."
+    }
+  ],
+  "modifiers": {
+    "body_region": {
+      "head": 2.0,
+      "torso": 1.5,
+      "limbs": 0.3,
+      "description": "Multiplier on P(death). Head impacts are ~2x more lethal than torso for same kinetic energy (AIS data). Limb impacts rarely fatal."
+    },
+    "ppe": {
+      "hard_hat": 0.5,
+      "high_vis": 0.7,
+      "barriers": 0.1,
+      "description": "These are mitigations handled by the simulator, not the calibration curves. Listed here for reference only."
+    }
+  },
+  "sources": [
+    {"author": "OSHA", "year": 2023, "relevance": "Focus Four: struck-by is #2 cause of construction fatalities after falls. Crane loads, falling objects, flying debris."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: crane load drop onto person should give P(SIF) near 1.0 — heavy_object_fall, most outcomes serious+ ✓",
+    "STKY check: dropped hand tool is NON_SIF — matches industry practice (hard hat is adequate control) ✓",
+    "Vehicle strikes are under transport mechanism, not struck — see motion_transport.json",
+    "struck_against (person hits object) is a separate mechanism with generally lower severity — not covered here"
+  ]
+}

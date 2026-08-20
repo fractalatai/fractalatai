@@ -1,0 +1,89 @@
+{
+  "energy_type": "pressure",
+  "mechanism": "explosion",
+  "description": "Severity distribution for explosions — sudden energy release producing blast overpressure, projectiles, and thermal effects simultaneously. Covers gas/vapour explosions, dust explosions, pressure vessel failures, and chemical detonations. The calibration captures the combined effect since a model classifying 'explosion' implies all mechanisms are active. Electrical arc blast is handled under electrical mechanism. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No blast shelter, barriers, or blast-resistant construction",
+    "Person is within the hazard zone (not remote/isolated from the explosion)",
+    "Combined primary (overpressure), secondary (projectiles), and tertiary (displacement) blast injury"
+  ],
+  "magnitude_unit": "explosion_scale",
+  "magnitude_note": "Explosion severity at a given location depends on overpressure (kPa), which is a function of energy release and distance. Published thresholds: 7 kPa (1 psi) = window breakage/minor injury, 21 kPa (3 psi) = serious injury, 35 kPa (5 psi) = likely fatal, 69 kPa (10 psi) = near-certain fatal. Bands are defined by explosion type/scale because the model extracts scenario, not overpressure.",
+  "magnitude_bands": [
+    {
+      "band": "minor_confined",
+      "description": "Minor confined explosion. Small gas ignition (cooker, pilot light), aerosol can, battery thermal runaway, minor dust flash. Limited energy release, small affected radius.",
+      "published_mortality": 0.01,
+      "mortality_source": "NFPA gas ignition data; consumer product incident reports. Small confined gas ignitions produce flash burns and minor blast. Fatal only if very close to ignition point in enclosed space.",
+      "p10": 0.001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Limited energy release. Primary injuries are flash burns to hands/face and minor blast effects (tympanic rupture). P90 serious injury reflects close-proximity blast in enclosed space (bathroom, cupboard). Overlaps with fire flash_momentary band but includes blast component."
+    },
+    {
+      "band": "significant_industrial",
+      "description": "Significant industrial explosion. Dust explosion in hopper/silo, gas accumulation ignition in process area, pressure vessel failure (non-BLEVE), transformer explosion. Substantial energy release, multiple casualties possible.",
+      "published_mortality": 0.25,
+      "mortality_source": "CSB investigation data; ATEX incident reports; HSE dangerous occurrence statistics. Dust explosions in silos average 2-3 fatalities per event. Gas explosions in process areas similar.",
+      "p10": 0.01,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Significant energy release producing >21 kPa overpressure within metres. Combined blast injury (lung barotrauma), projectile injury (shrapnel, debris), and burn injury (flash fire). Median is serious injury for those within the hazard zone. P90 fatality from close proximity. Grain silo dust explosions are a classic example — often produce secondary explosions that are more lethal than the first."
+    },
+    {
+      "band": "major_catastrophic",
+      "description": "Major catastrophic explosion. Vapour cloud explosion (VCE), BLEVE, chemical detonation, large-scale dust explosion, refinery/petrochemical explosion. Mass casualty event. Lethal zone extends tens to hundreds of metres.",
+      "published_mortality": 0.60,
+      "mortality_source": "CSB major incident data (Texas City 2005: 15 dead, Buncefield 2005, West Fertilizer 2013: 15 dead). VCE/BLEVE lethality zones from TNT-equivalent blast modelling.",
+      "p10": 0.10,
+      "p50": 0.90,
+      "p90": 0.999,
+      "p10_label": "serious_injury",
+      "p50_label": "fatality",
+      "p90_label": "fatality",
+      "rationale": "VCE/BLEVE/detonation produces >35 kPa overpressure over wide area — above the lung damage threshold. Fireball radius can exceed 100m for large BLEVE. Those within the primary blast zone have near-zero survival. P10=serious_injury reflects those at the edge of the blast zone receiving secondary injuries. These are the events that produce headlines."
+    }
+  ],
+  "modifiers": {
+    "confinement": {
+      "open_air": 0.5,
+      "partially_confined": 1.0,
+      "fully_confined": 2.0,
+      "description": "Multiplier on P(death). Confined explosions produce higher peak overpressure (pressure reflection from walls). Open-air explosions dissipate faster. Dust explosions are almost exclusively confined."
+    },
+    "secondary_explosion": {
+      "single": 1.0,
+      "secondary_likely": 1.5,
+      "description": "Multiplier on P(death). Dust and gas explosions frequently produce secondary explosions that are more lethal — the first explosion disturbs settled dust/dislodges gas, creating a larger fuel-air mixture. Imperial Sugar (2008) is the classic example."
+    },
+    "distance": {
+      "within_blast_zone": 1.0,
+      "at_boundary": 0.3,
+      "beyond_boundary": 0.05,
+      "description": "Multiplier on P(death). Overpressure drops with inverse cube of distance. The calibration assumes within the hazard zone. At the boundary, primarily secondary injuries (glass, debris)."
+    }
+  },
+  "sources": [
+    {"author": "CSB", "year": 2020, "relevance": "US Chemical Safety Board — major explosion investigation reports. Texas City (2005), Imperial Sugar (2008), West Fertilizer (2013). Detailed casualty and damage data."},
+    {"author": "HSE", "year": 2024, "relevance": "Dangerous Substances and Explosive Atmospheres Regulations (DSEAR). UK explosion incident data."},
+    {"author": "NFPA", "year": 2023, "relevance": "NFPA 652/654 dust explosion standards; NFPA 68/69 explosion protection. Incident data and blast modelling."},
+    {"author": "TNO", "year": 2005, "relevance": "Yellow Book — methods for calculation of physical effects of release of dangerous materials. Blast overpressure vs distance models."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: dust explosion in silo should give P(SIF) > 0.50 — significant_industrial P(SIF)=0.50 ✓",
+    "STKY check: VCE/BLEVE should give P(SIF) near 1.0 — major_catastrophic P(SIF)=0.90 ✓",
+    "Cross-check: minor gas ignition (cooker) is ELEVATED not SIF — matches domestic/light industrial experience ✓",
+    "Overlap note: electrical arc blast → use electrical.json. Explosion fireball thermal effects → also in fire.json explosion_fireball band. If model outputs 'explosion', use this curve for the combined blast+thermal+projectile effect.",
+    "Key insight: explosion is one of few mechanisms where a single event routinely produces multiple fatalities. The per-person P(death) in these curves doesn't capture the multi-casualty dimension — that's a risk assessment concern beyond the calibration curve."
+  ]
+}

@@ -1,0 +1,106 @@
+{
+  "energy_type": "thermal",
+  "mechanism": "fire",
+  "description": "Severity distribution for fire and flash fire exposure, unmitigated. Open flame, flash fire, clothing ignition, engulfment. Distinct from thermal contact burns — fire produces radiant + convective heat over large BSA with inhalation risk. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No fire-resistant clothing (FR/AR), no suppression system, no escape route",
+    "Standard indoor/outdoor workplace — not confined space (see breathing mechanism for oxygen depletion)",
+    "Clothing ignition is the critical escalation point — once clothing burns, BSA involvement is rapid"
+  ],
+  "magnitude_unit": "fire_scale",
+  "magnitude_note": "Fire severity depends on heat flux, exposure duration, and whether clothing ignites. Bands are defined by fire scale/type rather than pure heat flux because the mechanism of harm shifts (radiant → convective → clothing ignition → structural).",
+  "magnitude_bands": [
+    {
+      "band": "flash_momentary",
+      "description": "Brief flash or flare. Solvent flash, welding flash, small gas ignition, momentary flame contact (<2s). Clothing does not ignite.",
+      "published_mortality": 0.005,
+      "mortality_source": "Burn centre data: flash burns without clothing ignition are typically partial-thickness, limited BSA. NFPA fire injury data.",
+      "p10": 0.001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Flash exposure without clothing ignition produces partial-thickness burns on exposed skin (hands, face). Median is medical treatment. P90 serious injury from facial/airway flash burns. Brief duration limits BSA involvement."
+    },
+    {
+      "band": "clothing_ignition",
+      "description": "Clothing catches fire. This is the critical escalation — once clothing burns, BSA involvement increases rapidly. Flash fire in flammable atmosphere, sustained flame contact, splashed accelerant.",
+      "published_mortality": 0.20,
+      "mortality_source": "ABA National Burn Repository: clothing fire burns average 25-40% TBSA. Baux rule at age 40 + 30% TBSA ≈ 30% mortality. NFPA clothing ignition data.",
+      "p10": 0.01,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Clothing ignition is the single most important escalation point in fire injury. Burning clothing produces full-thickness burns over large BSA within seconds. P50 serious injury reflects typical 20-30% TBSA deep burns. P90 fatality from >40% TBSA or airway involvement."
+    },
+    {
+      "band": "structural_fire",
+      "description": "Established structural or industrial fire. Building fire, plant fire, tank fire. Heat flux >20 kW/m², smoke, structural collapse risk, limited escape.",
+      "published_mortality": 0.40,
+      "mortality_source": "NFPA fire fatality data; industrial fire investigations. Smoke inhalation is the primary killer in structural fires (~75% of fire deaths).",
+      "p10": 0.01,
+      "p50": 0.50,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "fatal_range",
+      "p90_label": "fatality",
+      "rationale": "In a structural fire without suppression or escape route, smoke inhalation kills before burns in most cases. P10 reflects those near an exit who escape with burns. P50 reflects the high fatality rate when trapped or disoriented. Combines burn, inhalation, and structural collapse mechanisms."
+    },
+    {
+      "band": "explosion_fireball",
+      "description": "Explosion with fireball or BLEVE. Vapour cloud explosion, dust explosion, pressure vessel BLEVE, refinery fire. Massive radiant heat pulse over wide area.",
+      "published_mortality": 0.60,
+      "mortality_source": "CSB investigation data; BLEVE incidents; Buncefield, Texas City. Fireball radiation extends tens of metres. Blast + burn + projectile combination.",
+      "p10": 0.10,
+      "p50": 0.90,
+      "p90": 0.999,
+      "p10_label": "serious_injury",
+      "p50_label": "fatality",
+      "p90_label": "fatality",
+      "rationale": "Fireballs from BLEVE/VCE produce lethal radiant heat flux at distance. Those within the fireball radius have near-zero survival. P10 reflects those at the edge of the thermal radiation zone receiving serious burns. Overlaps with explosion mechanism — use explosion for blast effects, fire for thermal."
+    }
+  ],
+  "modifiers": {
+    "clothing": {
+      "bare_skin": 1.0,
+      "standard_workwear": 0.8,
+      "fr_clothing": 0.2,
+      "ar_rated_ppe": 0.1,
+      "description": "Multiplier on P(death). FR/AR clothing prevents clothing ignition — the critical escalation point. Standard workwear (cotton/poly) can melt onto skin, worsening burns. Listed for reference — mitigations handled by simulator."
+    },
+    "escape_route": {
+      "open_air": 0.5,
+      "clear_exit": 0.7,
+      "limited_exit": 1.0,
+      "no_exit_confined": 2.0,
+      "description": "Multiplier on P(death). Escape route availability is the primary determinant of fire exposure duration. Confined space fires are disproportionately fatal."
+    },
+    "suppression": {
+      "none": 1.0,
+      "sprinkler": 0.3,
+      "deluge": 0.2,
+      "gas_suppression": 0.15,
+      "description": "Multiplier on P(death). Automatic suppression limits fire growth and duration. Listed for reference — mitigations handled by simulator."
+    }
+  },
+  "sources": [
+    {"author": "NFPA", "year": 2023, "relevance": "Fire Loss in the United States — fire death statistics, cause analysis, clothing ignition data"},
+    {"author": "American Burn Association", "year": 2023, "relevance": "National Burn Repository — BSA/age/mortality data, clothing fire outcomes"},
+    {"author": "CSB", "year": 2020, "relevance": "Chemical Safety Board investigation reports — industrial fire/explosion case studies with casualty data"},
+    {"author": "Bull & Fisher", "year": 1954, "relevance": "Burn mortality by age and TBSA — Baux rule foundation"},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: flash fire in flammable atmosphere → clothing_ignition P(SIF)=0.50 ✓",
+    "STKY check: structural fire without escape → structural_fire P(SIF) near 1.0 ✓",
+    "Cross-check: welding flash without clothing ignition is ELEVATED — matches industry practice ✓",
+    "Key insight: clothing ignition is THE escalation boundary. FR clothing is the most effective single mitigation for fire SIF potential — it prevents the transition from flash to clothing fire.",
+    "Note: explosion_fireball overlaps with explosion mechanism. If model says 'explosion', use explosion calibration for blast; if 'fire', use this for thermal. Many real events involve both."
+  ]
+}

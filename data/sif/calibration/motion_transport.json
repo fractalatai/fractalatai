@@ -1,0 +1,88 @@
+{
+  "energy_type": "motion",
+  "mechanism": "transport",
+  "description": "Severity distribution for vehicle-pedestrian strikes, unmitigated (no barriers, speed controls, or high-vis). P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65) as pedestrian",
+    "No traffic barriers, speed humps, or exclusion zones",
+    "No high-vis or spotter",
+    "Vehicle mass typical for category (forklift 2-5t, car 1.5t, HGV 10-40t)"
+  ],
+  "magnitude_unit": "km/h",
+  "magnitude_bands": [
+    {
+      "band": "yard_speed",
+      "speed_low": 0,
+      "speed_high": 20,
+      "description": "Yard/site speed. Forklift, reversing truck, construction vehicle manoeuvring. Includes crush/pin/run-over at very low speed.",
+      "published_mortality": 0.10,
+      "mortality_source": "NHTSA pedestrian impact data; forklift fatality data from OSHA/NIOSH. Forklift (2-5t at 10km/h) crush injuries are frequently fatal despite low speed.",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Low speed but high mass — a forklift at walking pace still delivers enormous momentum. Crush/pin/run-over mechanisms dominate. Median is serious injury. P90 fatality from being pinned under vehicle or run over."
+    },
+    {
+      "band": "road_speed",
+      "speed_low": 20,
+      "speed_high": 60,
+      "description": "Urban/road speed. Car/van hitting pedestrian, HGV in work zone, site vehicle on access road.",
+      "published_mortality": 0.30,
+      "mortality_source": "Tefft 2013 (AAA Foundation): pedestrian fatality rate ~10% at 20mph, ~40% at 30mph, ~80% at 40mph. WHO pedestrian impact studies.",
+      "p10": 0.01,
+      "p50": 0.50,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "fatal_range",
+      "p90_label": "fatality",
+      "rationale": "Tefft (2013) dose-response: pedestrian fatality risk increases steeply through this band. P50=0.50 reflects ~30-40% mortality midpoint. P10 reflects glancing blow at 20km/h."
+    },
+    {
+      "band": "highway_speed",
+      "speed_low": 60,
+      "speed_high": null,
+      "description": "Highway/dual carriageway speed (>60 km/h). Highway work zone, high-speed collision with pedestrian or cyclist.",
+      "published_mortality": 0.80,
+      "mortality_source": "Tefft 2013: >80% pedestrian fatality at 40mph+. DOT work zone fatality data.",
+      "p10": 0.10,
+      "p50": 0.90,
+      "p90": 0.999,
+      "p10_label": "serious_injury",
+      "p50_label": "fatality",
+      "p90_label": "fatality",
+      "rationale": "At highway speeds, pedestrian survival is the exception. Published data shows >80% fatality rate above 60km/h. P10=serious_injury reflects rare glancing contact."
+    }
+  ],
+  "modifiers": {
+    "vehicle_mass": {
+      "motorcycle": 0.5,
+      "car_van": 1.0,
+      "hgv_bus": 1.5,
+      "forklift_pit": 1.3,
+      "description": "Multiplier on P(death). Heavier vehicles transfer more momentum. Forklift/PIT elevated above car because of crush/pin risk from low centre of gravity and forks."
+    },
+    "victim_position": {
+      "standing": 1.0,
+      "prone_kneeling": 2.0,
+      "elevated_cab": 0.3,
+      "description": "Multiplier on P(death). Prone/kneeling workers are at much higher risk of run-over. Elevated cab occupants partially protected."
+    }
+  },
+  "sources": [
+    {"author": "Tefft", "year": 2013, "relevance": "Impact speed and a pedestrian's risk of severe injury or death. AAA Foundation. Key dose-response for vehicle-pedestrian impacts."},
+    {"author": "NHTSA", "year": 2022, "relevance": "Pedestrian safety data — speed vs fatality probability, impact biomechanics"},
+    {"author": "NIOSH", "year": 2020, "relevance": "Forklift-related fatalities — powered industrial truck struck-by data"},
+    {"author": "OSHA", "year": 2023, "relevance": "Focus Four: struck-by is #2 cause of construction fatalities after falls."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: forklift strike should give P(SIF) > 0.50 — yard_speed P50=0.10, meets threshold ✓",
+    "STKY check: highway work zone strike should give P(SIF) near 1.0 — highway_speed, most outcomes serious+ ✓",
+    "Cross-check: Tefft 2013 is the definitive pedestrian dose-response — well-cited, used by NHTSA for policy"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "name": "P(death) severity scale",
+  "description": "Continuous severity mapping from ordinal workplace injury categories to probability of death, grounded in AIS empirical mortality data (Baker 1974, NTDB) and corroborated by HSE appraisal costs.",
+  "rationale": "The naive ordinal mapping (1,2,3,4) assumes equal spacing. AIS mortality data shows approximately geometric spacing — each level represents a 4-6x increase in P(death). P(death) is bounded [0,1], directly interpretable, and empirically grounded.",
+  "sif_threshold": 0.10,
+  "sif_threshold_rationale": "Serious injury spans AIS 3-4 (3-16% mortality). A midpoint of 10% aligns with HSE 'specified injury' category. P(SIF) = P(death >= 0.10).",
+  "categories": [
+    {
+      "label": "no_injury",
+      "ais_equivalent": 0,
+      "p_death": 0.0,
+      "hse_cost_gbp": 0,
+      "description": "No anatomical injury, no treatment needed"
+    },
+    {
+      "label": "first_aid",
+      "ais_equivalent": 1,
+      "p_death": 0.001,
+      "hse_cost_gbp": 1190,
+      "description": "Minor: abrasions, superficial lacerations, minor sprains. AIS 1 mortality ~0.1%"
+    },
+    {
+      "label": "medical_treatment",
+      "ais_equivalent": 2,
+      "p_death": 0.005,
+      "hse_cost_gbp": 44300,
+      "description": "Moderate: simple fractures, lacerations needing sutures, undisplaced fractures. AIS 2 mortality ~0.5%"
+    },
+    {
+      "label": "serious_injury",
+      "ais_equivalent": "3-4",
+      "p_death": 0.10,
+      "hse_cost_gbp": 500000,
+      "description": "Serious/severe: displaced fractures, open fractures, organ damage, amputations. AIS 3 mortality ~3%, AIS 4 ~16%. Midpoint ~10%"
+    },
+    {
+      "label": "fatality",
+      "ais_equivalent": "5-6",
+      "p_death": 1.0,
+      "hse_cost_gbp": 2185000,
+      "description": "Critical/unsurvivable: death. AIS 5 mortality ~64%, AIS 6 ~75-100% (defined as unsurvivable)"
+    }
+  ],
+  "sources": {
+    "ais_mortality": "Baker SP et al. (1974). The Injury Severity Score. J Trauma 14(3):187-196",
+    "hse_costs": "HSE Appraisal Values 2024. https://www.hse.gov.uk/statistics/economics/eauappraisal.htm",
+    "ntdb": "National Trauma Data Bank. AIS-6 survival ~25% (Surviving AIS-6, J Surgical Research 2021)"
+  }
+}

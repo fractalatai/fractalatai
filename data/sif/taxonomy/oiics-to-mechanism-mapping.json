@@ -1,0 +1,218 @@
+{
+  "description": "Mapping from OSHA OIICS event codes to ICECI mechanism codes and Energy Wheel types. Built from OSHA ITA 2023 data (891K rows, 806K with event codes).",
+  "total_rows": 890944,
+  "rows_with_event_code": 805600,
+  "mappings": [
+    {
+      "oiics_code": "71", "oiics_title": "Overexertion involving outside sources",
+      "count_2023": 197889, "pct": 22.2,
+      "iceci_c2": "7.1", "mechanism": "Over-exertion",
+      "energy_types": [], "sif_gate": "AUTO_NON_SIF",
+      "notes": "Highest prevalence. Strains, sprains, lifting injuries. Near-zero SIF potential."
+    },
+    {
+      "oiics_code": "62", "oiics_title": "Struck by object or equipment",
+      "count_2023": 139082, "pct": 15.6,
+      "iceci_c2": "1.2", "mechanism": "Contact with object",
+      "energy_types": ["motion"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "High volume. SIF depends on object mass × velocity."
+    },
+    {
+      "oiics_code": "42", "oiics_title": "Falls on same level",
+      "count_2023": 99835, "pct": 11.2,
+      "iceci_c2": "1.5", "mechanism": "Fall (same level)",
+      "energy_types": ["gravity"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "High volume but mostly low energy. SIF from head strike on hard surface."
+    },
+    {
+      "oiics_code": "55", "oiics_title": "Exposure to other harmful substances",
+      "count_2023": 64691, "pct": 7.3,
+      "iceci_c2": "6.1", "mechanism": "Chemical exposure",
+      "energy_types": ["chemical"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "Dose/concentration dependent."
+    },
+    {
+      "oiics_code": "63", "oiics_title": "Struck against object or equipment",
+      "count_2023": 55422, "pct": 6.2,
+      "iceci_c2": "1.2", "mechanism": "Contact with object (struck against)",
+      "energy_types": ["motion"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "Worker moves into object. Usually lower energy than struck-by."
+    },
+    {
+      "oiics_code": "73", "oiics_title": "Other exertions or bodily reactions",
+      "count_2023": 49489, "pct": 5.6,
+      "iceci_c2": "7.1", "mechanism": "Over-exertion (other)",
+      "energy_types": [], "sif_gate": "AUTO_NON_SIF",
+      "notes": "Bending, reaching, twisting. Near-zero SIF."
+    },
+    {
+      "oiics_code": "64", "oiics_title": "Caught in or compressed by equipment or objects",
+      "count_2023": 31520, "pct": 3.5,
+      "iceci_c2": "1.4", "mechanism": "Crushing (caught-in/between)",
+      "energy_types": ["mechanical"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "Spans finger-in-drawer to industrial press."
+    },
+    {
+      "oiics_code": "11", "oiics_title": "Intentional injury by person",
+      "count_2023": 25557, "pct": 2.9,
+      "iceci_c2": "1.3", "mechanism": "Contact with person (assault)",
+      "energy_types": ["motion"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "Workplace violence. SIF from weapons or severe beating."
+    },
+    {
+      "oiics_code": "72", "oiics_title": "Repetitive motions involving microtasks",
+      "count_2023": 24422, "pct": 2.7,
+      "iceci_c2": "7.1", "mechanism": "Over-exertion (repetitive)",
+      "energy_types": [], "sif_gate": "AUTO_NON_SIF",
+      "notes": "RSI, carpal tunnel. Not SIF."
+    },
+    {
+      "oiics_code": "41", "oiics_title": "Slip or trip without fall",
+      "count_2023": 22265, "pct": 2.5,
+      "iceci_c2": "1.6", "mechanism": "Slip/trip (no fall)",
+      "energy_types": [], "sif_gate": "AUTO_NON_SIF",
+      "notes": "Strain from catching oneself. Not SIF."
+    },
+    {
+      "oiics_code": "43", "oiics_title": "Falls to lower level",
+      "count_2023": 21812, "pct": 2.4,
+      "iceci_c2": "1.5", "mechanism": "Fall from height",
+      "energy_types": ["gravity"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "KEY SIF CATEGORY. Height is the discriminator. 2.4% of volume but high SIF potential."
+    },
+    {
+      "oiics_code": "26", "oiics_title": "Roadway incidents involving motorized land vehicle",
+      "count_2023": 12027, "pct": 1.3,
+      "iceci_c2": "1.1", "mechanism": "Transport (roadway)",
+      "energy_types": ["motion"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "KEY SIF CATEGORY. Speed is the discriminator."
+    },
+    {
+      "oiics_code": "66", "oiics_title": "Rubbed or abraded by friction or pressure",
+      "count_2023": 11125, "pct": 1.2,
+      "iceci_c2": "1.6", "mechanism": "Abrasion/friction",
+      "energy_types": [], "sif_gate": "AUTO_NON_SIF",
+      "notes": "Low energy by definition."
+    },
+    {
+      "oiics_code": "53", "oiics_title": "Exposure to temperature extremes",
+      "count_2023": 10748, "pct": 1.2,
+      "iceci_c2": "4.1/4.2", "mechanism": "Thermal exposure",
+      "energy_types": ["thermal"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "Burns, scalds, heat stress, cold stress."
+    },
+    {
+      "oiics_code": "13", "oiics_title": "Animal and insect related incidents",
+      "count_2023": 9587, "pct": 1.1,
+      "iceci_c2": "1.2/2.3", "mechanism": "Animal/insect contact",
+      "energy_types": ["biological"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "Bites, stings, allergic reactions. SIF from anaphylaxis."
+    },
+    {
+      "oiics_code": "52", "oiics_title": "Exposure to radiation and noise",
+      "count_2023": 6473, "pct": 0.7,
+      "iceci_c2": "98.2", "mechanism": "Radiation/noise exposure",
+      "energy_types": ["radiation", "sound"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "Underrepresented. Mostly noise-induced hearing loss (non-SIF). Ionising radiation is SIF."
+    },
+    {
+      "oiics_code": "27", "oiics_title": "Nonroadway incidents involving motorized land vehicles",
+      "count_2023": 5794, "pct": 0.7,
+      "iceci_c2": "1.1", "mechanism": "Transport (non-roadway)",
+      "energy_types": ["motion"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "Forklifts, warehouse vehicles. SIF from pedestrian-vehicle interaction."
+    },
+    {
+      "oiics_code": "24", "oiics_title": "Pedestrian vehicular incidents",
+      "count_2023": 3737, "pct": 0.4,
+      "iceci_c2": "1.1", "mechanism": "Pedestrian struck by vehicle",
+      "energy_types": ["motion"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "KEY SIF CATEGORY. Almost always high energy."
+    },
+    {
+      "oiics_code": "44", "oiics_title": "Jumps to lower level",
+      "count_2023": 1375, "pct": 0.2,
+      "iceci_c2": "1.5", "mechanism": "Jump from height",
+      "energy_types": ["gravity"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "Intentional descent. Height discriminates."
+    },
+    {
+      "oiics_code": "51", "oiics_title": "Exposure to electricity",
+      "count_2023": 978, "pct": 0.1,
+      "iceci_c2": "98.2", "mechanism": "Electrical contact",
+      "energy_types": ["electrical"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "UNDERREPRESENTED but high SIF potential. Voltage discriminates."
+    },
+    {
+      "oiics_code": "21", "oiics_title": "Aircraft incidents",
+      "count_2023": 931, "pct": 0.1,
+      "iceci_c2": "1.1", "mechanism": "Aircraft transport",
+      "energy_types": ["motion", "gravity"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "Rare. Almost always SIF."
+    },
+    {
+      "oiics_code": "32", "oiics_title": "Explosions",
+      "count_2023": 316, "pct": 0.04,
+      "iceci_c2": "3.1", "mechanism": "Explosion",
+      "energy_types": ["pressure", "thermal"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "UNDERREPRESENTED. Very high SIF potential."
+    },
+    {
+      "oiics_code": "31", "oiics_title": "Fires",
+      "count_2023": 296, "pct": 0.03,
+      "iceci_c2": "4.1", "mechanism": "Fire",
+      "energy_types": ["thermal", "chemical"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "UNDERREPRESENTED. High SIF potential."
+    },
+    {
+      "oiics_code": "54", "oiics_title": "Exposure to air and water pressure change",
+      "count_2023": 144, "pct": 0.02,
+      "iceci_c2": "98.4", "mechanism": "Pressure change",
+      "energy_types": ["pressure"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "UNDERREPRESENTED. Confined space, diving."
+    },
+    {
+      "oiics_code": "25", "oiics_title": "Water vehicle incidents",
+      "count_2023": 41, "pct": 0.005,
+      "iceci_c2": "1.1/5.2", "mechanism": "Water transport / drowning",
+      "energy_types": ["motion", "gravity"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "VERY UNDERREPRESENTED. High SIF."
+    },
+    {
+      "oiics_code": "65", "oiics_title": "Struck, caught, or crushed in collapsing structure",
+      "count_2023": 29, "pct": 0.003,
+      "iceci_c2": "1.4/5.3", "mechanism": "Structural collapse / trench cave-in",
+      "energy_types": ["gravity", "pressure"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "VERY UNDERREPRESENTED. Almost always SIF."
+    },
+    {
+      "oiics_code": "22", "oiics_title": "Rail vehicle incidents",
+      "count_2023": 27, "pct": 0.003,
+      "iceci_c2": "1.1", "mechanism": "Rail transport",
+      "energy_types": ["motion"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "VERY UNDERREPRESENTED. Almost always SIF."
+    },
+    {
+      "oiics_code": "56", "oiics_title": "Exposure to oxygen deficiency, n.e.c.",
+      "count_2023": 26, "pct": 0.003,
+      "iceci_c2": "5.3", "mechanism": "Oxygen-deficient atmosphere",
+      "energy_types": ["chemical"], "sif_gate": "NEEDS_ASSESSMENT",
+      "notes": "VERY UNDERREPRESENTED. Almost always SIF. Confined space."
+    }
+  ],
+  "summary": {
+    "auto_non_sif_pct": 34.2,
+    "auto_non_sif_codes": ["71", "73", "72", "41", "66"],
+    "needs_assessment_pct": 55.2,
+    "underrepresented_high_sif": [
+      {"code": "51", "title": "Electrical contact", "count": 978, "note": "0.1% but high SIF"},
+      {"code": "32", "title": "Explosions", "count": 316, "note": "0.04% but very high SIF"},
+      {"code": "31", "title": "Fires", "count": 296, "note": "0.03% but high SIF"},
+      {"code": "54", "title": "Pressure change", "count": 144, "note": "0.02% — confined space"},
+      {"code": "25", "title": "Water vessel", "count": 41, "note": "0.005% — drowning"},
+      {"code": "65", "title": "Structural collapse", "count": 29, "note": "0.003% — trench cave-in"},
+      {"code": "22", "title": "Rail", "count": 27, "note": "0.003%"},
+      {"code": "56", "title": "Oxygen deficiency", "count": 26, "note": "0.003% — confined space"}
+    ]
+  }
+}

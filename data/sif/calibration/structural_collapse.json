@@ -1,0 +1,102 @@
+{
+  "energy_type": "gravity",
+  "mechanism": "structural_collapse",
+  "description": "Severity distribution for structural and ground collapse — person buried, trapped, or crushed by collapsing structure or material. Trenches, excavations, scaffolding, buildings, formwork, retaining walls, stockpiles. Distinct from struck (discrete object) and explosion (blast-induced). The energy is gravitational mass of the collapsing material. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No protective system (trench box, shoring, bracing)",
+    "Person is within the collapse zone",
+    "Burial/entrapment assumed — distinguishes from struck-by (discrete falling object)"
+  ],
+  "magnitude_unit": "collapse_type",
+  "magnitude_note": "Collapse severity depends on mass of material, depth of burial, and whether the victim is fully or partially buried. Trench collapse is the most lethal per-event because soil is heavy (~1.6 t/m³) and burial prevents breathing. Bands by collapse type.",
+  "magnitude_bands": [
+    {
+      "band": "minor_partial",
+      "description": "Partial collapse of light structure or material. Racking collapse, small stockpile shift, false ceiling failure, lightweight partition collapse. Person struck or partially trapped but not buried.",
+      "published_mortality": 0.02,
+      "mortality_source": "HSE RIDDOR data; warehouse racking collapse incidents. Light-structure collapses produce crush injuries but rarely full burial.",
+      "p10": 0.001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Light materials (racking, ceiling tiles, partition) cause crush injuries but load is typically insufficient for fatal compression. P90 serious injury from heavy racking load pinning worker. Crosses SIF threshold at P90."
+    },
+    {
+      "band": "trench_excavation",
+      "description": "Trench or excavation collapse. Unshored trench wall cave-in burying worker. Soil weighs ~1.6 t/m³ — even partial burial can prevent breathing. One of the most consistently lethal workplace scenarios.",
+      "published_mortality": 0.40,
+      "mortality_source": "OSHA trench fatality data: ~40 trench collapse deaths/year in US. NIOSH trench safety reports. Survival rate drops rapidly with burial depth — full burial in soil is frequently fatal even with rapid rescue.",
+      "p10": 0.10,
+      "p50": 0.50,
+      "p90": 0.999,
+      "p10_label": "serious_injury",
+      "p50_label": "fatal_range",
+      "p90_label": "fatality",
+      "rationale": "Soil at 1.6 t/m³ produces enormous compressive load. 1m of soil on the chest weighs ~500kg — above the threshold for traumatic asphyxia. Even partial burial prevents chest expansion. P10=serious_injury reflects leg-only burial (rescued quickly). P50 reflects the high fatality rate for any significant burial. Rescue time is critical — survival drops from minutes."
+    },
+    {
+      "band": "scaffold_formwork",
+      "description": "Scaffold or formwork collapse. Multi-level scaffold failure, falsework collapse during concrete pour. Combines structural mass with height — workers fall as well as being struck/buried.",
+      "published_mortality": 0.25,
+      "mortality_source": "OSHA construction fatality data; scaffold collapse investigations. Scaffold collapses combine fall-from-height with struck-by-structure, producing compound injuries.",
+      "p10": 0.01,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Scaffold collapse = fall + struck + burial. Workers on the scaffold fall (height-dependent severity), workers below are struck/buried. P50=serious_injury reflects the compound mechanism. P90=fatality from multi-storey fall + structure landing on top."
+    },
+    {
+      "band": "building_structure",
+      "description": "Building or major structure collapse. Roof failure, floor collapse, retaining wall failure, demolition incident, blast-damaged structure. Large mass, full burial/entrapment.",
+      "published_mortality": 0.50,
+      "mortality_source": "OSHA/NIOSH building collapse data; demolition incident investigations; structural failure case studies. Building collapses produce mass casualty events.",
+      "p10": 0.10,
+      "p50": 0.90,
+      "p90": 0.999,
+      "p10_label": "serious_injury",
+      "p50_label": "fatality",
+      "p90_label": "fatality",
+      "rationale": "Building collapse produces tonnes of material on the victim. Survival requires being in a void space — structural luck. P10=serious_injury reflects those trapped in voids (rescued with crush injuries). P50=fatality reflects the high mortality of full structural collapse. Void space rescue can take hours/days."
+    }
+  ],
+  "modifiers": {
+    "burial_depth": {
+      "partial_legs_only": 0.3,
+      "chest_level": 1.0,
+      "full_burial": 2.0,
+      "description": "Multiplier on P(death). Full burial in soil prevents breathing (traumatic asphyxia within minutes). Partial burial of legs/lower body is survivable if rescued promptly."
+    },
+    "material_density": {
+      "lightweight_panels": 0.3,
+      "soil_gravel": 1.0,
+      "concrete_masonry": 2.0,
+      "description": "Multiplier on P(death). Concrete/masonry at ~2.4 t/m³ is 50% heavier than soil. Lightweight panels/racking may trap but not fatally crush."
+    },
+    "rescue_time": {
+      "immediate_lt5min": 0.5,
+      "moderate_5_30min": 1.0,
+      "delayed_gt30min": 2.0,
+      "description": "Multiplier on P(death). For burial events, survival time is minutes (traumatic asphyxia). Delayed rescue dramatically increases mortality. Remote sites and deep excavations delay rescue."
+    }
+  },
+  "sources": [
+    {"author": "OSHA", "year": 2023, "relevance": "Trenching and Excavation Safety — ~40 trench fatalities/year. One of the Focus Four hazards in construction."},
+    {"author": "NIOSH", "year": 2020, "relevance": "Preventing Worker Deaths from Trench Cave-Ins. Analysis of trench fatalities, soil mechanics, protective systems."},
+    {"author": "HSE", "year": 2024, "relevance": "Structural collapse incidents — scaffold, formwork, building collapse data from RIDDOR reports."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: unshored trench collapse should give P(SIF) near 1.0 — trench_excavation P(SIF)=0.90 ✓",
+    "STKY check: scaffold collapse should give P(SIF) > 0.50 — scaffold_formwork P(SIF)=0.50 ✓",
+    "STKY check: warehouse racking collapse should be ELEVATED — minor_partial P(SIF)=0.10 ✓",
+    "Cross-check: trench collapses are disproportionately fatal — 40 deaths/year from a small number of events. The per-event fatality rate is among the highest of any workplace scenario.",
+    "Note: explosion-induced structural collapse should use this curve if the model classifies as structural_collapse, or explosion curve if classified as explosion. Both are valid — the model picks the dominant mechanism from the narrative."
+  ]
+}

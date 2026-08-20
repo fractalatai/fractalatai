@@ -1,0 +1,81 @@
+{
+  "energy_type": "biological",
+  "mechanism": "overexertion",
+  "description": "Severity distribution for overexertion and bodily reaction events. Manual handling, lifting, pushing, pulling, repetitive motion, awkward posture. The most reported workplace event category but almost never SIF — the energy source is the worker's own musculoskeletal system, which is self-limiting. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No pre-existing cardiac condition (cardiac event during exertion is a separate mechanism)",
+    "Energy source is the worker's own body — biomechanically self-limiting",
+    "No secondary hazard (dropping a load onto self or others is struck, not overexertion)"
+  ],
+  "magnitude_unit": "exertion_type",
+  "magnitude_note": "Overexertion severity is not magnitude-dependent in the same way as external energy — you cannot overexert yourself to death (the body stops). Severity variation comes from the tissue affected and whether there is a secondary mechanism. Bands are by exertion type.",
+  "magnitude_bands": [
+    {
+      "band": "manual_handling",
+      "description": "Lifting, carrying, pushing, pulling. The classic manual handling injury — back strain, shoulder injury, hernia. Single-event acute overload.",
+      "published_mortality": 0.0001,
+      "mortality_source": "BLS/HSE data: manual handling is the #1 cause of workplace musculoskeletal injury but virtually zero fatalities. OSHA ITA 2024: 162,352 overexertion events, 0 fatalities.",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.005,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Manual handling injuries are self-limiting — the body cannot generate enough force to cause serious anatomical injury to itself. P50=first_aid (back strain, muscle pull). P90=medical_treatment (disc prolapse, hernia, torn ligament). Fatality is essentially impossible from the overexertion itself."
+    },
+    {
+      "band": "repetitive_strain",
+      "description": "Repetitive motion, sustained awkward posture, vibration exposure. Develops over days/weeks, not single-event. Carpal tunnel, tendinitis, HAVS.",
+      "published_mortality": 0.0001,
+      "mortality_source": "Occupational health literature: repetitive strain injuries are chronic, not acute. No fatality mechanism.",
+      "p10": 0.0001,
+      "p50": 0.0005,
+      "p90": 0.005,
+      "p10_label": "no_injury",
+      "p50_label": "no_injury",
+      "p90_label": "medical_treatment",
+      "rationale": "Chronic musculoskeletal condition, not an acute energy event. No SIF potential whatsoever. P90=medical_treatment reflects severe RSI requiring surgery (carpal tunnel release). Included because the model will classify these as overexertion and the calibration curve needs to return NON_SIF."
+    },
+    {
+      "band": "extreme_physical_stress",
+      "description": "Extreme physical exertion in hostile environment. Heavy labour in heat/altitude, rescue operations, military-style exertion. The risk is cardiac event or rhabdomyolysis, not musculoskeletal injury.",
+      "published_mortality": 0.005,
+      "mortality_source": "Military exertional heat casualty data; CDC exertional rhabdomyolysis reports. Cardiac sudden death during extreme exertion is real but rare in screened working-age adults.",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.01,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Even extreme exertion rarely causes SIF in working-age adults without underlying conditions. P90=medical_treatment reflects exertional rhabdomyolysis or heat exhaustion requiring hospital. Cardiac sudden death is the SIF pathway but probability is <1% per extreme event in screened population. If heat stroke develops, the mechanism transitions to thermal — the model should classify by the dominant energy."
+    }
+  ],
+  "modifiers": {
+    "cardiac_risk": {
+      "screened_fit": 1.0,
+      "unscreened": 2.0,
+      "known_cardiac": 5.0,
+      "description": "Multiplier on P(death). Cardiac sudden death during exertion is the only real fatality pathway. Pre-existing cardiac conditions dramatically increase risk. Workplace fitness screening largely eliminates this."
+    },
+    "load_drop": {
+      "no_secondary": 1.0,
+      "description": "If the worker drops a heavy load onto themselves or others during overexertion, the mechanism transitions to struck. The overexertion calibration does not cover secondary struck-by events."
+    }
+  },
+  "sources": [
+    {"author": "BLS", "year": 2023, "relevance": "Survey of Occupational Injuries and Illnesses — overexertion is #1 workplace injury cause by frequency, accounting for ~30% of all nonfatal injuries."},
+    {"author": "HSE", "year": 2024, "relevance": "Manual handling statistics — handling, lifting, carrying is the most common cause of workplace injury in UK."},
+    {"author": "OSHA", "year": 2024, "relevance": "ITA Case Detail: 162,352 overexertion events (event code 71) in 2024, by far the largest category. Essentially zero fatalities."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: manual handling back injury should be NON_SIF — manual_handling P(SIF)=0.001 ✓",
+    "STKY check: RSI/carpal tunnel should be NON_SIF — repetitive_strain P(SIF)=0.000 ✓",
+    "Cross-check: OSHA ITA 2024 has 162,352 overexertion events, dwarfing all other categories. Zero fatalities. The calibration must produce NON_SIF for all bands to avoid drowning SIF signals in noise.",
+    "Key design point: overexertion is AUTO_NON_SIF in the classifier label set for exactly this reason — it should never trigger SIF investigation. The calibration curve confirms this quantitatively.",
+    "Cardiac death during exertion is a real but rare event. The model may classify this as overexertion but the dominant energy is cardiac (biological). This is an edge case best handled by narrative content rather than calibration curve adjustment."
+  ]
+}

@@ -1,7 +1,13 @@
 /target
 guests/*/target
 /models
-/data
+/data/*
+!/data/sif/
+/data/sif/*
+!/data/sif/taxonomy/
+!/data/sif/calibration/
+# ICD-11 raw source download — 14MB, derive from WHO site
+data/sif/taxonomy/SimpleTabulation-*
 .zed
 nohup.out
 backups/

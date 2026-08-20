@@ -1,0 +1,106 @@
+{
+  "energy_type": "mechanical",
+  "mechanism": "caught_in",
+  "description": "Severity distribution for caught-in, caught-between, and entanglement events. Worker drawn into, trapped between, or crushed by machinery, equipment, or materials. The mechanical energy of the machine is transferred to the body through entanglement, nip points, crush, or compression. Distinct from struck (single impact) and abrasion (surface contact). P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No guarding, interlock, or emergency stop",
+    "Machine running under power — the energy source is the machine, not the worker",
+    "Entanglement or crush — body part drawn in or compressed"
+  ],
+  "magnitude_unit": "machine_type",
+  "magnitude_note": "Caught-in severity depends on the machine's torque, speed, and nip point geometry. Low-torque machines may stop when they encounter resistance (a hand); high-torque machines will not. The severity boundary is whether the machine can overpower the human body. Bands by machine type/torque class.",
+  "magnitude_bands": [
+    {
+      "band": "light_machinery",
+      "description": "Light powered equipment with limited torque. Drill press, bench grinder, small conveyor, power tool. May catch glove/sleeve but typically stalls or allows withdrawal before severe injury.",
+      "published_mortality": 0.005,
+      "mortality_source": "OSHA machinery contact data; HSE RIDDOR reports. Light machinery entanglement produces lacerations, fractures, degloving of fingers, but machine often stalls before amputation.",
+      "p10": 0.001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Light machines have limited torque — they may catch a glove or loose clothing but typically stall or allow the worker to pull free. P50=medical_treatment reflects laceration, fracture, or partial degloving. P90=serious_injury from finger/hand amputation when glove is caught in drill or grinder. Crosses SIF threshold at P90."
+    },
+    {
+      "band": "medium_machinery",
+      "description": "Medium powered machinery with significant torque. Lathe, milling machine, auger, industrial conveyor, printing press, packaging machine. Cannot be stopped by human resistance. Nip points draw the worker in.",
+      "published_mortality": 0.15,
+      "mortality_source": "OSHA machinery fatality data; HSE machinery guarding enforcement data. Lathes and conveyors are consistently among the top machinery killers. Entanglement with a lathe chuck at speed is frequently fatal.",
+      "p10": 0.01,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Medium machinery has enough torque to overpower the body. Lathe entanglement (hair, sleeve, rag caught in chuck) draws the arm/body in — scalping and limb avulsion are common. Conveyor nip points crush limbs. P50=serious_injury reflects amputation or crush injury. P90=fatality from full-body entanglement or head/torso drawn into machine."
+    },
+    {
+      "band": "heavy_machinery",
+      "description": "Heavy industrial machinery with high torque. Industrial press, roller mill, paper machine, sugar cane mill, metal rolling mill, large auger/screw conveyor, industrial shredder. Enormous force — the machine will not stop.",
+      "published_mortality": 0.40,
+      "mortality_source": "OSHA press/roller fatality data; industrial machinery fatality investigations. Hydraulic presses, roller mills, and large augers are among the highest-fatality machinery types.",
+      "p10": 0.01,
+      "p50": 0.50,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "fatal_range",
+      "p90_label": "fatality",
+      "rationale": "Heavy machinery applies tonnes of force through crush or draw-in. A hydraulic press delivers its full rated tonnage regardless of what is between the platens. Roller mills draw the body through the nip point. P10=medical_treatment reflects hand/finger caught at the edge, withdrawn before full engagement. P50 reflects the high fatality rate when any significant body part enters the machine."
+    },
+    {
+      "band": "caught_between",
+      "description": "Caught between or crushed between moving and fixed objects. Pinned between vehicle and wall, caught between crane load and structure, trapped between closing doors/gates, caught between vessel and quay (maritime). The energy source is the moving object, not rotating machinery.",
+      "published_mortality": 0.20,
+      "mortality_source": "OSHA struck-by/caught-between fatality data; maritime crush fatality reports. Vehicle pinning is a leading cause of caught-between fatalities.",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Caught-between injuries depend on the force of the moving object and the compliance of the fixed object. Vehicle-to-wall pinning applies the vehicle's full mass. Crane load crushing is similar. P50=serious_injury from compression fractures, organ damage. P90=fatality from full torso crush. Overlaps with transport (vehicle pinning) but caught_between is the correct mechanism when the worker is trapped rather than struck."
+    }
+  ],
+  "modifiers": {
+    "machine_torque": {
+      "stalls_on_resistance": 0.3,
+      "continues_through_resistance": 1.0,
+      "unstoppable_high_inertia": 2.0,
+      "description": "Multiplier on P(death). The critical question: does the machine stop when it meets a human body? Light machines may stall. Heavy machinery with high inertia or hydraulic force will not."
+    },
+    "guarding_interlock": {
+      "none": 1.0,
+      "fixed_guard": 0.1,
+      "interlocked_guard": 0.05,
+      "light_curtain": 0.1,
+      "e_stop_only": 0.5,
+      "description": "Listed for reference — mitigations handled by simulator. Fixed guarding and interlocks are the primary controls for caught-in hazards."
+    },
+    "body_part": {
+      "finger_hand": 0.3,
+      "arm": 0.7,
+      "hair_clothing": 1.0,
+      "torso_head": 3.0,
+      "description": "Multiplier on P(death). Finger/hand entanglement can result in amputation (serious but survivable). Hair or loose clothing caught in a lathe draws the head/torso in — this is the fatal pattern."
+    }
+  },
+  "sources": [
+    {"author": "OSHA", "year": 2023, "relevance": "Machine guarding standards (29 CFR 1910 Subpart O). Caught-in/between is one of the Focus Four construction hazards. Machinery is the #1 cause of workplace amputations."},
+    {"author": "HSE", "year": 2024, "relevance": "PUWER 1998 enforcement data. Machinery guarding remains the most common serious breach. Contact with moving machinery fatalities."},
+    {"author": "NIOSH", "year": 2020, "relevance": "Preventing Worker Deaths from Uncontrolled Release of Electrical, Mechanical, and Other Types of Hazardous Energy (LOTO)."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: lathe entanglement should give P(SIF) > 0.50 — medium_machinery P(SIF)=0.50 ✓",
+    "STKY check: hydraulic press should give P(SIF) near 1.0 — heavy_machinery P(SIF)=0.72 ✓",
+    "STKY check: finger in drill press should be ELEVATED — light_machinery P(SIF)=0.10 ✓",
+    "Cross-check: caught-between (vehicle pinning) correctly at SIF — overlaps with transport but mechanism is crush/compress, not impact ✓",
+    "Key insight: the critical question for caught-in severity is 'does the machine stop when it meets a human body?' Light machines (drill press) may stall. A lathe, roller mill, or hydraulic press will not. That's the SIF boundary for caught-in.",
+    "LOTO connection: caught-in fatalities are disproportionately during maintenance/cleaning when guards are removed and LOTO is not applied. The guard/interlock modifier captures this — without guarding, the full unmitigated curve applies."
+  ]
+}

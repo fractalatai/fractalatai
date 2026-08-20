@@ -1,0 +1,87 @@
+{
+  "energy_type": "gravity",
+  "mechanism": "slip_no_fall",
+  "description": "Severity distribution for slips, trips, and stumbles WITHOUT fall to lower level. Person stays on the same level — falls to ground from standing height. The highest-frequency workplace event but mostly non-SIF. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "Same-level fall from standing height (~1.5-1.8m head height)",
+    "No fall protection relevant (same level)",
+    "No secondary hazard (no adjacent edge, machinery, traffic, water)"
+  ],
+  "magnitude_unit": "surface_and_context",
+  "magnitude_note": "Same-level falls have roughly constant gravitational energy (standing height). Severity variation comes from landing surface, secondary hazards, and body orientation on impact. Bands defined by context rather than energy magnitude.",
+  "magnitude_bands": [
+    {
+      "band": "indoor_level",
+      "description": "Indoor same-level slip/trip on flat surface. Office, warehouse, corridor, shop floor. Typical wet floor, cable trip, uneven mat.",
+      "published_mortality": 0.001,
+      "mortality_source": "HSE RIDDOR data; BLS nonfatal injury survey. Same-level falls are #1 cause of workplace injury by frequency but <1% result in serious injury. Fatalities almost exclusively elderly or secondary mechanism (hit head on furniture).",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.005,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Most indoor slips produce bruising or minor sprains. P50=first_aid (ice pack, minor sprain). P90=medical_treatment reflects wrist/ankle fracture from bracing. Head strike onto hard floor is the SIF pathway but rare enough to not reach P90 for a working-age adult."
+    },
+    {
+      "band": "outdoor_uneven",
+      "description": "Outdoor same-level slip/trip on uneven or hazardous surface. Construction site, kerb, gravel, ice, mud, slopes, decking. Higher energy transfer from uneven ground and inability to brace.",
+      "published_mortality": 0.002,
+      "mortality_source": "HSE construction injury data; winter slip-and-fall studies. Outdoor falls on hard/uneven surfaces produce more fractures than indoor, but fatality remains rare for working-age.",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.01,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Similar to indoor but higher fracture rate from uneven ground (can't control the fall). P90 at 0.01 reflects hip/wrist fracture on concrete or ice. Still well below SIF threshold for working-age adults."
+    },
+    {
+      "band": "near_secondary_hazard",
+      "description": "Same-level slip/trip adjacent to a secondary hazard. Near platform edge, open water, machinery, traffic, excavation, chemical spill. The slip itself is low energy but the secondary exposure creates SIF potential.",
+      "published_mortality": 0.02,
+      "mortality_source": "OSHA/HSE fatality investigations where root cause was a slip/trip but fatality mechanism was the secondary hazard (fell into water, into machinery, off edge, into traffic).",
+      "p10": 0.001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "The slip is non-SIF but proximity to a secondary hazard creates SIF potential. P90=serious_injury reflects the 10% of such events where the slip leads to secondary exposure (into water, over edge, into machinery). Note: if the secondary event occurs, it should be reclassified to that mechanism (fall, caught_in, etc.). This band captures the potential."
+    }
+  ],
+  "modifiers": {
+    "age": {
+      "under_65": 1.0,
+      "over_65": 5.0,
+      "description": "Multiplier on P(death). Same-level falls are a leading cause of death in over-65s due to osteoporosis (hip fracture mortality ~20-30% at 1 year) and anticoagulant use (intracranial bleeding from minor head strike). For workplace context, this modifier applies to elderly workers or public-facing environments."
+    },
+    "surface": {
+      "carpet_rubber": 0.3,
+      "concrete_tile": 1.0,
+      "metal_grating": 1.5,
+      "ice": 1.5,
+      "description": "Multiplier on P(death). Harder surfaces produce more severe impact injuries. Ice adds uncontrolled fall dynamics."
+    },
+    "carrying_load": {
+      "hands_free": 1.0,
+      "carrying": 1.5,
+      "description": "Multiplier on P(death). Carrying a load prevents bracing during fall, increasing head-strike risk."
+    }
+  },
+  "sources": [
+    {"author": "HSE", "year": 2024, "relevance": "Slips and trips statistics — highest frequency workplace injury category in UK. RIDDOR data on same-level fall outcomes."},
+    {"author": "BLS", "year": 2023, "relevance": "Survey of Occupational Injuries and Illnesses — same-level falls are #1 nonfatal injury event in US."},
+    {"author": "OSHA", "year": 2024, "relevance": "ITA Case Detail: 88,678 same-level fall events in 2024 data. Event code 43."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: same-level slip on wet floor should be NON_SIF — indoor_level P(SIF)=0.001 ✓",
+    "STKY check: slip near open excavation edge should be ELEVATED — near_secondary_hazard P(SIF)=0.10 ✓",
+    "Cross-check: OSHA ITA 2024 has 88,678 same-level falls with 0 fatalities out of ~689K total events — consistent with <0.001 fatality rate",
+    "The secondary hazard band is important: many 'slip' fatalities in investigation reports are really fall/caught_in/drowning events with a slip as the initiating mechanism. The classifier should ideally identify the dominant energy, not the initiating event."
+  ]
+}

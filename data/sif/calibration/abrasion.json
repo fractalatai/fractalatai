@@ -1,0 +1,73 @@
+{
+  "energy_type": "mechanical",
+  "mechanism": "abrasion",
+  "description": "Severity distribution for abrasion, friction, and surface contact injuries. Rubbing, scraping, rope burns, conveyor belt friction, grinding contact. Low-energy mechanical surface damage — distinct from struck (impact) and caught_in (entanglement/crush). Mostly non-SIF. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No PPE (gloves, guards, sleeves)",
+    "Surface friction/contact only — not entanglement in machinery (that's caught_in)"
+  ],
+  "magnitude_unit": "abrasion_type",
+  "magnitude_note": "Abrasion severity is limited by the energy transfer mechanism — friction removes surface tissue but doesn't transfer deep kinetic or thermal energy. The rare SIF pathway is secondary infection or friction contact with high-speed rotating surface (grinding wheel, belt sander) causing deep laceration.",
+  "magnitude_bands": [
+    {
+      "band": "minor_friction",
+      "description": "Minor friction/rubbing injury. Rope burn, skin scrape against rough surface, manual handling abrasion, minor conveyor contact. Surface-level tissue damage only.",
+      "published_mortality": 0.0001,
+      "mortality_source": "BLS nonfatal injury data: abrasion/friction injuries are high-frequency, low-severity. No fatality mechanism from surface abrasion alone.",
+      "p10": 0.0001,
+      "p50": 0.0005,
+      "p90": 0.001,
+      "p10_label": "no_injury",
+      "p50_label": "no_injury",
+      "p90_label": "first_aid",
+      "rationale": "Surface abrasion — skin removal, friction burns. Self-limiting because contact pressure is low. P90=first_aid reflects cleaning and dressing a graze. No SIF potential whatsoever."
+    },
+    {
+      "band": "power_tool_graze",
+      "description": "Glancing contact with powered rotating surface. Grinder, belt sander, wire wheel, lathe workpiece. Brief contact producing deep abrasion or laceration but not entanglement.",
+      "published_mortality": 0.001,
+      "mortality_source": "OSHA machinery contact data: glancing contact with rotating tools produces deep lacerations but is distinct from entanglement (caught_in). Fatal only if contact is to neck/face with large grinding wheel.",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.01,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Brief glancing contact with a powered surface produces deep abrasion or laceration. P90=medical_treatment reflects laceration needing sutures or skin graft. If the worker is drawn into the machine, the mechanism transitions to caught_in — abrasion covers only the surface contact without entanglement."
+    },
+    {
+      "band": "high_speed_friction",
+      "description": "Sustained contact with high-speed surface. Dragged by conveyor belt, rope friction through hands (crane/winch), large grinding wheel contact. Higher energy transfer from speed and duration.",
+      "published_mortality": 0.005,
+      "mortality_source": "Conveyor belt injury data; industrial friction contact reports. Conveyor drag injuries can produce deep tissue damage and amputation but are usually survivable.",
+      "p10": 0.001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Sustained friction with a high-speed surface removes tissue deeply — degloving, deep burns, potential amputation. P90=serious_injury reflects extensive degloving or friction amputation. Crosses SIF threshold at P90 but only just. If the worker is pulled onto the conveyor, this transitions to caught_in."
+    }
+  ],
+  "modifiers": {
+    "surface_speed": {
+      "low_hand_speed": 0.5,
+      "moderate_power_tool": 1.0,
+      "high_speed_belt": 2.0,
+      "description": "Multiplier on P(death). Higher surface speed removes tissue faster and deeper."
+    }
+  },
+  "sources": [
+    {"author": "BLS", "year": 2023, "relevance": "Nonfatal injury survey — abrasion/friction is a high-frequency category. Nature code 13 (surface and flesh wounds)."},
+    {"author": "OSHA", "year": 2024, "relevance": "ITA Case Detail: contact with non-running objects (code 66) captures many abrasion events. 112,726 events in 2024."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: rope burn should be NON_SIF — minor_friction P(SIF)=0.000 ✓",
+    "STKY check: conveyor belt drag should be ELEVATED — high_speed_friction P(SIF)=0.10 ✓",
+    "Cross-check: abrasion is fundamentally surface-level injury. The SIF pathway is almost always a mechanism transition — abrasion becomes caught_in (entanglement) or struck (if the grinding wheel shatters). The abrasion calibration should be low because if it escalates, the model should reclassify to the dominant mechanism."
+  ]
+}

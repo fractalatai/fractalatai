@@ -1,0 +1,4740 @@
+{
+  "chapter": "23",
+  "title": "External causes of morbidity or mortality",
+  "blocks": [
+    {
+      "block_id": "BlockL1-PA0",
+      "title": "Unintentional causes",
+      "sub_blocks": [
+        {
+          "block_id": "BlockL2-PA0",
+          "title": "Unintentional transport injury event",
+          "codes": [
+            {
+              "code": "PA00",
+              "title": "Unintentional land transport traffic event injuring a pedestrian",
+              "is_residual": false
+            },
+            {
+              "code": "PA01",
+              "title": "Unintentional land transport traffic event injuring the user of a pedestrian conveyance",
+              "is_residual": false
+            },
+            {
+              "code": "PA02",
+              "title": "Unintentional land transport traffic event injuring a pedal cyclist",
+              "is_residual": false
+            },
+            {
+              "code": "PA03",
+              "title": "Unintentional land transport traffic event injuring a motor cyclist",
+              "is_residual": false
+            },
+            {
+              "code": "PA04",
+              "title": "Unintentional land transport traffic event injuring a car occupant",
+              "is_residual": false
+            },
+            {
+              "code": "PA05",
+              "title": "Unintentional land transport traffic event injuring an occupant of a bus or coach",
+              "is_residual": false
+            },
+            {
+              "code": "PA06",
+              "title": "Unintentional land transport traffic event injuring an occupant of a light goods vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA07",
+              "title": "Unintentional land transport traffic event injuring an occupant of a heavy goods vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA08",
+              "title": "Unintentional land transport traffic event injuring an occupant of a streetcar or tram",
+              "is_residual": false
+            },
+            {
+              "code": "PA09",
+              "title": "Unintentional land transport traffic event injuring an occupant of a low powered passenger vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA0A",
+              "title": "Unintentional land transport traffic event injuring a user of a special vehicle mainly used in agriculture",
+              "is_residual": false
+            },
+            {
+              "code": "PA0B",
+              "title": "Unintentional land transport traffic event injuring a user of a special vehicle mainly used on industrial premises",
+              "is_residual": false
+            },
+            {
+              "code": "PA0C",
+              "title": "Unintentional land transport traffic event injuring a user of a special construction vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA0D",
+              "title": "Unintentional land transport traffic event injuring a user of an all-terrain vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA0E",
+              "title": "Unintentional land transport traffic event injuring a rider of an animal",
+              "is_residual": false
+            },
+            {
+              "code": "PA0F",
+              "title": "Unintentional land transport traffic event injuring an occupant of an animal-drawn vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA0Y",
+              "title": "Unintentional land transport traffic event injuring a user of other specified land transport",
+              "is_residual": true
+            },
+            {
+              "code": "PA0Z",
+              "title": "Unintentional land transport traffic event injuring a user of unspecified land transport",
+              "is_residual": true
+            },
+            {
+              "code": "PA10",
+              "title": "Unintentional land transport nontraffic event injuring a pedestrian",
+              "is_residual": false
+            },
+            {
+              "code": "PA11",
+              "title": "Unintentional land transport nontraffic event injuring the user of a pedestrian conveyance",
+              "is_residual": false
+            },
+            {
+              "code": "PA12",
+              "title": "Unintentional land transport nontraffic event injuring a pedal cyclist",
+              "is_residual": false
+            },
+            {
+              "code": "PA13",
+              "title": "Unintentional land transport nontraffic event injuring a motor cyclist",
+              "is_residual": false
+            },
+            {
+              "code": "PA14",
+              "title": "Unintentional land transport nontraffic event injuring a car occupant",
+              "is_residual": false
+            },
+            {
+              "code": "PA15",
+              "title": "Unintentional land transport nontraffic event injuring an occupant of a bus or coach",
+              "is_residual": false
+            },
+            {
+              "code": "PA16",
+              "title": "Unintentional land transport nontraffic event injuring an occupant of a light goods vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA17",
+              "title": "Unintentional land transport nontraffic event injuring an occupant of a heavy goods vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA18",
+              "title": "Unintentional land transport nontraffic event injuring an occupant of a streetcar or tram",
+              "is_residual": false
+            },
+            {
+              "code": "PA19",
+              "title": "Unintentional land transport nontraffic event injuring an occupant of a low powered passenger vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA1A",
+              "title": "Unintentional land transport nontraffic event injuring a user of a special vehicle mainly used in agriculture",
+              "is_residual": false
+            },
+            {
+              "code": "PA1B",
+              "title": "Unintentional land transport nontraffic event injuring a user of a special vehicle mainly used on industrial premises",
+              "is_residual": false
+            },
+            {
+              "code": "PA1C",
+              "title": "Unintentional land transport nontraffic event injuring a user of a special construction vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA1D",
+              "title": "Unintentional land transport nontraffic event injuring a user of an all-terrain vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA1E",
+              "title": "Unintentional land transport nontraffic event injuring a rider of an animal",
+              "is_residual": false
+            },
+            {
+              "code": "PA1F",
+              "title": "Unintentional land transport nontraffic event injuring an occupant of an animal-drawn vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA1Y",
+              "title": "Unintentional land transport nontraffic event injuring a user of other specified land transport",
+              "is_residual": true
+            },
+            {
+              "code": "PA1Z",
+              "title": "Unintentional land transport nontraffic event injuring a user of unknown or unspecified land transport",
+              "is_residual": true
+            },
+            {
+              "code": "PA20",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring a pedestrian",
+              "is_residual": false
+            },
+            {
+              "code": "PA21",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring the user of a pedestrian conveyance",
+              "is_residual": false
+            },
+            {
+              "code": "PA22",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring a pedal cyclist",
+              "is_residual": false
+            },
+            {
+              "code": "PA23",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring a motor cyclist",
+              "is_residual": false
+            },
+            {
+              "code": "PA24",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring a car occupant",
+              "is_residual": false
+            },
+            {
+              "code": "PA25",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring an occupant of a bus or coach",
+              "is_residual": false
+            },
+            {
+              "code": "PA26",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring an occupant of a light goods vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA27",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring an occupant of a heavy goods vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA28",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring an occupant of a streetcar or tram",
+              "is_residual": false
+            },
+            {
+              "code": "PA29",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring an occupant of a low powered passenger vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA2A",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring an occupant of a special vehicle mainly used in agriculture",
+              "is_residual": false
+            },
+            {
+              "code": "PA2B",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring an occupant of a special vehicle mainly used on industrial premises",
+              "is_residual": false
+            },
+            {
+              "code": "PA2C",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring an occupant of a special construction vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA2D",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring an occupant of an all-terrain vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA2E",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring a rider of an animal",
+              "is_residual": false
+            },
+            {
+              "code": "PA2F",
+              "title": "Unintentional land transport event unknown whether traffic or nontraffic injuring an occupant of an animal-drawn vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PA2Y",
+              "title": "Unintentional land transport injury event unknown whether traffic or nontraffic injuring a user of other specified transport",
+              "is_residual": true
+            },
+            {
+              "code": "PA2Z",
+              "title": "Unintentional land transport injury event unknown whether traffic or nontraffic injuring a user of unspecified transport",
+              "is_residual": true
+            },
+            {
+              "code": "PA30",
+              "title": "Unintentional railway transport injury event with collision or derailment",
+              "is_residual": false
+            },
+            {
+              "code": "PA31",
+              "title": "Unintentional railway transport injury event without collision or derailment",
+              "is_residual": false
+            },
+            {
+              "code": "PA3Z",
+              "title": "Unintentional railway transport injury event of unspecified type",
+              "is_residual": true
+            },
+            {
+              "code": "PA40",
+              "title": "Unintentional water transport injury event with water vessel not damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PA40.0",
+              "title": "Unintentional water transport injury event with water vessel not damaged, disabled or destroyed, causing submersion or drowning",
+              "is_residual": false
+            },
+            {
+              "code": "PA40.1",
+              "title": "Unintentional water transport injury event with water vessel not damaged, disabled or destroyed, causing other injury",
+              "is_residual": false
+            },
+            {
+              "code": "PA40.Z",
+              "title": "Unintentional water transport injury event with water vessel not damaged, disabled or destroyed, causing unspecified injury",
+              "is_residual": true
+            },
+            {
+              "code": "PA41",
+              "title": "Unintentional water transport injury event with water vessel damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PA41.0",
+              "title": "Unintentional water transport injury event with water vessel damaged, disabled or destroyed, causing submersion or drowning",
+              "is_residual": false
+            },
+            {
+              "code": "PA41.Z",
+              "title": "Unintentional water transport injury event with water vessel damaged, disabled or destroyed, causing unspecified injury",
+              "is_residual": true
+            },
+            {
+              "code": "PA4Z",
+              "title": "Unintentional water transport injury event with damage to water vessel unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PA50",
+              "title": "Unintentional air or space transport injury event",
+              "is_residual": false
+            },
+            {
+              "code": "PA50.0",
+              "title": "Unintentional air or space transport injury event with aircraft or spacecraft not damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PA50.1",
+              "title": "Unintentional air or space transport injury event with aircraft or spacecraft damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PA50.Z",
+              "title": "Unintentional air or space transport injury event, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PA5Y",
+              "title": "Other specified unintentional transport injury event",
+              "is_residual": true
+            },
+            {
+              "code": "PA5Z",
+              "title": "Unintentional transport injury event, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PA6",
+          "title": "Unintentional fall",
+          "codes": [
+            {
+              "code": "PA60",
+              "title": "Unintentional fall on the same level or from less than 1 metre",
+              "is_residual": false
+            },
+            {
+              "code": "PA61",
+              "title": "Unintentional fall from a height of 1 metre or more",
+              "is_residual": false
+            },
+            {
+              "code": "PA6Z",
+              "title": "Unintentional fall from unspecified height",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PA7",
+          "title": "Unintentional contact with person, animal or plant",
+          "codes": [
+            {
+              "code": "PA70",
+              "title": "Unintentionally struck, kicked, or bumped by person",
+              "is_residual": false
+            },
+            {
+              "code": "PA71",
+              "title": "Unintentionally struck, kicked, or bumped by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PA72",
+              "title": "Unintentionally stepped on or crushed by person",
+              "is_residual": false
+            },
+            {
+              "code": "PA73",
+              "title": "Unintentionally stepped on or crushed by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PA74",
+              "title": "Unintentionally bitten by person",
+              "is_residual": false
+            },
+            {
+              "code": "PA75",
+              "title": "Unintentionally bitten by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PA76",
+              "title": "Unintentionally scratched or clawed by person",
+              "is_residual": false
+            },
+            {
+              "code": "PA77",
+              "title": "Unintentionally scratched or clawed by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PA78",
+              "title": "Unintentionally stung or envenomated by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PA79",
+              "title": "Unintentionally injured by contact with plant",
+              "is_residual": false
+            },
+            {
+              "code": "PA7Y",
+              "title": "Other specified type of unintentional contact with person, animal or plant",
+              "is_residual": true
+            },
+            {
+              "code": "PA7Z",
+              "title": "Unintentional contact with person, animal or plant, type unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PA8",
+          "title": "Unintentional exposure to object, not elsewhere classified",
+          "codes": [
+            {
+              "code": "PA80",
+              "title": "Unintentionally struck by projectile from firearm",
+              "is_residual": false
+            },
+            {
+              "code": "PA80.0",
+              "title": "Unintentionally struck by projectile from handgun",
+              "is_residual": false
+            },
+            {
+              "code": "PA80.1",
+              "title": "Unintentionally struck by projectile from rifle, shotgun or larger firearm",
+              "is_residual": false
+            },
+            {
+              "code": "PA80.2",
+              "title": "Unintentional exposure to other and unspecified firearm",
+              "is_residual": false
+            },
+            {
+              "code": "PA81",
+              "title": "Unintentionally struck by moving object",
+              "is_residual": false
+            },
+            {
+              "code": "PA82",
+              "title": "Unintentional striking against stationary object",
+              "is_residual": false
+            },
+            {
+              "code": "PA83",
+              "title": "Unintentionally cut or pierced by sharp object",
+              "is_residual": false
+            },
+            {
+              "code": "PA83.0",
+              "title": "Unintentionally cut or pierced by knife, sword, or dagger",
+              "is_residual": false
+            },
+            {
+              "code": "PA83.1",
+              "title": "Unintentionally cut or pierced by sharp glass",
+              "is_residual": false
+            },
+            {
+              "code": "PA83.2",
+              "title": "Unintentionally cut or pierced by other or unspecified sharp object",
+              "is_residual": false
+            },
+            {
+              "code": "PA84",
+              "title": "Unintentionally struck by blunt object",
+              "is_residual": false
+            },
+            {
+              "code": "PA85",
+              "title": "Unintentionally caught, crushed, jammed or pinched between objects",
+              "is_residual": false
+            },
+            {
+              "code": "PA8Y",
+              "title": "Unintentional exposure to other specified object, not elsewhere classified",
+              "is_residual": true
+            },
+            {
+              "code": "PA8Z",
+              "title": "Unintentional exposure to object, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PA9",
+          "title": "Unintentional immersion, submersion or falling into water",
+          "codes": [
+            {
+              "code": "PA90",
+              "title": "Unintentional drowning or submersion, while in body of water",
+              "is_residual": false
+            },
+            {
+              "code": "PA91",
+              "title": "Unintentional drowning or submersion, following fall into body of water",
+              "is_residual": false
+            },
+            {
+              "code": "PA92",
+              "title": "Unintentional injury other than drowning following fall into body of water",
+              "is_residual": false
+            },
+            {
+              "code": "PA9Z",
+              "title": "Unintentional immersion, submersion or falling into water, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PB0",
+          "title": "Unintentional threat to breathing",
+          "codes": [
+            {
+              "code": "PB00",
+              "title": "Unintentional threat to breathing by suffocation from object covering mouth or nose",
+              "is_residual": false
+            },
+            {
+              "code": "PB01",
+              "title": "Unintentional threat to breathing by hanging",
+              "is_residual": false
+            },
+            {
+              "code": "PB02",
+              "title": "Unintentional threat to breathing by strangulation",
+              "is_residual": false
+            },
+            {
+              "code": "PB03",
+              "title": "Unintentional threat to breathing by external compression of airways or chest",
+              "is_residual": false
+            },
+            {
+              "code": "PB04",
+              "title": "Unintentional threat to breathing by inhalation or ingestion of gastric contents",
+              "is_residual": false
+            },
+            {
+              "code": "PB05",
+              "title": "Unintentional threat to breathing by inhalation or ingestion of liquids",
+              "is_residual": false
+            },
+            {
+              "code": "PB06",
+              "title": "Unintentional threat to breathing by inhalation or ingestion of food",
+              "is_residual": false
+            },
+            {
+              "code": "PB07",
+              "title": "Unintentional threat to breathing by inhalation or ingestion of other objects or materials",
+              "is_residual": false
+            },
+            {
+              "code": "PB08",
+              "title": "Unintentional threat to breathing from low oxygen environment",
+              "is_residual": false
+            },
+            {
+              "code": "PB0Y",
+              "title": "Unintentional threat to breathing by other specified means",
+              "is_residual": true
+            },
+            {
+              "code": "PB0Z",
+              "title": "Unintentional threat to breathing by unspecified means",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PB1",
+          "title": "Unintentional exposure to thermal mechanism",
+          "codes": [
+            {
+              "code": "PB10",
+              "title": "Unintentional exposure to uncontrolled fire",
+              "is_residual": false
+            },
+            {
+              "code": "PB11",
+              "title": "Unintentional exposure to controlled fire",
+              "is_residual": false
+            },
+            {
+              "code": "PB12",
+              "title": "Unintentional exposure to ignition or melting of material",
+              "is_residual": false
+            },
+            {
+              "code": "PB13",
+              "title": "Unintentional contact with hot object or liquid",
+              "is_residual": false
+            },
+            {
+              "code": "PB14",
+              "title": "Unintentional exposure to steam, hot vapour, air or gases",
+              "is_residual": false
+            },
+            {
+              "code": "PB15",
+              "title": "Unintentional exposure to excessive heat",
+              "is_residual": false
+            },
+            {
+              "code": "PB16",
+              "title": "Unintentional exposure to excessive cold",
+              "is_residual": false
+            },
+            {
+              "code": "PB1Y",
+              "title": "Unintentional exposure to other specified thermal mechanism",
+              "is_residual": true
+            },
+            {
+              "code": "PB1Z",
+              "title": "Unintentional exposure to unspecified thermal mechanism",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PB2",
+          "title": "Unintentional exposure to or harmful effects of substances",
+          "codes": [
+            {
+              "code": "PB20",
+              "title": "Unintentional exposure to or harmful effects of opioids or related analgesics",
+              "is_residual": false
+            },
+            {
+              "code": "PB21",
+              "title": "Unintentional exposure to or harmful effects of sedative hypnotic drugs or other CNS depressants",
+              "is_residual": false
+            },
+            {
+              "code": "PB22",
+              "title": "Unintentional exposure to or harmful effects of psychostimulants",
+              "is_residual": false
+            },
+            {
+              "code": "PB23",
+              "title": "Unintentional exposure to or harmful effects of cannabinoids or hallucinogens",
+              "is_residual": false
+            },
+            {
+              "code": "PB24",
+              "title": "Unintentional exposure to or harmful effects of analgesics, antipyretics or nonsteroidal anti-inflammatory drugs",
+              "is_residual": false
+            },
+            {
+              "code": "PB25",
+              "title": "Unintentional exposure to or harmful effects of antidepressants",
+              "is_residual": false
+            },
+            {
+              "code": "PB26",
+              "title": "Unintentional exposure to or harmful effects of antipsychotics",
+              "is_residual": false
+            },
+            {
+              "code": "PB27",
+              "title": "Unintentional exposure to or harmful effects of antiepileptics or antiparkinsonism drugs",
+              "is_residual": false
+            },
+            {
+              "code": "PB28",
+              "title": "Unintentional exposure to or harmful effects of other or unspecified drug, medicament or biological substance",
+              "is_residual": false
+            },
+            {
+              "code": "PB29",
+              "title": "Unintentional exposure to or harmful effects of multiple drugs, medicaments or biological substances",
+              "is_residual": false
+            },
+            {
+              "code": "PB30",
+              "title": "Unintentional exposure to or harmful effects of alcohols",
+              "is_residual": false
+            },
+            {
+              "code": "PB31",
+              "title": "Unintentional exposure to or harmful effects of organic solvents",
+              "is_residual": false
+            },
+            {
+              "code": "PB32",
+              "title": "Unintentional exposure to or harmful effects of carbon monoxide",
+              "is_residual": false
+            },
+            {
+              "code": "PB33",
+              "title": "Unintentional exposure to or harmful effects of pesticides",
+              "is_residual": false
+            },
+            {
+              "code": "PB34",
+              "title": "Unintentional exposure to or harmful effects of corrosive substances",
+              "is_residual": false
+            },
+            {
+              "code": "PB35",
+              "title": "Unintentional exposure to or harmful effects of halogen derivatives of aliphatic or aromatic hydrocarbons",
+              "is_residual": false
+            },
+            {
+              "code": "PB36",
+              "title": "Unintentional exposure to or harmful effects of other or unspecified substances chiefly nonmedicinal as to source",
+              "is_residual": false
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PB5",
+          "title": "Unintentional exposure to other mechanism",
+          "codes": [
+            {
+              "code": "PB50",
+              "title": "Unintentional exposure to foreign body in orifice",
+              "is_residual": false
+            },
+            {
+              "code": "PB51",
+              "title": "Unintentional exposure to electric current",
+              "is_residual": false
+            },
+            {
+              "code": "PB52",
+              "title": "Unintentional exposure to sunlight",
+              "is_residual": false
+            },
+            {
+              "code": "PB53",
+              "title": "Unintentional exposure to radiation",
+              "is_residual": false
+            },
+            {
+              "code": "PB54",
+              "title": "Unintentional exposure to high or low air pressure or changes in air pressure",
+              "is_residual": false
+            },
+            {
+              "code": "PB55",
+              "title": "Unintentional exposure to explosion",
+              "is_residual": false
+            },
+            {
+              "code": "PB55.0",
+              "title": "Unintentional exposure to chemical explosion",
+              "is_residual": false
+            },
+            {
+              "code": "PB55.1",
+              "title": "Unintentional exposure to explosion or rupture of pressurised materials or object",
+              "is_residual": false
+            },
+            {
+              "code": "PB55.Y",
+              "title": "Other specified unintentional exposure to explosion",
+              "is_residual": true
+            },
+            {
+              "code": "PB55.Z",
+              "title": "Unintentional exposure to explosion, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PB56",
+              "title": "Unintentional exposure to physical overexertion",
+              "is_residual": false
+            },
+            {
+              "code": "PB57",
+              "title": "Unintentional lack of food",
+              "is_residual": false
+            },
+            {
+              "code": "PB58",
+              "title": "Unintentional lack of water",
+              "is_residual": false
+            },
+            {
+              "code": "PB59",
+              "title": "Unintentional other specified privation",
+              "is_residual": false
+            },
+            {
+              "code": "PB5A",
+              "title": "Unintentional abandonment",
+              "is_residual": false
+            },
+            {
+              "code": "PB5B",
+              "title": "Unintentional neglect",
+              "is_residual": false
+            },
+            {
+              "code": "PB6Y",
+              "title": "Other unintentional cause of morbidity or mortality",
+              "is_residual": true
+            },
+            {
+              "code": "PB6Z",
+              "title": "Unspecified unintentional cause of morbidity or mortality",
+              "is_residual": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "BlockL1-PB8",
+      "title": "Intentional self-harm",
+      "sub_blocks": [
+        {
+          "block_id": "BlockL2-PB8",
+          "title": "Intentional self-harm by transport injury event",
+          "codes": [
+            {
+              "code": "PB80",
+              "title": "Intentional self-harm by land transport road traffic injury event",
+              "is_residual": false
+            },
+            {
+              "code": "PB81",
+              "title": "Intentional self-harm by land transport off-road nontraffic injury event",
+              "is_residual": false
+            },
+            {
+              "code": "PB82",
+              "title": "Intentional self-harm by land transport injury event unknown whether traffic or nontraffic",
+              "is_residual": false
+            },
+            {
+              "code": "PB83",
+              "title": "Intentional self-harm by railway transport injury event",
+              "is_residual": false
+            },
+            {
+              "code": "PB90",
+              "title": "Intentional self-harm by water transport injury event with water vessel damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PB91",
+              "title": "Intentional self-harm by water transport injury event with water vessel not damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PB91.0",
+              "title": "Intentional self-harm by water transport injury event with water vessel not damaged, disabled or destroyed causing submersion or drowning",
+              "is_residual": false
+            },
+            {
+              "code": "PB91.1",
+              "title": "Intentional self-harm by water transport injury event with water vessel not damaged, disabled or destroyed causing other injury",
+              "is_residual": false
+            },
+            {
+              "code": "PB91.Z",
+              "title": "Intentional self-harm by water transport injury event with water vessel not damaged, disabled or destroyed, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PB9Z",
+              "title": "Intentional self-harm by water transport injury event with damage to water vessel unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PC00",
+              "title": "Intentional self-harm by air or space transport injury event with aircraft or spacecraft damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PC01",
+              "title": "Intentional self-harm by air or space transport injury event with aircraft or spacecraft not damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PC0Z",
+              "title": "Intentional self-harm by air or space transport injury event with damage to aircraft or spacecraft unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PC2Y",
+              "title": "Intentional self-harm by other specified transport injury event",
+              "is_residual": true
+            },
+            {
+              "code": "PC2Z",
+              "title": "Intentional self-harm by transport injury event, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PC3",
+          "title": "Intentional self-harm by fall or jump",
+          "codes": [
+            {
+              "code": "PC30",
+              "title": "Intentional self-harm by fall or jump on same level or from less than 1 metre",
+              "is_residual": false
+            },
+            {
+              "code": "PC31",
+              "title": "Intentional self-harm by fall or jump from a height of 1 metre or more",
+              "is_residual": false
+            },
+            {
+              "code": "PC3Y",
+              "title": "Other specified intentional self-harm by fall or jump",
+              "is_residual": true
+            },
+            {
+              "code": "PC3Z",
+              "title": "Intentional self-harm by fall or jump, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PC4",
+          "title": "Intentional self-harm by contact with person, animal or plant",
+          "codes": [
+            {
+              "code": "PC40",
+              "title": "Intentional self-harm by being struck, kicked, or bumped by person",
+              "is_residual": false
+            },
+            {
+              "code": "PC41",
+              "title": "Intentional self-harm by being struck, kicked, or bumped by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PC42",
+              "title": "Intentional self-harm by being stepped on or crushed by person",
+              "is_residual": false
+            },
+            {
+              "code": "PC43",
+              "title": "Intentional self-harm by being stepped on or crushed by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PC44",
+              "title": "Intentional self-harm by being bitten by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PC45",
+              "title": "Intentional self-harm by being scratched or clawed by person",
+              "is_residual": false
+            },
+            {
+              "code": "PC46",
+              "title": "Intentional self-harm by being scratched or clawed by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PC47",
+              "title": "Intentional self-harm by being stung or envenomated by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PC48",
+              "title": "Intentional self-harm by contact with plant",
+              "is_residual": false
+            },
+            {
+              "code": "PC4Y",
+              "title": "Other specified type of intentional self-harm by contact with person, animal or plant",
+              "is_residual": true
+            },
+            {
+              "code": "PC4Z",
+              "title": "Intentional self-harm by contact with person, animal or plant, type unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PC5",
+          "title": "Intentional self-harm by exposure to object, not elsewhere classified",
+          "codes": [
+            {
+              "code": "PC50",
+              "title": "Intentional self-harm by being struck by projectile from firearm",
+              "is_residual": false
+            },
+            {
+              "code": "PC50.0",
+              "title": "Intentional self-harm by projectile from handgun",
+              "is_residual": false
+            },
+            {
+              "code": "PC50.1",
+              "title": "Intentional self-harm by projectile from rifle, shotgun or larger firearm",
+              "is_residual": false
+            },
+            {
+              "code": "PC50.Y",
+              "title": "Other specified intentional self-harm by being struck by projectile from firearm",
+              "is_residual": true
+            },
+            {
+              "code": "PC50.Z",
+              "title": "Intentional self-harm by being struck by projectile from firearm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PC51",
+              "title": "Intentional self-harm by being struck by moving object, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PC52",
+              "title": "Intentional self-harm by striking against stationary object",
+              "is_residual": false
+            },
+            {
+              "code": "PC53",
+              "title": "Intentional self-harm by being cut or pierced by sharp object",
+              "is_residual": false
+            },
+            {
+              "code": "PC53.0",
+              "title": "Intentional self-harm by being cut or pierced by knife, sword or dagger",
+              "is_residual": false
+            },
+            {
+              "code": "PC53.1",
+              "title": "Intentional self-harm by being cut or pierced by sharp glass",
+              "is_residual": false
+            },
+            {
+              "code": "PC53.Y",
+              "title": "Other specified intentional self-harm by being cut or pierced by sharp object",
+              "is_residual": true
+            },
+            {
+              "code": "PC53.Z",
+              "title": "Intentional self-harm by being cut or pierced by sharp object, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PC54",
+              "title": "Intentional self-harm by being struck by blunt object",
+              "is_residual": false
+            },
+            {
+              "code": "PC55",
+              "title": "Intentional self-harm by being caught, crushed, jammed or pinched between objects",
+              "is_residual": false
+            },
+            {
+              "code": "PC5Y",
+              "title": "Intentional self harm by contact with other specified type of weapon",
+              "is_residual": true
+            },
+            {
+              "code": "PC5Z",
+              "title": "Intentional self harm by contact with weapon, type unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PC6",
+          "title": "Intentional self-harm by immersion, submersion or falling into water",
+          "codes": [
+            {
+              "code": "PC60",
+              "title": "Intentional self-harm by drowning or submersion while in body of water",
+              "is_residual": false
+            },
+            {
+              "code": "PC61",
+              "title": "Intentional self-harm by drowning or submersion following fall into body of water",
+              "is_residual": false
+            },
+            {
+              "code": "PC62",
+              "title": "Intentional self-harm by injury other than drowning while in body of water",
+              "is_residual": false
+            },
+            {
+              "code": "PC63",
+              "title": "Intentional self-harm by injury other than drowning following fall into body of water",
+              "is_residual": false
+            },
+            {
+              "code": "PC6Z",
+              "title": "Intentional self-harm by immersion, submersion or falling into water, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PC7",
+          "title": "Intentional self-harm by threat to breathing",
+          "codes": [
+            {
+              "code": "PC70",
+              "title": "Intentional self-harm by threat to breathing by suffocation from object covering mouth or nose",
+              "is_residual": false
+            },
+            {
+              "code": "PC71",
+              "title": "Intentional self-harm by threat to breathing by hanging",
+              "is_residual": false
+            },
+            {
+              "code": "PC72",
+              "title": "Intentional self-harm by threat to breathing by strangulation",
+              "is_residual": false
+            },
+            {
+              "code": "PC73",
+              "title": "Intentional self-harm by threat to breathing by external compression of airways or chest",
+              "is_residual": false
+            },
+            {
+              "code": "PC74",
+              "title": "Intentional self-harm by inhalation or ingestion of gastric contents",
+              "is_residual": false
+            },
+            {
+              "code": "PC75",
+              "title": "Intentional self-harm by threat to breathing by inhalation or ingestion of liquids",
+              "is_residual": false
+            },
+            {
+              "code": "PC76",
+              "title": "Intentional self-harm by threat to breathing by inhalation or ingestion of food",
+              "is_residual": false
+            },
+            {
+              "code": "PC77",
+              "title": "Intentional self-harm by threat to breathing by inhalation or ingestion of other objects or materials",
+              "is_residual": false
+            },
+            {
+              "code": "PC78",
+              "title": "Intentional self-harm by threat to breathing from low oxygen environment",
+              "is_residual": false
+            },
+            {
+              "code": "PC7Y",
+              "title": "Other specified intentional self-harm by threat to breathing",
+              "is_residual": true
+            },
+            {
+              "code": "PC7Z",
+              "title": "Intentional self-harm by threat to breathing, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PC8",
+          "title": "Intentional self-harm by exposure to thermal mechanism",
+          "codes": [
+            {
+              "code": "PC80",
+              "title": "Intentional self-harm by exposure to controlled fire",
+              "is_residual": false
+            },
+            {
+              "code": "PC81",
+              "title": "Intentional self-harm by exposure to uncontrolled fire",
+              "is_residual": false
+            },
+            {
+              "code": "PC82",
+              "title": "Intentional self-harm by exposure to ignition or melting of material",
+              "is_residual": false
+            },
+            {
+              "code": "PC83",
+              "title": "Intentional self-harm by contact with hot object or liquid",
+              "is_residual": false
+            },
+            {
+              "code": "PC84",
+              "title": "Intentional self-harm by exposure to steam, hot vapour, air or gases",
+              "is_residual": false
+            },
+            {
+              "code": "PC85",
+              "title": "Intentional self-harm by exposure to excessive heat",
+              "is_residual": false
+            },
+            {
+              "code": "PC86",
+              "title": "Intentional self-harm by exposure to excessive cold",
+              "is_residual": false
+            },
+            {
+              "code": "PC8Y",
+              "title": "Intentional self-harm by exposure to other specified thermal mechanism",
+              "is_residual": true
+            },
+            {
+              "code": "PC8Z",
+              "title": "Intentional self-harm by exposure to unspecified thermal mechanism",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PC9",
+          "title": "Intentional self-harm by exposure to or harmful effects of substances",
+          "codes": [
+            {
+              "code": "PC90",
+              "title": "Intentional self-harm by exposure to or harmful effects of opioids or related analgesics",
+              "is_residual": false
+            },
+            {
+              "code": "PC91",
+              "title": "Intentional self-harm by exposure to or harmful effects of sedative hypnotic drugs or other CNS depressants",
+              "is_residual": false
+            },
+            {
+              "code": "PC92",
+              "title": "Intentional self-harm by exposure to or harmful effects of psychostimulants",
+              "is_residual": false
+            },
+            {
+              "code": "PC93",
+              "title": "Intentional self-harm by exposure to or harmful effects of cannabinoids or hallucinogens",
+              "is_residual": false
+            },
+            {
+              "code": "PC94",
+              "title": "Intentional self-harm by exposure to or harmful effects of analgesics, antipyretics or nonsteroidal anti-inflammatory drugs",
+              "is_residual": false
+            },
+            {
+              "code": "PC95",
+              "title": "Intentional self-harm by exposure to or harmful effects of antidepressants",
+              "is_residual": false
+            },
+            {
+              "code": "PC96",
+              "title": "Intentional self-harm by exposure to or harmful effects of antipsychotics",
+              "is_residual": false
+            },
+            {
+              "code": "PC97",
+              "title": "Intentional self-harm by exposure to or harmful effects of antiepileptics or antiparkinsonism drugs",
+              "is_residual": false
+            },
+            {
+              "code": "PC98",
+              "title": "Intentional self-harm by exposure to other and unspecified drug, medicament and biological substance",
+              "is_residual": false
+            },
+            {
+              "code": "PC99",
+              "title": "Intentional self-harm by exposure to or harmful effects of multiple drugs, medicaments or biological substances",
+              "is_residual": false
+            },
+            {
+              "code": "PD00",
+              "title": "Intentional self-harm by exposure to or harmful effects of alcohols",
+              "is_residual": false
+            },
+            {
+              "code": "PD01",
+              "title": "Intentional self-harm by exposure to or harmful effects of organic solvents",
+              "is_residual": false
+            },
+            {
+              "code": "PD02",
+              "title": "Intentional self-harm by exposure to or harmful effects of carbon monoxide",
+              "is_residual": false
+            },
+            {
+              "code": "PD03",
+              "title": "Intentional self-harm by exposure to or harmful effects of pesticides",
+              "is_residual": false
+            },
+            {
+              "code": "PD04",
+              "title": "Intentional self-harm by exposure to or harmful effects of corrosive substances",
+              "is_residual": false
+            },
+            {
+              "code": "PD05",
+              "title": "Intentional self-harm by exposure to or harmful effects of other or unspecified substances chiefly nonmedicinal as to source",
+              "is_residual": false
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PD2",
+          "title": "Intentional self-harm by exposure to other mechanism",
+          "codes": [
+            {
+              "code": "PD20",
+              "title": "Intentional self-harm by foreign body in orifice",
+              "is_residual": false
+            },
+            {
+              "code": "PD21",
+              "title": "Intentional self-harm by exposure to electric current",
+              "is_residual": false
+            },
+            {
+              "code": "PD22",
+              "title": "Intentional self-harm by exposure to sunlight",
+              "is_residual": false
+            },
+            {
+              "code": "PD23",
+              "title": "Intentional self-harm by exposure to radiation",
+              "is_residual": false
+            },
+            {
+              "code": "PD24",
+              "title": "Intentional self-harm by exposure to high or low air pressure or changes in air pressure",
+              "is_residual": false
+            },
+            {
+              "code": "PD25",
+              "title": "Intentional self-harm by explosion or rupture of pressurised materials or object",
+              "is_residual": false
+            },
+            {
+              "code": "PD26",
+              "title": "Intentional self-harm by physical overexertion",
+              "is_residual": false
+            },
+            {
+              "code": "PD27",
+              "title": "Intentional self-harm by lack of food",
+              "is_residual": false
+            },
+            {
+              "code": "PD28",
+              "title": "Intentional self-harm by lack of water",
+              "is_residual": false
+            },
+            {
+              "code": "PD29",
+              "title": "Intentional self-harm by other specified privation",
+              "is_residual": false
+            },
+            {
+              "code": "PD3Y",
+              "title": "Other specified intentional self-harm",
+              "is_residual": true
+            },
+            {
+              "code": "PD3Z",
+              "title": "Intentional self-harm, unspecified",
+              "is_residual": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "BlockL1-PD5",
+      "title": "Assault",
+      "sub_blocks": [
+        {
+          "block_id": "BlockL2-PD5",
+          "title": "Assault by transport events",
+          "codes": [
+            {
+              "code": "PD50",
+              "title": "Assault by land transport road traffic injury event",
+              "is_residual": false
+            },
+            {
+              "code": "PD51",
+              "title": "Assault by land transport off-road nontraffic injury event",
+              "is_residual": false
+            },
+            {
+              "code": "PD52",
+              "title": "Assault by land transport injury event unknown whether road traffic or off-road nontraffic",
+              "is_residual": false
+            },
+            {
+              "code": "PD53",
+              "title": "Assault by railway transport injury event",
+              "is_residual": false
+            },
+            {
+              "code": "PD60",
+              "title": "Assault by water transport injury event with water vessel damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PD60.0",
+              "title": "Assault by water transport injury event with water vessel damaged, disabled or destroyed, causing submersion or drowning",
+              "is_residual": false
+            },
+            {
+              "code": "PD60.1",
+              "title": "Assault by water transport injury event with water vessel damaged, disabled or destroyed, causing other injury",
+              "is_residual": false
+            },
+            {
+              "code": "PD60.Z",
+              "title": "Assault by water transport injury event with water vessel damaged, disabled or destroyed, causing unspecified injury",
+              "is_residual": true
+            },
+            {
+              "code": "PD61",
+              "title": "Assault by water transport injury event with water vessel not damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PD61.0",
+              "title": "Assault by water transport injury event with water vessel not damaged, disabled or destroyed, causing submersion or drowning",
+              "is_residual": false
+            },
+            {
+              "code": "PD61.1",
+              "title": "Assault by water transport injury event with water vessel not damaged, disabled or destroyed, causing other injury",
+              "is_residual": false
+            },
+            {
+              "code": "PD61.Y",
+              "title": "Assault by water transport injury event with water vessel not damaged, disabled or destroyed, causing unspecified injury",
+              "is_residual": true
+            },
+            {
+              "code": "PD61.Z",
+              "title": "Assault by water transport injury event with water vessel not damaged, disabled or destroyed, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PD6Z",
+              "title": "Assault by water transport injury event with damage to water vessel unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PD70",
+              "title": "Assault by air or space transport injury event with aircraft or spacecraft damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PD71",
+              "title": "Assault by air or space transport injury event with aircraft or spacecraft not damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PD7Z",
+              "title": "Assault by air or space transport injury event with damage to aircraft or spacecraft unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PD9Y",
+              "title": "Other specified assault by transport injury event",
+              "is_residual": true
+            },
+            {
+              "code": "PD9Z",
+              "title": "Assault by transport injury event, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PE0",
+          "title": "Assault by causing a fall or jump",
+          "codes": [
+            {
+              "code": "PE00",
+              "title": "Assault by causing a fall or jump on same level or from less than 1 metre",
+              "is_residual": false
+            },
+            {
+              "code": "PE01",
+              "title": "Assault by causing a fall or jump from a height of 1 metre or more",
+              "is_residual": false
+            },
+            {
+              "code": "PE0Z",
+              "title": "Assault by causing a fall or jump from unspecified height",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PE1",
+          "title": "Assault by contact with person, animal or plant",
+          "codes": [
+            {
+              "code": "PE10",
+              "title": "Assault by being struck, kicked or bumped by person",
+              "is_residual": false
+            },
+            {
+              "code": "PE11",
+              "title": "Assault by being struck, kicked or bumped by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PE12",
+              "title": "Assault by being crushed or stepped on by person",
+              "is_residual": false
+            },
+            {
+              "code": "PE13",
+              "title": "Assault by being crushed or stepped on by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PE14",
+              "title": "Assault by being bitten by person",
+              "is_residual": false
+            },
+            {
+              "code": "PE15",
+              "title": "Assault by being bitten by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PE16",
+              "title": "Assault by being scratched or clawed by person",
+              "is_residual": false
+            },
+            {
+              "code": "PE17",
+              "title": "Assault by being scratched or clawed by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PE18",
+              "title": "Assault by being stung or envenomated by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PE19",
+              "title": "Assault by contact with plant",
+              "is_residual": false
+            },
+            {
+              "code": "PE1Y",
+              "title": "Other specified type of assault by contact with person, animal or plant",
+              "is_residual": true
+            },
+            {
+              "code": "PE1Z",
+              "title": "Assault by contact with person, animal or plant, type unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PE2",
+          "title": "Assault by exposure to object not elsewhere classified",
+          "codes": [
+            {
+              "code": "PE20",
+              "title": "Assault by projectile from firearm",
+              "is_residual": false
+            },
+            {
+              "code": "PE20.0",
+              "title": "Assault by projectile from handgun",
+              "is_residual": false
+            },
+            {
+              "code": "PE20.1",
+              "title": "Assault by projectile from rifle, shotgun or larger firearm",
+              "is_residual": false
+            },
+            {
+              "code": "PE20.Y",
+              "title": "Assault by being struck by projectile from other specified firearm",
+              "is_residual": true
+            },
+            {
+              "code": "PE20.Z",
+              "title": "Assault by being struck by projectile from unspecified firearm",
+              "is_residual": true
+            },
+            {
+              "code": "PE21",
+              "title": "Assault by being struck by moving object, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PE22",
+              "title": "Assault by striking against stationary object",
+              "is_residual": false
+            },
+            {
+              "code": "PE30",
+              "title": "Assault by being cut or pierced by knife, sword, or dagger",
+              "is_residual": false
+            },
+            {
+              "code": "PE31",
+              "title": "Assault by being cut or pierced by sharp glass",
+              "is_residual": false
+            },
+            {
+              "code": "PE3Z",
+              "title": "Assault by being cut or pierced by other or unspecified sharp object",
+              "is_residual": true
+            },
+            {
+              "code": "PE40",
+              "title": "Assault by being struck by blunt object",
+              "is_residual": false
+            },
+            {
+              "code": "PE41",
+              "title": "Assault by being caught, crushed, jammed or pinched between objects",
+              "is_residual": false
+            },
+            {
+              "code": "PE4Y",
+              "title": "Assault by contact with other specified object, not elsewhere classified",
+              "is_residual": true
+            },
+            {
+              "code": "PE4Z",
+              "title": "Assault by exposure to unspecified object, not elsewhere classified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PE5",
+          "title": "Assault by immersion, submersion or falling into water",
+          "codes": [
+            {
+              "code": "PE50",
+              "title": "Assault by drowning or submersion, while in body of water",
+              "is_residual": false
+            },
+            {
+              "code": "PE51",
+              "title": "Assault by drowning or submersion following fall into body of water",
+              "is_residual": false
+            },
+            {
+              "code": "PE52",
+              "title": "Assault by injury other than drowning while in body of water",
+              "is_residual": false
+            },
+            {
+              "code": "PE53",
+              "title": "Assault by injury other than drowning following fall into body of water",
+              "is_residual": false
+            },
+            {
+              "code": "PE5Y",
+              "title": "Other specified assault by immersion, submersion or falling into water",
+              "is_residual": true
+            },
+            {
+              "code": "PE5Z",
+              "title": "Assault by immersion, submersion or falling into water, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PE6",
+          "title": "Assault by threat to breathing",
+          "codes": [
+            {
+              "code": "PE60",
+              "title": "Assault by threat to breathing, suffocation from object covering mouth or nose",
+              "is_residual": false
+            },
+            {
+              "code": "PE61",
+              "title": "Assault by threat to breathing by hanging",
+              "is_residual": false
+            },
+            {
+              "code": "PE62",
+              "title": "Assault by threat to breathing by strangulation",
+              "is_residual": false
+            },
+            {
+              "code": "PE63",
+              "title": "Assault by threat to breathing by external compression of airways or chest",
+              "is_residual": false
+            },
+            {
+              "code": "PE64",
+              "title": "Assault by threat to breathing by inhalation or ingestion of liquids",
+              "is_residual": false
+            },
+            {
+              "code": "PE65",
+              "title": "Assault by threat to breathing by inhalation or ingestion of food",
+              "is_residual": false
+            },
+            {
+              "code": "PE66",
+              "title": "Assault by threat to breathing by inhalation or ingestion of other objects or materials",
+              "is_residual": false
+            },
+            {
+              "code": "PE67",
+              "title": "Assault by threat to breathing by low oxygen environment",
+              "is_residual": false
+            },
+            {
+              "code": "PE6Y",
+              "title": "Other specified assault by threat to breathing",
+              "is_residual": true
+            },
+            {
+              "code": "PE6Z",
+              "title": "Assault by threat to breathing, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PE7",
+          "title": "Assault by exposure to thermal mechanism",
+          "codes": [
+            {
+              "code": "PE70",
+              "title": "Assault by exposure to uncontrolled fire",
+              "is_residual": false
+            },
+            {
+              "code": "PE71",
+              "title": "Assault by exposure to controlled fire",
+              "is_residual": false
+            },
+            {
+              "code": "PE72",
+              "title": "Assault by exposure to ignition or melting of materials",
+              "is_residual": false
+            },
+            {
+              "code": "PE73",
+              "title": "Assault by contact with hot object or liquid",
+              "is_residual": false
+            },
+            {
+              "code": "PE74",
+              "title": "Assault by contact with steam, hot vapour, air or gases",
+              "is_residual": false
+            },
+            {
+              "code": "PE75",
+              "title": "Assault by exposure to excessive heat",
+              "is_residual": false
+            },
+            {
+              "code": "PE76",
+              "title": "Assault by exposure to excessive cold",
+              "is_residual": false
+            },
+            {
+              "code": "PE7Y",
+              "title": "Assault by exposure to other specified thermal mechanism",
+              "is_residual": true
+            },
+            {
+              "code": "PE7Z",
+              "title": "Assault by exposure to unspecified thermal mechanism",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PE8",
+          "title": "Assault by exposure to or harmful effects of substances",
+          "codes": [
+            {
+              "code": "PE80",
+              "title": "Assault by exposure to or harmful effects of opioids or related analgesics",
+              "is_residual": false
+            },
+            {
+              "code": "PE81",
+              "title": "Assault by exposure to or harmful effects of sedative, hypnotic drugs or other CNS depressants",
+              "is_residual": false
+            },
+            {
+              "code": "PE82",
+              "title": "Assault by exposure to or harmful effects of psychostimulants",
+              "is_residual": false
+            },
+            {
+              "code": "PE83",
+              "title": "Assault by exposure to or harmful effects of cannabinoids or hallucinogens",
+              "is_residual": false
+            },
+            {
+              "code": "PE84",
+              "title": "Assault by exposure to or harmful effects of analgesics, antipyretics or nonsteroidal anti-inflammatory drugs",
+              "is_residual": false
+            },
+            {
+              "code": "PE85",
+              "title": "Assault by exposure to or harmful effects of antidepressants",
+              "is_residual": false
+            },
+            {
+              "code": "PE86",
+              "title": "Assault by exposure to or harmful effects of antipsychotics",
+              "is_residual": false
+            },
+            {
+              "code": "PE87",
+              "title": "Assault by exposure to or harmful effects of antiepileptics or antiparkinsonism drugs",
+              "is_residual": false
+            },
+            {
+              "code": "PE88",
+              "title": "Assault by exposure to or harmful effects of other or unspecified drug, medicament or biological substance",
+              "is_residual": false
+            },
+            {
+              "code": "PE89",
+              "title": "Assault by exposure to or harmful effects of multiple drugs, medicaments or biological substances",
+              "is_residual": false
+            },
+            {
+              "code": "PE8Y",
+              "title": "Other specified assault by exposure to or harmful effects of drugs, medicaments or biological substances",
+              "is_residual": true
+            },
+            {
+              "code": "PE8Z",
+              "title": "Assault by exposure to or harmful effects of drugs, medicaments or biological substances, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PE90",
+              "title": "Assault by exposure to or harmful effects of alcohols",
+              "is_residual": false
+            },
+            {
+              "code": "PE91",
+              "title": "Assault by exposure to or harmful effects of organic solvents",
+              "is_residual": false
+            },
+            {
+              "code": "PE92",
+              "title": "Assault by exposure to or harmful effects of carbon monoxide",
+              "is_residual": false
+            },
+            {
+              "code": "PE93",
+              "title": "Assault by exposure to or harmful effects of pesticides",
+              "is_residual": false
+            },
+            {
+              "code": "PE94",
+              "title": "Assault by exposure to or harmful effects of corrosive substances",
+              "is_residual": false
+            },
+            {
+              "code": "PE95",
+              "title": "Assault by exposure to or harmful effects of other or unspecified substances chiefly nonmedicinal as to source",
+              "is_residual": false
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PF1",
+          "title": "Assault by exposure to other mechanism",
+          "codes": [
+            {
+              "code": "PF10",
+              "title": "Assault by foreign body in orifice or eye",
+              "is_residual": false
+            },
+            {
+              "code": "PF11",
+              "title": "Assault by exposure to electric current",
+              "is_residual": false
+            },
+            {
+              "code": "PF12",
+              "title": "Assault by exposure to sunlight",
+              "is_residual": false
+            },
+            {
+              "code": "PF13",
+              "title": "Assault by exposure to radiation",
+              "is_residual": false
+            },
+            {
+              "code": "PF14",
+              "title": "Assault by exposure to high or low air pressure or changes in air pressure",
+              "is_residual": false
+            },
+            {
+              "code": "PF15",
+              "title": "Assault by exposure to explosion",
+              "is_residual": false
+            },
+            {
+              "code": "PF15.0",
+              "title": "Assault by exposure to chemical explosion",
+              "is_residual": false
+            },
+            {
+              "code": "PF15.1",
+              "title": "Assault by explosion or rupture of materials or object",
+              "is_residual": false
+            },
+            {
+              "code": "PF15.Y",
+              "title": "Other specified assault by exposure to explosion",
+              "is_residual": true
+            },
+            {
+              "code": "PF15.Z",
+              "title": "Assault by exposure to explosion, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PF16",
+              "title": "Assault by physical overexertion",
+              "is_residual": false
+            },
+            {
+              "code": "PF17",
+              "title": "Assault by lack of food",
+              "is_residual": false
+            },
+            {
+              "code": "PF18",
+              "title": "Assault by lack of water",
+              "is_residual": false
+            },
+            {
+              "code": "PF19",
+              "title": "Assault by other specified privation",
+              "is_residual": false
+            },
+            {
+              "code": "PF1A",
+              "title": "Assault by abandonment",
+              "is_residual": false
+            },
+            {
+              "code": "PF1B",
+              "title": "Assault by neglect",
+              "is_residual": false
+            },
+            {
+              "code": "PF2Y",
+              "title": "Other specified assault",
+              "is_residual": true
+            },
+            {
+              "code": "PF2Z",
+              "title": "Assault, unspecified",
+              "is_residual": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "BlockL1-PF4",
+      "title": "Undetermined intent",
+      "sub_blocks": [
+        {
+          "block_id": "BlockL2-PF4",
+          "title": "Transport injury event of undetermined intent",
+          "codes": [
+            {
+              "code": "PF40",
+              "title": "Land transport traffic injury event of undetermined intent injuring a pedestrian",
+              "is_residual": false
+            },
+            {
+              "code": "PF41",
+              "title": "Land transport traffic injury event of undetermined intent injuring the user of a pedestrian conveyance",
+              "is_residual": false
+            },
+            {
+              "code": "PF42",
+              "title": "Land transport traffic injury event of undetermined intent injuring a pedal cyclist",
+              "is_residual": false
+            },
+            {
+              "code": "PF43",
+              "title": "Land transport traffic injury event of undetermined intent injuring a motor cyclist",
+              "is_residual": false
+            },
+            {
+              "code": "PF44",
+              "title": "Land transport traffic injury event of undetermined intent injuring a car occupant",
+              "is_residual": false
+            },
+            {
+              "code": "PF45",
+              "title": "Land transport traffic injury event of undetermined intent injuring a bus or coach occupant",
+              "is_residual": false
+            },
+            {
+              "code": "PF46",
+              "title": "Land transport traffic injury event of undetermined intent injuring an occupant of light goods vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF47",
+              "title": "Land transport traffic injury event of undetermined intent injuring an occupant of heavy goods vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF48",
+              "title": "Land transport traffic injury event of undetermined intent injuring an occupant of a streetcar or tram",
+              "is_residual": false
+            },
+            {
+              "code": "PF49",
+              "title": "Land transport traffic injury event of undetermined intent injuring an occupant of a low powered passenger vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF4A",
+              "title": "Land transport traffic injury event of undetermined intent injuring a user of a special vehicle mainly used in agriculture",
+              "is_residual": false
+            },
+            {
+              "code": "PF4B",
+              "title": "Land transport traffic injury event of undetermined intent injuring a user of a special vehicle mainly used on industrial premises",
+              "is_residual": false
+            },
+            {
+              "code": "PF4C",
+              "title": "Land transport traffic injury event of undetermined intent injuring a user of a special construction vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF4D",
+              "title": "Land transport traffic injury event of undetermined intent injuring a user of an all-terrain vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF4E",
+              "title": "Land transport traffic injury event of undetermined intent injuring a rider of an animal",
+              "is_residual": false
+            },
+            {
+              "code": "PF4F",
+              "title": "Land transport traffic injury event of undetermined intent injuring an occupant of an animal-drawn vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF4Y",
+              "title": "Land transport traffic injury event of undetermined intent injuring a user of other specified land transport",
+              "is_residual": true
+            },
+            {
+              "code": "PF4Z",
+              "title": "Land transport traffic injury event of undetermined intent injuring a user of unknown or unspecified land transport",
+              "is_residual": true
+            },
+            {
+              "code": "PF50",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring a pedestrian",
+              "is_residual": false
+            },
+            {
+              "code": "PF51",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring the user of a pedestrian conveyance",
+              "is_residual": false
+            },
+            {
+              "code": "PF52",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring a pedal cyclist",
+              "is_residual": false
+            },
+            {
+              "code": "PF53",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring a motor cyclist",
+              "is_residual": false
+            },
+            {
+              "code": "PF54",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring a car occupant",
+              "is_residual": false
+            },
+            {
+              "code": "PF55",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring a bus or coach occupant",
+              "is_residual": false
+            },
+            {
+              "code": "PF56",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring an occupant of light goods vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF57",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring an occupant of heavy goods vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF58",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring an occupant of a streetcar or tram",
+              "is_residual": false
+            },
+            {
+              "code": "PF59",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring an occupant of a low powered passenger vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF5A",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring a user of a special vehicle mainly used in agriculture",
+              "is_residual": false
+            },
+            {
+              "code": "PF5B",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring a user of a special vehicle mainly used on industrial premises",
+              "is_residual": false
+            },
+            {
+              "code": "PF5C",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring a user of a special construction vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF5D",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring a user of an all-terrain vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF5E",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring a rider of an animal",
+              "is_residual": false
+            },
+            {
+              "code": "PF5F",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring an occupant of an animal-drawn vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF5Y",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring a user of other specified land transport",
+              "is_residual": true
+            },
+            {
+              "code": "PF5Z",
+              "title": "Land transport nontraffic injury event of undetermined intent injuring a user of unknown or unspecified land transport",
+              "is_residual": true
+            },
+            {
+              "code": "PF60",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring a pedestrian",
+              "is_residual": false
+            },
+            {
+              "code": "PF61",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring the user of a pedestrian conveyance",
+              "is_residual": false
+            },
+            {
+              "code": "PF62",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring a pedal cyclist",
+              "is_residual": false
+            },
+            {
+              "code": "PF63",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring a motor cyclist",
+              "is_residual": false
+            },
+            {
+              "code": "PF64",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring a car occupant",
+              "is_residual": false
+            },
+            {
+              "code": "PF65",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring a bus or coach occupant",
+              "is_residual": false
+            },
+            {
+              "code": "PF66",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring an occupant of light goods vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF67",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring an occupant of heavy goods vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF68",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring an occupant of a streetcar or tram",
+              "is_residual": false
+            },
+            {
+              "code": "PF69",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring an occupant of a low powered passenger vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF6A",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring a user of a special vehicle mainly used in agriculture",
+              "is_residual": false
+            },
+            {
+              "code": "PF6B",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring a user of a special vehicle mainly used on industrial premises",
+              "is_residual": false
+            },
+            {
+              "code": "PF6C",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring a user of a special construction vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF6D",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring a user of an all-terrain vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF6E",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring a rider of an animal",
+              "is_residual": false
+            },
+            {
+              "code": "PF6F",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring an occupant of an animal-drawn vehicle",
+              "is_residual": false
+            },
+            {
+              "code": "PF6Y",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring a user of an other specified vehicle",
+              "is_residual": true
+            },
+            {
+              "code": "PF6Z",
+              "title": "Land transport injury event of undetermined intent, unknown whether road traffic or off-road nontraffic injuring a user of an unknown or unspecified vehicle",
+              "is_residual": true
+            },
+            {
+              "code": "PF70",
+              "title": "Railway transport injury event of undetermined intent with collision or derailment",
+              "is_residual": false
+            },
+            {
+              "code": "PF71",
+              "title": "Railway transport injury event of undetermined intent without collision or derailment",
+              "is_residual": false
+            },
+            {
+              "code": "PF7Z",
+              "title": "Railway transport injury event of undetermined intent of unspecified type",
+              "is_residual": true
+            },
+            {
+              "code": "PF80",
+              "title": "Water transport injury event of undetermined intent with water vessel damaged, disabled or destroyed causing submersion or drowning",
+              "is_residual": false
+            },
+            {
+              "code": "PF8Y",
+              "title": "Water transport injury event of undetermined intent with water vessel damaged, disabled or destroyed causing other injury",
+              "is_residual": true
+            },
+            {
+              "code": "PF8Z",
+              "title": "Water transport injury event of undetermined intent with water vessel damaged, disabled or destroyed causing unspecified injury",
+              "is_residual": true
+            },
+            {
+              "code": "PF90",
+              "title": "Water transport injury event of undetermined intent with water vessel not damaged, disabled or destroyed causing submersion or drowning",
+              "is_residual": false
+            },
+            {
+              "code": "PF9Y",
+              "title": "Water transport injury event of undetermined intent with water vessel not damaged, disabled or destroyed causing other injury",
+              "is_residual": true
+            },
+            {
+              "code": "PF9Z",
+              "title": "Water transport injury event of undetermined intent with water vessel not damaged, disabled or destroyed causing unspecified injury",
+              "is_residual": true
+            },
+            {
+              "code": "PG1Z",
+              "title": "Water transport injury event of undetermined intent, damage to water vessel unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PG20",
+              "title": "Air or space transport injury event of undetermined intent with aircraft or spacecraft damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PG21",
+              "title": "Air or space transport injury event of undetermined intent with aircraft or spacecraft not damaged, disabled or destroyed",
+              "is_residual": false
+            },
+            {
+              "code": "PG2Z",
+              "title": "Air or space transport event injury of undetermined intent, damage to aircraft or spacecraft unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PG4Y",
+              "title": "Other specified transport injury event of undetermined intent",
+              "is_residual": true
+            },
+            {
+              "code": "PG4Z",
+              "title": "Unspecified transport injury event of undetermined intent",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PG5",
+          "title": "Fall or jump with undetermined intent",
+          "codes": [
+            {
+              "code": "PG50",
+              "title": "Fall or jump of undetermined intent on the same level or from less than 1 metre",
+              "is_residual": false
+            },
+            {
+              "code": "PG51",
+              "title": "Fall or jump of undetermined intent from a height of 1 metre or more",
+              "is_residual": false
+            },
+            {
+              "code": "PG5Z",
+              "title": "Fall or jump of undetermined intent, height unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PG6",
+          "title": "Contact with person, animal or plant with undetermined intent",
+          "codes": [
+            {
+              "code": "PG60",
+              "title": "Struck, kicked, or bumped with undetermined intent by person",
+              "is_residual": false
+            },
+            {
+              "code": "PG61",
+              "title": "Struck, kicked, or bumped with undetermined intent by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PG62",
+              "title": "Stepped on or crushed with undetermined intent by person",
+              "is_residual": false
+            },
+            {
+              "code": "PG63",
+              "title": "Stepped on or crushed with undetermined intent by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PG64",
+              "title": "Bitten with undetermined intent by person",
+              "is_residual": false
+            },
+            {
+              "code": "PG65",
+              "title": "Bitten with undetermined intent by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PG66",
+              "title": "Scratched or clawed with undetermined intent by person",
+              "is_residual": false
+            },
+            {
+              "code": "PG67",
+              "title": "Scratched or clawed with undetermined intent by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PG68",
+              "title": "Stung or envenomated with undetermined intent by animal",
+              "is_residual": false
+            },
+            {
+              "code": "PG69",
+              "title": "Contact with plant of undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PG6Y",
+              "title": "Other specified type of contact with person, animal or plant of undetermined intent",
+              "is_residual": true
+            },
+            {
+              "code": "PG6Z",
+              "title": "Unspecified type of contact with person, animal or plant of undetermined intent",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PG7",
+          "title": "Contact with object, not elsewhere classified with undetermined intent",
+          "codes": [
+            {
+              "code": "PG70",
+              "title": "Struck by projectile from handgun of undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PG71",
+              "title": "Struck by projectile from rifle, shotgun or larger firearm of undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PG7Z",
+              "title": "Struck by projectile from other and unspecified firearm with unknown intent",
+              "is_residual": true
+            },
+            {
+              "code": "PG80",
+              "title": "Struck by moving object, not elsewhere classified of undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PG81",
+              "title": "Striking against stationary object of undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PG90",
+              "title": "Cut or pierced by knife, sword or dagger of undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PG91",
+              "title": "Cut or pierced by sharp glass of undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PG9Z",
+              "title": "Cut or pierced by other or unspecified sharp object, undetermined intent",
+              "is_residual": true
+            },
+            {
+              "code": "PH00",
+              "title": "Struck by blunt object with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH01",
+              "title": "Caught, crushed, jammed or pinched between objects with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH0Y",
+              "title": "Contact with other specified object, not elsewhere classified with undetermined intent",
+              "is_residual": true
+            },
+            {
+              "code": "PH0Z",
+              "title": "Exposure to unspecified object, not elsewhere classified, undetermined intent",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PH1",
+          "title": "Immersion, submersion or falling into water with undetermined intent",
+          "codes": [
+            {
+              "code": "PH10",
+              "title": "Drowning or submersion while in body of water with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH11",
+              "title": "Drowning or submersion following fall into body of water with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH12",
+              "title": "Injury other than drowning while in body of water with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH13",
+              "title": "Injury other than drowning following fall into body of water with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH1Z",
+              "title": "Immersion, submersion or falling into water with undetermined intent, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PH2",
+          "title": "Threat to breathing with undetermined intent",
+          "codes": [
+            {
+              "code": "PH20",
+              "title": "Threat to breathing by suffocation from object covering mouth or nose with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH21",
+              "title": "Threat to breathing by hanging with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH22",
+              "title": "Threat to breathing by strangulation with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH23",
+              "title": "Threat to breathing by external compression of airways or chest with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH24",
+              "title": "Threat to breathing by inhalation or ingestion of liquids with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH25",
+              "title": "Threat to breathing by inhalation or ingestion of food with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH26",
+              "title": "Threat to breathing by inhalation or ingestion of other objects or materials with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH27",
+              "title": "Threat to breathing by low oxygen environment with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH2Y",
+              "title": "Other specified threat to breathing with undetermined intent",
+              "is_residual": true
+            },
+            {
+              "code": "PH2Z",
+              "title": "Threat to breathing with undetermined intent, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PH3",
+          "title": "Exposure to thermal mechanism with undetermined intent",
+          "codes": [
+            {
+              "code": "PH30",
+              "title": "Exposure to uncontrolled fire with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH31",
+              "title": "Exposure to controlled fire with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH32",
+              "title": "Exposure to ignition or melting of materials with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH33",
+              "title": "Contact with hot object or liquid with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH34",
+              "title": "Contact with steam, hot vapour, air or gases with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH35",
+              "title": "Exposure to excessive heat with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH36",
+              "title": "Exposure to excessive cold with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH3Y",
+              "title": "Exposure to other specified thermal mechanism with undetermined intent",
+              "is_residual": true
+            },
+            {
+              "code": "PH3Z",
+              "title": "Exposure to unspecified thermal mechanism with undetermined intent",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PH4",
+          "title": "Exposure to or harmful effects of substances, undetermined intent",
+          "codes": [
+            {
+              "code": "PH40",
+              "title": "Exposure to or harmful effects of undetermined intent of opioids or related analgesics",
+              "is_residual": false
+            },
+            {
+              "code": "PH41",
+              "title": "Exposure to or harmful effects of undetermined intent of sedative hypnotic drugs or other CNS depressants",
+              "is_residual": false
+            },
+            {
+              "code": "PH42",
+              "title": "Exposure to or harmful effects of undetermined intent of psychostimulants",
+              "is_residual": false
+            },
+            {
+              "code": "PH43",
+              "title": "Exposure to or harmful effects of undetermined intent of cannabinoids or hallucinogens",
+              "is_residual": false
+            },
+            {
+              "code": "PH44",
+              "title": "Exposure to or harmful effects of undetermined intent of analgesics, antipyretics or nonsteroidal anti-inflammatory drugs",
+              "is_residual": false
+            },
+            {
+              "code": "PH45",
+              "title": "Exposure to or harmful effects of undetermined intent of antidepressants",
+              "is_residual": false
+            },
+            {
+              "code": "PH46",
+              "title": "Exposure to or harmful effects of undetermined intent of antipsychotics",
+              "is_residual": false
+            },
+            {
+              "code": "PH47",
+              "title": "Exposure to or harmful effects of undetermined intent of antiepileptics or antiparkinsonism drugs",
+              "is_residual": false
+            },
+            {
+              "code": "PH47.0",
+              "title": "Harmful effects of or exposure to mixed antiepileptics, not elsewhere classified, undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH47.Z",
+              "title": "Undetermined intent: Harmful effects of and exposure to noxious substances: Drugs, medicaments or biological substances: Unspecified antiepileptics or antiparkinsonism drugs",
+              "is_residual": true
+            },
+            {
+              "code": "PH48",
+              "title": "Exposure to or harmful effects of undetermined intent of other or unspecified drugs, medicaments or biological substances",
+              "is_residual": false
+            },
+            {
+              "code": "PH49",
+              "title": "Exposure to or harmful effects of undetermined intent of multiple drugs, medicaments or biological substances",
+              "is_residual": false
+            },
+            {
+              "code": "PH50",
+              "title": "Exposure to or harmful effects of undetermined intent of alcohols",
+              "is_residual": false
+            },
+            {
+              "code": "PH51",
+              "title": "Exposure to or harmful effects of undetermined intent of organic solvents",
+              "is_residual": false
+            },
+            {
+              "code": "PH52",
+              "title": "Exposure to or harmful effects of undetermined intent of carbon monoxide",
+              "is_residual": false
+            },
+            {
+              "code": "PH53",
+              "title": "Exposure to or harmful effects of undetermined intent of pesticides",
+              "is_residual": false
+            },
+            {
+              "code": "PH54",
+              "title": "Exposure to or harmful effects of undetermined intent of corrosive substances",
+              "is_residual": false
+            },
+            {
+              "code": "PH55",
+              "title": "Exposure to or harmful effects of undetermined intent of halogen derivatives of aliphatic or aromatic hydrocarbons",
+              "is_residual": false
+            },
+            {
+              "code": "PH56",
+              "title": "Exposure to or harmful effects of undetermined intent of other or unspecified substances chiefly nonmedicinal as to source",
+              "is_residual": false
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PH7",
+          "title": "Exposure to other mechanism with undetermined intent",
+          "codes": [
+            {
+              "code": "PH70",
+              "title": "Exposure to foreign body in orifice or eye with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH71",
+              "title": "Exposure to electric current with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH72",
+              "title": "Exposure to sunlight with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH73",
+              "title": "Exposure to radiation with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH74",
+              "title": "Exposure to high or low air pressure or changes in air pressure with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH75",
+              "title": "Exposure to explosion with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH75.0",
+              "title": "Exposure to chemical explosion with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH75.1",
+              "title": "Exposure to explosion or rupture of pressurised materials or object with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH75.Y",
+              "title": "Other specified exposure to explosion with undetermined intent",
+              "is_residual": true
+            },
+            {
+              "code": "PH75.Z",
+              "title": "Exposure to explosion with undetermined intent, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PH76",
+              "title": "Physical overexertion with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH77",
+              "title": "Lack of food with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH78",
+              "title": "Lack of water with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH79",
+              "title": "Other specified privation with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH7A",
+              "title": "Abandonment with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH7B",
+              "title": "Neglect with undetermined intent",
+              "is_residual": false
+            },
+            {
+              "code": "PH8Y",
+              "title": "Other specified injury event of undetermined intent",
+              "is_residual": true
+            },
+            {
+              "code": "PH8Z",
+              "title": "Unspecified injury event of undetermined intent",
+              "is_residual": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "BlockL1-PJ0",
+      "title": "Exposure to extreme forces of nature",
+      "sub_blocks": []
+    },
+    {
+      "block_id": "BlockL1-PJ2",
+      "title": "Maltreatment",
+      "sub_blocks": []
+    },
+    {
+      "block_id": "BlockL1-PJ4",
+      "title": "Legal intervention",
+      "sub_blocks": []
+    },
+    {
+      "block_id": "BlockL1-PJ6",
+      "title": "Armed conflict",
+      "sub_blocks": [
+        {
+          "block_id": "BlockL2-PJ6",
+          "title": "Explosion of marine weapons during armed conflict",
+          "codes": [
+            {
+              "code": "PJ60",
+              "title": "Explosion of depth-charge or marine mine during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PJ61",
+              "title": "Explosion of torpedo during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PJ62",
+              "title": "Explosion of sea-based artillery shell during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PJ6Y",
+              "title": "Explosion of other marine weapons during armed conflict",
+              "is_residual": true
+            },
+            {
+              "code": "PJ6Z",
+              "title": "Explosion of unspecified marine weapon",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PJ7",
+          "title": "Attack on or destruction of aircraft during armed conflict",
+          "codes": [
+            {
+              "code": "PJ70",
+              "title": "Attack on or destruction of aircraft during armed conflict due to enemy fire or explosives",
+              "is_residual": false
+            },
+            {
+              "code": "PJ71",
+              "title": "Attack on or destruction of aircraft during armed conflict due to collision with other aircraft",
+              "is_residual": false
+            },
+            {
+              "code": "PJ7Y",
+              "title": "Other destruction of aircraft during armed conflict",
+              "is_residual": true
+            },
+            {
+              "code": "PJ7Z",
+              "title": "Unspecified destruction of aircraft during armed conflict",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PJ8",
+          "title": "Other explosions or fragments during armed conflict",
+          "codes": [
+            {
+              "code": "PJ80",
+              "title": "Explosion of missile during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PJ81",
+              "title": "Explosion of aerial bomb during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PJ82",
+              "title": "Explosion of munitions or weapons during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PJ83",
+              "title": "Explosion of improvised explosive device during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PJ8Y",
+              "title": "Other explosion or fragments during armed conflict",
+              "is_residual": true
+            },
+            {
+              "code": "PJ8Z",
+              "title": "Unspecified explosion or fragments during armed conflict",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PJ9",
+          "title": "Fires, conflagrations or hot substances during armed conflict",
+          "codes": [
+            {
+              "code": "PJ90",
+              "title": "Use of gasoline bomb during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PJ91",
+              "title": "Use of flamethrower during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PJ92",
+              "title": "Use of incendiary bullets during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PJ9Y",
+              "title": "Other specified fires, conflagrations or hot substances during armed conflict",
+              "is_residual": true
+            },
+            {
+              "code": "PJ9Z",
+              "title": "Unspecified fire, conflagration or hot substance during armed conflict",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PK0",
+          "title": "Firearm discharge or other forms of conventional warfare during armed conflict",
+          "codes": [
+            {
+              "code": "PK00",
+              "title": "Use of rubber bullets during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK01",
+              "title": "Use of firearm pellets during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK02",
+              "title": "Other firearms discharge during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK03",
+              "title": "Other weapons use during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK04",
+              "title": "Unarmed combat during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK0Z",
+              "title": "Other and unspecified forms of conventional weapons use during armed conflict",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PK1",
+          "title": "Use of nuclear weapons during armed conflict",
+          "codes": [
+            {
+              "code": "PK10",
+              "title": "Thermal or blast effects of nuclear weapon during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK11",
+              "title": "Nuclear radiation effects of nuclear weapon during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK1Z",
+              "title": "Other and unspecified effect of nuclear weapon during armed conflict",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PK2",
+          "title": "Use of biological weapons during armed conflict",
+          "codes": [
+            {
+              "code": "PK20",
+              "title": "Use of weaponised micro-organisms during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK2Y",
+              "title": "Use of other specified biological weapons during armed conflict",
+              "is_residual": true
+            },
+            {
+              "code": "PK2Z",
+              "title": "Use of unspecified biological weapons during armed conflict",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PK3",
+          "title": "Chemical weapons or other forms of unconventional warfare during armed conflict",
+          "codes": [
+            {
+              "code": "PK30",
+              "title": "Use of chemical weapons during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK31",
+              "title": "Use of lasers or other energetic beams or fields during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK32",
+              "title": "Use of electric weapons during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK33",
+              "title": "Use of autonomous or semi-autonomous machines as weapons during armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK3Z",
+              "title": "Other and unspecified forms of unconventional warfare during armed conflict",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PK4",
+          "title": "Injury event occurring after cessation of armed conflict",
+          "codes": [
+            {
+              "code": "PK40",
+              "title": "Explosion of mine after cessation of armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK41",
+              "title": "Explosion of bomb after cessation of armed conflict",
+              "is_residual": false
+            },
+            {
+              "code": "PK4Z",
+              "title": "Other and unspecified event after cessation of armed conflict",
+              "is_residual": true
+            },
+            {
+              "code": "PK6Y",
+              "title": "Other specified weapon or attack during armed conflict",
+              "is_residual": true
+            },
+            {
+              "code": "PK6Z",
+              "title": "Unspecified weapon or attack during armed conflict",
+              "is_residual": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "block_id": "BlockL1-PK8",
+      "title": "Causes of healthcare related harm or injury",
+      "sub_blocks": [
+        {
+          "block_id": "BlockL2-PK8",
+          "title": "Surgical or other medical procedures associated with injury or harm in diagnostic or therapeutic use",
+          "codes": [
+            {
+              "code": "PK80",
+              "title": "Medical or surgical procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.0",
+              "title": "Neurological procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.00",
+              "title": "Neurological procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.01",
+              "title": "Neurological procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.02",
+              "title": "Neurological procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.0Y",
+              "title": "Neurological procedure associated with injury or harm, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.0Z",
+              "title": "Neurological procedure associated with injury or harm, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.1",
+              "title": "Cardiac procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.10",
+              "title": "Cardiac procedure for repair of congenital anomaly associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.11",
+              "title": "Cardiac procedure for repair of congenital anomaly associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.12",
+              "title": "Cardiac procedure for repair of congenital anomaly associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.13",
+              "title": "Cardiac procedure for repair of congenital anomaly associated with injury or harm, unspecified approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.14",
+              "title": "Other cardiac procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.15",
+              "title": "Other cardiac procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.16",
+              "title": "Other cardiac procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.17",
+              "title": "Other cardiac procedure associated with injury or harm, unspecified approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.1Y",
+              "title": "Unspecified type of cardiac procedure associated with injury or harm in therapeutic use, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.1Z",
+              "title": "Unspecified type of cardiac procedure associated with injury or harm in therapeutic use, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.2",
+              "title": "Thoracic procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.20",
+              "title": "Thoracic procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.21",
+              "title": "Thoracic procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.22",
+              "title": "Thoracic procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.2Y",
+              "title": "Thoracic procedure associated with injury or harm, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.2Z",
+              "title": "Thoracic procedure associated with injury or harm, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.3",
+              "title": "Gastrointestinal, abdominal, or abdominal wall procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.30",
+              "title": "Gastrointestinal, abdominal, or abdominal wall procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.31",
+              "title": "Gastrointestinal, abdominal, or abdominal wall procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.32",
+              "title": "Gastrointestinal, abdominal, or abdominal wall procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.3Y",
+              "title": "Gastrointestinal, abdominal, or abdominal wall procedure associated with injury or harm in therapeutic use, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.3Z",
+              "title": "Gastrointestinal, abdominal, or abdominal wall procedure associated with injury or harm in therapeutic use, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.4",
+              "title": "Endocrine procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.40",
+              "title": "Endocrine procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.41",
+              "title": "Endocrine procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.42",
+              "title": "Endocrine procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.4Y",
+              "title": "Endocrine procedure associated with injury or harm in therapeutic use, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.4Z",
+              "title": "Endocrine procedure associated with injury or harm in therapeutic use, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.5",
+              "title": "Gynaecological or breast procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.50",
+              "title": "Gynaecological or breast procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.51",
+              "title": "Gynaecological or breast procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.52",
+              "title": "Gynaecological or breast procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.53",
+              "title": "Gynaecological or breast procedure associated with injury or harm in therapeutic use, per orifice approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.5Y",
+              "title": "Gynaecological or breast procedure associated with injury or harm in therapeutic use, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.5Z",
+              "title": "Gynaecological or breast procedure associated with injury or harm in therapeutic use, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.6",
+              "title": "Urological procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.60",
+              "title": "Urological procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.61",
+              "title": "Urological procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.62",
+              "title": "Urological procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.6Y",
+              "title": "Urological procedure associated with injury or harm, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.6Z",
+              "title": "Urological procedure associated with injury or harm, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.7",
+              "title": "Obstetric procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.70",
+              "title": "Caesarean section or other obstetric procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.71",
+              "title": "Obstetric procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.72",
+              "title": "Obstetric procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.73",
+              "title": "Obstetric procedure associated with injury or harm in therapeutic use, per orifice approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.7Y",
+              "title": "Caesarean section or other obstetric procedure associated with injury or harm, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.7Z",
+              "title": "Caesarean section or other obstetric procedure associated with injury or harm, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.8",
+              "title": "Musculoskeletal procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.80",
+              "title": "Musculoskeletal procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.81",
+              "title": "Musculoskeletal procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.82",
+              "title": "Musculoskeletal procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.8Y",
+              "title": "Musculoskeletal procedure associated with injury or harm in therapeutic use, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.8Z",
+              "title": "Musculoskeletal procedure associated with injury or harm in therapeutic use, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.9",
+              "title": "Vascular procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.90",
+              "title": "Vascular procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.91",
+              "title": "Vascular procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.92",
+              "title": "Vascular procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.9Y",
+              "title": "Vascular procedure associated with injury or harm, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.9Z",
+              "title": "Vascular procedure associated with injury or harm, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.A",
+              "title": "Ear, nose, oral, or throat procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.A0",
+              "title": "Ear, nose, oral, or throat procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.A1",
+              "title": "Ear, nose, oral, or throat procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.A2",
+              "title": "Ear, nose, oral, or throat procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.AY",
+              "title": "Ear, nose, oral, or throat procedure associated with injury or harm in therapeutic use, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.AZ",
+              "title": "Ear, nose, oral, or throat procedure associated with injury or harm in therapeutic use, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.B",
+              "title": "Dental procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.B0",
+              "title": "Dental procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.B1",
+              "title": "Dental procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.B2",
+              "title": "Dental procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.BY",
+              "title": "Dental procedure associated with injury or harm, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.BZ",
+              "title": "Dental procedure associated with injury or harm, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.C",
+              "title": "Skin or integument procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.C0",
+              "title": "Skin or integument procedure associated with injury or harm, open approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.C1",
+              "title": "Skin or integument procedure associated with injury or harm, percutaneous approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.C2",
+              "title": "Skin or integument procedure associated with injury or harm, endoscopic approach",
+              "is_residual": false
+            },
+            {
+              "code": "PK80.CY",
+              "title": "Skin or integument procedure associated with injury or harm in therapeutic use, other specified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.CZ",
+              "title": "Skin or integument procedure associated with injury or harm in therapeutic use, unspecified approach",
+              "is_residual": true
+            },
+            {
+              "code": "PK80.D",
+              "title": "Ophthalmic procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81",
+              "title": "Certain medical procedures associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.0",
+              "title": "Ventilation associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.1",
+              "title": "Extracorporeal life support procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.2",
+              "title": "Aspiration or drainage of body cavity or fluid collection associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.3",
+              "title": "Acupuncture or related therapies associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.30",
+              "title": "Acupuncture cupping associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.3Y",
+              "title": "Other specified acupuncture or related therapies associated with injury or harm in therapeutic use",
+              "is_residual": true
+            },
+            {
+              "code": "PK81.3Z",
+              "title": "Acupuncture or related therapies associated with injury or harm in therapeutic use, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK81.4",
+              "title": "Bone marrow aspiration or biopsy associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.5",
+              "title": "Biopsy procedure, not elsewhere classified, associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.6",
+              "title": "Dialysis associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.7",
+              "title": "Injection or infusion for therapeutic or diagnostic purposes associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.8",
+              "title": "Insertion of tube associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.9",
+              "title": "Joint aspiration associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.A",
+              "title": "Lumbar puncture associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.B",
+              "title": "Manipulative therapies associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.C",
+              "title": "Radiation therapy associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.D",
+              "title": "Other specified medical procedure associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.E",
+              "title": "Cardiopulmonary resuscitation associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK81.F",
+              "title": "Needle stick associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PK8Y",
+              "title": "Other specified surgical or other medical procedures associated with injury or harm in diagnostic or therapeutic use",
+              "is_residual": true
+            },
+            {
+              "code": "PK8Z",
+              "title": "Surgical or other medical procedures associated with injury or harm in diagnostic or therapeutic use, unspecified",
+              "is_residual": true
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PK9",
+          "title": "Surgical or other medical devices, implants or grafts associated with injury or harm in therapeutic use",
+          "codes": [
+            {
+              "code": "PK90",
+              "title": "Anaesthesiology devices associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK90.0",
+              "title": "Anaesthesiology devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK90.1",
+              "title": "Anaesthesiology devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK90.2",
+              "title": "Anaesthesiology devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK90.3",
+              "title": "Anaesthesiology devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK90.4",
+              "title": "Anaesthesiology devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PK90.Y",
+              "title": "Other specified anaesthesiology devices associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PK90.Z",
+              "title": "Anaesthesiology devices associated with injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK91",
+              "title": "Cardiovascular devices, implants or grafts associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.0",
+              "title": "Cardiovascular devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.1",
+              "title": "Cardiovascular devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.10",
+              "title": "Cardiovascular devices associated with injury or harm, pacemaker",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.11",
+              "title": "Cardiovascular devices associated with injury or harm, implantable defibrillator",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.12",
+              "title": "Cardiovascular devices associated with injury or harm, left ventricular assist devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.13",
+              "title": "Cardiovascular devices associated with injury or harm, intra-aortic balloon pump",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.14",
+              "title": "Cardiovascular devices associated with injury or harm, IVC filter",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.15",
+              "title": "Cardiovascular devices associated with injury or harm, central venous catheter",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.16",
+              "title": "Cardiovascular devices associated with injury or harm: peripheral venous catheter",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.1Y",
+              "title": "Other specified cardiovascular devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": true
+            },
+            {
+              "code": "PK91.1Z",
+              "title": "Cardiovascular devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK91.2",
+              "title": "Cardiovascular devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.20",
+              "title": "Cardiovascular devices associated with injury or harm, grafts",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.21",
+              "title": "Cardiovascular devices associated with injury or harm, stents",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.22",
+              "title": "Cardiovascular devices associated with injury or harm, mechanical or bioprosthetic valves",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.2Y",
+              "title": "Other specified cardiovascular devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": true
+            },
+            {
+              "code": "PK91.2Z",
+              "title": "Cardiovascular devices associated with injury or harm, prosthetic or other implants, materials or accessory devices, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK91.3",
+              "title": "Cardiovascular devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.4",
+              "title": "Cardiovascular devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PK91.Y",
+              "title": "Other specified cardiovascular devices, implants or grafts associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PK91.Z",
+              "title": "Cardiovascular devices, implants or grafts associated with injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK92",
+              "title": "Otorhinolaryngological devices, implants or grafts associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK92.0",
+              "title": "Otorhinolaryngological devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK92.1",
+              "title": "Otorhinolaryngological devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK92.2",
+              "title": "Otorhinolaryngological devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK92.3",
+              "title": "Otorhinolaryngological devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK92.4",
+              "title": "Otorhinolaryngological devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PK92.Y",
+              "title": "Other specified otorhinolaryngological devices, implants or grafts associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PK92.Z",
+              "title": "Otorhinolaryngological devices, implants or grafts associated with injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK93",
+              "title": "Gastroenterology or urology devices, implants or grafts associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK93.0",
+              "title": "Gastroenterology or urology devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK93.1",
+              "title": "Gastroenterology or urology devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK93.10",
+              "title": "Gastroenterology or urology devices associated with injury or harm, urinary catheter",
+              "is_residual": false
+            },
+            {
+              "code": "PK93.1Y",
+              "title": "Other specified gastroenterology or urology devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": true
+            },
+            {
+              "code": "PK93.1Z",
+              "title": "Gastroenterology or urology devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK93.2",
+              "title": "Gastroenterology or urology devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK93.3",
+              "title": "Gastroenterology or urology devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK93.4",
+              "title": "Gastroenterology or urology devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PK93.Y",
+              "title": "Other specified gastroenterology or urology devices, implants or grafts associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PK93.Z",
+              "title": "Gastroenterology or urology devices, implants or grafts associated with injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK94",
+              "title": "General hospital or personal use devices associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK94.0",
+              "title": "General hospital or personal use devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK94.1",
+              "title": "General hospital or personal use devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK94.2",
+              "title": "General hospital or personal use devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK94.3",
+              "title": "General hospital or personal use devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK94.4",
+              "title": "General hospital or personal use devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PK94.Y",
+              "title": "Other specified general hospital or personal use devices associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PK94.Z",
+              "title": "General hospital or personal use devices associated with injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK95",
+              "title": "Neurological devices, implants or grafts associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK95.0",
+              "title": "Neurological devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK95.1",
+              "title": "Neurological devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK95.2",
+              "title": "Neurological devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK95.20",
+              "title": "Neurological devices associated with injury or harm, ventricular shunt",
+              "is_residual": false
+            },
+            {
+              "code": "PK95.2Y",
+              "title": "Other specified neurological devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": true
+            },
+            {
+              "code": "PK95.2Z",
+              "title": "Neurological devices associated with injury or harm, prosthetic or other implants, materials or accessory devices, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK95.3",
+              "title": "Neurological devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK95.4",
+              "title": "Neurological devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PK95.Y",
+              "title": "Other specified neurological devices, implants or grafts associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PK95.Z",
+              "title": "Neurological devices, implants or grafts associated with injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK96",
+              "title": "Obstetric or gynaecological devices, implants or grafts associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK96.0",
+              "title": "Obstetric or gynaecological devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK96.1",
+              "title": "Obstetric or gynaecological devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK96.2",
+              "title": "Obstetric or gynaecological devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK96.3",
+              "title": "Obstetric or gynaecological devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK96.4",
+              "title": "Obstetric or gynaecological devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PK96.Y",
+              "title": "Other specified obstetric or gynaecological devices, implants or grafts associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PK96.Z",
+              "title": "Obstetric or gynaecological devices, implants or grafts associated with injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK97",
+              "title": "Ophthalmic devices, implants or grafts associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK97.0",
+              "title": "Ophthalmic devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK97.1",
+              "title": "Ophthalmic devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK97.2",
+              "title": "Ophthalmic devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK97.3",
+              "title": "Ophthalmic devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK97.4",
+              "title": "Ophthalmic devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PK97.Y",
+              "title": "Other specified ophthalmic devices, implants or grafts associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PK97.Z",
+              "title": "Ophthalmic devices, implants or grafts associated with injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK98",
+              "title": "Radiological devices associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK98.0",
+              "title": "Radiological devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK98.1",
+              "title": "Radiological devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK98.2",
+              "title": "Radiological devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK98.3",
+              "title": "Radiological devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK98.4",
+              "title": "Radiological devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PK98.Y",
+              "title": "Other specified radiological devices associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PK98.Z",
+              "title": "Radiological devices associated with injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK99",
+              "title": "Orthopaedic devices, implants or grafts associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK99.0",
+              "title": "Orthopaedic devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK99.1",
+              "title": "Orthopaedic devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK99.2",
+              "title": "Orthopaedic devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK99.3",
+              "title": "Orthopaedic devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK99.4",
+              "title": "Orthopaedic devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PK99.Y",
+              "title": "Other specified orthopaedic devices, implants or grafts associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PK99.Z",
+              "title": "Orthopaedic devices, implants or grafts associated with injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK9A",
+              "title": "Physical medicine devices associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK9A.0",
+              "title": "Physical medicine devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK9A.1",
+              "title": "Physical medicine devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK9A.2",
+              "title": "Physical medicine devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK9A.20",
+              "title": "Communication system devices associated with adverse incidents",
+              "is_residual": false
+            },
+            {
+              "code": "PK9A.21",
+              "title": "Communication system devices associated with adverse incidents in a physical medicine care environment",
+              "is_residual": false
+            },
+            {
+              "code": "PK9A.22",
+              "title": "Environmental control system devices associated with adverse incidents",
+              "is_residual": false
+            },
+            {
+              "code": "PK9A.23",
+              "title": "Mobility aids associated with adverse incidents",
+              "is_residual": false
+            },
+            {
+              "code": "PK9A.24",
+              "title": "Orthotic devices associated with adverse incidents",
+              "is_residual": false
+            },
+            {
+              "code": "PK9A.2Y",
+              "title": "Other specified physical medicine devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": true
+            },
+            {
+              "code": "PK9A.2Z",
+              "title": "Physical medicine devices associated with injury or harm, prosthetic or other implants, materials or accessory devices, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK9A.3",
+              "title": "Physical medicine devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK9A.4",
+              "title": "Physical medicine devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PK9A.Y",
+              "title": "Other specified physical medicine devices associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PK9A.Z",
+              "title": "Physical medicine devices associated with injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK9B",
+              "title": "General or plastic surgery devices, implants or grafts associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK9B.0",
+              "title": "General or plastic surgery devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK9B.1",
+              "title": "General or plastic surgery devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK9B.2",
+              "title": "General or plastic surgery devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK9B.3",
+              "title": "General or plastic surgery devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK9B.4",
+              "title": "General or plastic surgery devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PK9B.Y",
+              "title": "Other specified general or plastic surgery devices, implants or grafts associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PK9B.Z",
+              "title": "General or plastic surgery devices, implants or grafts associated with injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK9C",
+              "title": "Other or unspecified medical devices, implants or grafts associated with injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PK9C.0",
+              "title": "Other or unspecified medical devices associated with injury or harm, diagnostic or monitoring devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK9C.1",
+              "title": "Other or unspecified medical devices associated with injury or harm, therapeutic, nonsurgical or rehabilitative devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK9C.2",
+              "title": "Other or unspecified medical devices associated with injury or harm, prosthetic or other implants, materials or accessory devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK9C.3",
+              "title": "Other or unspecified medical devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": false
+            },
+            {
+              "code": "PK9C.30",
+              "title": "Mechanical complication of nonabsorbable surgical material, not otherwise specified",
+              "is_residual": false
+            },
+            {
+              "code": "PK9C.31",
+              "title": "Mechanical complication of permanent sutures",
+              "is_residual": false
+            },
+            {
+              "code": "PK9C.3Y",
+              "title": "Other specified other or unspecified medical devices associated with injury or harm, surgical instruments, materials or devices",
+              "is_residual": true
+            },
+            {
+              "code": "PK9C.3Z",
+              "title": "Other or unspecified medical devices associated with injury or harm, surgical instruments, materials or devices, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PK9C.4",
+              "title": "Other or unspecified medical devices associated with injury or harm, miscellaneous devices, not elsewhere classified",
+              "is_residual": false
+            }
+          ]
+        },
+        {
+          "block_id": "BlockL2-PL0",
+          "title": "Substances associated with injury or harm in therapeutic use",
+          "codes": [
+            {
+              "code": "PL00",
+              "title": "Drugs, medicaments or biological substances associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PL01",
+              "title": "Complementary or traditional medicines associated with injury or harm in therapeutic use",
+              "is_residual": false
+            },
+            {
+              "code": "PL01.0",
+              "title": "Complementary or traditional medicines associated with injury or harm in therapeutic use, Herbal Preparations or Formulas",
+              "is_residual": false
+            },
+            {
+              "code": "PL01.1",
+              "title": "Complementary or traditional medicines associated with injury or harm in therapeutic use, Dietary Supplements, Vitamins or Minerals",
+              "is_residual": false
+            },
+            {
+              "code": "PL01.2",
+              "title": "Complementary or traditional medicines associated with injury or harm in therapeutic use, Complementary or Traditional Medicines, not elsewhere classified",
+              "is_residual": false
+            },
+            {
+              "code": "PL01.Y",
+              "title": "Other specified complementary or traditional medicines associated with injury or harm in therapeutic use",
+              "is_residual": true
+            },
+            {
+              "code": "PL01.Z",
+              "title": "Complementary or traditional medicines associated with injury or harm in therapeutic use, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PL0Z",
+              "title": "Substances associated with injury or harm in therapeutic use, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PL10",
+              "title": "Other health care related causes of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL11",
+              "title": "Mode of injury or harm associated with a surgical or other medical procedure",
+              "is_residual": false
+            },
+            {
+              "code": "PL11.0",
+              "title": "Cut, puncture or tear, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL11.1",
+              "title": "Burn arising during procedure, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL11.2",
+              "title": "Embolisation, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL11.20",
+              "title": "Air embolism, as mode of injury",
+              "is_residual": false
+            },
+            {
+              "code": "PL11.2Y",
+              "title": "Other specified embolisation, as mode of injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PL11.2Z",
+              "title": "Embolisation, as mode of injury or harm, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PL11.3",
+              "title": "Foreign body accidentally left in body, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL11.4",
+              "title": "Failure of sterile precautions, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL11.5",
+              "title": "Procedure undertaken at wrong site or wrong side, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL11.6",
+              "title": "Pressure, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL11.Y",
+              "title": "Other specified mode of injury or harm associated with a surgical or other medical procedure",
+              "is_residual": true
+            },
+            {
+              "code": "PL11.Z",
+              "title": "Unspecified mode of injury or harm associated with a surgical or other medical procedure",
+              "is_residual": true
+            },
+            {
+              "code": "PL12",
+              "title": "Mode of injury or harm associated with a surgical or other medical device, implant or graft",
+              "is_residual": false
+            },
+            {
+              "code": "PL12.0",
+              "title": "Structural device failure, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL12.1",
+              "title": "Functional device failure, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL12.2",
+              "title": "Perforation or protrusion by device, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL12.3",
+              "title": "Obstruction of device, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL12.4",
+              "title": "Dislodgement, misconnection or de-attachment, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL12.5",
+              "title": "Operator error, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL12.6",
+              "title": "Combination or interaction of operator error and device failure, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL12.Y",
+              "title": "Other specified mode of injury or harm associated with a surgical or other medical device, implant or graft",
+              "is_residual": true
+            },
+            {
+              "code": "PL12.Z",
+              "title": "Mode of injury or harm associated with a surgical or other medical device, implant or graft, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PL13",
+              "title": "Mode of injury or harm associated with exposure to a drug, medicament or biological substance",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.0",
+              "title": "Overdose of substance, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.1",
+              "title": "Underdosing, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.2",
+              "title": "Drug-related injury or harm in the context of correct administration or dosage, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.3",
+              "title": "Incorrect substance, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.5",
+              "title": "Incorrect administration of drug or medicament, as mode of injury",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.50",
+              "title": "Incorrect route of drug or medicament, as mode of injury",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.51",
+              "title": "Incorrect rate of drug or medicament, as mode of injury",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.52",
+              "title": "Incorrect timing of drug or medicament, as mode of injury",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.53",
+              "title": "Incorrect duration of drug or medicament, as mode of injury",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.5Y",
+              "title": "Other specified incorrect administration of drug or medicament, as mode of injury",
+              "is_residual": true
+            },
+            {
+              "code": "PL13.5Z",
+              "title": "Incorrect administration of drug or medicament, as mode of injury, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PL13.6",
+              "title": "Medication or substance that is known to be an allergen, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.7",
+              "title": "Medication or substance that is known to be contraindicated for the patient, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.8",
+              "title": "Expired or deteriorated medication or substance, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.9",
+              "title": "Drug or substance interactions, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.A",
+              "title": "Inappropriate stoppage or discontinuation of drug, as mode of injury or harm",
+              "is_residual": false
+            },
+            {
+              "code": "PL13.Y",
+              "title": "Other specified mode of injury or harm associated with exposure to a drug, medicament or biological substance",
+              "is_residual": true
+            },
+            {
+              "code": "PL13.Z",
+              "title": "Mode of injury or harm associated with exposure to a drug, medicament or biological substance, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PL14",
+              "title": "Mode of injury or harm associated with other health care related causes",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.0",
+              "title": "Non-administration of necessary drug",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.1",
+              "title": "Non provision of necessary procedure",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.2",
+              "title": "Problem associated with physical transfer of patient",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.3",
+              "title": "Mismatched blood used in transfusion",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.4",
+              "title": "Other problem associated with transfusion",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.5",
+              "title": "Problem associated with physical restraints",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.6",
+              "title": "Problem associated with isolation protocol",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.7",
+              "title": "Problem associated with clinical documentation",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.8",
+              "title": "Problem associated with clinical software",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.9",
+              "title": "Incorrect diagnosis",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.A",
+              "title": "Delayed diagnosis",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.B",
+              "title": "Delayed treatment",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.C",
+              "title": "Patient received diagnostic test or treatment intended for another patient",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.D",
+              "title": "Problem associated with transitions of care, hand offs, or handovers",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.E",
+              "title": "Fall in health care",
+              "is_residual": false
+            },
+            {
+              "code": "PL14.Y",
+              "title": "Other specified aspects of care associated with injury or harm",
+              "is_residual": true
+            },
+            {
+              "code": "PL14.Z",
+              "title": "Mode of injury or harm associated with other health care related causes, unspecified",
+              "is_residual": true
+            },
+            {
+              "code": "PL2Y",
+              "title": "Other specified external causes of morbidity or mortality",
+              "is_residual": true
+            },
+            {
+              "code": "PL2Z",
+              "title": "External causes of morbidity or mortality, unspecified",
+              "is_residual": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

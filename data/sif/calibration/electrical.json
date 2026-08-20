@@ -1,0 +1,139 @@
+{
+  "energy_type": "electrical",
+  "mechanism": "electrical",
+  "description": "Severity distribution for electrical contact and arc flash, unmitigated (no PPE, insulation, or lockout). P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "Direct contact or arc flash within flash boundary",
+    "Unmitigated: no insulated gloves, no arc-rated PPE, no LOTO",
+    "AC current (50/60 Hz) — DC thresholds are ~3-5x higher",
+    "Pathway through trunk assumed for worst-case (hand-to-hand or hand-to-foot)"
+  ],
+  "magnitude_unit": "volts",
+  "magnitude_bands": [
+    {
+      "band": "extra_low",
+      "voltage_low": 0,
+      "voltage_high": 50,
+      "description": "Extra-low voltage. Battery systems, control circuits, telecoms. Below IEC 60479 safety threshold.",
+      "published_mortality": 0.001,
+      "mortality_source": "IEC 60479-1: body impedance at 50V insufficient to drive dangerous current through intact dry skin",
+      "p10": 0.0001,
+      "p50": 0.0005,
+      "p90": 0.001,
+      "p10_label": "no_injury",
+      "p50_label": "no_injury",
+      "p90_label": "first_aid",
+      "rationale": "Below 50V AC, current through intact skin is below perception threshold in most conditions. P90 reflects wet-skin contact producing tingling/minor burn. Not SIF-capable except in exceptional circumstances (immersion, broken skin)."
+    },
+    {
+      "band": "low",
+      "voltage_low": 50,
+      "voltage_high": 240,
+      "description": "Low voltage. Domestic/light commercial (120V NA, 230V EU). Above let-go threshold.",
+      "published_mortality": 0.02,
+      "mortality_source": "IEC 60479-1: 50-250V spans let-go current (10mA) through VF zone (30-500mA depending on duration). NFPA 70E incident data.",
+      "p10": 0.001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Most domestic electrical contacts produce burns or muscle contraction without cardiac effects. P90 reflects wet-skin hand-to-hand pathway driving VF current (>30mA AC). Let-go threshold ~10mA means victim may be unable to release. Crosses SIF threshold at P90."
+    },
+    {
+      "band": "medium",
+      "voltage_low": 240,
+      "voltage_high": 600,
+      "description": "Medium voltage. Industrial 3-phase (380-600V). Arc flash becomes significant.",
+      "published_mortality": 0.15,
+      "mortality_source": "NFPA 70E arc flash boundary calculations; IEEE 1584 incident energy models; OSHA electrical fatality data",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "At 480V+ the current through body impedance (~1kΩ wet) reaches 0.5A — 10x the VF threshold. Arc flash at these voltages produces 2nd/3rd degree burns. Median outcome is serious injury. P90 fatality from sustained contact or arc blast."
+    },
+    {
+      "band": "high",
+      "voltage_low": 600,
+      "voltage_high": 15000,
+      "description": "High voltage. Distribution systems, substations, industrial HV. Arc blast zone extends metres.",
+      "published_mortality": 0.40,
+      "mortality_source": "IEEE 1584: incident energy at HV produces severe burns at distance. Utility worker fatality studies.",
+      "p10": 0.01,
+      "p50": 0.50,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "fatal_range",
+      "p90_label": "fatality",
+      "rationale": "Arc flash energy at HV causes severe burns at several metres distance. Direct contact is almost always fatal. P10=0.01 reflects momentary arc exposure at flash boundary edge. P50=0.50 reflects ~40% mortality. Unambiguously SIF."
+    },
+    {
+      "band": "very_high",
+      "voltage_low": 15000,
+      "voltage_high": null,
+      "description": "Very high voltage. Transmission lines (33kV-400kV+), major substations. Arc flash at distance.",
+      "published_mortality": 0.70,
+      "mortality_source": "Utility sector fatality data; transmission line contact is near-uniformly fatal",
+      "p10": 0.10,
+      "p50": 0.90,
+      "p90": 0.999,
+      "p10_label": "serious_injury",
+      "p50_label": "fatality",
+      "p90_label": "fatality",
+      "rationale": "At transmission voltages, arc flash produces plasma temperatures >20,000°C and blast pressures sufficient to cause fatal burns and blunt trauma at distance. Direct contact is unsurvivable. P10 reflects arc exposure at extreme edge of flash boundary. P50=0.90 reflects that ~70% of contacts are fatal."
+    }
+  ],
+  "modifiers": {
+    "skin_condition": {
+      "dry": 0.5,
+      "normal": 1.0,
+      "wet": 2.0,
+      "immersed": 3.0,
+      "description": "Multiplier on effective current (reduces body impedance). IEC 60479-1 shows wet skin impedance ~1/4 of dry. This dramatically changes the risk at low voltages."
+    },
+    "pathway": {
+      "hand_to_hand": 1.0,
+      "hand_to_foot": 1.0,
+      "hand_to_other_hand": 0.8,
+      "foot_to_foot": 0.3,
+      "description": "Heart current factor from IEC 60479-1. Pathways through the chest have highest cardiac risk."
+    },
+    "duration": {
+      "momentary_ms": 0.3,
+      "seconds_1_3": 1.0,
+      "sustained_gt3": 2.0,
+      "description": "Multiplier on severity. VF risk is duration-dependent (IEC 60479-1 time-current zones). Above let-go threshold, duration is determined by circuit protection (breaker trip time)."
+    },
+    "current_type": {
+      "ac_50_60hz": 1.0,
+      "dc": {
+        "extra_low": 0.2,
+        "low": 0.3,
+        "medium": 0.4,
+        "high": 0.8,
+        "very_high": 1.0
+      },
+      "description": "Multiplier on P(death) by band. DC is less dangerous than AC at low/medium voltages: VF threshold ~150mA DC vs ~30mA AC (5x), and DC causes throw-off rather than tetanic grip (shorter contact duration). At high voltages the current exceeds all thresholds regardless, so AC/DC converges. IEC 60479-1 Parts 1 (AC) and 4 (DC). Note: DC arc flash (solar, batteries, EV) behaves differently — DC arcs are sustained (no zero crossing to self-extinguish), partially offsetting the lower cardiac risk.",
+      "source": "IEC 60479-1:2018 (AC thresholds), IEC 60479-4:2020 (DC thresholds)"
+    }
+  },
+  "sources": [
+    {"author": "IEC 60479-1", "year": 2018, "relevance": "Effects of current on human beings — body impedance, perception/reaction/let-go/VF thresholds, time-current zones"},
+    {"author": "NFPA 70E", "year": 2024, "relevance": "Standard for Electrical Safety in the Workplace — arc flash boundary, PPE categories, incident energy calculations"},
+    {"author": "IEEE 1584", "year": 2018, "relevance": "Guide for Performing Arc-Flash Hazard Calculations — incident energy vs distance, arc duration, equipment type"},
+    {"author": "OSHA", "year": 2023, "relevance": "Electrical fatalities: ~5% of all workplace fatalities. Low-voltage (120-240V) accounts for majority of electrical deaths."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale mapping"}
+  ],
+  "validation_notes": [
+    "STKY check: 480V unmitigated contact should give P(SIF) > 0.50 — medium band P50=0.10, P(SIF)=0.50 ✓",
+    "STKY check: 11kV contact should give P(SIF) near 1.0 — high band, most outcomes serious+ ✓",
+    "Cross-check: domestic 120V is ELEVATED not SIF — matches industry practice of requiring GFCI but not full arc flash PPE",
+    "Key insight: most electrical workplace deaths are from LOW voltage (120-240V) because exposure frequency is high, not because per-contact severity is highest"
+  ]
+}

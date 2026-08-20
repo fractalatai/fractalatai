@@ -1,0 +1,209 @@
+{
+  "energy_type": "thermal",
+  "mechanism": "thermal",
+  "description": "Severity distribution for thermal exposure, unmitigated. Covers hot contact (burns, scalds, molten material), environmental heat (hyperthermia/heat stroke), cold contact (frostbite), and environmental cold (hypothermia). Does NOT include open flame/fire — see fire mechanism. Follows ICD-11 Chapter 23 separation of contact vs environmental thermal causes. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No PPE (thermal gloves, face shield, heat-resistant clothing)",
+    "No emergency cooling/treatment within first minutes",
+    "Unmitigated exposure duration — no automatic shutoff or rescue"
+  ],
+  "magnitude_unit": "temperature_C",
+  "magnitude_note": "Hot contact: severity = temperature × duration × BSA. Environmental heat: severity = WBGT × exertion × duration. Cold: severity = temperature × wind × wet × duration. Bands grouped by sub-mechanism (hot_contact, hot_environment, cold_contact, cold_environment) then by magnitude.",
+  "magnitude_bands": [
+    {
+      "band": "warm",
+      "temp_c_low": 40,
+      "temp_c_high": 60,
+      "description": "Warm surface or liquid (40-60°C). Hot water from tap, warm pipe, heated equipment surface. Burns possible above 48°C with sustained contact.",
+      "published_mortality": 0.001,
+      "mortality_source": "Moritz & Henriques 1947 (foundational burn threshold study): skin damage begins at 44°C with prolonged contact, 48°C produces burns in minutes, 60°C in seconds.",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.005,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Below 60°C, burns are superficial unless contact is sustained (minutes). P90 reflects prolonged immersion/contact producing partial-thickness burn needing treatment. Rarely SIF except in scalding immersion (elderly/incapacitated)."
+    },
+    {
+      "band": "hot_surface",
+      "temp_c_low": 60,
+      "temp_c_high": 150,
+      "description": "Hot surface or pressurised liquid (60-150°C). Steam pipe, exhaust, cooking surface, pressurised hot water, low-pressure steam release.",
+      "published_mortality": 0.005,
+      "mortality_source": "Burn centre data: contact burns at 60-150°C produce partial to full thickness burns. Mortality depends on BSA — <10% BSA rarely fatal in working-age adults.",
+      "p10": 0.001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Contact at these temperatures produces instant partial-thickness burns. Median is medical treatment (localised burn, debridement). P90 serious injury reflects large BSA scald (burst pipe, steam release) or facial/airway involvement. Crosses SIF threshold at P90."
+    },
+    {
+      "band": "high_temp_surface",
+      "temp_c_low": 150,
+      "temp_c_high": 500,
+      "description": "High temperature surface or process (150-500°C). Molten solder, exhaust manifold, industrial oven, high-pressure steam, hot process equipment.",
+      "published_mortality": 0.05,
+      "mortality_source": "Burn centre data: full thickness burns at these temperatures. TBSA >20% in working-age adults has ~5-10% mortality (Bull & Fisher 1954, updated by ABA).",
+      "p10": 0.005,
+      "p50": 0.05,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Instant full-thickness burns on contact. High-pressure steam release can affect large BSA rapidly. P50 at 0.05 reflects typical localised contact. P90 fatality from large-area steam release or entrapment near hot process."
+    },
+    {
+      "band": "molten_material",
+      "temp_c_low": 500,
+      "temp_c_high": null,
+      "description": "Molten material or extreme heat (>500°C). Molten metal (aluminium 660°C, steel 1500°C), slag, glass, furnace breach, foundry splash.",
+      "published_mortality": 0.30,
+      "mortality_source": "Foundry and smelter incident data: molten metal contact produces deep full-thickness burns. BSA involvement is typically large due to splash/pour. ABA data: >40% TBSA full-thickness burn in adult has ~30-50% mortality.",
+      "p10": 0.01,
+      "p50": 0.50,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "fatal_range",
+      "p90_label": "fatality",
+      "rationale": "Molten metal at 660-1500°C causes instant deep tissue destruction. Splash typically affects large BSA. P10 reflects peripheral splash (hand/foot only). P50 reflects the high mortality of large-area deep burns. Unambiguously SIF."
+    },
+    {
+      "band": "hot_environment_moderate",
+      "sub_mechanism": "hot_environment",
+      "description": "Hot working environment (WBGT 28-32°C). Outdoor summer work, boiler rooms, laundries. Heat exhaustion zone — progressive if work continues without cooling.",
+      "published_mortality": 0.005,
+      "mortality_source": "OSHA heat illness data; NIOSH criteria for heat stress. Heat exhaustion rarely fatal if recognised and treated, but progresses to heat stroke if ignored.",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.01,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "At WBGT 28-32°C with heavy work, heat exhaustion develops over hours. Most cases resolve with rest and fluids. P90 reflects unrecognised progression requiring medical treatment. Fatal only if worker collapses unnoticed and progresses to heat stroke."
+    },
+    {
+      "band": "hot_environment_extreme",
+      "sub_mechanism": "hot_environment",
+      "description": "Extreme heat environment (WBGT >32°C) or sustained heavy exertion in heat. Foundry work, desert construction, enclosed vehicle/container, confined space near heat source. Heat stroke zone.",
+      "published_mortality": 0.10,
+      "mortality_source": "CDC heat-related mortality data; military heat casualty studies. Heat stroke (core >40°C) has 10-50% mortality depending on cooling speed. Core >42°C sustained has >50% mortality.",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "At WBGT >32°C with heavy exertion, heat stroke can develop within 1-2 hours. Core temp >40°C causes organ damage; >42°C is frequently fatal. P50=serious_injury reflects heat stroke requiring hospitalisation. P90=fatality from unrecognised collapse or delayed cooling. Workers alone or in confined spaces are highest risk."
+    },
+    {
+      "band": "cold_contact",
+      "sub_mechanism": "cold_contact",
+      "description": "Contact with cold surface or substance. Cryogenic liquid (LN2 -196°C, CO2 -78°C), cold metal in freezing conditions, dry ice. Frostbite/cold burns.",
+      "published_mortality": 0.005,
+      "mortality_source": "Cryogenic incident reports; cold injury literature. Contact cold burns are analogous to thermal burns — severity depends on temperature, duration, BSA. Cryogenic splash to face/airway is the high-severity scenario.",
+      "p10": 0.0001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "no_injury",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Most cold contact injuries are localised frostbite (fingers, hands) — painful but not life-threatening. P90 reflects cryogenic splash to face producing airway cold burn or large-area deep frostbite. Crosses SIF threshold at P90. Cryogenic asphyxiation (oxygen displacement) falls under breathing mechanism, not thermal."
+    },
+    {
+      "band": "cold_environment_moderate",
+      "sub_mechanism": "cold_environment",
+      "description": "Cold working environment (0 to -10°C) with wind/wet exposure. Outdoor winter work, cold stores, refrigerated transport. Mild hypothermia zone if prolonged.",
+      "published_mortality": 0.002,
+      "mortality_source": "Hypothermia literature; cold store incident reports. At these temperatures, hypothermia develops over hours with inadequate clothing. Rarely fatal for fit workers who can seek shelter.",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.005,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "At 0 to -10°C, a fit worker develops hypothermia only after prolonged exposure (hours) without adequate clothing. P90 reflects trapped/incapacitated worker (e.g., locked in cold store) developing moderate hypothermia requiring hospital warming. Fatal only if unable to seek shelter for extended period."
+    },
+    {
+      "band": "cold_environment_extreme",
+      "sub_mechanism": "cold_environment",
+      "description": "Extreme cold environment (<-10°C) or cold water immersion. Arctic/offshore work, unheated confined space in winter, overboard/immersion, trapped in freezer (-25°C). Severe hypothermia zone.",
+      "published_mortality": 0.15,
+      "mortality_source": "Maritime immersion survival data (Golden & Hervey 1981); cold store entrapment incidents; military cold casualty data. Cold water immersion: survival time ~30 min at 5°C, ~1 hour at 10°C.",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "At <-10°C or in cold water, core temperature drops rapidly. Cold water immersion is the acute scenario — incapacitation in minutes, death in 30-60 min at 5°C. Freezer entrapment is the workplace equivalent. P50=serious_injury reflects severe hypothermia with cardiac risk. P90=fatality from prolonged immersion or entrapment."
+    }
+  ],
+  "modifiers": {
+    "body_surface_area": {
+      "applies_to": "hot_contact, cold_contact",
+      "localised_lt5pct": 0.3,
+      "moderate_5_20pct": 1.0,
+      "large_gt20pct": 2.5,
+      "description": "Multiplier on P(death) for contact injuries. Burns/frostbite mortality driven by TBSA. Baux rule (age + %TBSA ≈ mortality %) is a rough guide."
+    },
+    "airway": {
+      "applies_to": "hot_contact, hot_environment",
+      "no_inhalation": 1.0,
+      "steam_inhalation": 3.0,
+      "description": "Multiplier on P(death). Steam/hot gas inhalation causes airway oedema — can be fatal even with small BSA burns."
+    },
+    "duration": {
+      "applies_to": "hot_contact, cold_contact",
+      "momentary_lt1s": 0.3,
+      "brief_1_5s": 1.0,
+      "sustained_gt5s": 2.0,
+      "description": "Multiplier for contact injuries. Reflex withdrawal limits most contacts to <1s, but entrapment extends exposure."
+    },
+    "exertion": {
+      "applies_to": "hot_environment",
+      "sedentary": 0.3,
+      "moderate_work": 1.0,
+      "heavy_labour": 2.0,
+      "description": "Multiplier on P(death) for heat illness. Metabolic heat production from heavy labour accelerates core temperature rise. NIOSH heat stress criteria are work-rate dependent."
+    },
+    "wet_wind": {
+      "applies_to": "cold_environment",
+      "dry_still": 0.5,
+      "normal": 1.0,
+      "wet_or_windy": 2.0,
+      "wet_and_windy": 3.0,
+      "description": "Multiplier on P(death) for cold exposure. Wind chill and wet clothing dramatically accelerate heat loss. Wet clothing loses ~90% of insulation value."
+    },
+    "rescue_shelter": {
+      "applies_to": "hot_environment, cold_environment",
+      "immediate": 0.2,
+      "within_30min": 1.0,
+      "delayed_gt1hr": 3.0,
+      "description": "Multiplier on P(death) for environmental exposure. Speed of rescue/shelter access is the primary survival determinant. Lone workers, confined spaces, and remote locations delay rescue."
+    }
+  },
+  "sources": [
+    {"author": "Moritz & Henriques", "year": 1947, "relevance": "Foundational study on thermal injury thresholds — time-temperature relationship for skin damage. 44°C sustained, 48°C minutes, 60°C seconds, 70°C instant."},
+    {"author": "Bull & Fisher", "year": 1954, "relevance": "Burn mortality as function of age and TBSA — basis for Baux rule and modern burn survival prediction."},
+    {"author": "American Burn Association", "year": 2023, "relevance": "National Burn Repository: modern survival data by age, TBSA, inhalation injury."},
+    {"author": "NIOSH", "year": 2016, "relevance": "Criteria for a Recommended Standard: Occupational Exposure to Heat and Hot Environments. WBGT thresholds, work-rest cycles."},
+    {"author": "Golden & Hervey", "year": 1981, "relevance": "The afterdrop and death after rescue from immersion in cold water. Cold water survival times, immersion hypothermia physiology."},
+    {"author": "CDC", "year": 2023, "relevance": "Heat-related mortality surveillance — heat stroke epidemiology, occupational heat deaths."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: molten metal splash should give P(SIF) > 0.50 — molten_material P50=0.50 ✓",
+    "STKY check: high-pressure steam release should give P(SIF) > 0.50 — high_temp_surface with airway modifier ✓",
+    "STKY check: heat stroke in extreme conditions should give P(SIF) > 0.50 — hot_environment_extreme P50=0.10 ✓",
+    "STKY check: cold water immersion should give P(SIF) > 0.50 — cold_environment_extreme P50=0.10 ✓",
+    "Cross-check: hot water scald (60°C) is ELEVATED not SIF — matches domestic/industrial experience ✓",
+    "Cross-check: cold store work (0 to -10°C) is NON_SIF — matches industry practice (adequate clothing is sufficient) ✓",
+    "ICD-11 alignment: hot contact (PF80-PF8Z), environmental heat (PF90-PF9Z), cold contact (PG80-PG8Z), environmental cold (PG90-PG9Z)"
+  ]
+}

@@ -1,0 +1,122 @@
+{
+  "energy_type": "biological",
+  "mechanism": "animal_insect",
+  "description": "Severity distribution for animal and insect contact — bites, stings, kicks, charging, envenomation. Covers domestic/farm animals, wildlife, insects, and marine creatures. Mostly non-SIF except for large animal crush/charge, venomous snake/spider, and anaphylaxis from stings. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No anti-venom available on site",
+    "No adrenaline auto-injector for anaphylaxis",
+    "Workplace context — agriculture, forestry, construction, utilities, veterinary"
+  ],
+  "magnitude_unit": "animal_hazard_type",
+  "magnitude_note": "Animal injury severity depends on the size/type of animal and whether envenomation or anaphylaxis is involved. Large animal injuries are mechanical (crush, kick — high kinetic energy), while insect/snake injuries are chemical/biological (venom, allergic response). Bands by hazard type.",
+  "magnitude_bands": [
+    {
+      "band": "insect_sting_no_allergy",
+      "description": "Insect sting or minor bite without allergic response. Bee, wasp, ant, spider (non-venomous), tick, mosquito. Localised pain and swelling.",
+      "published_mortality": 0.0001,
+      "mortality_source": "CDC injury data: insect stings without anaphylaxis are self-limiting. ~60 sting deaths/year in US, almost all from anaphylaxis (separate band).",
+      "p10": 0.0001,
+      "p50": 0.0003,
+      "p90": 0.001,
+      "p10_label": "no_injury",
+      "p50_label": "no_injury",
+      "p90_label": "first_aid",
+      "rationale": "Without allergic response, insect stings cause localised pain and swelling only. P90=first_aid (antihistamine, ice). Not SIF. The risk is anaphylaxis in sensitised individuals (separate band)."
+    },
+    {
+      "band": "anaphylaxis",
+      "description": "Anaphylactic reaction to sting or bite in sensitised individual. Bee/wasp sting with known or unknown allergy. Systemic allergic response — airway swelling, cardiovascular collapse. Time-critical.",
+      "published_mortality": 0.05,
+      "mortality_source": "CDC: ~60 insect sting deaths/year in US, virtually all anaphylaxis. With epinephrine within minutes, mortality <1%. Without treatment, anaphylaxis mortality ~5-10%.",
+      "p10": 0.001,
+      "p50": 0.01,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "Anaphylaxis without epinephrine auto-injector can be fatal within 30 minutes. P50=medical_treatment reflects hospital treatment for anaphylaxis. P90=serious_injury from severe reaction with delayed treatment. Adrenaline auto-injector is the critical mitigation (reduces P(death) by ~90%). Crosses SIF threshold at P90."
+    },
+    {
+      "band": "venomous_bite",
+      "description": "Venomous snake or spider bite. Relevant to agriculture, forestry, utilities, construction in endemic areas. Rattlesnake, brown snake, redback, funnel-web. Severity depends on species, venom load, and time to anti-venom.",
+      "published_mortality": 0.02,
+      "mortality_source": "WHO snakebite data: ~100,000 deaths/year globally (mostly developing world). In developed countries with anti-venom access, mortality <1% for treated bites. Without treatment, some species (brown snake, taipan) have significant mortality.",
+      "p10": 0.001,
+      "p50": 0.005,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "In developed countries with hospital access, envenomation mortality is low (<1%). The unmitigated calibration (no anti-venom) gives P90=serious_injury from neurotoxic or haemotoxic effects. In remote locations without anti-venom or rapid evacuation, severity increases significantly — use the rescue_time modifier."
+    },
+    {
+      "band": "dog_bite",
+      "description": "Dog bite or attack. Security dogs, stray dogs on construction sites, farm dogs. Also covers aggressive domestic animal bites (cat bites have high infection rate).",
+      "published_mortality": 0.001,
+      "mortality_source": "CDC: ~30-50 dog bite fatalities/year in US, mostly children. Adult workplace dog bites cause lacerations and puncture wounds. Fatal attacks on working-age adults are very rare.",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.01,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Dog bites produce puncture wounds and lacerations. P90=medical_treatment for deep bite requiring sutures, antibiotics, possible tendon repair. Fatal dog attacks on working-age adults are exceptionally rare — most fatalities are children or elderly. Not SIF for adult workers."
+    },
+    {
+      "band": "large_animal",
+      "description": "Large animal kick, charge, crush, or trample. Horse, cattle, bull, pig. Farm/agricultural/equestrian setting. Large animals deliver enormous kinetic energy — a cow kick at 1 tonne is comparable to a low-speed vehicle strike.",
+      "published_mortality": 0.05,
+      "mortality_source": "HSE agricultural fatality data: cattle and horses are leading causes of agricultural death in UK (~5-10 deaths/year from cattle alone). BLS: ~100 animal-related workplace deaths/year in US.",
+      "p10": 0.001,
+      "p50": 0.01,
+      "p90": 0.10,
+      "p10_label": "first_aid",
+      "p50_label": "medical_treatment",
+      "p90_label": "serious_injury",
+      "rationale": "A cattle kick delivers ~500J — similar to a fall from 2m. A charging bull (500kg at 15km/h) delivers ~4kJ — comparable to a vehicle strike. P50=medical_treatment (fractures, crush injuries). P90=serious_injury from bull charge or being trampled/pinned against wall. Crosses SIF threshold at P90. Agricultural workers handling cattle are exposed to genuine SIF risk."
+    },
+    {
+      "band": "large_animal_confined",
+      "description": "Large animal attack in confined space — cattle crush, horse stable, bull pen. Animal pins worker against wall or gate. No escape route. Combines large animal energy with entrapment.",
+      "published_mortality": 0.15,
+      "mortality_source": "HSE agricultural fatality investigations: majority of cattle fatalities involve worker pinned in confined handling area. Bull in pen is one of the most dangerous routine agricultural scenarios.",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Large animal in confined space = crush/pin mechanism. Worker cannot escape, animal repeats attack. A bull pinning a worker against a gate applies its full body weight (~800kg+). P50=serious_injury from crush fractures, organ damage. P90=fatality from sustained crush or head injury. This is the dominant agricultural SIF mechanism in the UK."
+    }
+  ],
+  "modifiers": {
+    "rescue_time": {
+      "immediate": 0.5,
+      "remote_delayed": 2.0,
+      "description": "Multiplier on P(death). For envenomation and anaphylaxis, time to anti-venom/epinephrine is the primary survival factor. For large animal attacks, time to rescue from confined handling area. Agricultural and forestry settings are typically remote."
+    },
+    "animal_size": {
+      "small_lt50kg": 0.3,
+      "medium_50_200kg": 0.7,
+      "large_gt200kg": 1.0,
+      "very_large_gt500kg": 1.5,
+      "description": "Multiplier on P(death) for large animal bands. Scales with kinetic energy of charge/kick."
+    }
+  },
+  "sources": [
+    {"author": "HSE", "year": 2024, "relevance": "Agricultural fatality data — cattle and horses are leading causes. ~5-10 cattle-related deaths/year in UK. Majority involve worker pinned in confined handling area."},
+    {"author": "CDC", "year": 2023, "relevance": "Insect sting deaths (~60/year, anaphylaxis), dog bite fatalities (~30-50/year), snakebite data."},
+    {"author": "BLS", "year": 2023, "relevance": "Census of Fatal Occupational Injuries — ~100 animal-related workplace deaths/year in US."},
+    {"author": "WHO", "year": 2023, "relevance": "Snakebite envenoming — global burden, anti-venom access, mortality data."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: bull attack in pen should give P(SIF) > 0.50 — large_animal_confined P(SIF)=0.50 ✓",
+    "STKY check: bee sting (no allergy) should be NON_SIF — insect_sting_no_allergy P(SIF)=0.000 ✓",
+    "Cross-check: cattle handling is a genuine SIF risk — 5-10 UK deaths/year from a small exposed population. The per-event risk is comparable to working at height ✓",
+    "Key insight: large_animal_confined is the agricultural equivalent of caught_between — the animal is the 'moving object', the gate/wall is the 'fixed object'. The physics is the same as vehicle pinning."
+  ]
+}

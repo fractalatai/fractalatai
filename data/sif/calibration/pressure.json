@@ -1,0 +1,111 @@
+{
+  "energy_type": "pressure",
+  "mechanism": "pressure",
+  "description": "Severity distribution for pressure energy release — compressed gas, hydraulic, pneumatic, vacuum, and high-pressure injection events. Distinct from explosion (rapid deflagration/detonation) and thermal (steam burns covered under thermal). Pressure mechanism covers the mechanical energy of pressurised fluid/gas release: whipping hoses, high-pressure injection injuries, pneumatic discharge, compressed gas cylinder failures. P(death) scale from AIS mortality data.",
+  "version": "0.1",
+  "metalog_bounds": [0.0, 1.0],
+  "assumptions": [
+    "Working-age adult (18-65)",
+    "No pressure relief, isolation, or guarding",
+    "Direct exposure to pressurised release",
+    "Steam thermal effects are under thermal mechanism — this covers the mechanical pressure energy"
+  ],
+  "magnitude_unit": "pressure_bar",
+  "magnitude_note": "Pressure severity depends on pressure × volume × medium (gas vs liquid). Gas expands on release (blast/whip), liquid doesn't but can inject through skin at high pressure. Bands by scenario because the injury mechanism shifts with pressure and medium.",
+  "magnitude_bands": [
+    {
+      "band": "low_pressure_pneumatic",
+      "description": "Low-pressure pneumatic or air system (<10 bar). Compressed air line, air tools, tyre inflation. Can cause air injection through skin or eye injury at close range.",
+      "published_mortality": 0.005,
+      "mortality_source": "Industrial injury data: compressed air injuries are mostly eye/ear/skin. Fatal air embolism from compressed air entering wound or body cavity is documented but rare.",
+      "p10": 0.0001,
+      "p50": 0.001,
+      "p90": 0.01,
+      "p10_label": "no_injury",
+      "p50_label": "first_aid",
+      "p90_label": "medical_treatment",
+      "rationale": "Low-pressure air causes localised injuries. P90=medical_treatment reflects compressed air to eye or ear (tympanic rupture). Fatal air embolism from directed compressed air into wound is documented but requires specific conditions. Tyre explosions (truck/earth-mover) are a separate, higher-severity scenario."
+    },
+    {
+      "band": "tyre_inflation",
+      "description": "Tyre/wheel explosion during inflation or servicing. Split-rim, multi-piece wheel, over-inflation. The tyre itself becomes a pressure vessel. Truck and earthmover tyres store enormous energy.",
+      "published_mortality": 0.15,
+      "mortality_source": "OSHA tyre explosion fatality data; mining tyre safety bulletins. Split-rim wheel explosions during inflation are a well-documented SIF mechanism. A truck tyre at 8 bar contains enough energy to be lethal at close range.",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "Tyre explosions combine blast pressure with high-velocity projectile (rim components, tyre fragments). A truck tyre at 8 bar failing explosively produces blast + struck-by simultaneously. P50=serious_injury from blast/fragment injuries. P90=fatality from direct hit by rim component or close-range blast. Cages and remote inflation are the key mitigations."
+    },
+    {
+      "band": "hydraulic_injection",
+      "description": "High-pressure hydraulic fluid injection (100-700 bar). Pinhole leak in hydraulic hose, grease gun, fuel injector. Fluid penetrates skin and spreads through tissue planes. Deceptively serious — entry wound looks minor.",
+      "published_mortality": 0.01,
+      "mortality_source": "Plastic surgery and hand surgery literature: high-pressure injection injuries have ~50% amputation rate for digits. Fatal from sepsis or compartment syndrome if not surgically debrided within hours. Houghton & Varley (1996); Wieder et al. (2005).",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.50,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatal_range",
+      "rationale": "High-pressure injection through skin looks like a small puncture but fluid tracks along tissue planes, causing compartment syndrome, tissue necrosis, and sepsis. ~50% of digit injections result in amputation. P50=serious_injury reflects the high amputation/surgery rate. P90=0.50 reflects limb-threatening injection with delayed treatment. Rarely directly fatal but serious injury is the norm."
+    },
+    {
+      "band": "high_pressure_gas",
+      "description": "High-pressure gas release (>10 bar). Compressed gas cylinder failure, pipeline rupture, pressure vessel safety valve failure, pneumatic accumulator. Whipping hoses, gas jet, blast.",
+      "published_mortality": 0.10,
+      "mortality_source": "BOC/Air Liquide cylinder safety data; pipeline rupture incident reports; OSHA pressure vessel fatality data. Gas cylinder rocket/fragment from valve failure is a known killer.",
+      "p10": 0.005,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "High-pressure gas release produces multiple hazards: whipping hose (struck), gas jet (penetrating), blast (overpressure), cylinder rocket (projectile). A gas cylinder with a sheared valve becomes a projectile. P50=serious_injury from hose whip or gas jet. P90=fatality from cylinder rocket or close-range pipeline rupture."
+    },
+    {
+      "band": "high_pressure_water_jet",
+      "description": "High-pressure water jet (100-3000 bar). Water jetting, hydroblasting, waterjet cutting. Can cut through steel — will cut through flesh instantly. Used in industrial cleaning, demolition, cutting.",
+      "published_mortality": 0.10,
+      "mortality_source": "WaterJet Technology Association safety data; OSHA waterjet fatality reports. At >1000 bar, water cuts through any biological tissue. Fatalities from hydroblast contact are well-documented.",
+      "p10": 0.01,
+      "p50": 0.10,
+      "p90": 0.999,
+      "p10_label": "medical_treatment",
+      "p50_label": "serious_injury",
+      "p90_label": "fatality",
+      "rationale": "High-pressure water at >1000 bar cuts through steel — human tissue has no chance. Even glancing contact causes deep laceration. Direct contact with torso causes penetrating injury. P50=serious_injury from limb contact (deep tissue damage, possible amputation). P90=fatality from torso/head contact. Similar injury profile to hydraulic injection but with larger wound."
+    }
+  ],
+  "modifiers": {
+    "medium": {
+      "air_inert_gas": 1.0,
+      "hydraulic_oil": 1.5,
+      "toxic_fluid": 2.0,
+      "water": 0.8,
+      "description": "Multiplier on P(death). Hydraulic oil injection causes chemical tissue damage on top of mechanical. Toxic fluids (solvents, fuels) add systemic toxicity. Water is slightly less damaging to tissue than oil."
+    },
+    "body_region": {
+      "digit_hand": 0.5,
+      "limb": 1.0,
+      "torso_head": 3.0,
+      "description": "Multiplier on P(death). Injection/jet injuries to digits cause amputation but rarely death. Torso/head contact with high-pressure jet or blast is frequently fatal."
+    }
+  },
+  "sources": [
+    {"author": "Houghton & Varley", "year": 1996, "relevance": "High-pressure injection injuries — review of outcomes. ~50% amputation rate for grease gun injuries to fingers."},
+    {"author": "OSHA", "year": 2023, "relevance": "Pressure vessel and compressed gas safety data. Cylinder failure and tyre explosion fatalities."},
+    {"author": "WaterJet Technology Association", "year": 2020, "relevance": "Recommended Practices for the Use of Manually Operated High-Pressure Waterjetting Equipment. Safety data."},
+    {"author": "Baker et al.", "year": 1974, "relevance": "AIS mortality rates — foundation for P(death) scale"}
+  ],
+  "validation_notes": [
+    "STKY check: hydraulic injection to finger should give P(SIF) > 0.50 — hydraulic_injection P(SIF)=0.50 ✓ (amputation is 'serious injury')",
+    "STKY check: gas cylinder failure should give P(SIF) > 0.50 — high_pressure_gas P(SIF)=0.50 ✓",
+    "STKY check: split-rim tyre explosion should give P(SIF) > 0.50 — tyre_inflation P(SIF)=0.50 ✓",
+    "Cross-check: compressed air line blow-off is NON_SIF — low_pressure_pneumatic P(SIF)=0.01 ✓",
+    "Overlap note: steam release → thermal mechanism (burn injury dominates). Explosion/BLEVE → explosion mechanism (blast dominates). Pressure covers the mechanical energy of pressurised fluid/gas without combustion or phase change.",
+    "Key insight: hydraulic injection injuries are deceptively serious — the entry wound is a pinhole but the fluid tracks through tissue planes. Many are initially misdiagnosed as minor puncture wounds. Surgical debridement within 6 hours is critical."
+  ]
+}
