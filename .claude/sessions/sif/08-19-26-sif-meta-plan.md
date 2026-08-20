@@ -15,7 +15,7 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 - ✅ S1: SIPmath engine — `fractalaw-sipmath` crate (1,055 lines, 21 tests, zero math deps)
 - ✅ S2: Taxonomy & data — ICD-11, OSHA 1.6M rows, QQ 2,747 events ingested, P(death) scale
 - ✅ S2a: Calibration curves — 18 files, 87 bands, all metalog-feasible, STKY validated, ICD-11 reconciled
-- ⬜ S2b: Second-pass band selection — NEXT. Qwen on RunPod, per-mechanism prompts from calibration JSON, default-to-least-severe
+- ✅ S2b: Band selection — 2,740 events, 0.70s/event, calibrated SIF 10.4% (was 45.9% default-to-middle, human 14.3%)
 - ⬜ S2c: OSHA magnitude extraction & curve validation — extract heights/speeds/voltages from OSHA narratives, cross-tab vs outcomes
 - ⬜ S2d: Mitigation effectiveness library — LOPA, fall protection, NFPA 70E published barrier effectiveness data
 - ⬜ S3: SIF simulator — Product 2, CLI + WASM, energy params → severity → mitigations → residual P(SIF)
@@ -46,7 +46,7 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 | S1 | `sipmath-engine` | 0 | — | **CLOSED** | `fractalaw-sipmath` crate, 1,055 lines, 21 tests. WASM deferred to S3 |
 | S2 | `taxonomy-and-data` | 1 | S1 | **CLOSED** | ICD-11 taxonomy, OSHA 1.6M rows, QQ 2,747 events, P(death) scale |
 | S2a | `calibration-curves` | 1.5 | S1, S2, S4a | **CLOSED** | 18 calibration files, 87 bands, STKY validated, ICD-11 reconciled. Band selection identified as bottleneck. |
-| S2b | `band-selection` | 1.6 | S2a, S4a | **NEXT** | Second-pass Qwen prompts (auto-generated from calibration JSON). Per-mechanism band selection + magnitude extraction. RunPod. |
+| S2b | `band-selection` | 1.6 | S2a, S4a | **CLOSED** | 2,740 events at 0.70s/event. Calibrated SIF rate 10.4% (vs 45.9% baseline, 14.3% human). End-to-end pipeline validated. |
 | S2c | `osha-validation` | 1.7 | S2a, S2b | PENDING | Extract magnitudes from OSHA narratives, cross-tab vs outcomes, validate/adjust literature curves |
 | S2d | `mitigation-library` | 1.8 | S2a | PENDING | LOPA, fall protection, NFPA 70E barrier effectiveness. Metalog coefficients for common mitigations. |
 | S3 | `simulator` | 2 | S1, S2a, S2d | PENDING | CLI `sif sim` + WASM prototype. Needs calibration curves + mitigation library |
@@ -68,8 +68,8 @@ S1 (sipmath) ──→ S2 (data) ──→ S2a (calibration) ──→ S2b (band
                CLOSED         CLOSED
 ```
 
-- S2a CLOSED: 18 calibration files, 87 bands, all validated. Band selection is the bottleneck.
-- **S2b is NEXT** — second-pass Qwen prompts on RunPod for band selection + magnitude extraction
+- S2a CLOSED: 18 calibration files, 87 bands, all validated.
+- S2b CLOSED: band selection fixes the bottleneck. 10.4% SIF vs 45.9% baseline.
 - S2c (OSHA validation) depends on S2b — needs magnitude extraction working first
 - S2d (mitigation library) is independent of S2b/S2c — can run in parallel
 - S3 (simulator) needs S2a (curves) + S2d (mitigations) — S2b/S2c validate but don't block
