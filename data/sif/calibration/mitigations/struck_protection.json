@@ -8,13 +8,17 @@
       "type": "engineered",
       "timing": "pre_impact",
       "p_active": 0.95,
-      "effectiveness_p10": 0.80,
-      "effectiveness_p50": 0.90,
+      "effectiveness_p10": 0.8,
+      "effectiveness_p50": 0.9,
       "effectiveness_p90": 0.95,
-      "effectiveness_bounds": [0.0, 1.0],
-      "description": "Scaffold toe boards (EN 12811) and debris netting prevent objects falling from height to workers below. Collective protection — protects everyone in the zone.",
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "Scaffold toe boards (EN 12811) and debris netting prevent objects falling from height to workers below. Collective protection \u2014 protects everyone in the zone.",
       "pfd_source": "PFD 0.05. Passive engineered. Failure: incomplete coverage, gaps at edges, netting damaged, toe boards not installed on all levels.",
-      "effectiveness_source": "Prevents small objects (tools, fittings, debris) from falling. Not effective against large objects that can break through netting."
+      "effectiveness_source": "Prevents small objects (tools, fittings, debris) from falling. Not effective against large objects that can break through netting.",
+      "control_type": "exposure"
     },
     {
       "name": "tool_lanyard",
@@ -25,10 +29,14 @@
       "effectiveness_p10": 0.85,
       "effectiveness_p50": 0.95,
       "effectiveness_p90": 0.99,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Tools tethered to worker or structure to prevent dropping. Eliminates the dropped-object hazard at source.",
-      "pfd_source": "PFD 0.15. Human-dependent — worker must clip the lanyard. Similar compliance challenge to fall arrest harness.",
-      "effectiveness_source": "When tethered, tool cannot fall to workers below. Near-complete elimination of that specific dropped-object hazard."
+      "pfd_source": "PFD 0.15. Human-dependent \u2014 worker must clip the lanyard. Similar compliance challenge to fall arrest harness.",
+      "effectiveness_source": "When tethered, tool cannot fall to workers below. Near-complete elimination of that specific dropped-object hazard.",
+      "control_type": "exposure"
     },
     {
       "name": "hard_hat",
@@ -36,13 +44,17 @@
       "type": "engineered",
       "timing": "pre_impact",
       "p_active": 0.92,
-      "effectiveness_p10": 0.40,
-      "effectiveness_p50": 0.60,
-      "effectiveness_p90": 0.80,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_p10": 0.4,
+      "effectiveness_p50": 0.6,
+      "effectiveness_p90": 0.8,
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Industrial safety helmet absorbing and distributing impact force. EN 397 rated to 5kg from 1m (49J). The primary PPE for struck-by head protection.",
       "pfd_source": "PFD 0.08. Failure modes: not worn (most common), worn incorrectly (not fastened), damaged/expired shell, impact exceeds rating.",
-      "effectiveness_source": "EN 397 test: survives 49J impact without transmitting >5kN to head. Distributes force over larger area. Reduces skull fracture probability significantly but cannot prevent all head injuries from heavy objects. P50=0.60 reflects that hard hats prevent ~60% of the severity of impacts within their rating."
+      "effectiveness_source": "EN 397 test: survives 49J impact without transmitting >5kN to head. Distributes force over larger area. Reduces skull fracture probability significantly but cannot prevent all head injuries from heavy objects. P50=0.60 reflects that hard hats prevent ~60% of the severity of impacts within their rating.",
+      "control_type": "severity"
     },
     {
       "name": "exclusion_zone",
@@ -50,32 +62,52 @@
       "type": "managed",
       "timing": "pre_impact",
       "p_active": 0.85,
-      "effectiveness_p10": 0.80,
-      "effectiveness_p50": 0.90,
+      "effectiveness_p10": 0.8,
+      "effectiveness_p50": 0.9,
       "effectiveness_p90": 0.95,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Barriered zone preventing personnel from entering the drop zone below overhead work. Physical barriers + signage + banksman.",
-      "pfd_source": "PFD 0.15. Managed control — requires barriers to be set up and maintained, personnel to comply. Failure: barriers moved, shortcut through zone, zone not extended far enough.",
-      "effectiveness_source": "If no one is in the drop zone, falling objects cannot strike anyone. Effectiveness limited by zone size calculation and compliance."
+      "pfd_source": "PFD 0.15. Managed control \u2014 requires barriers to be set up and maintained, personnel to comply. Failure: barriers moved, shortcut through zone, zone not extended far enough.",
+      "effectiveness_source": "If no one is in the drop zone, falling objects cannot strike anyone. Effectiveness limited by zone size calculation and compliance.",
+      "control_type": "exposure"
     },
     {
       "name": "crane_lift_plan",
       "display": "Crane lift plan + banksman",
       "type": "managed",
       "timing": "pre_impact",
-      "p_active": 0.90,
-      "effectiveness_p10": 0.40,
-      "effectiveness_p50": 0.60,
-      "effectiveness_p90": 0.80,
-      "effectiveness_bounds": [0.0, 1.0],
+      "p_active": 0.9,
+      "effectiveness_p10": 0.4,
+      "effectiveness_p50": 0.6,
+      "effectiveness_p90": 0.8,
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Formal lift plan for crane operations: load calculation, exclusion zone, banksman, communication protocol. Administrative control ensuring competent execution.",
       "pfd_source": "LOPA: PFD 0.10 for administrative/procedural controls.",
-      "effectiveness_source": "Reduces probability of load drop and ensures exclusion zone during lift. Does not physically prevent the drop — effectiveness is indirect."
+      "effectiveness_source": "Reduces probability of load drop and ensures exclusion zone during lift. Does not physically prevent the drop \u2014 effectiveness is indirect.",
+      "control_type": "chance"
     }
   ],
   "sources": [
-    {"author": "EN 397", "year": 2012, "relevance": "Industrial safety helmets — impact test (49J), penetration test"},
-    {"author": "EN 12811", "year": 2003, "relevance": "Temporary works equipment — scaffolds, toe boards"},
-    {"author": "CCPS", "year": 2015, "relevance": "LOPA guidelines — PFD for engineered and managed barriers"}
+    {
+      "author": "EN 397",
+      "year": 2012,
+      "relevance": "Industrial safety helmets \u2014 impact test (49J), penetration test"
+    },
+    {
+      "author": "EN 12811",
+      "year": 2003,
+      "relevance": "Temporary works equipment \u2014 scaffolds, toe boards"
+    },
+    {
+      "author": "CCPS",
+      "year": 2015,
+      "relevance": "LOPA guidelines \u2014 PFD for engineered and managed barriers"
+    }
   ]
 }

@@ -8,13 +8,17 @@
       "type": "design",
       "timing": "pre_impact",
       "p_active": 0.999,
-      "effectiveness_p10": 0.80,
-      "effectiveness_p50": 0.90,
+      "effectiveness_p10": 0.8,
+      "effectiveness_p50": 0.9,
       "effectiveness_p90": 0.99,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Replace hazardous chemical with less toxic/corrosive alternative. Water-based instead of solvent-based, citric acid instead of HCl, mechanical cleaning instead of chemical. Inherent safety.",
-      "pfd_source": "Inherent safety — the hazardous chemical is not present.",
-      "effectiveness_source": "Depends on the substitute. Complete elimination if chemical removed entirely. Partial if substitute is less hazardous but not harmless."
+      "pfd_source": "Inherent safety \u2014 the hazardous chemical is not present.",
+      "effectiveness_source": "Depends on the substitute. Complete elimination if chemical removed entirely. Partial if substitute is less hazardous but not harmless.",
+      "control_type": "exposure"
     },
     {
       "name": "closed_system",
@@ -25,10 +29,14 @@
       "effectiveness_p10": 0.85,
       "effectiveness_p50": 0.95,
       "effectiveness_p90": 0.99,
-      "effectiveness_bounds": [0.0, 1.0],
-      "description": "Fully enclosed chemical handling — closed transfer, sealed systems, no open decanting. Prevents skin/eye contact during normal operations.",
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "Fully enclosed chemical handling \u2014 closed transfer, sealed systems, no open decanting. Prevents skin/eye contact during normal operations.",
       "pfd_source": "PFD 0.03. Failure: seal failure, gasket leak, opened for sampling/maintenance, overflow.",
-      "effectiveness_source": "When system is sealed, no contact exposure occurs. Maintenance/sampling breaks the containment."
+      "effectiveness_source": "When system is sealed, no contact exposure occurs. Maintenance/sampling breaks the containment.",
+      "control_type": "exposure"
     },
     {
       "name": "chemical_ppe",
@@ -36,41 +44,53 @@
       "type": "engineered",
       "timing": "pre_impact",
       "p_active": 0.88,
-      "effectiveness_p10": 0.70,
+      "effectiveness_p10": 0.7,
       "effectiveness_p50": 0.85,
       "effectiveness_p90": 0.95,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Chemical-resistant gloves (EN 374), goggles/face shield, apron or suit. Material must be rated for the specific chemical. Nitrile for organics, butyl for ketones, etc.",
-      "pfd_source": "PFD 0.12. Failure: wrong glove material for the chemical (common — permeation not checked), not worn for 'quick job', gloves perforated, splash over/under PPE.",
-      "effectiveness_source": "When correct material and intact, prevents skin contact. EN 374 breakthrough time gives quantified protection. Gap: splash to face/eyes around goggles."
+      "pfd_source": "PFD 0.12. Failure: wrong glove material for the chemical (common \u2014 permeation not checked), not worn for 'quick job', gloves perforated, splash over/under PPE.",
+      "effectiveness_source": "When correct material and intact, prevents skin contact. EN 374 breakthrough time gives quantified protection. Gap: splash to face/eyes around goggles.",
+      "control_type": "severity"
     },
     {
       "name": "emergency_shower",
       "display": "Emergency shower / eyewash",
       "type": "engineered",
       "timing": "post_impact",
-      "p_active": 0.90,
-      "effectiveness_p10": 0.40,
-      "effectiveness_p50": 0.70,
-      "effectiveness_p90": 0.90,
-      "effectiveness_bounds": [0.0, 1.0],
+      "p_active": 0.9,
+      "effectiveness_p10": 0.4,
+      "effectiveness_p50": 0.7,
+      "effectiveness_p90": 0.9,
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "ANSI Z358.1 emergency shower and eyewash within 10 seconds travel. Immediate decontamination limits burn depth and chemical absorption. THE critical post-impact control for corrosive exposure.",
       "pfd_source": "PFD 0.10. Failure: too far away (>10 sec travel), not tested/maintained (weekly test required), obstructed access, water supply interrupted, worker doesn't use it (panic, doesn't know location).",
-      "effectiveness_source": "Moritz & Henriques: decontamination within 1 minute dramatically reduces burn depth. After 5 minutes, full-thickness damage is established. Effectiveness is entirely time-dependent."
+      "effectiveness_source": "Moritz & Henriques: decontamination within 1 minute dramatically reduces burn depth. After 5 minutes, full-thickness damage is established. Effectiveness is entirely time-dependent.",
+      "control_type": "severity"
     },
     {
       "name": "calcium_gluconate",
       "display": "Calcium gluconate gel (HF specific)",
       "type": "managed",
       "timing": "post_impact",
-      "p_active": 0.80,
-      "effectiveness_p10": 0.50,
-      "effectiveness_p50": 0.70,
-      "effectiveness_p90": 0.90,
-      "effectiveness_bounds": [0.0, 1.0],
+      "p_active": 0.8,
+      "effectiveness_p10": 0.5,
+      "effectiveness_p50": 0.7,
+      "effectiveness_p90": 0.9,
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "HF-specific first aid: calcium gluconate gel applied to HF burn binds fluoride ions, preventing systemic absorption and cardiac arrest. Must be available on site wherever HF is used.",
-      "pfd_source": "PFD 0.20. Failure: gel not stocked, expired, not applied immediately (worker doesn't recognise HF burn — initially painless with concentrated HF), incorrect application.",
-      "effectiveness_source": "Calcium gluconate binds F- ions before systemic absorption. When applied within minutes, prevents hypocalcaemia. Delay >30 min from concentrated HF exposure may be too late for cardiac effects."
+      "pfd_source": "PFD 0.20. Failure: gel not stocked, expired, not applied immediately (worker doesn't recognise HF burn \u2014 initially painless with concentrated HF), incorrect application.",
+      "effectiveness_source": "Calcium gluconate binds F- ions before systemic absorption. When applied within minutes, prevents hypocalcaemia. Delay >30 min from concentrated HF exposure may be too late for cardiac effects.",
+      "control_type": "severity"
     },
     {
       "name": "labelling_sds",
@@ -78,19 +98,39 @@
       "type": "managed",
       "timing": "pre_impact",
       "p_active": 0.85,
-      "effectiveness_p10": 0.20,
-      "effectiveness_p50": 0.30,
-      "effectiveness_p90": 0.50,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_p10": 0.2,
+      "effectiveness_p50": 0.3,
+      "effectiveness_p90": 0.5,
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Correct GHS labelling on all containers, safety data sheets accessible. Prevents accidental exposure from unidentified chemicals. Administrative control.",
       "pfd_source": "PFD 0.15. Failure: decanted into unlabelled containers (the #1 cause of accidental ingestion), SDS not updated, language barriers.",
-      "effectiveness_source": "Labels warn — they don't prevent contact. Effectiveness is indirect: informed worker takes precautions. Prevents the specific 'drank from unlabelled bottle' scenario."
+      "effectiveness_source": "Labels warn \u2014 they don't prevent contact. Effectiveness is indirect: informed worker takes precautions. Prevents the specific 'drank from unlabelled bottle' scenario.",
+      "control_type": "chance"
     }
   ],
   "sources": [
-    {"author": "ANSI Z358.1", "year": 2014, "relevance": "Emergency eyewash and shower equipment — performance, installation, maintenance"},
-    {"author": "EN 374", "year": 2016, "relevance": "Protective gloves against dangerous chemicals — permeation, penetration, degradation"},
-    {"author": "Kirkpatrick et al.", "year": 1995, "relevance": "HF burn treatment — calcium gluconate effectiveness"},
-    {"author": "CCPS", "year": 2015, "relevance": "LOPA PFD values"}
+    {
+      "author": "ANSI Z358.1",
+      "year": 2014,
+      "relevance": "Emergency eyewash and shower equipment \u2014 performance, installation, maintenance"
+    },
+    {
+      "author": "EN 374",
+      "year": 2016,
+      "relevance": "Protective gloves against dangerous chemicals \u2014 permeation, penetration, degradation"
+    },
+    {
+      "author": "Kirkpatrick et al.",
+      "year": 1995,
+      "relevance": "HF burn treatment \u2014 calcium gluconate effectiveness"
+    },
+    {
+      "author": "CCPS",
+      "year": 2015,
+      "relevance": "LOPA PFD values"
+    }
   ]
 }

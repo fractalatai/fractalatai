@@ -8,13 +8,17 @@
       "type": "design",
       "timing": "pre_impact",
       "p_active": 0.999,
-      "effectiveness_p10": 0.70,
+      "effectiveness_p10": 0.7,
       "effectiveness_p50": 0.85,
       "effectiveness_p90": 0.95,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Fire-resistant building materials, compartmentation, fire-rated doors/walls. Limits fire spread and gives occupants time to escape. Inherent to the structure.",
-      "pfd_source": "Design mitigation — can't be defeated. PFD reflects structural fire rating being exceeded.",
-      "effectiveness_source": "Fire compartmentation limits fire to origin compartment. Effectiveness depends on fire rating (30/60/120 min) vs fire duration."
+      "pfd_source": "Design mitigation \u2014 can't be defeated. PFD reflects structural fire rating being exceeded.",
+      "effectiveness_source": "Fire compartmentation limits fire to origin compartment. Effectiveness depends on fire rating (30/60/120 min) vs fire duration.",
+      "control_type": "severity"
     },
     {
       "name": "sprinkler",
@@ -22,13 +26,17 @@
       "type": "engineered",
       "timing": "pre_impact",
       "p_active": 0.95,
-      "effectiveness_p10": 0.70,
+      "effectiveness_p10": 0.7,
       "effectiveness_p50": 0.85,
       "effectiveness_p90": 0.95,
-      "effectiveness_bounds": [0.0, 1.0],
-      "description": "Automatic fire suppression — sprinkler heads activate at temperature threshold. Suppresses or controls fire before it can grow. NFPA 13/BS 9251.",
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "Automatic fire suppression \u2014 sprinkler heads activate at temperature threshold. Suppresses or controls fire before it can grow. NFPA 13/BS 9251.",
       "pfd_source": "PFD 0.05. NFPA data: sprinkler reliability ~95% when maintained. Failure: system shut off for maintenance, heads painted/blocked, water supply interrupted.",
-      "effectiveness_source": "NFPA: sprinklers control or extinguish fire in ~96% of activations. Reduces fire death rate by 87% (NFPA 2021). Highly effective when operating."
+      "effectiveness_source": "NFPA: sprinklers control or extinguish fire in ~96% of activations. Reduces fire death rate by 87% (NFPA 2021). Highly effective when operating.",
+      "control_type": "severity"
     },
     {
       "name": "fr_clothing",
@@ -36,13 +44,17 @@
       "type": "engineered",
       "timing": "pre_impact",
       "p_active": 0.88,
-      "effectiveness_p10": 0.70,
+      "effectiveness_p10": 0.7,
       "effectiveness_p50": 0.85,
       "effectiveness_p90": 0.95,
-      "effectiveness_bounds": [0.0, 1.0],
-      "description": "Flame-resistant clothing prevents clothing ignition — THE critical escalation boundary for fire SIF. Standard workwear (cotton/poly) melts and sustains burning. FR self-extinguishes.",
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "Flame-resistant clothing prevents clothing ignition \u2014 THE critical escalation boundary for fire SIF. Standard workwear (cotton/poly) melts and sustains burning. FR self-extinguishes.",
       "pfd_source": "PFD 0.12. Failure: not worn (most common), wrong rating for exposure, damaged/contaminated (oil-soaked FR loses protection), layered with non-FR garments underneath.",
-      "effectiveness_source": "Prevents the clothing ignition escalation. With FR, a flash fire produces skin burns on exposed areas only. Without FR, clothing fire produces 25-40% TBSA deep burns (Baux rule mortality)."
+      "effectiveness_source": "Prevents the clothing ignition escalation. With FR, a flash fire produces skin burns on exposed areas only. Without FR, clothing fire produces 25-40% TBSA deep burns (Baux rule mortality).",
+      "control_type": "severity"
     },
     {
       "name": "fire_detection_alarm",
@@ -50,13 +62,17 @@
       "type": "engineered",
       "timing": "pre_impact",
       "p_active": 0.95,
-      "effectiveness_p10": 0.50,
-      "effectiveness_p50": 0.70,
+      "effectiveness_p10": 0.5,
+      "effectiveness_p50": 0.7,
       "effectiveness_p90": 0.85,
-      "effectiveness_bounds": [0.0, 1.0],
-      "description": "Smoke/heat detection with audible alarm. Provides early warning for evacuation. Does not suppress the fire — enables escape.",
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "Smoke/heat detection with audible alarm. Provides early warning for evacuation. Does not suppress the fire \u2014 enables escape.",
       "pfd_source": "PFD 0.05. Passive engineered. Failure: detector disabled, battery dead (domestic), alarm not heard (noisy environment), occupants don't respond.",
-      "effectiveness_source": "Effectiveness is enabling escape — detection time determines available safe egress time (ASET). Effective for structural fires where occupants are remote from origin."
+      "effectiveness_source": "Effectiveness is enabling escape \u2014 detection time determines available safe egress time (ASET). Effective for structural fires where occupants are remote from origin.",
+      "control_type": "chance"
     },
     {
       "name": "escape_route",
@@ -64,13 +80,17 @@
       "type": "design",
       "timing": "post_impact",
       "p_active": 0.97,
-      "effectiveness_p10": 0.60,
-      "effectiveness_p50": 0.80,
-      "effectiveness_p90": 0.90,
-      "effectiveness_bounds": [0.0, 1.0],
-      "description": "Maintained escape routes with emergency lighting, fire doors, signage. Design mitigation — routes are inherent to the building. Post-impact because they enable escape after fire starts.",
+      "effectiveness_p10": 0.6,
+      "effectiveness_p50": 0.8,
+      "effectiveness_p90": 0.9,
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "Maintained escape routes with emergency lighting, fire doors, signage. Design mitigation \u2014 routes are inherent to the building. Post-impact because they enable escape after fire starts.",
       "pfd_source": "PFD 0.03. Design feature. Failure: routes blocked (stored materials), fire doors propped open, emergency lighting failed.",
-      "effectiveness_source": "Clear escape routes enable evacuation before flashover/smoke incapacitation. Travel distance standards (BS 9999) ensure routes reach safety within available time."
+      "effectiveness_source": "Clear escape routes enable evacuation before flashover/smoke incapacitation. Travel distance standards (BS 9999) ensure routes reach safety within available time.",
+      "control_type": "severity"
     },
     {
       "name": "emergency_response_fire",
@@ -78,19 +98,39 @@
       "type": "managed",
       "timing": "post_impact",
       "p_active": 0.85,
-      "effectiveness_p10": 0.30,
-      "effectiveness_p50": 0.50,
-      "effectiveness_p90": 0.70,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_p10": 0.3,
+      "effectiveness_p50": 0.5,
+      "effectiveness_p90": 0.7,
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Professional fire service response. Suppression, search and rescue, casualty treatment. Response time is the critical variable.",
       "pfd_source": "PFD 0.15. Dependent on response time, access, water supply, fire service availability. Rural/industrial sites may have 15+ min response.",
-      "effectiveness_source": "Professional firefighters with BA can effect rescue from smoke-filled buildings. Effectiveness drops rapidly with time — flashover typically occurs 5-10 min after ignition."
+      "effectiveness_source": "Professional firefighters with BA can effect rescue from smoke-filled buildings. Effectiveness drops rapidly with time \u2014 flashover typically occurs 5-10 min after ignition.",
+      "control_type": "severity"
     }
   ],
   "sources": [
-    {"author": "NFPA 13", "year": 2022, "relevance": "Standard for the Installation of Sprinkler Systems"},
-    {"author": "NFPA", "year": 2021, "relevance": "US Experience with Sprinklers — 87% reduction in fire death rate"},
-    {"author": "BS 9999", "year": 2017, "relevance": "Fire safety in the design, management and use of buildings — travel distances, escape routes"},
-    {"author": "CCPS", "year": 2015, "relevance": "LOPA guidelines — PFD for detection, suppression, managed controls"}
+    {
+      "author": "NFPA 13",
+      "year": 2022,
+      "relevance": "Standard for the Installation of Sprinkler Systems"
+    },
+    {
+      "author": "NFPA",
+      "year": 2021,
+      "relevance": "US Experience with Sprinklers \u2014 87% reduction in fire death rate"
+    },
+    {
+      "author": "BS 9999",
+      "year": 2017,
+      "relevance": "Fire safety in the design, management and use of buildings \u2014 travel distances, escape routes"
+    },
+    {
+      "author": "CCPS",
+      "year": 2015,
+      "relevance": "LOPA guidelines \u2014 PFD for detection, suppression, managed controls"
+    }
   ]
 }

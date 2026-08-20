@@ -8,13 +8,17 @@
       "type": "design",
       "timing": "pre_impact",
       "p_active": 0.97,
-      "effectiveness_p10": 0.90,
+      "effectiveness_p10": 0.9,
       "effectiveness_p50": 0.95,
       "effectiveness_p90": 0.99,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Replace oxygen with inert gas to keep atmosphere below LOC (limiting oxygen concentration). Prevents explosive atmosphere forming. Common in chemical/pharma vessels.",
       "pfd_source": "PFD 0.03. Failure: inerting system failure, O2 analyser fault, vessel opened without purging, insufficient flow rate.",
-      "effectiveness_source": "If O2 is below LOC, combustion cannot occur. Very high effectiveness when maintained. Note: creates breathing hazard — see confined space mitigations."
+      "effectiveness_source": "If O2 is below LOC, combustion cannot occur. Very high effectiveness when maintained. Note: creates breathing hazard \u2014 see confined space mitigations.",
+      "control_type": "exposure"
     },
     {
       "name": "blast_resistant_design",
@@ -22,13 +26,17 @@
       "type": "design",
       "timing": "pre_impact",
       "p_active": 0.999,
-      "effectiveness_p10": 0.60,
-      "effectiveness_p50": 0.80,
+      "effectiveness_p10": 0.6,
+      "effectiveness_p50": 0.8,
       "effectiveness_p90": 0.95,
-      "effectiveness_bounds": [0.0, 1.0],
-      "description": "Control rooms and occupied buildings designed to withstand blast overpressure. API 752/753 building siting studies. The structure absorbs the blast — inherent to the design.",
-      "pfd_source": "Design mitigation — can't be defeated. PFD reflects blast exceeding design rating.",
-      "effectiveness_source": "Blast-resistant buildings protect occupants from overpressure up to design limit. Texas City (2005): portable buildings in blast zone killed 15 — reinforced control room survived."
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "Control rooms and occupied buildings designed to withstand blast overpressure. API 752/753 building siting studies. The structure absorbs the blast \u2014 inherent to the design.",
+      "pfd_source": "Design mitigation \u2014 can't be defeated. PFD reflects blast exceeding design rating.",
+      "effectiveness_source": "Blast-resistant buildings protect occupants from overpressure up to design limit. Texas City (2005): portable buildings in blast zone killed 15 \u2014 reinforced control room survived.",
+      "control_type": "severity"
     },
     {
       "name": "explosion_suppression",
@@ -36,13 +44,17 @@
       "type": "engineered",
       "timing": "pre_impact",
       "p_active": 0.95,
-      "effectiveness_p10": 0.70,
+      "effectiveness_p10": 0.7,
       "effectiveness_p50": 0.85,
       "effectiveness_p90": 0.95,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Detects incipient explosion (pressure rise) and discharges suppressant (sodium bicarbonate, water) within milliseconds. NFPA 69. Prevents explosion from developing.",
       "pfd_source": "PFD 0.05. Failure: detector fouled, suppressant bottle not charged, system not reset after previous activation, explosion too fast for suppression.",
-      "effectiveness_source": "When detection and discharge are fast enough, explosion is quenched before peak overpressure. Most effective for dust explosions in vessels (contained volume)."
+      "effectiveness_source": "When detection and discharge are fast enough, explosion is quenched before peak overpressure. Most effective for dust explosions in vessels (contained volume).",
+      "control_type": "chance"
     },
     {
       "name": "explosion_venting",
@@ -50,13 +62,17 @@
       "type": "engineered",
       "timing": "pre_impact",
       "p_active": 0.97,
-      "effectiveness_p10": 0.50,
-      "effectiveness_p50": 0.70,
+      "effectiveness_p10": 0.5,
+      "effectiveness_p50": 0.7,
       "effectiveness_p90": 0.85,
-      "effectiveness_bounds": [0.0, 1.0],
-      "description": "Explosion vent panels (NFPA 68) that open at low pressure, directing blast away from occupied areas. Passive — no activation needed. Limits peak overpressure inside the vessel/room.",
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "Explosion vent panels (NFPA 68) that open at low pressure, directing blast away from occupied areas. Passive \u2014 no activation needed. Limits peak overpressure inside the vessel/room.",
       "pfd_source": "PFD 0.03. Passive device. Failure: vent blocked/painted over, vent area insufficient for explosion severity, vent directs blast toward occupied area.",
-      "effectiveness_source": "Limits internal overpressure by venting to safe area. Does not prevent the explosion — directs it. Personnel in the vent discharge zone are at risk."
+      "effectiveness_source": "Limits internal overpressure by venting to safe area. Does not prevent the explosion \u2014 directs it. Personnel in the vent discharge zone are at risk.",
+      "control_type": "severity"
     },
     {
       "name": "gas_detection",
@@ -64,33 +80,57 @@
       "type": "engineered",
       "timing": "pre_impact",
       "p_active": 0.93,
-      "effectiveness_p10": 0.50,
-      "effectiveness_p50": 0.70,
+      "effectiveness_p10": 0.5,
+      "effectiveness_p50": 0.7,
       "effectiveness_p90": 0.85,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Fixed gas detectors (catalytic/IR) or dust monitors with alarm at %LEL threshold. Early warning to evacuate and eliminate ignition sources before explosive atmosphere is reached.",
       "pfd_source": "PFD 0.07. Failure: detector poisoned/fouled, wrong detection technology for the gas, insufficient coverage, alarm ignored.",
-      "effectiveness_source": "Early warning enables evacuation before ignition. Does not prevent the explosion if ignition occurs before evacuation. Effectiveness is time between detection and ignition."
+      "effectiveness_source": "Early warning enables evacuation before ignition. Does not prevent the explosion if ignition occurs before evacuation. Effectiveness is time between detection and ignition.",
+      "control_type": "chance"
     },
     {
       "name": "atex_zoning",
       "display": "ATEX zoning + ignition control",
       "type": "managed",
       "timing": "pre_impact",
-      "p_active": 0.90,
-      "effectiveness_p10": 0.40,
-      "effectiveness_p50": 0.60,
-      "effectiveness_p90": 0.80,
-      "effectiveness_bounds": [0.0, 1.0],
+      "p_active": 0.9,
+      "effectiveness_p10": 0.4,
+      "effectiveness_p50": 0.6,
+      "effectiveness_p90": 0.8,
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "DSEAR/ATEX hazardous area classification with zone-appropriate equipment (Ex-rated) and hot work controls. Administrative framework ensuring ignition sources are controlled.",
       "pfd_source": "LOPA: PFD 0.10 for administrative controls. Failure: incorrect zone classification, non-Ex equipment brought into zone, hot work permit not obtained.",
-      "effectiveness_source": "Removes ignition sources from explosive atmospheres. Effectiveness is indirect — the atmosphere may still form, but without ignition the explosion doesn't occur."
+      "effectiveness_source": "Removes ignition sources from explosive atmospheres. Effectiveness is indirect \u2014 the atmosphere may still form, but without ignition the explosion doesn't occur.",
+      "control_type": "chance"
     }
   ],
   "sources": [
-    {"author": "NFPA 68", "year": 2018, "relevance": "Standard on Explosion Protection by Deflagration Venting"},
-    {"author": "NFPA 69", "year": 2019, "relevance": "Standard on Explosion Prevention Systems (inerting, suppression)"},
-    {"author": "API 752/753", "year": 2009, "relevance": "Management of Hazards Associated with Location of Process Plant Buildings/Portable Buildings"},
-    {"author": "CCPS", "year": 2015, "relevance": "LOPA PFD values for detection, suppression, administrative controls"}
+    {
+      "author": "NFPA 68",
+      "year": 2018,
+      "relevance": "Standard on Explosion Protection by Deflagration Venting"
+    },
+    {
+      "author": "NFPA 69",
+      "year": 2019,
+      "relevance": "Standard on Explosion Prevention Systems (inerting, suppression)"
+    },
+    {
+      "author": "API 752/753",
+      "year": 2009,
+      "relevance": "Management of Hazards Associated with Location of Process Plant Buildings/Portable Buildings"
+    },
+    {
+      "author": "CCPS",
+      "year": 2015,
+      "relevance": "LOPA PFD values for detection, suppression, administrative controls"
+    }
   ]
 }

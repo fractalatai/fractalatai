@@ -1,6 +1,6 @@
 {
   "mechanism": "transport",
-  "description": "Mitigations for vehicle-pedestrian strikes. Segregation is the dominant control — keep people and vehicles apart.",
+  "description": "Mitigations for vehicle-pedestrian strikes. Segregation is the dominant control \u2014 keep people and vehicles apart.",
   "mitigations": [
     {
       "name": "segregation_design",
@@ -8,13 +8,17 @@
       "type": "design",
       "timing": "pre_impact",
       "p_active": 0.98,
-      "effectiveness_p10": 0.90,
+      "effectiveness_p10": 0.9,
       "effectiveness_p50": 0.95,
       "effectiveness_p90": 0.99,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Physical separation of pedestrian and vehicle routes by design. Raised walkways, separate access routes, physical barriers (jersey barriers, bollards). Inherent to site layout.",
-      "pfd_source": "PFD 0.02. Design feature — can't be bypassed easily. Failure: gaps in barrier coverage, shared zones at loading/delivery points.",
-      "effectiveness_source": "If pedestrians and vehicles are physically separated, strikes cannot occur. Effectiveness limited by transition zones where separation breaks down."
+      "pfd_source": "PFD 0.02. Design feature \u2014 can't be bypassed easily. Failure: gaps in barrier coverage, shared zones at loading/delivery points.",
+      "effectiveness_source": "If pedestrians and vehicles are physically separated, strikes cannot occur. Effectiveness limited by transition zones where separation breaks down.",
+      "control_type": "exposure"
     },
     {
       "name": "speed_controls",
@@ -22,13 +26,17 @@
       "type": "engineered",
       "timing": "pre_impact",
       "p_active": 0.95,
-      "effectiveness_p10": 0.40,
-      "effectiveness_p50": 0.60,
-      "effectiveness_p90": 0.80,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_p10": 0.4,
+      "effectiveness_p50": 0.6,
+      "effectiveness_p90": 0.8,
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Speed humps, speed limiters on vehicles, radar speed signs. Reduces kinetic energy at impact. Tefft 2013: 10mph reduction halves pedestrian fatality risk.",
       "pfd_source": "PFD 0.05 for physical speed controls (humps). Higher PFD for electronic limiters that can be overridden.",
-      "effectiveness_source": "Tefft 2013 dose-response: reducing speed from 30mph to 20mph reduces pedestrian fatality from ~40% to ~10%. Speed controls don't prevent the strike but dramatically reduce severity."
+      "effectiveness_source": "Tefft 2013 dose-response: reducing speed from 30mph to 20mph reduces pedestrian fatality from ~40% to ~10%. Speed controls don't prevent the strike but dramatically reduce severity.",
+      "control_type": "chance"
     },
     {
       "name": "reversing_aids",
@@ -36,27 +44,35 @@
       "type": "engineered",
       "timing": "pre_impact",
       "p_active": 0.92,
-      "effectiveness_p10": 0.50,
-      "effectiveness_p50": 0.70,
+      "effectiveness_p10": 0.5,
+      "effectiveness_p50": 0.7,
       "effectiveness_p90": 0.85,
-      "effectiveness_bounds": [0.0, 1.0],
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
       "description": "Reversing cameras, proximity sensors, radar on vehicles. Alerts driver to pedestrians in blind spot. Most effective for low-speed reversing strikes.",
       "pfd_source": "PFD 0.08. Failure: camera obscured, driver doesn't check display, sensor false alarms leading to alarm fatigue.",
-      "effectiveness_source": "NHTSA: rear cameras reduce backing crashes by ~17% overall, much higher for pedestrian-behind-vehicle scenarios."
+      "effectiveness_source": "NHTSA: rear cameras reduce backing crashes by ~17% overall, much higher for pedestrian-behind-vehicle scenarios.",
+      "control_type": "chance"
     },
     {
       "name": "high_vis",
       "display": "High visibility clothing",
       "type": "engineered",
       "timing": "pre_impact",
-      "p_active": 0.90,
-      "effectiveness_p10": 0.20,
-      "effectiveness_p50": 0.40,
-      "effectiveness_p90": 0.60,
-      "effectiveness_bounds": [0.0, 1.0],
-      "description": "EN ISO 20471 high-visibility clothing. Makes pedestrians visible to drivers. PPE — human-dependent (must be worn, must be clean, limited effectiveness in poor visibility).",
+      "p_active": 0.9,
+      "effectiveness_p10": 0.2,
+      "effectiveness_p50": 0.4,
+      "effectiveness_p90": 0.6,
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "EN ISO 20471 high-visibility clothing. Makes pedestrians visible to drivers. PPE \u2014 human-dependent (must be worn, must be clean, limited effectiveness in poor visibility).",
       "pfd_source": "PFD 0.10 for PPE. Failure: not worn, dirty/faded, insufficient lighting for fluorescent material, driver looking elsewhere.",
-      "effectiveness_source": "Improves driver detection of pedestrians. Limited effectiveness — being visible doesn't prevent a strike if the driver isn't looking or can't stop in time."
+      "effectiveness_source": "Improves driver detection of pedestrians. Limited effectiveness \u2014 being visible doesn't prevent a strike if the driver isn't looking or can't stop in time.",
+      "control_type": "chance"
     },
     {
       "name": "banksman_spotter",
@@ -64,19 +80,39 @@
       "type": "managed",
       "timing": "pre_impact",
       "p_active": 0.85,
-      "effectiveness_p10": 0.40,
-      "effectiveness_p50": 0.60,
-      "effectiveness_p90": 0.80,
-      "effectiveness_bounds": [0.0, 1.0],
-      "description": "Trained spotter guiding vehicle movements in shared zones. Human control — guides the driver and warns pedestrians.",
+      "effectiveness_p10": 0.4,
+      "effectiveness_p50": 0.6,
+      "effectiveness_p90": 0.8,
+      "effectiveness_bounds": [
+        0.0,
+        1.0
+      ],
+      "description": "Trained spotter guiding vehicle movements in shared zones. Human control \u2014 guides the driver and warns pedestrians.",
       "pfd_source": "PFD 0.15. Failure: banksman distracted, not positioned correctly, communication breakdown, driver proceeds without banksman for 'quick' move.",
-      "effectiveness_source": "Effective when banksman is competent and driver follows instructions. Human-dependent — both parties must perform."
+      "effectiveness_source": "Effective when banksman is competent and driver follows instructions. Human-dependent \u2014 both parties must perform.",
+      "control_type": "chance"
     }
   ],
   "sources": [
-    {"author": "Tefft", "year": 2013, "relevance": "Impact speed and pedestrian risk — dose-response for speed controls"},
-    {"author": "NHTSA", "year": 2022, "relevance": "Rear camera effectiveness data"},
-    {"author": "HSE", "year": 2024, "relevance": "Workplace transport safety — segregation guidance"},
-    {"author": "CCPS", "year": 2015, "relevance": "LOPA PFD values"}
+    {
+      "author": "Tefft",
+      "year": 2013,
+      "relevance": "Impact speed and pedestrian risk \u2014 dose-response for speed controls"
+    },
+    {
+      "author": "NHTSA",
+      "year": 2022,
+      "relevance": "Rear camera effectiveness data"
+    },
+    {
+      "author": "HSE",
+      "year": 2024,
+      "relevance": "Workplace transport safety \u2014 segregation guidance"
+    },
+    {
+      "author": "CCPS",
+      "year": 2015,
+      "relevance": "LOPA PFD values"
+    }
   ]
 }
