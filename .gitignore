@@ -6,6 +6,7 @@ guests/*/target
 /data/sif/*
 !/data/sif/taxonomy/
 !/data/sif/calibration/
+!/data/sif/benchmarks/
 # ICD-11 raw source download — 14MB, derive from WHO site
 data/sif/taxonomy/SimpleTabulation-*
 .zed

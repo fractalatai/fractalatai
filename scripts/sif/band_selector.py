@@ -148,6 +148,33 @@ def call_gemini(prompt, api_key):
         return {"error": str(e), "raw": str(data)[:300]}
 
 
+def call_qwen(prompt, ollama_url="http://localhost:11434/api/chat", model="qwen3:8b"):
+    """Call Qwen via Ollama for band selection."""
+    import requests
+
+    resp = requests.post(
+        ollama_url,
+        json={
+            "model": model,
+            "messages": [
+                {"role": "user", "content": prompt},
+            ],
+            "stream": False,
+            "options": {"temperature": 0.0, "num_predict": 500},
+            "format": "json",
+            "think": False,
+        },
+        timeout=120,
+    )
+    resp.raise_for_status()
+    content = resp.json()["message"]["content"]
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return {"error": "invalid_json", "raw": content[:500]}
+
+
 def get_narrative(event_id, qwen_events, qq_data=None):
     """Get the full narrative for an event. Try QQ DuckDB first, fall back to preview."""
     # Try DuckDB
@@ -172,8 +199,10 @@ def get_narrative(event_id, qwen_events, qq_data=None):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sample", type=int, default=50, help="Number of events to process")
+    parser.add_argument("--sample", type=int, default=0, help="Number of events to process (0 = all)")
     parser.add_argument("--model", default="gemini", choices=["gemini", "qwen"])
+    parser.add_argument("--qwen-model", default="qwen3:8b", help="Ollama model name for Qwen")
+    parser.add_argument("--ollama-url", default="http://localhost:11434/api/chat")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--output", default="band_selection_results.json")
     args = parser.parse_args()
@@ -182,7 +211,7 @@ def main():
     with open(QWEN_FILE) as f:
         qwen_events = json.load(f)
 
-    # Get API key for Gemini
+    # Get API key for Gemini (not needed for Qwen)
     api_key = None
     if args.model == "gemini":
         api_key = os.environ.get("GEMINI_API_KEY")
@@ -195,34 +224,43 @@ def main():
         if not api_key:
             print("ERROR: GEMINI_API_KEY not set")
             return
+    elif args.model == "qwen":
+        print(f"Qwen mode: {args.qwen_model} via {args.ollama_url}")
 
-    # Stratified sample: pick events across mechanisms
-    by_mech = {}
+    # Build event list — filter to mappable mechanisms
+    all_events = []
     for evt in qwen_events:
         raw_mech = evt["prediction"].get("mechanism", "unknown")
         mech = MECHANISM_MAP.get(raw_mech)
         if mech and mech in MECHANISM_TO_FILE:
+            all_events.append(evt)
+
+    if args.sample > 0:
+        # Stratified sample: pick events across mechanisms
+        by_mech = {}
+        for evt in all_events:
+            mech = MECHANISM_MAP.get(evt["prediction"].get("mechanism", ""))
             by_mech.setdefault(mech, []).append(evt)
 
-    sample = []
-    # Take proportional sample, at least 1 per mechanism
-    mechs_sorted = sorted(by_mech.keys(), key=lambda m: len(by_mech[m]), reverse=True)
-    per_mech = max(1, args.sample // len(mechs_sorted))
-    for mech in mechs_sorted:
-        events = by_mech[mech]
-        take = min(per_mech, len(events))
-        # Mix of SIFp and Not SIFp
-        sif_events = [e for e in events if e["qq_sifp"] != "9 Not SIFp"]
-        non_sif = [e for e in events if e["qq_sifp"] == "9 Not SIFp"]
-        take_sif = min(take // 2, len(sif_events))
-        take_non = min(take - take_sif, len(non_sif))
-        sample.extend(sif_events[:take_sif])
-        sample.extend(non_sif[:take_non])
-        if len(sample) >= args.sample:
-            break
+        sample = []
+        mechs_sorted = sorted(by_mech.keys(), key=lambda m: len(by_mech[m]), reverse=True)
+        per_mech = max(1, args.sample // len(mechs_sorted))
+        for mech in mechs_sorted:
+            events = by_mech[mech]
+            take = min(per_mech, len(events))
+            sif_events = [e for e in events if e["qq_sifp"] != "9 Not SIFp"]
+            non_sif = [e for e in events if e["qq_sifp"] == "9 Not SIFp"]
+            take_sif = min(take // 2, len(sif_events))
+            take_non = min(take - take_sif, len(non_sif))
+            sample.extend(sif_events[:take_sif])
+            sample.extend(non_sif[:take_non])
+            if len(sample) >= args.sample:
+                break
+        sample = sample[:args.sample]
+    else:
+        sample = all_events
 
-    sample = sample[:args.sample]
-    print(f"Sample: {len(sample)} events across {len(set(MECHANISM_MAP.get(e['prediction'].get('mechanism',''),'?') for e in sample))} mechanisms")
+    print(f"Events: {len(sample)} across {len(set(MECHANISM_MAP.get(e['prediction'].get('mechanism',''),'?') for e in sample))} mechanisms")
 
     if args.dry_run:
         # Show one example prompt per mechanism
@@ -276,11 +314,20 @@ def main():
         if args.model == "gemini":
             response = call_gemini(prompt, api_key)
         else:
-            print("Qwen mode not implemented yet — use --model gemini")
-            return
+            response = call_qwen(prompt, ollama_url=args.ollama_url, model=args.qwen_model)
         elapsed = time.time() - t0
 
-        band_name = response.get("band_name", cal["magnitude_bands"][0]["band"])
+        # Validate band_name against actual bands in calibration
+        valid_bands = [b["band"] for b in cal["magnitude_bands"]]
+        band_name = response.get("band_name", "")
+        if band_name not in valid_bands:
+            # Try band_number as fallback
+            band_num = response.get("band_number")
+            if isinstance(band_num, int) and 1 <= band_num <= len(valid_bands):
+                band_name = valid_bands[band_num - 1]
+            else:
+                # Default to least severe (band 0)
+                band_name = valid_bands[0]
         confidence = response.get("confidence", "low")
 
         result = {
@@ -304,7 +351,7 @@ def main():
 
         print(f"  [{len(results)}] {elapsed:.1f}s  {mech:20s} → {band_name:25s}  conf={confidence:6s}  sifp={evt['qq_sifp']}")
 
-        # Rate limit for Gemini free tier
+        # Rate limit for Gemini free tier only — Qwen is local, no delay needed
         if args.model == "gemini" and elapsed < 4.0:
             time.sleep(4.0 - elapsed)
 
