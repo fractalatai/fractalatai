@@ -1,0 +1,111 @@
+{
+  "mechanism": "electrical",
+  "description": "Mitigations for electrical contact and arc flash. Covers isolation (LOTO), insulation, PPE, and detection.",
+  "mitigations": [
+    {
+      "name": "low_voltage_design",
+      "display": "Low voltage design (<50V)",
+      "type": "design",
+      "timing": "pre_impact",
+      "p_active": 0.999,
+      "effectiveness_p10": 0.95,
+      "effectiveness_p50": 0.99,
+      "effectiveness_p90": 0.999,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Design the system to operate below 50V AC (IEC 60479 safety threshold). SELV/PELV systems. Eliminates the hazard by keeping voltage below dangerous levels.",
+      "pfd_source": "Inherent safety — the system cannot produce dangerous voltage by design.",
+      "effectiveness_source": "Below 50V, current through intact skin is below perception threshold. Near-complete elimination of electrical injury risk."
+    },
+    {
+      "name": "loto",
+      "display": "Lockout/Tagout (LOTO)",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.95,
+      "effectiveness_p10": 0.95,
+      "effectiveness_p50": 0.99,
+      "effectiveness_p90": 0.999,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Physical isolation of energy source with personal lock. 29 CFR 1910.147. Requires worker to apply lock — human-dependent step, but once locked the isolation is physical.",
+      "pfd_source": "LOPA: PFD 0.05 for LOTO. Failure modes: not applied (most common — time pressure, complacency), wrong isolation point, stored energy not dissipated, lock removed prematurely. OSHA: LOTO violations are #4 most cited standard.",
+      "effectiveness_source": "When correctly applied, system is de-energised. Near-complete elimination of contact risk. Stored energy (capacitors, springs) is the residual hazard if not verified."
+    },
+    {
+      "name": "insulated_tools_gloves",
+      "display": "Insulated gloves + tools",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.90,
+      "effectiveness_p10": 0.80,
+      "effectiveness_p50": 0.90,
+      "effectiveness_p90": 0.95,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Voltage-rated insulated gloves (EN 60903) and insulated tools for live work. Prevents current path through body. Requires correct voltage class selection and regular testing.",
+      "pfd_source": "PFD 0.10 for PPE. Failure modes: wrong voltage class, gloves not tested (6-month retest required), pinhole damage, not worn for 'quick job'.",
+      "effectiveness_source": "When correctly rated and intact, insulated gloves prevent current flow. EN 60903 proof-tested to voltage class. Effectiveness limited by glove integrity and correct selection."
+    },
+    {
+      "name": "arc_rated_ppe",
+      "display": "Arc-rated PPE (NFPA 70E)",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.90,
+      "effectiveness_p10": 0.70,
+      "effectiveness_p50": 0.85,
+      "effectiveness_p90": 0.95,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Arc-rated clothing, face shield, gloves per NFPA 70E PPE categories. Protects against arc flash thermal energy. Category 1 (4 cal/cm2) to Category 4 (40 cal/cm2).",
+      "pfd_source": "PFD 0.10 for PPE. Failure modes: wrong category for incident energy, not worn, clothing damaged, face shield not down.",
+      "effectiveness_source": "NFPA 70E PPE category testing — clothing prevents burns up to rated incident energy. Arc blast pressure and shrapnel are not fully mitigated by clothing."
+    },
+    {
+      "name": "gfci_rcd",
+      "display": "GFCI / RCD (30mA)",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.98,
+      "effectiveness_p10": 0.85,
+      "effectiveness_p50": 0.95,
+      "effectiveness_p90": 0.99,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Ground Fault Circuit Interrupter / Residual Current Device. Trips at 30mA in <30ms — below VF threshold for most pathways. Automatic, no human action required.",
+      "pfd_source": "PFD 0.02. Passive engineered device. Failure modes: not installed (older circuits), tripped/bypassed, failed to trip (stuck contacts — requires monthly test).",
+      "effectiveness_source": "IEC 60479: 30mA RCD limits current below VF threshold for most exposure durations. Very effective for domestic/light industrial voltages. Less effective for high-energy arc flash."
+    },
+    {
+      "name": "permit_to_work_elec",
+      "display": "Electrical permit to work",
+      "type": "managed",
+      "timing": "pre_impact",
+      "p_active": 0.90,
+      "effectiveness_p10": 0.40,
+      "effectiveness_p50": 0.60,
+      "effectiveness_p90": 0.80,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Formal authorisation for electrical work by competent person. Ensures LOTO, proving dead, correct PPE, and safe system of work. Administrative control.",
+      "pfd_source": "LOPA: PFD 0.10 for administrative controls.",
+      "effectiveness_source": "Effectiveness is indirect — ensures other controls (LOTO, PPE) are in place. A permit alone doesn't prevent shock."
+    },
+    {
+      "name": "emergency_response",
+      "display": "Electrical emergency response",
+      "type": "managed",
+      "timing": "post_impact",
+      "p_active": 0.80,
+      "effectiveness_p10": 0.20,
+      "effectiveness_p50": 0.40,
+      "effectiveness_p90": 0.60,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Trained first aiders with AED, emergency isolation procedure, burn treatment capability. Post-contact response. AED within 3 minutes dramatically improves cardiac arrest survival.",
+      "pfd_source": "PFD 0.20. Requires trained personnel on site, AED maintained and accessible, prompt response.",
+      "effectiveness_source": "AED within 3 min: ~70% survival from VF cardiac arrest. Without AED: ~5% survival. Effectiveness is dominated by response time."
+    }
+  ],
+  "sources": [
+    {"author": "NFPA 70E", "year": 2024, "relevance": "Standard for Electrical Safety in the Workplace — PPE categories, arc flash boundary, safe work practices"},
+    {"author": "IEC 60479-1", "year": 2018, "relevance": "Effects of current on human beings — VF thresholds, RCD effectiveness"},
+    {"author": "EN 60903", "year": 2003, "relevance": "Live working — gloves of insulating material"},
+    {"author": "CCPS", "year": 2015, "relevance": "LOPA guidelines — PFD values for LOTO, PPE, administrative controls"},
+    {"author": "OSHA", "year": 2023, "relevance": "LOTO standard 1910.147 — #4 most cited, failure mode data"}
+  ]
+}

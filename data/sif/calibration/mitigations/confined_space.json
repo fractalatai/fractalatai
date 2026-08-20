@@ -1,0 +1,109 @@
+{
+  "mechanism": "breathing",
+  "description": "Mitigations for confined space and breathing hazards. Rescue capability is the dominant post-impact control — 60% of confined space deaths are rescuers.",
+  "mitigations": [
+    {
+      "name": "elimination_entry",
+      "display": "Eliminate confined space entry",
+      "type": "design",
+      "timing": "pre_impact",
+      "p_active": 0.999,
+      "effectiveness_p10": 0.99,
+      "effectiveness_p50": 0.999,
+      "effectiveness_p90": 0.999,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Design out the need for confined space entry. Remote inspection (cameras, drones), external cleaning systems, automation. If no one enters, no one dies.",
+      "pfd_source": "Inherent safety. PFD reflects rare cases where entry is still needed despite design intent.",
+      "effectiveness_source": "Complete elimination of the breathing hazard if no entry occurs."
+    },
+    {
+      "name": "continuous_monitoring",
+      "display": "Continuous atmospheric monitoring",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.95,
+      "effectiveness_p10": 0.80,
+      "effectiveness_p50": 0.90,
+      "effectiveness_p90": 0.95,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Fixed or portable multi-gas detector (O2, LEL, CO, H2S) with alarm. Continuous monitoring during entry — alerts worker before atmosphere becomes IDLH.",
+      "pfd_source": "PFD 0.05. Failure: not calibrated, sensor poisoned, alarm ignored, battery dead, placed in wrong location within the space.",
+      "effectiveness_source": "Early warning allows self-rescue before incapacitation. Most effective when alarm triggers immediate evacuation. Ineffective if atmosphere changes suddenly (e.g., argon purge initiated during entry)."
+    },
+    {
+      "name": "forced_ventilation",
+      "display": "Forced ventilation",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.93,
+      "effectiveness_p10": 0.70,
+      "effectiveness_p50": 0.85,
+      "effectiveness_p90": 0.95,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Mechanical ventilation diluting/displacing hazardous atmosphere. Blower + ducting providing fresh air to the space. Must run continuously during entry.",
+      "pfd_source": "PFD 0.07. Failure: insufficient air changes, duct disconnected, blower tripped, intake contaminated, space geometry prevents effective ventilation (dead spots).",
+      "effectiveness_source": "Effective for displacing accumulated gas/vapour. Less effective for oxygen-displacing inert gas (heavier-than-air gases settle below duct level). Continuous operation is critical."
+    },
+    {
+      "name": "scba",
+      "display": "SCBA (self-contained breathing apparatus)",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.90,
+      "effectiveness_p10": 0.90,
+      "effectiveness_p50": 0.95,
+      "effectiveness_p90": 0.99,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Self-contained breathing apparatus providing independent air supply. Worker breathes from cylinder regardless of ambient atmosphere. The definitive pre-impact control for IDLH atmospheres.",
+      "pfd_source": "PFD 0.10. Failure: mask seal failure (facial hair), cylinder duration exceeded, not donned correctly, worker removes mask in space.",
+      "effectiveness_source": "When properly worn, provides complete respiratory protection regardless of atmosphere. Duration limited by cylinder (typically 30-45 min). Very high effectiveness when working."
+    },
+    {
+      "name": "permit_confined_space",
+      "display": "Confined space permit to work",
+      "type": "managed",
+      "timing": "pre_impact",
+      "p_active": 0.90,
+      "effectiveness_p10": 0.40,
+      "effectiveness_p50": 0.60,
+      "effectiveness_p90": 0.80,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Formal permit system per 29 CFR 1910.146 / CS Regs 1997. Pre-entry atmosphere test, ventilation, rescue plan, attendant, communication. The framework that ensures other controls are in place.",
+      "pfd_source": "LOPA: PFD 0.10 for administrative controls.",
+      "effectiveness_source": "A permit alone doesn't change the atmosphere — it ensures monitoring, ventilation, SCBA, and rescue are in place. Effectiveness is indirect."
+    },
+    {
+      "name": "standby_rescue_team",
+      "display": "SCBA rescue team on standby",
+      "type": "managed",
+      "timing": "post_impact",
+      "p_active": 0.90,
+      "effectiveness_p10": 0.60,
+      "effectiveness_p50": 0.80,
+      "effectiveness_p90": 0.95,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Trained, SCBA-equipped rescue team positioned at the confined space entry during all work. Can effect rescue within 5 minutes of alarm. THE critical post-impact control — without it, confined space collapse is almost always fatal.",
+      "pfd_source": "PFD 0.10. Failure: team not on standby (called away, shift change), SCBA not ready, untrained bystander attempts rescue instead (60% of deaths are rescuers).",
+      "effectiveness_source": "HSE data: rescue within 5 min dramatically improves survival from O2-deficient atmosphere. Brain damage begins at 4 min without oxygen. The rescue team transforms P(death) from ~0.90 to ~0.20."
+    },
+    {
+      "name": "retrieval_line",
+      "display": "Retrieval line + tripod",
+      "type": "engineered",
+      "timing": "post_impact",
+      "p_active": 0.88,
+      "effectiveness_p10": 0.50,
+      "effectiveness_p50": 0.70,
+      "effectiveness_p90": 0.90,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Non-entry rescue capability: worker wears harness attached to retrieval line on tripod/davit at entry point. Attendant can extract the worker without entering the space. Eliminates the rescuer-becomes-victim cascade.",
+      "pfd_source": "PFD 0.12. Failure: not attached, line tangled in space, space geometry prevents extraction (bends, obstructions), worker too heavy for manual retrieval.",
+      "effectiveness_source": "When the geometry allows extraction, retrieval is fast (seconds to minutes). Eliminates the need for a rescuer to enter. Effectiveness limited by space configuration."
+    }
+  ],
+  "sources": [
+    {"author": "HSE", "year": 2024, "relevance": "Confined Spaces Regulations 1997 — ACOP and guidance. 60% of deaths are rescuers."},
+    {"author": "OSHA", "year": 2023, "relevance": "Permit-Required Confined Spaces 29 CFR 1910.146. Most cited for rescue plan failures."},
+    {"author": "CCPS", "year": 2015, "relevance": "LOPA guidelines — PFD for monitoring, ventilation, SCBA, rescue."}
+  ]
+}

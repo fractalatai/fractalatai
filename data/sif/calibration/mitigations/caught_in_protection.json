@@ -1,0 +1,96 @@
+{
+  "mechanism": "caught_in",
+  "description": "Mitigations for caught-in/between and machinery entanglement. Guarding and LOTO are the dominant controls. The key question: does the machine stop when it meets a human body?",
+  "mitigations": [
+    {
+      "name": "guarding_by_design",
+      "display": "Guarding integrated by design",
+      "type": "design",
+      "timing": "pre_impact",
+      "p_active": 0.99,
+      "effectiveness_p10": 0.90,
+      "effectiveness_p50": 0.95,
+      "effectiveness_p90": 0.99,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Machine designed with integral guarding that cannot be removed without tools. EN ISO 12100 risk reduction by design. Nip points and rotating parts enclosed as part of the machine structure.",
+      "pfd_source": "PFD 0.01. Can't be casually defeated. Failure: guard design doesn't cover all access points, maintenance access allows bypass.",
+      "effectiveness_source": "If nip points are enclosed, entanglement cannot occur during normal operation. Maintenance access is the residual gap."
+    },
+    {
+      "name": "fixed_guard",
+      "display": "Fixed guard (bolted)",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.97,
+      "effectiveness_p10": 0.85,
+      "effectiveness_p50": 0.95,
+      "effectiveness_p90": 0.99,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Fixed guard panels requiring tools to remove. EN 953. Prevents access to nip points and rotating parts during operation.",
+      "pfd_source": "PFD 0.03. Failure: guard removed for cleaning/adjustment and not replaced, guard damaged, bolts missing allowing removal without tools.",
+      "effectiveness_source": "When in place, prevents body access to danger zone. Very high effectiveness. PUWER Reg 11."
+    },
+    {
+      "name": "interlocked_guard",
+      "display": "Interlocked guard",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.96,
+      "effectiveness_p10": 0.90,
+      "effectiveness_p50": 0.95,
+      "effectiveness_p90": 0.99,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Guard with interlock switch — opening the guard stops the machine. EN ISO 14119. Allows access for cleaning/adjustment while ensuring machine is stopped.",
+      "pfd_source": "PFD 0.04. Failure: interlock defeated/bypassed (common — tied off, magnet), run-down time allows access before machine stops, interlock wiring fault.",
+      "effectiveness_source": "When working, machine stops before guard fully opens. Effectiveness limited by machine run-down time (high-inertia machines keep rotating after power cut)."
+    },
+    {
+      "name": "light_curtain",
+      "display": "Light curtain / safety scanner",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.95,
+      "effectiveness_p10": 0.85,
+      "effectiveness_p50": 0.90,
+      "effectiveness_p90": 0.95,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Electro-sensitive protective equipment (ESPE) — light curtain or laser scanner detects body part entering danger zone and stops machine. EN 61496.",
+      "pfd_source": "PFD 0.05. Failure: muting for material feed, blanking for small parts, contaminated optics, response time exceeds stopping time.",
+      "effectiveness_source": "Stops machine when beam is broken. Effectiveness depends on response time vs approach speed. Not suitable for machines with long run-down times."
+    },
+    {
+      "name": "loto_machinery",
+      "display": "LOTO for maintenance",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.95,
+      "effectiveness_p10": 0.95,
+      "effectiveness_p50": 0.99,
+      "effectiveness_p90": 0.999,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Lockout/Tagout during maintenance, cleaning, unjamming. Physical isolation of all energy sources (electrical, hydraulic, pneumatic, gravitational). The critical control for maintenance-phase caught-in.",
+      "pfd_source": "PFD 0.05. Same as electrical LOTO. Most caught-in fatalities occur during maintenance when guards are legitimately removed and LOTO was not applied.",
+      "effectiveness_source": "When all energy sources are isolated and verified, machine cannot move. Near-complete protection. The gap is stored energy (springs, elevated parts)."
+    },
+    {
+      "name": "e_stop",
+      "display": "Emergency stop",
+      "type": "engineered",
+      "timing": "post_impact",
+      "p_active": 0.95,
+      "effectiveness_p10": 0.20,
+      "effectiveness_p50": 0.40,
+      "effectiveness_p90": 0.60,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Emergency stop button within reach of operator. Stops machine after entanglement begins. Post-impact — the injury has started, e-stop limits its duration.",
+      "pfd_source": "PFD 0.05. Failure: button not within reach, operator incapacitated, machine has long run-down time, bystander doesn't know which button.",
+      "effectiveness_source": "Reduces the duration of entanglement. For high-torque machines, damage occurs in fractions of a second — e-stop may be too slow. Most effective for low-torque machines that can be stopped before full draw-in."
+    }
+  ],
+  "sources": [
+    {"author": "EN ISO 12100", "year": 2010, "relevance": "Safety of machinery — general principles for design, risk assessment and risk reduction"},
+    {"author": "EN ISO 14119", "year": 2013, "relevance": "Safety of machinery — interlocking devices associated with guards"},
+    {"author": "EN 953", "year": 2009, "relevance": "Safety of machinery — guards, general requirements for design and construction"},
+    {"author": "CCPS", "year": 2015, "relevance": "LOPA PFD values for guarding, interlocks, LOTO"}
+  ]
+}

@@ -1,10 +1,10 @@
 ---
 session: Mitigation Library
-status: pending
+status: active
 opened: 2026-08-20
 ---
 
-# Session: Mitigation Library (PENDING)
+# Session: Mitigation Library (ACTIVE)
 
 ## Problem
 
@@ -12,18 +12,21 @@ The SIF simulator (S3) needs a mitigation effectiveness library: for each common
 
 ## Todo
 
-- ⬜ Define mitigation data format (JSON — name, mechanism applicability, effectiveness P10/P50/P90, reliability/PFD, source)
-- ⬜ Fall protection mitigations — harness/lanyard (PFD from AS/NZS 1891, EN 365 inspection data), guardrails, safety nets, edge protection
-- ⬜ Electrical mitigations — LOTO (PFD from LOPA data), insulated gloves, arc-rated PPE (NFPA 70E categories), GFCI, permits
-- ⬜ Struck-by mitigations — hard hat (reduction factor from EN 397 test data), exclusion zones, catch nets, tool lanyards
-- ⬜ Transport mitigations — barriers, speed controls, spotters, segregation, high-vis
-- ⬜ Thermal/fire mitigations — FR clothing (prevents clothing ignition escalation), sprinklers, deluge, gas suppression
-- ⬜ Confined space mitigations — atmospheric monitoring, SCBA standby rescue, permit-to-work, ventilation
-- ⬜ Caught-in mitigations — fixed guarding, interlocked guards, light curtains, LOTO, e-stop
-- ⬜ Chemical mitigations — emergency shower (decontamination speed), chemical-resistant PPE, ventilation, calcium gluconate (HF)
-- ⬜ Generic mitigations — permit-to-work, competent person, method statement/RAMS, supervision
-- ⬜ Validate: unmitigated STKY hazard at SIF → add appropriate mitigations → residual P(SIF) drops below threshold
-- ⬜ Store as JSON in data/sif/calibration/mitigations/
+- ✅ Define mitigation data format — p_active (Bernoulli gate), effectiveness P10/P50/P90 (bounded [0,1] metalog), type (design/engineered/managed), timing (pre/post-impact)
+- ✅ Fall protection — 7 mitigations (elimination, guardrail, net, harness, restraint, permit, rescue)
+- ✅ Electrical — 7 mitigations (LV design, LOTO, insulated gloves, arc PPE, GFCI, permit, emergency response)
+- ✅ Struck-by — 5 mitigations (toe boards, tool lanyards, hard hat, exclusion zone, lift plan)
+- ✅ Transport — 5 mitigations (segregation, speed controls, reversing aids, high-vis, banksman)
+- ✅ Fire — 6 mitigations (fire-resistant design, sprinklers, FR clothing, detection, escape routes, fire brigade)
+- ✅ Thermal — 7 mitigations (insulation, thermal PPE, WBGT monitoring, hydration, cold clothing, PFD/immersion suit, emergency cooling)
+- ✅ Confined space / breathing — 7 mitigations (elimination, monitoring, ventilation, SCBA, permit, rescue team, retrieval line)
+- ✅ Caught-in — 6 mitigations (design guarding, fixed guard, interlock, light curtain, LOTO, e-stop)
+- ✅ Chemical — 6 mitigations (substitution, closed system, chemical PPE, emergency shower, calcium gluconate, labelling)
+- ✅ Explosion — 6 mitigations (inerting, blast-resistant design, suppression, venting, gas detection, ATEX zoning)
+- ✅ Structural collapse — 6 mitigations (trench box, sloping, scaffold design, TWC, competent person, rescue)
+- ✅ Generic controls — 6 mitigations (risk assessment, competent person, training, stop work, emergency plan, first aid)
+- ✅ Store as JSON in data/sif/calibration/mitigations/ — 12 files, 74 mitigations
+- ⬜ Validate: unmitigated STKY hazard at SIF → add mitigations → residual P(SIF) drops below threshold
 
 ## Dependencies
 

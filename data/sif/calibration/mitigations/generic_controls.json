@@ -1,0 +1,95 @@
+{
+  "mechanism": "any",
+  "description": "Generic administrative and organisational controls that apply across multiple mechanisms. These are the managed layer — human-dependent, lower reliability than engineered controls, but universally applicable.",
+  "mitigations": [
+    {
+      "name": "risk_assessment",
+      "display": "Risk assessment / RAMS",
+      "type": "managed",
+      "timing": "pre_impact",
+      "p_active": 0.85,
+      "effectiveness_p10": 0.20,
+      "effectiveness_p50": 0.40,
+      "effectiveness_p90": 0.60,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Task-specific risk assessment or method statement (RAMS) identifying hazards and specifying controls. Does not physically mitigate — ensures other controls are identified and planned.",
+      "pfd_source": "LOPA: PFD 0.15 for administrative controls. Failure: generic/copy-paste assessment, not task-specific, not read by workers, controls identified but not implemented.",
+      "effectiveness_source": "Effectiveness is entirely indirect — the value is in identifying and specifying the controls. A risk assessment that sits in a folder is worthless."
+    },
+    {
+      "name": "competent_person",
+      "display": "Competent person / supervision",
+      "type": "managed",
+      "timing": "pre_impact",
+      "p_active": 0.85,
+      "effectiveness_p10": 0.30,
+      "effectiveness_p50": 0.50,
+      "effectiveness_p90": 0.70,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Trained, experienced person supervising the work. Can identify changing conditions, enforce controls, stop work. The human element of the safety system.",
+      "pfd_source": "PFD 0.15. Failure: person not actually competent (has the title but not the knowledge), not present during critical phases, production pressure overrides safety judgement.",
+      "effectiveness_source": "A genuinely competent supervisor catches the things that procedures miss — changing conditions, shortcuts, complacency. Effectiveness varies hugely with the individual."
+    },
+    {
+      "name": "training_awareness",
+      "display": "Training + hazard awareness",
+      "type": "managed",
+      "timing": "pre_impact",
+      "p_active": 0.80,
+      "effectiveness_p10": 0.10,
+      "effectiveness_p50": 0.25,
+      "effectiveness_p90": 0.40,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Hazard-specific training and toolbox talks. Builds awareness but does not physically prevent the event. Knowledge decays without reinforcement.",
+      "pfd_source": "PFD 0.20. Failure: training not retained (Ebbinghaus curve — 70% forgotten within 24 hours without reinforcement), not specific to the task, language/literacy barriers.",
+      "effectiveness_source": "Training alone has low effectiveness — knowledge doesn't equal behaviour. Most effective when combined with practical reinforcement and competent supervision."
+    },
+    {
+      "name": "stop_work_authority",
+      "display": "Stop work authority",
+      "type": "managed",
+      "timing": "pre_impact",
+      "p_active": 0.70,
+      "effectiveness_p10": 0.40,
+      "effectiveness_p50": 0.60,
+      "effectiveness_p90": 0.80,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Any worker can stop work if they perceive unsafe conditions. Cultural control — only works if the organisation genuinely supports it without reprisal.",
+      "pfd_source": "PFD 0.30. High PFD because exercising stop work requires psychological safety. Failure: worker doesn't speak up (fear of reprisal, peer pressure, production pressure), concern dismissed by supervisor.",
+      "effectiveness_source": "When exercised and respected, stops the event before it occurs. The most powerful managed control — but also the most culturally dependent. Organisations with high Voice scores (cultural graph) have more effective stop work authority."
+    },
+    {
+      "name": "emergency_plan",
+      "display": "Emergency response plan",
+      "type": "managed",
+      "timing": "post_impact",
+      "p_active": 0.85,
+      "effectiveness_p10": 0.20,
+      "effectiveness_p50": 0.40,
+      "effectiveness_p90": 0.60,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Documented emergency plan with trained first aiders, communication protocol, evacuation routes, external service liaison. Framework for post-impact response.",
+      "pfd_source": "PFD 0.15. Failure: plan not rehearsed, first aiders not available (shift coverage), communication breakdown, external services delayed.",
+      "effectiveness_source": "Reduces response time and ensures appropriate first aid. Effectiveness depends on rehearsal frequency and personnel availability."
+    },
+    {
+      "name": "first_aid",
+      "display": "Trained first aiders + equipment",
+      "type": "managed",
+      "timing": "post_impact",
+      "p_active": 0.85,
+      "effectiveness_p10": 0.10,
+      "effectiveness_p50": 0.30,
+      "effectiveness_p90": 0.50,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Workplace first aiders with appropriate equipment (AED, burns kit, trauma kit). Provides immediate treatment before ambulance. AED within 3 min is the highest-impact first aid intervention.",
+      "pfd_source": "PFD 0.15. Failure: first aider not on shift, equipment not maintained (AED battery, expired supplies), first aider panics or doesn't respond.",
+      "effectiveness_source": "AED within 3 min: ~70% survival from VF cardiac arrest vs ~5% without. Burns: immediate cooling reduces severity. Trauma: bleeding control saves lives. Effectiveness is intervention-specific."
+    }
+  ],
+  "sources": [
+    {"author": "CCPS", "year": 2015, "relevance": "LOPA guidelines — PFD for administrative controls, training, procedures"},
+    {"author": "HSE", "year": 2024, "relevance": "Managing for health and safety (HSG65) — PDCA framework, competent person requirements"},
+    {"author": "AHA", "year": 2023, "relevance": "AED survival data — chain of survival, time-to-defibrillation outcomes"}
+  ]
+}

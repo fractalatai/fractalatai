@@ -1,0 +1,111 @@
+{
+  "mechanism": "fall",
+  "description": "Mitigations for fall from height. Ordered by hierarchy: design → engineered → managed. Pre-impact and post-impact separated.",
+  "mitigations": [
+    {
+      "name": "elimination_of_height",
+      "display": "Eliminate work at height",
+      "type": "design",
+      "timing": "pre_impact",
+      "p_active": 0.999,
+      "effectiveness_p10": 0.99,
+      "effectiveness_p50": 0.999,
+      "effectiveness_p90": 0.999,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Design out the need to work at height. Prefabrication at ground level, remote inspection (drones), permanent access platforms.",
+      "pfd_source": "Inherent safety — if work at height is eliminated, the hazard doesn't exist. PFD reflects rare cases where elimination isn't complete.",
+      "effectiveness_source": "By definition, eliminating the fall hazard removes the energy source."
+    },
+    {
+      "name": "guardrail",
+      "display": "Edge protection / guardrail",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.98,
+      "effectiveness_p10": 0.90,
+      "effectiveness_p50": 0.95,
+      "effectiveness_p90": 0.99,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Fixed edge protection preventing access to fall zone. EN 13374 temporary edge protection, permanent guardrails. Passive — no human action required.",
+      "pfd_source": "LOPA: PFD 0.01-0.02 for passive engineered barriers. Failure modes: incomplete installation, gap in coverage, structural failure under load.",
+      "effectiveness_source": "When present and intact, guardrails prevent >95% of falls over the edge. P10 reflects cases where worker climbs over or guardrail doesn't cover all edges."
+    },
+    {
+      "name": "safety_net",
+      "display": "Safety net",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.97,
+      "effectiveness_p10": 0.85,
+      "effectiveness_p50": 0.95,
+      "effectiveness_p90": 0.99,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Collective fall arrest net below the working level. EN 1263 safety nets. Catches the person during the fall — reduces impact energy.",
+      "pfd_source": "LOPA: PFD 0.02-0.03. Failure modes: incorrect mesh size, deterioration, gap at edges, excessive fall distance into net.",
+      "effectiveness_source": "ANSI Z359.2 test data. Safety nets limit fall distance and decelerate the body. Residual injury from net impact is typically P(death) < 0.005. P10 reflects cases near net edge or excessive fall height before net engagement."
+    },
+    {
+      "name": "harness_lanyard",
+      "display": "Fall arrest harness + lanyard",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.95,
+      "effectiveness_p10": 0.85,
+      "effectiveness_p50": 0.95,
+      "effectiveness_p90": 0.99,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Personal fall arrest system: full body harness + energy-absorbing lanyard + anchor point. EN 361/EN 355. Requires the worker to clip on — human-dependent.",
+      "pfd_source": "LOPA: PFD 0.05 for PPE requiring human action. Failure modes: not clipped on (most common — worker forgets or finds it inconvenient), incorrect anchor point, damaged lanyard, insufficient free-fall clearance. HSE data: ~5% non-compliance rate even on monitored sites.",
+      "effectiveness_source": "When properly worn and anchored, arrests the fall. Residual injury from suspension trauma, harness impact forces (EN 355 limits to 6kN). P(death) < 0.01 when system works correctly."
+    },
+    {
+      "name": "work_restraint",
+      "display": "Work restraint system",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.93,
+      "effectiveness_p10": 0.95,
+      "effectiveness_p50": 0.99,
+      "effectiveness_p90": 0.999,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Short lanyard or retractable preventing the worker from reaching the fall edge. Better than fall arrest because the fall never starts. Requires correct anchor and lanyard length.",
+      "pfd_source": "PFD 0.07 — same human-dependent failure as harness, plus incorrect lanyard length allowing edge access. Slightly less reliable than fall arrest because length calculation must be correct.",
+      "effectiveness_source": "When correctly configured, prevents reaching the edge. Near-complete elimination of fall risk. Higher effectiveness than fall arrest because no fall occurs."
+    },
+    {
+      "name": "permit_to_work",
+      "display": "Permit to work (WAH)",
+      "type": "managed",
+      "timing": "pre_impact",
+      "p_active": 0.90,
+      "effectiveness_p10": 0.30,
+      "effectiveness_p50": 0.50,
+      "effectiveness_p90": 0.70,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Administrative control requiring formal authorisation before work at height. Ensures risk assessment, equipment check, and competent person review. Does not physically prevent the fall.",
+      "pfd_source": "LOPA: PFD 0.10 for administrative controls. Failure modes: permit not obtained (work done informally), risk assessment inadequate, permit conditions not followed on site.",
+      "effectiveness_source": "A permit doesn't stop a fall — it ensures other controls are in place. Effectiveness is indirect: the probability that the permit process results in adequate physical controls being implemented."
+    },
+    {
+      "name": "rescue_plan",
+      "display": "Rescue plan + trained team",
+      "type": "managed",
+      "timing": "post_impact",
+      "p_active": 0.85,
+      "effectiveness_p10": 0.20,
+      "effectiveness_p50": 0.40,
+      "effectiveness_p90": 0.60,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Post-fall rescue plan with trained team, equipment, and rehearsal. Critical for suspended worker after fall arrest (suspension trauma kills within 30 min). Also covers rescue from height for injured worker.",
+      "pfd_source": "PFD 0.15 — human-dependent, requires team availability, equipment readiness, and rehearsal. Failure: no rescue plan, team not on site, equipment not maintained.",
+      "effectiveness_source": "Prompt rescue (within 15 min) of a suspended worker prevents suspension trauma death. Effectiveness is time-dependent — 90% survival if rescued in <10 min, dropping rapidly after 20 min."
+    }
+  ],
+  "sources": [
+    {"author": "EN 13374", "year": 2013, "relevance": "Temporary edge protection systems — test requirements, load classes"},
+    {"author": "EN 1263", "year": 2014, "relevance": "Safety nets — Part 1 requirements, Part 2 installation"},
+    {"author": "EN 361/355", "year": 2002, "relevance": "Full body harness and energy absorbers — performance requirements"},
+    {"author": "CCPS", "year": 2015, "relevance": "Guidelines for Initiating Events and Independent Protection Layers in Layer of Protection Analysis — PFD values"},
+    {"author": "HSE", "year": 2024, "relevance": "Work at height statistics and compliance data"}
+  ]
+}

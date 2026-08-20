@@ -1,0 +1,96 @@
+{
+  "mechanism": "structural_collapse",
+  "description": "Mitigations for structural and ground collapse. Trench shoring is the dominant control for excavation — the #1 collapse killer.",
+  "mitigations": [
+    {
+      "name": "trench_box",
+      "display": "Trench box / shoring system",
+      "type": "engineered",
+      "timing": "pre_impact",
+      "p_active": 0.95,
+      "effectiveness_p10": 0.85,
+      "effectiveness_p50": 0.95,
+      "effectiveness_p90": 0.99,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Prefabricated trench shield or hydraulic shoring system. Prevents trench wall collapse onto workers. Required by OSHA for trenches >5ft (1.5m). The primary engineered control.",
+      "pfd_source": "PFD 0.05. Failure: not used (most common — time/cost pressure), undersized for trench depth, not extending above trench edge, moved without re-shoring.",
+      "effectiveness_source": "When correctly sized and installed, prevents soil from reaching workers. Very high effectiveness. OSHA: most trench fatalities occur in unshored trenches."
+    },
+    {
+      "name": "sloping_benching",
+      "display": "Sloped/benched excavation",
+      "type": "design",
+      "timing": "pre_impact",
+      "p_active": 0.97,
+      "effectiveness_p10": 0.85,
+      "effectiveness_p50": 0.95,
+      "effectiveness_p90": 0.99,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Excavation walls cut to a safe angle (depends on soil type — OSHA soil classification A/B/C). Eliminates vertical walls that can collapse. Design mitigation — inherent to the excavation shape.",
+      "pfd_source": "PFD 0.03. Failure: incorrect soil classification (Type C assumed as Type A), slope angle too steep, water ingress weakening slope, surcharge loads too close to edge.",
+      "effectiveness_source": "At correct angle for soil type, wall collapse is prevented by geometry. The most reliable excavation protection when space permits."
+    },
+    {
+      "name": "scaffold_design_check",
+      "display": "Scaffold design + inspection",
+      "type": "managed",
+      "timing": "pre_impact",
+      "p_active": 0.90,
+      "effectiveness_p10": 0.60,
+      "effectiveness_p50": 0.80,
+      "effectiveness_p90": 0.90,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Scaffold designed by competent person, erected to design, inspected before use and after adverse weather. NASC/TG20 for tube and fitting. Prevents overload/structural failure.",
+      "pfd_source": "PFD 0.10. Failure: design inadequate for load, erected differently from design, not inspected, altered after inspection (boards removed, ties missing).",
+      "effectiveness_source": "Competent design and inspection prevents structural scaffold failure. Effectiveness is indirect — ensures scaffold is fit for purpose."
+    },
+    {
+      "name": "temporary_works_coordinator",
+      "display": "Temporary works coordinator",
+      "type": "managed",
+      "timing": "pre_impact",
+      "p_active": 0.88,
+      "effectiveness_p10": 0.40,
+      "effectiveness_p50": 0.60,
+      "effectiveness_p90": 0.80,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "BS 5975 temporary works management — coordinator ensures design, check, installation, and removal of temporary works (formwork, falsework, propping, shoring).",
+      "pfd_source": "PFD 0.12. Administrative role. Failure: role not assigned, coordinator not competent, design not checked, early striking of formwork.",
+      "effectiveness_source": "BS 5975 process ensures temporary structures are designed and checked. Most formwork/falsework collapses result from process failures that a TWC would catch."
+    },
+    {
+      "name": "competent_person_excavation",
+      "display": "Competent person (excavation)",
+      "type": "managed",
+      "timing": "pre_impact",
+      "p_active": 0.88,
+      "effectiveness_p10": 0.40,
+      "effectiveness_p50": 0.60,
+      "effectiveness_p90": 0.80,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "OSHA-required competent person to inspect excavation daily, after rain, and after any change. Identifies deteriorating conditions before collapse.",
+      "pfd_source": "PFD 0.12. Failure: person not competent (titled but not trained), inspection skipped, conditions change between inspections.",
+      "effectiveness_source": "Daily inspection catches deteriorating conditions (water ingress, cracking, surcharge loads). Effectiveness depends on inspector competence and response to findings."
+    },
+    {
+      "name": "rescue_from_collapse",
+      "display": "Collapse rescue capability",
+      "type": "managed",
+      "timing": "post_impact",
+      "p_active": 0.75,
+      "effectiveness_p10": 0.10,
+      "effectiveness_p50": 0.30,
+      "effectiveness_p90": 0.50,
+      "effectiveness_bounds": [0.0, 1.0],
+      "description": "Trained rescue team with shoring equipment for trench rescue. Post-collapse — victim is buried, team must shore and dig without causing secondary collapse. Time-critical: traumatic asphyxia kills in minutes.",
+      "pfd_source": "PFD 0.25. Specialised capability rarely available on site. Failure: no rescue plan, fire service (primary responder) not trained in trench rescue, secondary collapse during rescue.",
+      "effectiveness_source": "Even with trained team, survival from full burial in soil is low — soil weight prevents breathing within seconds. Effectiveness is strongly time-dependent. Partial burial has much better rescue outcomes."
+    }
+  ],
+  "sources": [
+    {"author": "OSHA", "year": 2023, "relevance": "Excavation standards 29 CFR 1926 Subpart P — soil classification, shoring requirements, competent person"},
+    {"author": "BS 5975", "year": 2019, "relevance": "Code of practice for temporary works procedures — TWC role, design check process"},
+    {"author": "NIOSH", "year": 2020, "relevance": "Preventing Worker Deaths from Trench Cave-Ins — rescue data, fatality analysis"},
+    {"author": "CCPS", "year": 2015, "relevance": "LOPA PFD values"}
+  ]
+}
