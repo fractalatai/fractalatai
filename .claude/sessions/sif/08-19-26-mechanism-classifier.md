@@ -1,10 +1,122 @@
 ---
 session: Mechanism Classifier
-status: active
+status: closed
 opened: 2026-08-19
+closed: 2026-08-20
+outcome: partial
+
+summary: >
+  Built and validated the Stage 1 mechanism classifier across 5 training runs (Qwen 0.6B→1.7B,
+  20→18 labels, with/without structured context). Achieved 0.80 macro F1 on OSHA held-out data
+  but discovered a fundamental domain gap: US OSHA narratives don't transfer to UK QQ defence
+  narratives. The auto-non-SIF gate filters only 12% of events and is marginal over random on
+  cross-domain data. Key finding: single-source training data produces single-domain performance.
+
+decisions:
+  - what: Merge fall_height + fall_same_level → fall, struck_by + struck_against → struck (20 → 18 labels)
+    why: The model couldn't distinguish these semantically similar pairs from narrative text alone (F1 0.39/0.54 and 0.46/0.68). Stage 2 energy analysis is the right place for height/energy discrimination.
+    result: Merged labels improved overall macro F1 from 0.742 to 0.810
+  - what: Narrative only — no structured context in training
+    why: Runs 3+4 showed that including OIICS event titles (as labelled fields or appended text) achieves 0.99 F1 on OSHA but collapses to single-class prediction on QQ. The model learns the OIICS text as a shortcut rather than learning from the narrative.
+    result: Run 5 (narrative only) is the only model that generalises to QQ, even though F1 is lower (0.80)
+  - what: Differentiated training caps — 1K for NEEDS_ASSESSMENT, 500 for AUTO_NON_SIF
+    why: Original 5K cap was overkill for 0.6B LoRA (78K events). Gemini review confirmed 500-1500/class is the sweet spot. Auto-non-SIF classes don't need 5K each to learn "gate this out".
+    result: Training set reduced from 78K to 14.8K. Training time ~20 min on RTX 5090.
+  - what: Domain gap is the blocker, not model architecture
+    why: Run 5 QQ gate analysis showed 88.2% NEEDS_ASSESSMENT rate — gate filters only 12%. SIFp false negative rate (9.4%) is marginally better than random (would be ~11.6%). The model learned OSHA narrative style, not generalisable mechanism patterns.
+    result: Stage 1 two-stage approach suspended. Moving to single-model zero-shot experiment.
+  - what: Weighted loss (inverse frequency), not oversampling
+    why: Gemini review recommended against oversampling — duplicating sparse class examples causes overfitting. Weighted loss penalises rare-class errors more without altering data distribution.
+    result: Breathing class (334 examples) achieved 0.97 F1 with weighted loss despite being the smallest class.
+
+metrics:
+  run1: { model: "Qwen3-0.6B", labels: 20, macro_f1: 0.742, micro_f1: 0.740, gpu: "RTX 4090", vram_gb: 18.3 }
+  run2: { model: "Qwen3-1.7B", labels: 18, macro_f1: 0.810, micro_f1: 0.815, gpu: "RTX 4090", vram_gb: 16, gate_accuracy: 0.925, false_neg_pct: 4.2, false_pos_pct: 3.2 }
+  run3: { model: "Qwen3-1.7B", labels: 18, macro_f1: 0.990, note: "BROKEN — labelled context shortcut, 95% breathing on QQ" }
+  run4: { model: "Qwen3-1.7B", labels: 18, macro_f1: 0.998, note: "BROKEN — appended text same failure as run3" }
+  run5: { model: "Qwen3-1.7B", labels: 18, macro_f1: 0.799, micro_f1: 0.803, gpu: "RTX 5090", vram_gb: 16, qq_gate_needs_assessment_pct: 88.2, qq_sifp_captured_pct: 90.6, qq_sifp_missed_pct: 9.4, qq_gate_marginal_over_random: 9 }
+  training_data: { train: 13351, val: 1483, total_labels: 18, osha_events: 1579596, msha_supplements: 2102 }
+  training_time: { run5_minutes: 20, gpu: "RTX 5090 32GB", batch_size: 16 }
+
+lessons:
+  - title: Structured context in training creates format-dependent shortcuts
+    detail: >
+      Including OIICS event titles as labelled fields (Hazard category: ...) or as appended plain text
+      both produced 0.99+ F1 on OSHA validation but collapsed to single-class prediction (95% breathing)
+      on QQ data. The model learned to read the OIICS text — which is effectively the answer — rather than
+      learning mechanism patterns from the narrative. Any supplementary text that correlates strongly with
+      the label will be exploited as a shortcut.
+    tag: models
+  - title: Single-source training data produces single-domain performance
+    detail: >
+      Training exclusively on US OSHA narratives (even with MSHA mining supplements) doesn't transfer to
+      UK defence/industrial narratives. Different vocabulary ("manual handling" vs "overexertion"),
+      different reporting culture, different incident mix. The auto-non-SIF gate's marginal-over-random
+      performance on QQ data confirms the model learned OSHA style, not generalisable patterns.
+    tag: data
+  - title: 78K training events is overkill for LoRA fine-tuning a 0.6B model
+    detail: >
+      Original 5K/class cap produced 78K events. Gemini review identified 500-1500/class as the sweet spot
+      for LoRA. Reduced to 14.8K with no loss of accuracy on OSHA held-out (0.80 vs 0.81). More data just
+      means longer training and more autocoder noise memorised.
+    tag: models
+  - title: Qwen 1.7B OOMs at batch 16 on RTX 4090 (24GB) but fits on RTX 5090 (32GB)
+    detail: >
+      LoRA fine-tune of Qwen3-1.7B for sequence classification used 18.3GB on 0.6B and OOM'd at batch 16
+      on 1.7B (24GB 4090). Batch 8 + grad_accum 2 fixed it (16GB). RTX 5090 (32GB) runs batch 16 comfortably.
+      Always confirm GPU VRAM before setting batch size.
+    tag: infrastructure
+  - title: RunPod pip packages are ephemeral — reinstall on every pod start
+    detail: >
+      System Python packages installed via pip3 --break-system-packages are lost when the pod stops/restarts.
+      Always verify packages before running, not just GPU. The workspace (/workspace) persists but the
+      system environment doesn't.
+    tag: infrastructure
+  - title: Always namespace model runs on /workspace
+    detail: >
+      Runs 3 and 4 overwrote /workspace/sif/models/mechanism-classifier/, destroying run 2's model.
+      Fixed by adding --run argument to scripts: mechanism-run5/ instead of mechanism-classifier/.
+      Each run gets its own directory. Never overwrite.
+    tag: tooling
+  - title: OIICS event_code_pred labels are BLS autocoder predictions, not human annotations
+    detail: >
+      The training labels come from another ML model (BLS SOII autocoder). This creates an inherent
+      ceiling — our model can't exceed the autocoder's accuracy. Documented limitation, can't avoid
+      at 1.6M scale. The QQ correlation test provides a different signal from a different labelling process.
+    tag: data
+  - title: bf16 not fp16 for modern GPUs
+    detail: >
+      fp16 training caused NotImplementedError on RTX 4090/5090 ("_amp_foreach_non_finite_check_and_unscale_cuda
+      not implemented for BFloat16"). These GPUs natively use bfloat16. Always set bf16=True.
+    tag: infrastructure
+
+artifacts:
+  - scripts/sif/finetune_mechanism.py
+  - scripts/sif/export_and_infer.py
+  - scripts/sif/extract_training_data.py
+  - scripts/sif/build_benchmark.py
+  - data/sif/training/train.parquet
+  - data/sif/training/val.parquet
+  - data/sif/taxonomy/classifier-labels.json
+  - data/sif/taxonomy/oiics-to-mechanism-mapping.json
+  - data/sif/benchmarks/osha_benchmark.json
+  - data/sif/benchmarks/qq_benchmark.json
+  - data/sif/models/mechanism-classifier-v1/training_meta.json
+  - data/sif/models/mechanism-classifier-v1/classification_report.txt
+  - data/code-review/sif-training-plan-review.md
+  - data/code-review/sif-training-data-strategy-review.md
+
+depends_on:
+  - 08-19-26-taxonomy-and-data.md
+  - 08-19-26-sipmath-engine.md
+
+enables:
+  - Zero-shot single-model experiment (mechanism + energy in one pass)
+  - Future multi-source training data acquisition (RIDDOR, Safe Work Australia)
+  - Customer-specific fine-tuning workflow
 ---
 
-# Session: Mechanism Classifier (ACTIVE)
+# Session: Mechanism Classifier (CLOSED)
 
 ## Problem
 
@@ -19,12 +131,10 @@ Stage 1 of the SIF classifier: single-label text classification from incident na
 - ✅ Training data v2: 15,151 train + 1,683 val (stratified 90/10), MSHA merged, pre-processed, instruction format
 - ✅ Fine-tune run 1: Qwen 3 0.6B / 20 labels — macro F1 = 0.742. Fall and struck pairs confused.
 - ✅ Fine-tune run 2: Qwen 3 1.7B / 18 labels (merged fall, struck) — macro F1 = 0.810. Gate accuracy 92.5%.
-- ⬜ Fine-tune run 3: single-model approach (mechanism + energy in one pass) — Gemini suggestion, compare to two-stage
-- ⬜ Export best model to ONNX
-- ⬜ Evaluate against QQ correlation test (bulk inference on RunPod)
-- ⬜ Implement `fractalaw-ai::sif::classifier` — ONNX inference wrapper
-- ⬜ Add auto-non-SIF gate logic
-- ⬜ CLI command `sif classify` — single event or batch
+- ⏸️ Single-model approach — moved to new zero-shot experiment session
+- ✅ QQ correlation test — run 5 completed, gate marginal over random (domain gap)
+- ⏸️ ONNX export — deferred until model is production-worthy
+- ⏸️ Rust implementation + CLI — deferred until model is production-worthy
 
 ## Dependencies
 

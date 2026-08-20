@@ -16,8 +16,9 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 - ✅ S2: Taxonomy & data — ICD-11, OSHA 1.6M rows, QQ 2,747 events ingested, P(death) scale
 - ⬜ S2a: Calibration curves — energy × magnitude → severity metalog, mitigation effectiveness library
 - ⬜ S3: SIF simulator — Product 2, CLI + WASM, energy params → severity → mitigations → residual P(SIF)
-- ⬜ S4: Mechanism classifier — Stage 1, Qwen 3 0.6B fine-tune, ONNX, multi-label mechanism + object
-- ⬜ S5: Energy analyser — Stage 2, Qwen 3 4B fine-tune, structured JSON extraction, severity quantiles
+- ✅ S4: Mechanism classifier — 5 runs, 0.80 F1 on OSHA, domain gap to QQ. Two-stage approach suspended.
+- ⬜ S4a: Zero-shot single-model — test base Qwen 8B on QQ data (mechanism + energy in one pass, no fine-tune)
+- ⬜ S5: Energy analyser — Stage 2, depends on S4a outcome
 - ⬜ S6: Integration — DuckDB, Zenoh sync, classifier→simulator handoff, QQ pilot
 
 ## Data Roles — DO NOT CONFUSE
@@ -43,8 +44,9 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 | S2 | `taxonomy-and-data` | 1 | S1 | **CLOSED** | ICD-11 taxonomy, OSHA 1.6M rows, QQ 2,747 events, P(death) scale |
 | S2a | `calibration-curves` | 1.5 | S1, S2 | PENDING | Severity metalog curves per energy type × magnitude, mitigation library |
 | S3 | `simulator` | 2 | S1, S2a | PENDING | CLI `sif sim` + WASM prototype. Validates calibration curves |
-| S4 | `mechanism-classifier` | 3 | S2 | PENDING | Stage 1 ONNX classifier, CLI `sif classify`, F1 ≥ 0.85. Includes synthetic gen + benchmark |
-| S5 | `energy-analyser` | 4 | S2, S4 | PENDING | Stage 2 Ollama extraction, full pipeline, SIF recall ≥ 0.90 |
+| S4 | `mechanism-classifier` | 3 | S2 | **CLOSED** | 0.80 F1 on OSHA, domain gap to QQ. Two-stage suspended. Key learnings captured. |
+| S4a | `zero-shot-single-model` | 3.5 | S2, S4 | PENDING | Zero-shot Qwen 8B: mechanism + energy in one pass on QQ. Determines if fine-tuning needed. |
+| S5 | `energy-analyser` | 4 | S4a | PENDING | Depends on S4a outcome — may merge into single-model or remain Stage 2 |
 | S6 | `integration` | 5 | S3, S5 | PENDING | DuckDB, Zenoh, classifier→simulator, QQ pilot |
 
 ## Dependency Graph
@@ -53,11 +55,11 @@ Tracker session for the full SIF v0.1 build — two products (classifier + simul
 S1 (sipmath) ──→ S2 (data) ──→ S2a (calibration) ──→ S3 (simulator)
                     │                                        │
                     ▼                                        ▼
-               S4 (mech) ──────→ S5 (energy) ──────────→ S6 (integration)
+               S4 (mech) ──→ S4a (zero-shot) ──→ S5 ──→ S6 (integration)
+               CLOSED         NEXT
 ```
 
-- S2a and S4 can run **in parallel** after S2 (different dependency chains)
-- S3 is blocked on S2a (needs calibration curves)
-- S4 is unblocked NOW (OSHA data + OIICS mapping = training data)
-- S5 needs S4 (Stage 1 feeds Stage 2)
-- S6 needs both S3 and S5
+- S4 CLOSED with key finding: domain gap kills single-source training
+- **S4a is NEXT** — zero-shot Qwen 8B on QQ, tests single-model approach without fine-tuning
+- S4a outcome determines S5 scope: if zero-shot works, S5 = prompt engineering; if not, S5 = fine-tune with energy annotations
+- S2a/S3 (simulator chain) remains independent and unblocked
