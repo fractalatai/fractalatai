@@ -41,18 +41,29 @@ Roughly half the controls in a typical risk register are consequence-reducing co
 
 The risk matrix has two axes: likelihood and consequence. Each axis has 5 ordinal levels. The assessor picks one cell.
 
-The consequence axis asks: "if this event happens, how bad is it?" But the word "it" is doing enormous work. Does "it" mean:
+When an assessor states "the consequence is fatal," they have picked a single point on the consequence distribution and frozen it. The PIG then becomes one of very many that would be needed to show the full picture. To see the consequence distribution, you would need a separate PIG for each outcome level:
 
-- The hazard is present (a 6-metre scaffold exists)?
-- The energy is released (the worker falls)?
-- The energy reaches a person (the worker hits the ground)?
-- The energy causes maximum harm (the worker lands headfirst on concrete)?
+- One PIG with consequence = fatal
+- One PIG with consequence = serious injury
+- One PIG with consequence = medical treatment
+- One PIG with consequence = first aid
+- One PIG with consequence = no injury
 
-The orthodox position implicitly picks the last interpretation: the worst-case energy transfer, with no mitigation and no lucky angles. The consequence is fatality because *if everything goes wrong*, a 6-metre fall kills. This is a defensible choice — it is conservative, and in SIF analysis we deliberately set chance P = 1 (see [What is SIF potential?](what-is-sif-potential.md)).
+Each of these PIGs would show a different "likelihood" — but that likelihood is not the probability of the event occurring. It is the probability of *that specific outcome* given the event occurs. It is the probability mass at that point in the consequence distribution.
 
-But then the PIG has no way to represent what the safety net does. The net does not change the "worst case if everything goes wrong" (the net could fail). It changes the *distribution* of outcomes — making serious injury far less likely and fatality rare rather than common. The PIG has no distribution. It has one cell. So the only axis left to absorb the net's benefit is likelihood.
+Now add a safety net. Simulate 10,000 falls. Without the net, 4,000 result in fatality. With the net, 200 result in fatality. The consequence distribution has shifted — fewer fatalities, more outcomes clustering around first aid and medical treatment. But on the PIG with consequence frozen at "fatal," the only thing the assessor can move is the likelihood axis. They shift it from "likely" to "unlikely." The change in the consequence distribution has been expressed as a change in likelihood.
 
-This is what "likelihood leaking into consequence" means. The assessor thinks: "with the net in place, a fatality is unlikely." They move the likelihood from "possible" to "unlikely." The consequence stays at "catastrophic." The risk score drops from 12 to 8. Somewhere in that likelihood shift is an unacknowledged truth: the net changed the consequence distribution, not the probability of falling. The worker is just as likely to fall — the net does nothing about that. What changed is what happens when they do.
+This is what "likelihood leaking into consequence" means. The safety net did not change the probability of falling — the worker is just as likely to fall with or without the net. What changed is what happens when they do. The consequence distribution shifted leftward. But the PIG has no distribution. It has one cell, with consequence frozen at one point. So the shift in the consequence distribution leaks into the only axis available: likelihood.
+
+**The framing problem.** A risk is the chance of an outcome with a reference. There are two ways to frame this:
+
+1. **P(outcome | event)** — the probability of *this severity of outcome* given the event occurs. "What is the chance of a fatality given a fall from this scaffold?" This is consequence-distribution thinking. Adding a safety net changes this probability directly — fewer of the 10,000 simulated falls are fatal.
+
+2. **P(event) × C(event)** — the probability of the event multiplied by a fixed consequence. "How likely is a fall, and how bad is a fall?" This is PIG thinking. The consequence is stated once and held constant. The only variable is how likely the event is.
+
+The first framing naturally handles controls that shift the severity distribution. The second cannot — it has frozen the consequence and left the likelihood axis to absorb everything. When the assessor holds consequence at "fatal" and reduces likelihood after adding a net, they are unconsciously performing framing #1 (the chance of a fatal outcome has decreased) while believing they are performing framing #2 (the fall has become less likely). The fall has not become less likely. The fatal outcome has become less likely. These are different statements, and the PIG cannot distinguish between them.
+
+The orthodox position — "consequence doesn't change" — is correct *within framing #2*. If you define consequence as a fixed property of the event, then by definition it cannot change. But this is circular: the consequence doesn't change because the assessor defined it as unchangeable. The real question is whether that framing captures what the controls actually do. For prevention controls (guard rails, LOTO), framing #2 works — they reduce the probability of the event. For mitigation controls (nets, PPE, harnesses), framing #2 fails — they reduce the severity *given* the event, which is a change in the consequence distribution that framing #2 has no mechanism to express.
 
 ## The bowtie makes this visible
 
@@ -140,28 +151,44 @@ The EVENT dimension also connects to the [correlated failure problem](monte-carl
 
 ## The distributional resolution
 
-With a [probability distribution](percentiles-and-distributions.md) instead of a single cell, this confusion dissolves.
+With a [probability distribution](percentiles-and-distributions.md) instead of a single cell, the confusion dissolves — because the distribution *is* the stack of PIGs, collapsed into one curve.
 
-**Unmitigated scenario** (6-metre fall, no controls):
-- P10: medical treatment
-- P50: serious injury
-- P90: fatality
-- P(SIF) = 0.78
+Simulate 10,000 falls from a 6-metre scaffold onto concrete. Count the outcomes:
+
+**Unmitigated** (no controls):
+
+| Outcome | Count (of 10,000) | PIG "likelihood" at this consequence |
+| --- | --- | --- |
+| Fatal | 4,000 | Likely |
+| Serious injury | 3,500 | Likely |
+| Medical treatment | 1,800 | Possible |
+| First aid | 500 | Unlikely |
+| No injury | 200 | Rare |
+
+P(SIF) = 0.78 — the fraction of trials at serious injury or worse.
+
+Now add a safety net and simulate again. The falls still happen — the net does not prevent them. But the energy absorbed by the body changes:
 
 **With safety net** (arrests fall at ~1.5 m):
-- P10: no injury
-- P50: first aid
-- P90: medical treatment
-- P(SIF) = 0.03
 
-The consequence distribution has shifted leftward. The likelihood of falling has not changed — the net does not prevent falls. But P(SIF) dropped from 0.78 to 0.03 because the *severity distribution* changed. The net absorbed most of the energy.
+| Outcome | Count (of 10,000) | PIG "likelihood" at this consequence |
+| --- | --- | --- |
+| Fatal | 50 | Rare |
+| Serious injury | 150 | Rare |
+| Medical treatment | 1,800 | Possible |
+| First aid | 4,500 | Likely |
+| No injury | 3,500 | Likely |
+
+P(SIF) = 0.02 — the consequence distribution has shifted leftward.
+
+The "PIG likelihood" column makes the leak visible. An assessor holding consequence at "fatal" sees the likelihood shift from "likely" to "rare" — a four-column move. An assessor holding consequence at "first aid" sees the likelihood shift from "unlikely" to "likely" — a three-column move in the opposite direction. They are both looking at the same distribution shift through different slices. Neither is seeing the whole picture. The distribution shows it in one curve.
 
 **With guard rail** (prevents fall):
 - The severity distribution is unchanged (if you fall, you fall the full 6 m)
-- But the probability of falling is much lower
+- But the probability of falling is much lower — perhaps 50 falls out of 10,000 exposure periods
 - P(SIF) incorporates both: even though the consequence distribution is severe, the event is rare
 
-The distribution framework separates what the PIG conflates. Prevention controls change how often the event occurs. Mitigation controls change what happens when it does. Both reduce P(SIF), but through different mechanisms — and the distinction matters for deciding which controls to invest in.
+This is the clean separation. The guard rail changes how many of the 10,000 periods produce a fall (framing #2 — event probability). The safety net changes what happens in those falls that do occur (framing #1 — outcome distribution). Both reduce P(SIF), but through different mechanisms — and the distinction matters for deciding which controls to invest in.
 
 ## Why this matters in practice
 
