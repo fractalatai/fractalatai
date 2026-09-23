@@ -62,6 +62,7 @@ Each archetype entry contains:
 Control:        Safety net (fall protection)
 PROPERTY:       Engineer
 METHOD:         Protection
+LEVEL:          L2 (UK Work at Height Regulations 2005, Reg 9)
 EVENT coverage: Normal + Abnormal
 Default cost (annualised, £/year):
   P10:    600    (simple scaffold, easy access, long replacement cycle)
@@ -81,6 +82,40 @@ The defaults provide a starting point grounded in published data and industry be
 
 **Building the library with AI.** The initial library can be constructed from published cost data (HSE cost-benefit guidance, LOPA reliability data, supplier catalogues, insurance actuarial tables) and augmented by a large language model extracting cost ranges from safety industry literature, procurement records, and maintenance logs. The LLM's role is data assembly, not cost estimation — it gathers and structures published figures into the P10/P50/P90 format. Human review validates the defaults before they enter the library. Over time, the library improves as organisations feed back their actual costs, narrowing the distributions with real data — the same [Bayesian updating](bayesian-priors.md) pattern used for severity priors.
 
+### Control levels: L1, L2, L3
+
+In practice, controls do not appear as a flat list. They arrive in layers, each additive to the one above:
+
+| Level | Scope | Source | Examples |
+| --- | --- | --- | --- |
+| **L1 — Organisation** | Enterprise-wide | Corporate policy, safety management system, international standards (ISO 45001, IEC 61511) | PPE policy, LOTO standard, incident reporting procedure, competence framework |
+| **L2 — Geography** | National or regional | Legislation, regulations, codes of practice | UK LOLER inspections, US OSHA fall protection standard, EU ATEX zoning |
+| **L3 — Local** | Site, project, contract, customer | Customer requirements, contract conditions, site-specific risk assessments | Client-mandated rescue plan, project-specific scaffolding spec, site exclusion zones |
+
+The levels are additive: L2 controls build on L1, and L3 controls build on L1 + L2. A worker on a scaffold in the UK has L1 controls from the corporate safety management system, L2 controls from the Work at Height Regulations 2005, and L3 controls from the site-specific risk assessment and the principal contractor's requirements.
+
+**Why levels matter for cost-benefit.** The cost of a control depends heavily on which level owns it:
+
+- **L1 costs are amortised across the enterprise.** A corporate LOTO standard costs £50,000/year to maintain (training programme, procedure updates, audit cycle) but is spread across 200 sites and 10,000 workers. The per-risk share is small. L1 controls appear cheap on the scatter plot because they are shared infrastructure.
+
+- **L2 costs are driven by the jurisdiction.** A UK statutory thorough examination of lifting equipment (LOLER Reg 9) costs a fixed amount per item per year regardless of how the organisation chooses to manage its risks. The cost is externally imposed and non-negotiable. L2 controls are compliance costs — they set the floor.
+
+- **L3 costs are local and variable.** A client-mandated rescue team dedicated to one site, or a project-specific scaffold design reviewed by an independent engineer — these costs are borne by the site or project alone. L3 controls are where the most variation exists and where over- and under-investment is most visible.
+
+**Slicing the scatter by level** reveals where the cost actually lives. For a given risk, the total protection cost can be decomposed into its L1, L2, and L3 components. A stacked bar or colour-coded point shows the proportion:
+
+- A risk where 80% of the protection cost is L1 (corporate policy) and 5% is L3 (local) is relying almost entirely on generic controls. If the risk has site-specific characteristics (unusual height, restricted access, mixed trades), the local layer may be too thin.
+- A risk where 70% of the protection cost is L3 (local, project-specific) may be over-specified locally when L1 or L2 controls already cover the need. This is common after a high-profile incident at one site triggers a local control that duplicates an existing corporate standard.
+- A risk where L2 (regulatory) dominates may have little room for optimisation — the cost is set by law. But the analysis can still show whether additional L3 controls above the regulatory minimum are delivering proportionate risk reduction.
+
+**Levels as the library's source data.** The three levels map naturally onto the library's data sources:
+
+- **L1 entries** are built from corporate safety management system documents, international standards (ISO, IEC, NFPA), and industry body guidance (IOGP, CIRIA, FASET). These are the most generic and the most shareable across organisations.
+- **L2 entries** are built from national legislation and approved codes of practice. Fractalaw's legal register — the legislation and provisions already parsed and classified by the [DRRP pipeline](../papers/from-pigs-to-probability-curves.md) — is the source. Each legal obligation that mandates a control becomes a library entry with a cost distribution derived from HSE cost-benefit analyses, LOPA data, and regulatory impact assessments.
+- **L3 entries** are the most site-specific and least shareable. They are built from customer contract requirements, project risk assessments, and site-specific procedures. AI can draft initial L3 entries by extracting control requirements from contract documents, but the cost distributions need local calibration — only the site team knows what the confined-space rescue plan actually costs at this location.
+
+Over time, the library accumulates L1 and L2 entries that are reusable across projects and organisations. L3 entries remain local but can be compared across similar sites to establish benchmarks. The level tag on each library entry tells the user whether they are looking at a corporate standard (likely well-calibrated, many data points) or a site-specific estimate (fewer data points, wider distribution, more adjustment needed).
+
 ### Aggregating per risk
 
 For a given risk, the total protection cost is the sum of the annualised cost distributions of all protection controls applied to that risk. Because costs are distributions, not points, they compose via [SIPmath](monte-carlo-and-swiss-cheese.md): generate 10,000 trials from each control's cost metalog, sum element-wise, and the result is the total cost distribution.
@@ -92,18 +127,22 @@ The output is not a single number but a distribution:
 
 ### Example: fall from 6-metre scaffold
 
-| Protection control | P10 (£/yr) | P50 (£/yr) | P90 (£/yr) |
-| --- | --- | --- | --- |
-| Safety net (Engineer × Protection) | 600 | 1,100 | 3,200 |
-| Fall harness programme (Engineer × Protection) | 400 | 800 | 1,500 |
-| Hard hat (Engineer × Protection) | 50 | 100 | 200 |
-| Rescue plan (Management × Protection) | 2,400 | 4,800 | 8,500 |
+| Protection control | Level | P10 (£/yr) | P50 (£/yr) | P90 (£/yr) |
+| --- | --- | --- | --- | --- |
+| Hard hat (Engineer × Protection) | L1 | 50 | 100 | 200 |
+| Safety net (Engineer × Protection) | L2 | 600 | 1,100 | 3,200 |
+| Fall harness programme (Engineer × Protection) | L2 | 400 | 800 | 1,500 |
+| Rescue plan (Management × Protection) | L3 | 2,400 | 4,800 | 8,500 |
 
 Summing the distributions (via SIPmath, not by adding the P50s):
 - **Total protection cost P50 ≈ £6,800/year**
 - **Total protection cost P90 ≈ £12,500/year**
 
+The level decomposition is immediate: L1 contributes ~£100/year (the hard hat — a corporate PPE standard, amortised across the enterprise). L2 contributes ~£1,900/year (net + harness — driven by the Work at Height Regulations). L3 contributes ~£4,800/year (the rescue plan — a site-specific requirement from the principal contractor). The local layer dominates the cost.
+
 The rescue plan dominates — not because it is expensive to procure, but because it requires ongoing training, coordination across multiple roles, and must function during both normal and abnormal/emergency conditions. The distribution also reveals that cost uncertainty is driven almost entirely by the rescue plan: in the P90 scenario (high staff turnover, complex site), it alone accounts for £8,500 of the £12,500 total. This is actionable information — if the organisation wants to reduce cost uncertainty, stabilising the rescue team (reducing turnover) is the highest-leverage intervention.
+
+Across a portfolio of risks, the level decomposition answers strategic questions: What fraction of our protection spend is L1 (corporate, within our control)? What fraction is L2 (regulatory, non-negotiable)? What fraction is L3 (local, variable, potentially duplicating L1/L2)? An organisation discovering that 60% of protection cost is L3 should ask whether corporate standards (L1) could absorb some of those local controls — reducing duplication, improving consistency, and building the L1 library for reuse across sites.
 
 ## The scatter plot
 
@@ -202,10 +241,13 @@ Sensible population groupings:
 | --- | --- |
 | By energy type | All gravity risks, all electrical risks — the severity distributions and effective controls are specific to the energy type |
 | By ICECI mechanism | All falls, all struck-by, all caught-in — aligns with the [SIF classifier](../papers/from-pigs-to-probability-curves.md) Stage 1 output |
-| By site or sector | Controls costs vary by location (offshore vs office) and industry |
+| By site or sector | Control costs vary by location (offshore vs office) and industry |
 | By STKY hazard | Hallowell's 13 high-energy categories — each has a characteristic control portfolio |
+| By control level | L1 vs L2 vs L3 — shows whether costs concentrate at corporate, regulatory, or local layer. Reveals duplicated controls across levels and gaps where a level is absent |
 
 Mixing energy types on one chart will produce noise: the cost of protecting against a gravity hazard (nets, harnesses) is structurally different from protecting against a chemical hazard (ventilation, PPE, decontamination). Within one energy type, the trade-offs are comparable and the outliers are meaningful.
+
+The level grouping is particularly useful for multi-national organisations. Plotting the same energy type across geographies, decomposed by level, shows how much of the protection cost is driven by L2 (local regulation) versus L1 (corporate standard). A jurisdiction where L2 adds little beyond L1 has low incremental compliance cost. A jurisdiction where L2 demands controls well above the corporate baseline has high incremental cost — and the scatter shows whether that additional cost is buying proportionate risk reduction or is purely a compliance overhead.
 
 ## What this does not capture
 
