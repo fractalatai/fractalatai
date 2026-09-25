@@ -43,6 +43,8 @@ pub mod popimar;
 pub mod purpose;
 pub mod signals;
 pub mod applicability;
+pub mod applicability_compile;
+pub mod application;
 pub mod text_cleaner;
 
 use regex::Regex;

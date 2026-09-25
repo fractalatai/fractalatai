@@ -5,7 +5,6 @@
 //! no DRRP coupling.
 
 use anyhow::Context;
-use fractalaw_core::taxa::applicability::ApplicabilityNode;
 use fractalaw_core::taxa::fitness;
 use fractalaw_store::{DuckStore, PgStore};
 use regex::Regex;
@@ -410,11 +409,261 @@ pub(crate) async fn cmd_fitness_status(
 // ── Expression tree compiler ────────────────────────────────────────
 
 /// Compile fitness mentions into expression trees per law, write to DuckDB.
+/// Fill the reconciled `entities` / `scope_dimensions` columns for mentions
+/// that have tier output but were never reconciled (e.g. extraction batches run
+/// after the July reconcile). Entities: first non-empty of ft > regex > slm.
+/// Scope dimensions: union across tiers. Rows already reconciled and the tier
+/// columns themselves are never modified.
+pub(crate) async fn cmd_fitness_reconcile(
+    pg_url: &str,
+    law_names: Option<&[String]>,
+    dry_run: bool,
+) -> anyhow::Result<()> {
+    let store = PgStore::connect(pg_url)
+        .await
+        .context("connecting to PostgreSQL")?;
+    let pool = store.pool();
+
+    let law_filter = if law_names.is_some() {
+        "AND split_part(section_id, ':', 1) = ANY($1)"
+    } else {
+        ""
+    };
+    let pending_where = format!(
+        "extraction_method != 'propagated' \
+         AND (entities IS NULL OR entities = '{{}}') \
+         AND (cardinality(ft_entities) > 0 OR cardinality(regex_entities) > 0 OR cardinality(slm_entities) > 0) {law_filter}"
+    );
+
+    let count_sql = format!(
+        "SELECT count(*), count(DISTINCT split_part(section_id, ':', 1)) FROM fitness_mentions WHERE {pending_where}"
+    );
+    let mut q = sqlx::query_as::<_, (i64, i64)>(&count_sql);
+    if let Some(names) = law_names {
+        q = q.bind(names.to_vec());
+    }
+    let (rows, laws) = q.fetch_one(pool).await?;
+    println!("{rows} unreconciled mentions across {laws} laws");
+    if dry_run || rows == 0 {
+        return Ok(());
+    }
+
+    let update_sql = format!(
+        "UPDATE fitness_mentions SET \
+           entities = COALESCE(NULLIF(ft_entities, '{{}}'), NULLIF(regex_entities, '{{}}'), NULLIF(slm_entities, '{{}}')), \
+           scope_dimensions = ARRAY(SELECT DISTINCT d FROM unnest( \
+               COALESCE(ft_scope_dimensions, '{{}}') || COALESCE(regex_scope_dimensions, '{{}}') \
+               || COALESCE(slm_scope_dimensions, '{{}}')) AS d ORDER BY d), \
+           updated_at = now() \
+         WHERE {pending_where}"
+    );
+    let mut q = sqlx::query(&update_sql);
+    if let Some(names) = law_names {
+        q = q.bind(names.to_vec());
+    }
+    let result = q.execute(pool).await?;
+    println!("Reconciled {} mentions", result.rows_affected());
+    Ok(())
+}
+
+/// Per-law title and application, for compile and `fitness application`.
+pub(crate) struct LawMeta {
+    pub title: String,
+    pub application: Option<fractalaw_core::taxa::application::Application>,
+}
+
+fn law_context(
+    meta: &std::collections::HashMap<String, LawMeta>,
+    law_name: &str,
+) -> fractalaw_core::taxa::applicability_compile::LawContext {
+    let m = meta.get(law_name);
+    fractalaw_core::taxa::applicability_compile::LawContext {
+        title: m.map(|m| m.title.clone()).unwrap_or_default(),
+        application: m.and_then(|m| m.application.as_ref()).map(|a| a.regions.clone()),
+    }
+}
+
+/// Load title (DuckDB, else the law's citation provision) and derive application
+/// (text clauses, title, type code, extent) for every law in DuckDB, or `law_names`.
+pub(crate) async fn load_law_meta(
+    pool: &sqlx::PgPool,
+    duck: &DuckStore,
+    law_names: Option<&[String]>,
+) -> anyhow::Result<std::collections::HashMap<String, LawMeta>> {
+    use arrow::array::{Array, StringArray};
+    use fractalaw_core::taxa::applicability_compile::title_from_citation;
+    use fractalaw_core::taxa::application::{ApplicationInput, derive_application};
+    use std::collections::HashMap;
+
+    // LRT: name, type_code, title, extent_code
+    let mut lrt: Vec<(String, String, Option<String>, Option<String>)> = Vec::new();
+    for batch in duck.query_arrow("SELECT name, type_code, title, extent_code FROM legislation")? {
+        let col = |i: usize| batch.column(i).as_any().downcast_ref::<StringArray>().cloned();
+        let (Some(n), Some(t), Some(ti), Some(e)) = (col(0), col(1), col(2), col(3)) else {
+            continue;
+        };
+        for i in 0..batch.num_rows() {
+            if n.is_null(i) {
+                continue;
+            }
+            let opt = |a: &StringArray| (!a.is_null(i)).then(|| a.value(i).to_string());
+            lrt.push((n.value(i).to_string(), opt(&t).unwrap_or_default(), opt(&ti), opt(&e)));
+        }
+    }
+    if let Some(names) = law_names {
+        lrt.retain(|(n, ..)| names.iter().any(|x| x == n));
+    }
+
+    let law_filter = if law_names.is_some() { "AND law_name = ANY($1)" } else { "" };
+    let bind = |sql: String| {
+        let names = law_names.map(|n| n.to_vec());
+        async move {
+            let mut q = sqlx::query_as::<_, (String, String, Option<String>)>(&sql);
+            if let Some(names) = names {
+                q = q.bind(names);
+            }
+            q.fetch_all(pool).await
+        }
+    };
+
+    // Provisions that could state application or extent
+    let mut clauses: HashMap<String, Vec<(String, String)>> = HashMap::new();
+    // Stems that state application/extent, with their sub-provisions joined
+    // ("These Regulations apply— (a) in Great Britain; and (b) ...")
+    let stem_filter = law_filter.replace("law_name", "s.law_name");
+    for (law, sid, text) in bind(format!(
+        "SELECT s.law_name, s.section_id, \
+                s.text || ' ' || coalesce((SELECT string_agg(c.text, ' ' ORDER BY c.sort_key) \
+                    FROM legislation_text c WHERE c.law_name = s.law_name \
+                    AND c.section_id LIKE s.section_id || '(%'), '') \
+         FROM legislation_text s \
+         WHERE s.text ~* '(these\\s+regulations|this\\s+(act|order|measure|scheme|instrument)|these\\s+(rules|byelaws))' \
+         AND s.text ~* '(appl(y|ies)|extends?)' {stem_filter}"
+    ))
+    .await?
+    {
+        if let Some(t) = text {
+            clauses.entry(law).or_default().push((sid, t));
+        }
+    }
+
+    // Citation provisions (title fallback)
+    let mut cited: HashMap<String, String> = HashMap::new();
+    for (law, _sid, text) in bind(format!(
+        "SELECT law_name, section_id, text FROM legislation_text WHERE text ~* 'may\\s+be\\s+cited\\s+as' {law_filter}"
+    ))
+    .await?
+    {
+        if let Some(title) = text.as_deref().and_then(title_from_citation) {
+            cited.entry(law).or_insert(title);
+        }
+    }
+
+    // LAT provision extents
+    let mut lat_extents: HashMap<String, Vec<String>> = HashMap::new();
+    for (law, code, _) in bind(format!(
+        "SELECT DISTINCT law_name, extent_code, NULL::text FROM legislation_text \
+         WHERE extent_code IS NOT NULL AND extent_code <> '' {law_filter}"
+    ))
+    .await?
+    {
+        lat_extents.entry(law).or_default().push(code);
+    }
+
+    let empty_p: Vec<(String, String)> = Vec::new();
+    let empty_e: Vec<String> = Vec::new();
+    let mut meta = HashMap::new();
+    for (name, type_code, title, extent) in lrt {
+        let title = title.filter(|t| !t.is_empty()).or_else(|| cited.get(&name).cloned()).unwrap_or_default();
+        let application = derive_application(&ApplicationInput {
+            type_code: &type_code,
+            title: &title,
+            provisions: clauses.get(&name).unwrap_or(&empty_p),
+            lat_extents: lat_extents.get(&name).unwrap_or(&empty_e),
+            lrt_extent: extent.as_deref(),
+        });
+        meta.insert(name, LawMeta { title, application });
+    }
+    Ok(meta)
+}
+
+/// Derive law application for every law (or `law_names`) and store it in DuckDB
+/// (`application_regions`, `application_source`, `application_evidence`), or
+/// write JSONL to `out`. Not published until ZENOH-SPEC v2.4 (sertantai-legal #163).
+pub(crate) async fn cmd_fitness_application(
+    pg_url: &str,
+    duck: &DuckStore,
+    law_names: Option<&[String]>,
+    out: Option<&std::path::Path>,
+) -> anyhow::Result<()> {
+    let store = PgStore::connect(pg_url)
+        .await
+        .context("connecting to PostgreSQL")?;
+    let meta = load_law_meta(store.pool(), duck, law_names).await?;
+
+    let mut by_source: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+    let mut names: Vec<&String> = meta.keys().collect();
+    names.sort();
+
+    if let Some(path) = out {
+        use std::io::Write;
+        let mut w = std::io::BufWriter::new(
+            std::fs::File::create(path).with_context(|| format!("creating {}", path.display()))?,
+        );
+        for name in &names {
+            let a = meta[*name].application.as_ref();
+            *by_source.entry(a.map(|a| a.source.as_str()).unwrap_or("none")).or_default() += 1;
+            writeln!(
+                w,
+                "{}",
+                serde_json::json!({
+                    "name": name,
+                    "application_regions": a.map(|a| &a.regions),
+                    "application_source": a.map(|a| a.source.as_str()),
+                    "application_evidence": a.map(|a| &a.evidence),
+                })
+            )?;
+        }
+    } else {
+        duck.execute("ALTER TABLE legislation ADD COLUMN IF NOT EXISTS application_regions VARCHAR[]")?;
+        duck.execute("ALTER TABLE legislation ADD COLUMN IF NOT EXISTS application_source VARCHAR")?;
+        duck.execute("ALTER TABLE legislation ADD COLUMN IF NOT EXISTS application_evidence VARCHAR")?;
+        let q = |s: &str| format!("'{}'", s.replace('\'', "''"));
+        for name in &names {
+            let a = meta[*name].application.as_ref();
+            *by_source.entry(a.map(|a| a.source.as_str()).unwrap_or("none")).or_default() += 1;
+            let (regions, source, evidence) = match a {
+                Some(a) => (
+                    format!("[{}]", a.regions.iter().map(|r| q(r)).collect::<Vec<_>>().join(", ")),
+                    q(a.source.as_str()),
+                    q(&a.evidence),
+                ),
+                None => ("NULL".into(), "NULL".into(), "NULL".into()),
+            };
+            duck.execute(&format!(
+                "UPDATE legislation SET application_regions = {regions}, application_source = {source}, \
+                 application_evidence = {evidence} WHERE name = {}",
+                q(name)
+            ))?;
+        }
+    }
+
+    println!("Application derived for {} laws:", names.len());
+    for (source, n) in by_source {
+        println!("  {source:16} {n}");
+    }
+    Ok(())
+}
+
 pub(crate) async fn cmd_fitness_compile(
     pg_url: &str,
     duck: &DuckStore,
     law_names: Option<&[String]>,
+    out: Option<&std::path::Path>,
 ) -> anyhow::Result<()> {
+    use fractalaw_core::taxa::applicability::ApplicabilityNode;
+    use fractalaw_core::taxa::applicability_compile::{MentionInput, compile_law, repair_tree};
+
     let store = PgStore::connect(pg_url)
         .await
         .context("connecting to PostgreSQL")?;
@@ -432,188 +681,142 @@ pub(crate) async fn cmd_fitness_compile(
             .collect()
     };
 
-    // Get all non-propagated mentions grouped by law
-    let mentions = if let Some(names) = law_names {
-        let name_list: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
-        sqlx::query_as::<_, (String, String, Option<String>, Option<Vec<String>>, Option<Vec<String>>)>(
-            "SELECT split_part(section_id, ':', 1) as law_name, polarity, scope_unit, entities, scope_dimensions \
-             FROM fitness_mentions \
-             WHERE extraction_method != 'propagated' \
-             AND entities IS NOT NULL AND entities != '{}' \
-             AND split_part(section_id, ':', 1) = ANY($1) \
-             ORDER BY split_part(section_id, ':', 1), scope_unit, polarity",
-        )
-        .bind(&name_list)
-        .fetch_all(pool)
-        .await?
-    } else {
-        sqlx::query_as::<_, (String, String, Option<String>, Option<Vec<String>>, Option<Vec<String>>)>(
-            "SELECT split_part(section_id, ':', 1) as law_name, polarity, scope_unit, entities, scope_dimensions \
-             FROM fitness_mentions \
-             WHERE extraction_method != 'propagated' \
-             AND entities IS NOT NULL AND entities != '{}' \
-             ORDER BY split_part(section_id, ':', 1), scope_unit, polarity",
-        )
-        .fetch_all(pool)
-        .await?
-    };
-
+    // Non-propagated mentions (with section_id so we can attach provision text)
+    let law_filter = "AND split_part(section_id, ':', 1) = ANY($1)";
+    let sql = format!(
+        "SELECT split_part(section_id, ':', 1) AS law_name, section_id, polarity, entities \
+         FROM fitness_mentions \
+         WHERE extraction_method != 'propagated' \
+         AND entities IS NOT NULL AND entities != '{{}}' {} \
+         ORDER BY 1, section_id, polarity",
+        if law_names.is_some() { law_filter } else { "" }
+    );
+    let mut q = sqlx::query_as::<_, (String, String, String, Option<Vec<String>>)>(&sql);
+    if let Some(names) = law_names {
+        q = q.bind(names.to_vec());
+    }
+    let mentions = q.fetch_all(pool).await?;
     eprintln!("Loaded {} mentions for compilation", mentions.len());
 
     // Group by law
-    let mut by_law: std::collections::BTreeMap<String, Vec<(String, Option<String>, Vec<String>, Vec<String>)>> =
+    let mut by_law: std::collections::BTreeMap<String, Vec<(String, String, Vec<String>)>> =
         std::collections::BTreeMap::new();
-    for (law, pol, scope, ents, dims) in mentions {
+    for (law, section_id, pol, ents) in mentions {
         let ents = ents.unwrap_or_default();
-        let dims = dims.unwrap_or_default();
         if !ents.is_empty() {
-            by_law.entry(law).or_default().push((pol, scope, ents, dims));
+            by_law.entry(law).or_default().push((section_id, pol, ents));
         }
     }
 
-    // Ensure DuckDB column exists
     let _ = duck.execute("ALTER TABLE legislation ADD COLUMN compiled_applicability VARCHAR");
 
-    // Compile each law
+    // Law title + application (grounding context and root gate)
+    let meta = load_law_meta(pool, duck, law_names).await?;
+
+    let mut out_file = match out {
+        Some(path) => Some(std::io::BufWriter::new(
+            std::fs::File::create(path).with_context(|| format!("creating {}", path.display()))?,
+        )),
+        None => None,
+    };
+
     let mut compiled = 0u32;
-    for (law_name, mentions) in &by_law {
-        let tree = compile_law(mentions, &entity_dims);
-        if let Some(tree) = tree {
-            let json = tree.to_json().map_err(|e| anyhow::anyhow!("JSON error for {law_name}: {e}"))?;
+    for (law_name, law_mentions) in &by_law {
+        // Provision text for grounding: each mention sees its provision + sub-provisions
+        let rows = sqlx::query_as::<_, (String, Option<String>)>(
+            "SELECT section_id, text FROM legislation_text WHERE law_name = $1",
+        )
+        .bind(law_name)
+        .fetch_all(pool)
+        .await?;
+        let text_for = |section_id: &str| -> String {
+            let child_prefix = format!("{section_id}(");
+            rows.iter()
+                .filter(|(sid, _)| sid == section_id || sid.starts_with(&child_prefix))
+                .filter_map(|(_, t)| t.as_deref())
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+
+        let inputs: Vec<MentionInput> = law_mentions
+            .iter()
+            .map(|(sid, pol, ents)| MentionInput {
+                polarity: pol.clone(),
+                entities: ents.clone(),
+                text: text_for(sid),
+            })
+            .collect();
+
+        let ctx = law_context(&meta, law_name);
+        let tree = compile_law(&inputs, &entity_dims, &ctx);
+        let json = match &tree {
+            Some(t) => Some(t.to_json().map_err(|e| anyhow::anyhow!("JSON error for {law_name}: {e}"))?),
+            None => None,
+        };
+
+        if let Some(w) = out_file.as_mut() {
+            use std::io::Write;
+            let line = serde_json::json!({ "name": law_name, "tree": tree });
+            writeln!(w, "{line}")?;
+        } else {
+            let value = match &json {
+                Some(j) => format!("'{}'", j.replace('\'', "''")),
+                None => "NULL".to_string(),
+            };
             duck.execute(&format!(
-                "UPDATE legislation SET compiled_applicability = '{}' WHERE name = '{}'",
-                json.replace('\'', "''"),
+                "UPDATE legislation SET compiled_applicability = {value} WHERE name = '{}'",
                 law_name.replace('\'', "''"),
             ))?;
+        }
+        if json.is_some() {
             compiled += 1;
         }
     }
 
-    eprintln!("Compiled expression trees for {compiled}/{} laws", by_law.len());
-    Ok(())
-}
-
-/// Compile all mentions for a single law into an expression tree.
-fn compile_law(
-    mentions: &[(String, Option<String>, Vec<String>, Vec<String>)],
-    entity_dims: &std::collections::HashMap<String, String>,
-) -> Option<ApplicabilityNode> {
-    let mut applies_nodes = Vec::new();
-    let mut disapplies_nodes = Vec::new();
-    let mut time_nodes = Vec::new();
-
-    for (polarity, _scope, entities, _dims) in mentions {
-        // Check for temporal entities (ISO dates)
-        let temporal: Vec<&String> = entities.iter().filter(|e| is_iso_date(e)).collect();
-        let non_temporal: Vec<&String> = entities.iter().filter(|e| !is_iso_date(e)).collect();
-
-        // Temporal → TimeWindow
-        for date in &temporal {
-            match polarity.as_str() {
-                "AppliesTo" | "ExtendsTo" => {
-                    time_nodes.push(ApplicabilityNode::time_window(Some(date), None));
-                }
-                "DisappliesTo" => {
-                    time_nodes.push(ApplicabilityNode::time_window(None, Some(date)));
-                }
-                _ => {}
-            }
-        }
-
-        if non_temporal.is_empty() {
+    // Laws with an existing tree but no mentions left to compile from: repair in place
+    let mut repaired = 0u32;
+    let existing = duck.query_arrow("SELECT name, compiled_applicability FROM legislation WHERE compiled_applicability IS NOT NULL")?;
+    for batch in &existing {
+        use arrow::array::{Array, StringArray};
+        let (Some(names), Some(trees)) = (
+            batch.column(0).as_any().downcast_ref::<StringArray>(),
+            batch.column(1).as_any().downcast_ref::<StringArray>(),
+        ) else {
             continue;
-        }
-
-        // Group entities by scope dimension
-        let mut by_dim: std::collections::BTreeMap<String, Vec<String>> = std::collections::BTreeMap::new();
-        for entity in &non_temporal {
-            let dim = entity_dims
-                .get(&entity.to_lowercase())
-                .cloned()
-                .unwrap_or_else(|| "material".to_string());
-            by_dim.entry(dim).or_default().push(
-                entity.to_lowercase().replace(' ', "_"),
-            );
-        }
-
-        // Each dimension → Match node (same dimension = OR)
-        let mut dim_nodes: Vec<ApplicabilityNode> = Vec::new();
-        for (dim, codes) in by_dim {
-            dim_nodes.push(ApplicabilityNode::match_any(&dim, codes));
-        }
-
-        // Multiple dimensions → AND
-        let mention_node = ApplicabilityNode::and(dim_nodes);
-
-        match polarity.as_str() {
-            "DisappliesTo" => disapplies_nodes.push(mention_node),
-            _ => applies_nodes.push(mention_node),
-        }
-    }
-
-    // Combine: OR(applies) AND NOT(OR(law-level disapplies)) AND time_windows
-    //
-    // AppliesTo = disjunctive: ANY provision's applicability = law applies
-    // DisappliesTo = law-level exclusions only. Provision-level exceptions
-    // (where the same code appears in both AppliesTo and DisappliesTo) are
-    // dropped — they're section-specific overrides, not law-wide exclusions.
-    let mut top_nodes = Vec::new();
-
-    if !applies_nodes.is_empty() {
-        // Collect all codes from AppliesTo for conflict detection
-        let applies_codes: std::collections::HashSet<String> = applies_nodes
-            .iter()
-            .flat_map(|node| extract_codes(node))
-            .collect();
-
-        top_nodes.push(ApplicabilityNode::or(applies_nodes));
-
-        // Filter disapplies: only keep codes that DON'T appear in AppliesTo
-        if !disapplies_nodes.is_empty() {
-            let filtered: Vec<ApplicabilityNode> = disapplies_nodes
-                .into_iter()
-                .filter(|node| {
-                    let codes = extract_codes(node);
-                    // Keep if NONE of its codes conflict with AppliesTo
-                    !codes.iter().any(|c| applies_codes.contains(c))
-                })
-                .collect();
-            if !filtered.is_empty() {
-                top_nodes.push(ApplicabilityNode::or(filtered).negate());
+        };
+        for i in 0..batch.num_rows() {
+            let law_name = names.value(i);
+            if by_law.contains_key(law_name) || law_names.is_some_and(|ns| !ns.iter().any(|n| n == law_name)) {
+                continue;
             }
+            let Ok(old) = ApplicabilityNode::from_json(trees.value(i)) else { continue };
+            let ctx = law_context(&meta, law_name);
+            let tree = repair_tree(old, &ctx);
+            if let Some(w) = out_file.as_mut() {
+                use std::io::Write;
+                writeln!(w, "{}", serde_json::json!({ "name": law_name, "tree": tree, "repaired": true }))?;
+            } else {
+                let value = match &tree {
+                    Some(t) => format!("'{}'", t.to_json()?.replace('\'', "''")),
+                    None => "NULL".to_string(),
+                };
+                duck.execute(&format!(
+                    "UPDATE legislation SET compiled_applicability = {value} WHERE name = '{}'",
+                    law_name.replace('\'', "''"),
+                ))?;
+            }
+            repaired += 1;
         }
     }
-    top_nodes.extend(time_nodes);
+    eprintln!("Repaired {repaired} existing trees with no mentions to compile from");
 
-    if top_nodes.is_empty() {
-        return None;
+    match out {
+        Some(path) => eprintln!(
+            "Compiled expression trees for {compiled}/{} laws → {} (DuckDB untouched)",
+            by_law.len(),
+            path.display()
+        ),
+        None => eprintln!("Compiled expression trees for {compiled}/{} laws", by_law.len()),
     }
-
-    Some(ApplicabilityNode::and(top_nodes))
-}
-
-/// Extract all codes from an ApplicabilityNode (recursively).
-fn extract_codes(node: &ApplicabilityNode) -> Vec<String> {
-    match node {
-        ApplicabilityNode::Match { codes, .. } => codes.clone(),
-        ApplicabilityNode::And { children } | ApplicabilityNode::Or { children } => {
-            children.iter().flat_map(extract_codes).collect()
-        }
-        ApplicabilityNode::Not { child } => extract_codes(child),
-        ApplicabilityNode::Conditional { condition, then } => {
-            let mut codes = extract_codes(condition);
-            codes.extend(extract_codes(then));
-            codes
-        }
-        ApplicabilityNode::TimeWindow { inner, .. } => {
-            inner.as_ref().map(|n| extract_codes(n)).unwrap_or_default()
-        }
-    }
-}
-
-fn is_iso_date(s: &str) -> bool {
-    s.len() == 10
-        && s.as_bytes().get(4) == Some(&b'-')
-        && s.as_bytes().get(7) == Some(&b'-')
-        && s[..4].chars().all(|c| c.is_ascii_digit())
+    Ok(())
 }

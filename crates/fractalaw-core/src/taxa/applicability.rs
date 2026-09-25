@@ -119,6 +119,87 @@ impl ApplicabilityNode {
     pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(json)
     }
+
+    /// Canonicalise the tree without changing its meaning:
+    /// - Match codes sorted and deduplicated
+    /// - nested And/Or of the same op flattened into the parent
+    /// - identical siblings removed (lint L1)
+    /// - AnyOf Match siblings on the same dimension under an Or merged
+    ///   (`Or(Match(d,[a]), Match(d,[b]))` ≡ `Match(d,[a,b])`)
+    /// - single-child And/Or collapsed, `Not(Not(x))` → `x`
+    pub fn normalize(self) -> Self {
+        match self {
+            Self::Match {
+                dimension,
+                mut codes,
+                match_op,
+            } => {
+                codes.sort();
+                codes.dedup();
+                Self::Match {
+                    dimension,
+                    codes,
+                    match_op,
+                }
+            }
+            Self::And { children } => Self::normalize_group(children, false),
+            Self::Or { children } => Self::normalize_group(children, true),
+            Self::Not { child } => match child.normalize() {
+                Self::Not { child: inner } => *inner,
+                other => other.negate(),
+            },
+            Self::Conditional { condition, then } => Self::Conditional {
+                condition: Box::new(condition.normalize()),
+                then: Box::new(then.normalize()),
+            },
+            Self::TimeWindow { from, to, inner } => Self::TimeWindow {
+                from,
+                to,
+                inner: inner.map(|n| Box::new(n.normalize())),
+            },
+        }
+    }
+
+    fn normalize_group(children: Vec<Self>, is_or: bool) -> Self {
+        let mut flat: Vec<Self> = Vec::new();
+        for child in children.into_iter().map(Self::normalize) {
+            match child {
+                Self::Or { children } if is_or => flat.extend(children),
+                Self::And { children } if !is_or => flat.extend(children),
+                other => flat.push(other),
+            }
+        }
+
+        let mut out: Vec<Self> = Vec::new();
+        for child in flat {
+            if is_or
+                && let Self::Match {
+                    dimension,
+                    codes,
+                    match_op: MatchOp::AnyOf,
+                } = &child
+            {
+                let existing = out.iter_mut().find(|n| {
+                    matches!(n, Self::Match { dimension: d, match_op: MatchOp::AnyOf, .. } if d == dimension)
+                });
+                if let Some(Self::Match { codes: existing_codes, .. }) = existing {
+                    existing_codes.extend(codes.iter().cloned());
+                    existing_codes.sort();
+                    existing_codes.dedup();
+                    continue;
+                }
+            }
+            if !out.contains(&child) {
+                out.push(child);
+            }
+        }
+
+        if is_or {
+            Self::or(out)
+        } else {
+            Self::and(out)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -156,6 +237,57 @@ mod tests {
         let json = tree.to_json().unwrap();
         let restored = ApplicabilityNode::from_json(&json).unwrap();
         assert_eq!(tree, restored);
+    }
+
+    fn m(dim: &str, codes: &[&str]) -> ApplicabilityNode {
+        ApplicabilityNode::match_any(dim, codes.iter().map(|c| c.to_string()).collect())
+    }
+
+    #[test]
+    fn normalize_removes_duplicate_siblings() {
+        let branch = ApplicabilityNode::and(vec![m("material", &["vehicle"]), m("territorial", &["premises"])]);
+        let tree = ApplicabilityNode::or(vec![branch.clone(), branch.clone(), branch.clone()]);
+        assert_eq!(tree.normalize(), branch);
+    }
+
+    #[test]
+    fn normalize_merges_or_matches_on_same_dimension() {
+        let tree = ApplicabilityNode::or(vec![
+            m("personal", &["employer"]),
+            m("material", &["waste"]),
+            m("personal", &["employee", "employer"]),
+        ]);
+        assert_eq!(
+            tree.normalize(),
+            ApplicabilityNode::or(vec![m("personal", &["employee", "employer"]), m("material", &["waste"])])
+        );
+    }
+
+    #[test]
+    fn normalize_does_not_merge_and_matches() {
+        // And(AnyOf a, AnyOf b) is not AnyOf(a ∪ b): leave both.
+        let tree = ApplicabilityNode::and(vec![m("personal", &["employer"]), m("personal", &["operator"])]);
+        assert_eq!(tree.clone().normalize(), tree);
+    }
+
+    #[test]
+    fn normalize_flattens_nested_same_op_and_single_child() {
+        let tree = ApplicabilityNode::And {
+            children: vec![
+                ApplicabilityNode::And { children: vec![m("personal", &["employer"])] },
+                ApplicabilityNode::Or { children: vec![m("material", &["waste"])] },
+            ],
+        };
+        assert_eq!(
+            tree.normalize(),
+            ApplicabilityNode::and(vec![m("personal", &["employer"]), m("material", &["waste"])])
+        );
+    }
+
+    #[test]
+    fn normalize_double_negation_and_code_order() {
+        let tree = m("material", &["waste", "asbestos", "waste"]).negate().negate();
+        assert_eq!(tree.normalize(), m("material", &["asbestos", "waste"]));
     }
 
     #[test]

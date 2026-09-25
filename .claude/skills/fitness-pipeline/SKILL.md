@@ -40,26 +40,48 @@ python3 -u /workspace/scripts/runpod_fitness_batch.py --workers 4
 
 Writes to `ft_entities` column (fine-tuned model) or `slm_entities` column (base model). Each tier has its own column — never overwrites other tiers.
 
-### Step 3: Compile expression trees
+### Step 3: Reconcile tiers
+
+**Always run after any extraction batch.** Fills `entities`/`scope_dimensions` for mentions that have tier output but were never reconciled (ft > regex > slm; dimensions unioned). Skipping this left 1,714 mentions (136 laws) with empty `entities` after the July batches, which silently degraded trees.
 
 ```bash
-# All laws
-cargo run -p fractalaw-cli -- fitness compile
-
-# Specific laws
-cargo run -p fractalaw-cli -- fitness compile --laws UK_ukpga_1981_69
+cargo run -p fractalaw-cli -- fitness reconcile --dry-run
+cargo run -p fractalaw-cli -- fitness reconcile
 ```
 
-Reads `fitness_mentions` from Postgres, compiles per-law boolean expression trees (`ApplicabilityNode` JSON), writes `compiled_applicability` to DuckDB.
+### Step 4: Derive application
 
-Compiler rules:
-- AppliesTo mentions → Or (any provision match = law applies)
-- DisappliesTo mentions → Not(Or(...)) with conflict filtering
-- Same scope dimension → Or (employer OR contractor)
-- Different dimensions → And (personal AND material)
-- Temporal entities → TimeWindow nodes
+Application is the set of nations where the law operates. It is **not extent**: an "(England)" SI extends E+W but applies in England. The order is text clause > title parenthetical > type code > extent (extent clause, then LAT, then LRT). Writes DuckDB `application_regions/source/evidence`. See sertantai-legal #162/#163.
 
-### Step 4: Publish to sertantai
+```bash
+cargo run -p fractalaw-cli -- fitness application --out /tmp/app.jsonl   # review
+cargo run -p fractalaw-cli -- fitness application                        # write DuckDB
+```
+
+### Step 5: Compile expression trees
+
+```bash
+# Dry run: JSONL, DuckDB untouched, then lint
+cargo run -p fractalaw-cli -- fitness compile --out /tmp/trees.jsonl
+/usr/bin/python3 scripts/maintenance/lint_trees.py --scope <laws.txt> --jsonl /tmp/trees.jsonl
+
+# Write DuckDB (back up compiled_applicability first)
+cargo run -p fractalaw-cli -- fitness compile [--laws UK_ukpga_1981_69]
+```
+
+Compiler (`fractalaw-core/src/taxa/applicability_compile.rs`):
+- AppliesTo mentions → Or; different dimensions within a mention → And
+- Root And gets one `territorial` gate holding the law's application. Jurisdiction codes (england, scotland, united_kingdom ...) never appear elsewhere (L3/L7)
+- Every code must be grounded in its provision text + sub-provisions, or the law's title, after stripping citations of other Acts (L4; the ft model emits `construction` for unrelated provisions)
+- Government actors dropped (L5); `construction` in the interpretation or vehicle/product sense dropped
+- Only law-level disapplications ("These Regulations do not apply to …") become the root Not; provision-level exceptions are dropped
+- TimeWindow: `from` = earliest law-level commencement; `to` only from a law-level sunset (L2)
+- Output normalised: duplicates removed, Or-Matches merged (L1)
+- Laws with a tree but no mentions left are repaired in place (`repair_tree`)
+
+`taxa_hash` does **not** cover fitness or tree fields, so `publish --changed` never picks up tree changes. Publish with explicit `--laws`.
+
+### Step 6: Publish to sertantai
 
 ```bash
 # Specific laws
@@ -78,7 +100,7 @@ db.close()
 
 Publishes `fitness_entities`, `fitness_scope_dimensions`, `fitness_mention_count`, `fitness_applies_count`, `fitness_disapplies_count`, and `compiled_applicability` as part of the LRT Arrow IPC payload.
 
-### Step 5: Check coverage
+### Step 7: Check coverage
 
 ```bash
 cargo run -p fractalaw-cli -- fitness status

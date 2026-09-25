@@ -348,6 +348,30 @@ enum FitnessAction {
         #[arg(long)]
         law_file: Option<PathBuf>,
     },
+    /// Reconcile tier entities into `entities` (ft > regex > slm) for rows not yet reconciled
+    Reconcile {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Read law names from a file (one per line or CSV)
+        #[arg(long)]
+        law_file: Option<PathBuf>,
+        /// Report what would be reconciled without writing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Derive law application (nations where it applies) → DuckDB application_* columns
+    Application {
+        /// Specific laws (comma-separated)
+        #[arg(long)]
+        laws: Option<String>,
+        /// Read law names from a file (one per line or CSV)
+        #[arg(long)]
+        law_file: Option<PathBuf>,
+        /// Write JSONL to this file instead of DuckDB
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     /// Compile fitness mentions into expression trees per law → DuckDB
     Compile {
         /// Specific laws (comma-separated)
@@ -356,6 +380,9 @@ enum FitnessAction {
         /// Read law names from a file (one per line or CSV)
         #[arg(long)]
         law_file: Option<PathBuf>,
+        /// Write trees as JSONL ({"name","tree"}) to this file instead of DuckDB
+        #[arg(long)]
+        out: Option<PathBuf>,
     },
 }
 
@@ -685,13 +712,28 @@ async fn main() -> anyhow::Result<()> {
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
                 commands::fitness::cmd_fitness_status(pg_url, law_names.as_deref()).await
             }
-            FitnessAction::Compile { laws, law_file } => {
+            FitnessAction::Reconcile { laws, law_file, dry_run } => {
+                let pg_url = pg_url
+                    .as_deref()
+                    .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
+                let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
+                commands::fitness::cmd_fitness_reconcile(pg_url, law_names.as_deref(), dry_run).await
+            }
+            FitnessAction::Application { laws, law_file, out } => {
                 let pg_url = pg_url
                     .as_deref()
                     .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
                 let duck = open_duck(&data_dir)?;
-                commands::fitness::cmd_fitness_compile(pg_url, &duck, law_names.as_deref()).await
+                commands::fitness::cmd_fitness_application(pg_url, &duck, law_names.as_deref(), out.as_deref()).await
+            }
+            FitnessAction::Compile { laws, law_file, out } => {
+                let pg_url = pg_url
+                    .as_deref()
+                    .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
+                let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
+                let duck = open_duck(&data_dir)?;
+                commands::fitness::cmd_fitness_compile(pg_url, &duck, law_names.as_deref(), out.as_deref()).await
             }
         },
 
