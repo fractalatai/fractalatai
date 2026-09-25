@@ -71,6 +71,14 @@ pub(crate) async fn cmd_sync_publish(
 ) -> anyhow::Result<()> {
     let store = open_duck(data_dir)?;
     store.ensure_taxa_hash_columns()?;
+    // ZENOH-SPEC v2.4 application fields (written by `fitness application`)
+    for ddl in [
+        "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS application_regions VARCHAR[]",
+        "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS application_source VARCHAR",
+        "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS application_evidence VARCHAR",
+    ] {
+        store.execute(ddl)?;
+    }
     // Legacy ensure_fitness_columns() removed — fitness uses fitness_mentions table
 
     let law_names: Vec<String> = if let Some(ref fam) = family {
@@ -178,7 +186,8 @@ pub(crate) async fn cmd_sync_publish(
                     significance_rating, significance_score, \
                     significance_high_count, significance_medium_count, \
                     significance_low_count, significance_total_obligations, \
-                    significance_parts \
+                    significance_parts, \
+                    application_regions, application_source, application_evidence \
              FROM legislation WHERE name = '{}'",
             law_name.replace('\'', "''")
         );
@@ -988,6 +997,8 @@ pub(crate) async fn cmd_sync_pull_lrt(
     timeout_secs: u64,
 ) -> anyhow::Result<()> {
     let duck = crate::open_duck(data_dir)?;
+    // v2.4: provenance of sertantai's extent (NULL = legacy/unverified)
+    duck.execute("ALTER TABLE legislation ADD COLUMN IF NOT EXISTS extent_source VARCHAR")?;
 
     let config = zenoh.build_zenoh_config()?;
     let sync = fractalaw_sync::ZenohSync::with_config(&zenoh.tenant, config)

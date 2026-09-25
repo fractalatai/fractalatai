@@ -495,11 +495,13 @@ pub(crate) async fn load_law_meta(
     use fractalaw_core::taxa::application::{ApplicationInput, derive_application};
     use std::collections::HashMap;
 
-    // LRT: name, type_code, title, extent_code
-    let mut lrt: Vec<(String, String, Option<String>, Option<String>)> = Vec::new();
-    for batch in duck.query_arrow("SELECT name, type_code, title, extent_code FROM legislation")? {
+    // LRT: name, type_code, title, extent_code, extent_source (v2.4; NULL = legacy/unverified)
+    duck.execute("ALTER TABLE legislation ADD COLUMN IF NOT EXISTS extent_source VARCHAR")?;
+    type LrtRow = (String, String, Option<String>, Option<String>, Option<String>);
+    let mut lrt: Vec<LrtRow> = Vec::new();
+    for batch in duck.query_arrow("SELECT name, type_code, title, extent_code, extent_source FROM legislation")? {
         let col = |i: usize| batch.column(i).as_any().downcast_ref::<StringArray>().cloned();
-        let (Some(n), Some(t), Some(ti), Some(e)) = (col(0), col(1), col(2), col(3)) else {
+        let (Some(n), Some(t), Some(ti), Some(e), Some(es)) = (col(0), col(1), col(2), col(3), col(4)) else {
             continue;
         };
         for i in 0..batch.num_rows() {
@@ -507,7 +509,7 @@ pub(crate) async fn load_law_meta(
                 continue;
             }
             let opt = |a: &StringArray| (!a.is_null(i)).then(|| a.value(i).to_string());
-            lrt.push((n.value(i).to_string(), opt(&t).unwrap_or_default(), opt(&ti), opt(&e)));
+            lrt.push((n.value(i).to_string(), opt(&t).unwrap_or_default(), opt(&ti), opt(&e), opt(&es)));
         }
     }
     if let Some(names) = law_names {
@@ -573,7 +575,7 @@ pub(crate) async fn load_law_meta(
     let empty_p: Vec<(String, String)> = Vec::new();
     let empty_e: Vec<String> = Vec::new();
     let mut meta = HashMap::new();
-    for (name, type_code, title, extent) in lrt {
+    for (name, type_code, title, extent, extent_source) in lrt {
         let title = title.filter(|t| !t.is_empty()).or_else(|| cited.get(&name).cloned()).unwrap_or_default();
         let application = derive_application(&ApplicationInput {
             type_code: &type_code,
@@ -581,6 +583,7 @@ pub(crate) async fn load_law_meta(
             provisions: clauses.get(&name).unwrap_or(&empty_p),
             lat_extents: lat_extents.get(&name).unwrap_or(&empty_e),
             lrt_extent: extent.as_deref(),
+            lrt_extent_source: extent_source.as_deref(),
         });
         meta.insert(name, LawMeta { title, application });
     }

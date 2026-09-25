@@ -339,7 +339,7 @@ impl DuckStore {
         "restrict_start_date",
         // Extent
         "extent_code", "extent_regions", "extent_national", "extent_detail",
-        "restrict_extent",
+        "restrict_extent", "extent_source",
         // Status
         "status", "status_source", "status_conflict", "status_conflict_detail",
         // Function
@@ -364,7 +364,9 @@ impl DuckStore {
     /// Defensive rules:
     /// 1. **Whitelist only** — only updates columns sertantai owns (see `SERTANTAI_OWNED_COLS`)
     /// 2. **Skip NULLs** — never overwrites a non-NULL value with NULL from sertantai
-    /// 3. **Column name mapping** — handles `title_en` → `title` and `family_ii` → `sub_family`
+    /// 3. **Column name mapping** — handles `title_en` → `title`, `family_ii` → `sub_family`,
+    ///    `geo_extent` → `extent_code`, `geo_region` → `extent_regions`,
+    ///    `geo_extent_source` → `extent_source` (ZENOH-SPEC v2.4; NULL = legacy/unverified)
     /// 4. **Fractalaw-owned columns untouched** — taxa, fitness, significance, pipeline state
     pub fn merge_legislation(&self, batches: &[RecordBatch]) -> Result<usize, StoreError> {
         let whitelist: std::collections::HashSet<&str> =
@@ -407,6 +409,9 @@ impl DuckStore {
             let col_mapping: Vec<(&str, &str)> = vec![
                 ("title_en", "title"),
                 ("family_ii", "sub_family"),
+                ("geo_extent", "extent_code"),
+                ("geo_region", "extent_regions"),
+                ("geo_extent_source", "extent_source"),
             ];
 
             let schema = batch.schema();

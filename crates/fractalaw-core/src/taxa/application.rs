@@ -10,8 +10,9 @@
 //!    a law-level "do not apply to Scotland" subtracts from what steps 2-4 give
 //! 2. `title`: nations named in a title parenthetical, "(England)", "(Wales) Act"
 //! 3. `type_code`: devolved legislation types
-//! 4. `extent_fallback`: extent clause in the text, else LAT provision extents,
-//!    else the LRT extent
+//! 4. `extent_fallback`: extent clause in the text, else a verified LRT extent
+//!    (`geo_extent_source` set, sertantai-legal #162), else LAT provision
+//!    extents, else a legacy/unverified LRT extent (an upper bound)
 
 use std::sync::LazyLock;
 
@@ -79,6 +80,8 @@ pub struct ApplicationInput<'a> {
     pub lat_extents: &'a [String],
     /// Law-level extent from the LRT ("UK", "E+W", "GB" ...)
     pub lrt_extent: Option<&'a str>,
+    /// sertantai's `geo_extent_source` for `lrt_extent`; `None` = legacy/unverified
+    pub lrt_extent_source: Option<&'a str>,
 }
 
 const SELF_REF: &str =
@@ -258,8 +261,23 @@ fn derive_without_clause(input: &ApplicationInput) -> Option<Application> {
             }
         }
     }
+    let lrt = |verified: bool| {
+        input
+            .lrt_extent
+            .filter(|_| input.lrt_extent_source.is_some() == verified)
+            .map(|e| {
+                let note = match input.lrt_extent_source {
+                    Some(src) => format!("LRT extent {e} (source {src})"),
+                    None => format!("LRT extent {e} (legacy/unverified)"),
+                };
+                (nations_for_extent(e), note)
+            })
+            .filter(|(r, _)| !r.is_empty())
+    };
     let base: Option<(Vec<String>, String)> = if !pos.is_empty() {
         None
+    } else if let Some(verified) = lrt(true) {
+        Some(verified)
     } else {
         let mut lat = Vec::new();
         for code in input.lat_extents {
@@ -268,10 +286,7 @@ fn derive_without_clause(input: &ApplicationInput) -> Option<Application> {
         if !lat.is_empty() {
             Some((lat, format!("LAT extent {}", input.lat_extents.join(","))))
         } else {
-            input
-                .lrt_extent
-                .map(|e| (nations_for_extent(e), format!("LRT extent {e}")))
-                .filter(|(r, _)| !r.is_empty())
+            lrt(false)
         }
     };
     let (mut regions, base_evidence) = match base {
@@ -387,6 +402,7 @@ mod tests {
             provisions: &p,
             lat_extents: &["E+W".into()],
             lrt_extent: Some("UK"),
+            lrt_extent_source: None,
         });
         assert_eq!(regions(&a), vec!["england"]);
         let a = a.unwrap();
@@ -404,6 +420,7 @@ mod tests {
             provisions: &p,
             lat_extents: &["E+W".into()],
             lrt_extent: Some("UK"),
+            lrt_extent_source: None,
         });
         assert_eq!(regions(&a), vec!["england"]);
         assert_eq!(a.unwrap().source, ApplicationSource::Title);
@@ -449,7 +466,17 @@ mod tests {
         });
         assert_eq!(regions(&a), vec!["england", "wales"]);
         let a = derive_application(&ApplicationInput { type_code: "ukpga", lrt_extent: Some("GB"), ..Default::default() });
-        assert_eq!(a.unwrap().evidence, "LRT extent GB");
+        assert_eq!(a.unwrap().evidence, "LRT extent GB (legacy/unverified)");
+        // A verified LRT extent (#162) beats the LAT provision union
+        let a = derive_application(&ApplicationInput {
+            type_code: "uksi",
+            lat_extents: &["E+W+S+NI".into()],
+            lrt_extent: Some("GB"),
+            lrt_extent_source: Some("law_level"),
+            ..Default::default()
+        });
+        assert_eq!(regions(&a), vec!["england", "wales", "scotland"]);
+        assert_eq!(a.unwrap().evidence, "LRT extent GB (source law_level)");
         assert!(derive_application(&ApplicationInput { type_code: "ukpga", ..Default::default() }).is_none());
     }
 
