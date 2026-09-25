@@ -20,6 +20,10 @@
 //!   apply to ...", "Nothing in this Act applies to ...") become the root Not.
 //!   Provision-level exceptions ("Regulation 9 does not apply to ...") can't be
 //!   scoped in the tree, so they are dropped rather than negating the whole law.
+//! - L3 (subject): a law never disapplies the subject its own title names.
+//!   "These Regulations shall not apply to activities to which the Control of
+//!   Noise at Work Regulations 2005 apply" would otherwise give the Merchant
+//!   Shipping (Control of Noise at Work) Regs `Not(at_work)`.
 //! - L3/L7: jurisdiction codes (england, scotland, united_kingdom ...) never
 //!   appear inside branches or under Not; the law's application
 //!   ([`super::application`]) becomes a single root `territorial` gate
@@ -58,6 +62,11 @@ pub struct LawContext {
 
 pub fn is_jurisdiction(code: &str) -> bool {
     JURISDICTION_CODES.contains(&code)
+}
+
+/// Is `code` part of the subject named by the law's own title?
+pub fn is_title_subject(code: &str, ctx: &LawContext) -> bool {
+    !ctx.title.is_empty() && is_grounded(code, &ctx.title)
 }
 
 /// Root application gate, placed first under the root And.
@@ -305,6 +314,10 @@ pub fn compile_law(
         // L5: government actors are regulators, never applicability conditions.
         // L3/L7: jurisdiction is carried by the root application gate only.
         grounded.retain(|(_, c)| !is_gov_actor(c) && !is_jurisdiction(c));
+        // L3 (subject): never disapply what the law's own title is about
+        if disapplies {
+            grounded.retain(|(_, c)| !is_title_subject(c, ctx));
+        }
         if grounded.is_empty() {
             continue;
         }
@@ -359,12 +372,13 @@ pub fn compile_law(
 /// L1 normalise, L2 drop `to` (no law-level sunset is recoverable without text),
 /// L4 drop `construction*` unless the law's title grounds it, L5 drop government actors.
 pub fn repair_tree(node: ApplicabilityNode, ctx: &LawContext) -> Option<ApplicabilityNode> {
-    fn go(node: ApplicabilityNode, ctx: &LawContext) -> Option<ApplicabilityNode> {
+    fn go(node: ApplicabilityNode, ctx: &LawContext, negated: bool) -> Option<ApplicabilityNode> {
         match node {
             ApplicabilityNode::Match { dimension, codes, match_op } => {
                 let codes: Vec<String> = codes
                     .into_iter()
                     .filter(|c| !is_gov_actor(c) && !is_jurisdiction(c))
+                    .filter(|c| !(negated && is_title_subject(c, ctx)))
                     .filter(|c| {
                         !(c == "construction" || c.starts_with("construction_")) || is_grounded(c, &ctx.title)
                     })
@@ -372,16 +386,16 @@ pub fn repair_tree(node: ApplicabilityNode, ctx: &LawContext) -> Option<Applicab
                 (!codes.is_empty()).then_some(ApplicabilityNode::Match { dimension, codes, match_op })
             }
             ApplicabilityNode::And { children } => {
-                let kids: Vec<_> = children.into_iter().filter_map(|c| go(c, ctx)).collect();
+                let kids: Vec<_> = children.into_iter().filter_map(|c| go(c, ctx, negated)).collect();
                 (!kids.is_empty()).then(|| ApplicabilityNode::and(kids))
             }
             ApplicabilityNode::Or { children } => {
-                let kids: Vec<_> = children.into_iter().filter_map(|c| go(c, ctx)).collect();
+                let kids: Vec<_> = children.into_iter().filter_map(|c| go(c, ctx, negated)).collect();
                 (!kids.is_empty()).then(|| ApplicabilityNode::or(kids))
             }
-            ApplicabilityNode::Not { child } => go(*child, ctx).map(ApplicabilityNode::negate),
+            ApplicabilityNode::Not { child } => go(*child, ctx, !negated).map(ApplicabilityNode::negate),
             ApplicabilityNode::Conditional { condition, then } => {
-                match (go(*condition, ctx), go(*then, ctx)) {
+                match (go(*condition, ctx, negated), go(*then, ctx, negated)) {
                     (Some(c), Some(t)) => Some(ApplicabilityNode::Conditional { condition: Box::new(c), then: Box::new(t) }),
                     (None, Some(t)) => Some(t),
                     _ => None,
@@ -393,7 +407,7 @@ pub fn repair_tree(node: ApplicabilityNode, ctx: &LawContext) -> Option<Applicab
         }
     }
     // Several TimeWindows under the root And: keep one, from the earliest date
-    let repaired = go(node, ctx)?.normalize();
+    let repaired = go(node, ctx, false)?.normalize();
     let repaired = match repaired {
         ApplicabilityNode::And { children } => {
             let (windows, mut rest): (Vec<_>, Vec<_>) =
@@ -616,6 +630,47 @@ mod tests {
         assert!(!is_law_level_disapplication("Regulation 9 does not apply to construction work on domestic premises"));
         assert!(!is_law_level_disapplication("This regulation does not apply to a domestic client."));
         assert!(!is_law_level_disapplication("Paragraph (2) of this regulation does not apply where these Regulations apply"));
+    }
+
+    #[test]
+    fn law_never_disapplies_its_title_subject() {
+        // UK_uksi_2007_3075 reg.4(6): boundary with the land-based Noise at Work Regs
+        let ctx = LawContext {
+            title: "Merchant Shipping and Fishing Vessels (Control of Noise at Work) Regulations".into(),
+            application: Some(vec!["england".into()]),
+        };
+        let mut d = dims();
+        d.insert("at work".into(), "conditional".into());
+        let tree = compile_law(
+            &[
+                mention("AppliesTo", &["employer"], "Every employer shall"),
+                mention(
+                    "DisappliesTo",
+                    &["at work", "waste"],
+                    "These regulations shall not apply to activities to which the Control of Noise at Work Regulations 2005 apply, or to waste",
+                ),
+            ],
+            &d,
+            &ctx,
+        )
+        .unwrap();
+        assert_eq!(
+            tree,
+            ApplicabilityNode::and(vec![
+                m("territorial", &["england"]),
+                m("personal", &["employer"]),
+                m("material", &["waste"]).negate(),
+            ])
+        );
+        // repair_tree applies the same guard to stored trees
+        let stored = ApplicabilityNode::and(vec![
+            m("personal", &["employer"]),
+            m("conditional", &["at_work"]).negate(),
+        ]);
+        assert_eq!(
+            repair_tree(stored, &ctx),
+            Some(ApplicabilityNode::and(vec![m("territorial", &["england"]), m("personal", &["employer"])]))
+        );
     }
 
     #[test]

@@ -50,6 +50,22 @@ def own_jurisdiction(type_code, title):
     return own
 
 
+STOPWORDS = {"of", "the", "and", "or", "for", "in", "to", "a", "an", "at", "on", "by", "with"}
+
+
+def title_subject(code, title):
+    """Mirror of applicability_compile::is_grounded against the law title."""
+    import re
+    if not title:
+        return False
+    words = [w for w in re.split(r"[_\s-]", code) if w and w not in STOPWORDS]
+    if not words:
+        return False
+    head = words[0]
+    pat = rf"\b{re.escape(head)}\b" if len(head) < 4 else rf"\b{re.escape(head[:6])}"
+    return re.search(pat, title.lower()) is not None
+
+
 def walk(node, in_not=False, depth=0, gating=False):
     """Yield (node, in_not, depth, gating) for every node.
 
@@ -89,6 +105,8 @@ def lint(tree, type_code, title, today):
             dim = node.get("dimension")
             if in_not and dim == "territorial" and codes & own:
                 hits.add("L3")
+            if in_not and any(title_subject(c, title) for c in codes):
+                hits.add("L3_subject")
             if "construction" in codes:
                 hits.add("L4")
                 if in_not:
@@ -157,7 +175,7 @@ def main():
             failing.setdefault(h, []).append(name)
 
     print(f"trees linted: {n}")
-    for key in ["L1", "L2", "L3", "L4", "L4_in_not", "L5", "L5_any", "L6", "L7", "L8", "has_not"]:
+    for key in ["L1", "L2", "L3", "L3_subject", "L4", "L4_in_not", "L5", "L5_any", "L6", "L7", "L8", "has_not"]:
         print(f"  {key:10} {counts.get(key, 0)}")
     if args.list:
         print("\n".join(sorted(failing.get(args.list, []))))
