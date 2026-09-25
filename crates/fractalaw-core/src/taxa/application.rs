@@ -98,7 +98,7 @@ static APPLY_RE: LazyLock<Regex> = LazyLock::new(|| {
 
 static EXTEND_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(&format!(
-        r"(?i){SELF_REF}[^.;]{{0,40}}?\b(?:shall\s+|do\s+|does\s+)?(not\s+)?extends?[\s—–-]+(?:only\s+)?to\s+({NATION_ALT}(?:\s*(?:,|and|or)\s*{NATION_ALT})*)"
+        r"(?i){SELF_REF}[^.;]{{0,40}}?\b(?:shall\s+|do\s+|does\s+)?(not\s+)?extends?[\s—–-]+(only\s+)?to\s+({NATION_ALT}(?:\s*(?:,|and|or)\s*{NATION_ALT})*)(\s+only)?"
     ))
     .unwrap()
 });
@@ -243,13 +243,18 @@ fn derive_without_clause(input: &ApplicationInput) -> Option<Application> {
 
     // 4. extent: text extent clause > LAT provision extents > LRT.
     //    "does not extend to Northern Ireland" subtracts from whichever base applies.
+    //    Positive extent clauses state the extent, except a clause naming only
+    //    Northern Ireland without "only": in a UK Act ("This Act extends to Northern
+    //    Ireland", Communications Act 2003 s.411(5)) it confirms NI on top of the
+    //    default UK-wide extent, so it is added to the base instead.
     let mut pos = Vec::new();
+    let mut exclusive = false;
     let mut neg = Vec::new();
     let mut evidence = Vec::new();
     for (sid, text) in input.provisions {
         for cap in EXTEND_RE.captures_iter(text) {
             let m = cap.get(0).unwrap();
-            let regions = nations_in(&cap[2]);
+            let regions = nations_in(&cap[3]);
             if regions.is_empty() || is_partial_subject(text, &m) || is_descriptive(m.as_str()) {
                 continue;
             }
@@ -257,6 +262,7 @@ fn derive_without_clause(input: &ApplicationInput) -> Option<Application> {
             if cap.get(1).is_some() || is_nothing_in(text, &m) {
                 union(&mut neg, regions);
             } else {
+                exclusive |= cap.get(2).is_some() || cap.get(4).is_some();
                 union(&mut pos, regions);
             }
         }
@@ -274,7 +280,8 @@ fn derive_without_clause(input: &ApplicationInput) -> Option<Application> {
             })
             .filter(|(r, _)| !r.is_empty())
     };
-    let base: Option<(Vec<String>, String)> = if !pos.is_empty() {
+    let ni_only_additive = !exclusive && !pos.is_empty() && pos.iter().all(|n| n == NORTHERN_IRELAND);
+    let base: Option<(Vec<String>, String)> = if !pos.is_empty() && !ni_only_additive {
         None
     } else if let Some(verified) = lrt(true) {
         Some(verified)
@@ -290,7 +297,10 @@ fn derive_without_clause(input: &ApplicationInput) -> Option<Application> {
         }
     };
     let (mut regions, base_evidence) = match base {
-        Some((r, ev)) => (r, Some(ev)),
+        Some((mut r, ev)) => {
+            union(&mut r, pos);
+            (r, Some(ev))
+        }
         None => (pos, None),
     };
     regions.retain(|n| !neg.contains(n));
@@ -554,6 +564,33 @@ mod tests {
         ]);
         let a = derive_application(&ApplicationInput { type_code: "uksi", provisions: &p, lrt_extent: Some("E+W"), ..Default::default() });
         assert_eq!(a.unwrap().source, ApplicationSource::ExtentFallback);
+    }
+
+    #[test]
+    fn additive_extent_clause_in_uk_act() {
+        // UK_ukpga_2003_21 s.411(5): "This Act extends to Northern Ireland" adds NI
+        let p = provs(&[("UK_ukpga_2003_21:s.411(5)", "This Act extends to Northern Ireland.")]);
+        let a = derive_application(&ApplicationInput {
+            type_code: "ukpga",
+            provisions: &p,
+            lat_extents: &["E+W+S".into()],
+            lrt_extent: Some("UK"),
+            ..Default::default()
+        });
+        assert_eq!(regions(&a), NATIONS.to_vec());
+        // "only" restricts
+        let p = provs(&[("UK_x:reg.1(3)", "These Regulations extend to Northern Ireland only.")]);
+        let a = derive_application(&ApplicationInput {
+            type_code: "uksi",
+            provisions: &p,
+            lat_extents: &["E+W+S+NI".into()],
+            ..Default::default()
+        });
+        assert_eq!(regions(&a), vec!["northern_ireland"]);
+        // Extent clause with no other source still works
+        let p = provs(&[("UK_x:reg.1(3)", "These Regulations extend to England and Wales.")]);
+        let a = derive_application(&ApplicationInput { type_code: "uksi", provisions: &p, ..Default::default() });
+        assert_eq!(regions(&a), vec!["england", "wales"]);
     }
 
     #[test]
