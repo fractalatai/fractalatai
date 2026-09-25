@@ -40,20 +40,50 @@ Backs up everything. Takes ~5 minutes.
 - **Backup dir**: `/mnt/nas/sertantai-data/data/fractalaw-backups/`
 - **Space**: 5.5 TB total, typically <1% used
 
+## The rule: stage locally, then copy, then verify
+
+**Never write backup files directly to the NAS.** The SMB mount block-pads binary files with trailing zeros. `correct_gold_standard.py` once wrote benchmark Parquet straight to the NAS and **13 of 15 files were corrupted**, with no second copy. Every procedure below therefore:
+
+1. **Stages** into `/mnt/ssd/fractalaw-backups/nas-stage-YYYYMMDD/` (local SSD, ~800 GB free; `/var/home` is nearly full).
+2. **Validates** the staged files locally.
+3. **Writes** a `SHA256SUMS` manifest.
+4. **Copies** to the NAS with `rsync`, then runs `sync`.
+5. **Verifies** the NAS copies against the manifest (`sha256sum -c`) and re-opens them.
+
+The staging directory stays on the SSD as a second copy. Prune old ones by hand.
+
 ## Quick Backup
 
 ```bash
-BACKUP_DIR=/mnt/nas/sertantai-data/data/fractalaw-backups/$(date +%Y%m%d)
-mkdir -p "$BACKUP_DIR"
+D=$(date +%Y%m%d)
+STAGE=/mnt/ssd/fractalaw-backups/nas-stage-$D
+NAS=/mnt/nas/sertantai-data/data/fractalaw-backups/$D
+mkdir -p "$STAGE"
 
-# Postgres (the primary store — provision_actors, legislation_text, gold_benchmarks)
-PGPASSWORD=fractalaw pg_dump -h localhost -p 5433 -U fractalaw -Fc fractalaw > "$BACKUP_DIR/fractalaw.pgdump"
+# 1. Stage locally
+# Postgres (the primary store — provision_actors, legislation_text, fitness_mentions, gold_benchmarks)
+PGPASSWORD=fractalaw pg_dump -h localhost -p 5433 -U fractalaw -Fc fractalaw > "$STAGE/fractalaw.pgdump"
+# DuckDB (LRT metadata, trees, application, publish state). Nothing may hold the lock:
+pgrep -af "target/debug/fractalaw" && echo "WARNING: fractalaw process running — DuckDB copy may be inconsistent"
+cp data/fractalaw.duckdb "$STAGE/"
 
-# DuckDB (LRT metadata, taxa hashes, publish state)
-cp data/fractalaw.duckdb "$BACKUP_DIR/"
+# 2. Validate locally
+PGPASSWORD=fractalaw pg_restore -l "$STAGE/fractalaw.pgdump" | grep -c "TABLE DATA"   # expect 8
+duckdb -readonly "$STAGE/fractalaw.duckdb" "SELECT count(*) FROM legislation"
 
-echo "Quick backup complete"
-du -sh "$BACKUP_DIR/fractalaw.pgdump" "$BACKUP_DIR/fractalaw.duckdb"
+# 3. Manifest
+(cd "$STAGE" && sha256sum fractalaw.pgdump fractalaw.duckdb > SHA256SUMS)
+
+# 4. Copy to NAS
+mkdir -p "$NAS"
+rsync -a "$STAGE/fractalaw.pgdump" "$STAGE/fractalaw.duckdb" "$STAGE/SHA256SUMS" "$NAS/"
+sync
+
+# 5. Verify NAS copies
+(cd "$NAS" && sha256sum -c SHA256SUMS)                        # both must say OK
+PGPASSWORD=fractalaw pg_restore -l "$NAS/fractalaw.pgdump" | grep -c "TABLE DATA"
+duckdb -readonly "$NAS/fractalaw.duckdb" "SELECT count(*) FROM legislation"
+du -sh "$NAS"/*
 ```
 
 ## Full Backup
@@ -70,58 +100,71 @@ du -sh data/fractalaw.duckdb data/lancedb/ data/cultural-graph.duckdb data/sif/ 
 # Check Postgres size
 PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -c "SELECT pg_size_pretty(pg_database_size('fractalaw'));"
 
-# Check NAS free space
-df -h /mnt/nas/sertantai-data/
+# Check free space: SSD staging and NAS
+df -h /mnt/ssd /mnt/nas/sertantai-data/
+
+# Nothing may hold DuckDB/LanceDB open
+pgrep -af "target/debug/fractalaw"
 ```
 
-### 2. Create dated backup
+### 2. Stage everything locally
 
 ```bash
-BACKUP_DIR=/mnt/nas/sertantai-data/data/fractalaw-backups/$(date +%Y%m%d)
-mkdir -p "$BACKUP_DIR"
+D=$(date +%Y%m%d)
+STAGE=/mnt/ssd/fractalaw-backups/nas-stage-$D
+NAS=/mnt/nas/sertantai-data/data/fractalaw-backups/$D
+mkdir -p "$STAGE"
 
 # Postgres (pg_dump — custom format for fast restore)
-PGPASSWORD=fractalaw pg_dump -h localhost -p 5433 -U fractalaw -Fc fractalaw > "$BACKUP_DIR/fractalaw.pgdump"
+PGPASSWORD=fractalaw pg_dump -h localhost -p 5433 -U fractalaw -Fc fractalaw > "$STAGE/fractalaw.pgdump"
 
 # DuckDB
-cp data/fractalaw.duckdb "$BACKUP_DIR/"
+cp data/fractalaw.duckdb "$STAGE/"
 
 # LanceDB (copy entire directory — binary fragments, not individual files)
-cp -r data/lancedb/ "$BACKUP_DIR/lancedb/"
+rsync -a data/lancedb/ "$STAGE/lancedb/"
 
-# Classifier models (now JSON in crates/fractalaw-cli/config/)
+# Classifier models are JSON in crates/fractalaw-cli/config/ (in git) — no backup needed
 # Active versions: drrp_classifier_v8.json, position_classifier_v3.json
-# No longer shipped as .pkl — skip classifier backup
 
 # Cultural graph DuckDB
-[ -f data/cultural-graph.duckdb ] && cp data/cultural-graph.duckdb "$BACKUP_DIR/"
+[ -f data/cultural-graph.duckdb ] && cp data/cultural-graph.duckdb "$STAGE/"
 
-# SIF data (taxonomy, sources, calibration, models, DuckDB)
-mkdir -p "$BACKUP_DIR/sif"
-[ -f data/sif.duckdb ] && cp data/sif.duckdb "$BACKUP_DIR/sif/"
-[ -d data/sif/taxonomy ] && cp -r data/sif/taxonomy/ "$BACKUP_DIR/sif/taxonomy/"
-[ -d data/sif/sources ] && rsync -a data/sif/sources/ "$BACKUP_DIR/sif/sources/"
-[ -d data/sif/calibration ] && cp -r data/sif/calibration/ "$BACKUP_DIR/sif/calibration/"
-[ -d data/sif/models ] && cp -r data/sif/models/ "$BACKUP_DIR/sif/models/"
-[ -d data/sif/benchmarks ] && cp -r data/sif/benchmarks/ "$BACKUP_DIR/sif/benchmarks/"
+# SIF data (taxonomy, sources, calibration, models, benchmarks, DuckDB)
+mkdir -p "$STAGE/sif"
+[ -f data/sif.duckdb ] && cp data/sif.duckdb "$STAGE/sif/"
+for d in taxonomy sources calibration models benchmarks; do
+  [ -d data/sif/$d ] && rsync -a data/sif/$d/ "$STAGE/sif/$d/"
+done
 
-# SLM adapter (only if exists)
-[ -d data/slm-adapter ] && cp -r data/slm-adapter/ "$BACKUP_DIR/slm-adapter/"
-
-# GGUF model (only if exists)
-[ -f models/gemma3-position-q4.gguf ] && cp models/gemma3-position-q4.gguf "$BACKUP_DIR/"
+# SLM adapter + GGUF (only if they exist)
+[ -d data/slm-adapter ] && rsync -a data/slm-adapter/ "$STAGE/slm-adapter/"
+[ -f models/gemma3-position-q4.gguf ] && cp models/gemma3-position-q4.gguf "$STAGE/"
 ```
 
-### 3. Verify
+### 3. Validate locally, write manifest
 
 ```bash
-du -sh "$BACKUP_DIR"/*
-
-# Verify Postgres dump
-PGPASSWORD=fractalaw pg_restore -l "$BACKUP_DIR/fractalaw.pgdump" | head -5
-
-# Verify Postgres row count
+PGPASSWORD=fractalaw pg_restore -l "$STAGE/fractalaw.pgdump" | grep -c "TABLE DATA"
+duckdb -readonly "$STAGE/fractalaw.duckdb" "SELECT count(*) FROM legislation"
+[ -f "$STAGE/cultural-graph.duckdb" ] && duckdb -readonly "$STAGE/cultural-graph.duckdb" "SELECT 1"
 PGPASSWORD=fractalaw psql -h localhost -p 5433 -U fractalaw -d fractalaw -c "SELECT count(*) FROM legislation_text;"
+
+(cd "$STAGE" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+wc -l "$STAGE/SHA256SUMS"
+```
+
+### 4. Copy to NAS and verify
+
+```bash
+mkdir -p "$NAS"
+rsync -a "$STAGE/" "$NAS/"
+sync
+
+(cd "$NAS" && sha256sum --quiet -c SHA256SUMS) && echo "NAS copy verified"   # any FAILED line = re-copy
+PGPASSWORD=fractalaw pg_restore -l "$NAS/fractalaw.pgdump" | grep -c "TABLE DATA"
+duckdb -readonly "$NAS/fractalaw.duckdb" "SELECT count(*) FROM legislation"
+du -sh "$NAS"/*
 ```
 
 ## Compaction Before Backup
@@ -135,8 +178,10 @@ If LanceDB has grown large due to merge_insert fragment bloat, compact first to 
 ## Restore
 
 ```bash
-# From NAS backup
+# From NAS backup (reads are safe; check the manifest first if present)
 BACKUP_DIR=/mnt/nas/sertantai-data/data/fractalaw-backups/YYYYMMDD
+[ -f "$BACKUP_DIR/SHA256SUMS" ] && (cd "$BACKUP_DIR" && sha256sum --quiet -c SHA256SUMS)
+# Or restore from the local SSD staging copy: /mnt/ssd/fractalaw-backups/nas-stage-YYYYMMDD/
 cp "$BACKUP_DIR/fractalaw.duckdb" data/
 cp -r "$BACKUP_DIR/lancedb/" data/lancedb/
 
@@ -173,4 +218,5 @@ print(f'Restored: {arrow.num_rows:,} rows')
 - Embeddings take ~9 hours to recompute on CPU (161K rows × 384-dim) — the backup is the safety net
 - Multiple dated backups can coexist on the NAS (5.5 TB available)
 - Local Parquet backups in `backups/` are a secondary safety net (~175 MB each)
-- **NEVER write directly to NAS** — NAS block-pads binary files. Write locally first, copy to NAS
+- **NEVER write directly to NAS** — NAS block-pads binary files (13/15 benchmark Parquet files corrupted once). Stage on the SSD, validate, `rsync`, `sync`, then `sha256sum -c` the NAS copy. See "The rule" above.
+- Backups before 2026-09-25 were written directly to the NAS without a manifest. Verify them before relying on one (open the DuckDB, `pg_restore -l` the dump).
