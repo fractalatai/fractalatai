@@ -68,6 +68,7 @@ pub(crate) async fn cmd_sync_publish(
     family: Option<String>,
     all: bool,
     changed: bool,
+    fitness_only: bool,
 ) -> anyhow::Result<()> {
     let store = open_duck(data_dir)?;
     store.ensure_taxa_hash_columns()?;
@@ -174,12 +175,20 @@ pub(crate) async fn cmd_sync_publish(
         println!("Published actor dictionary ({} bytes)", dict_yaml.len());
     }
 
+    // --fitness-only: leave DRRP out of the payload (sertantai-legal records no verdict)
+    let drrp_cols = if fitness_only {
+        println!("--fitness-only: DRRP columns omitted");
+        ""
+    } else {
+        "duty_holder, rights_holder, responsibility_holder, power_holder, \
+         duty_type, role, role_gvt, \
+         duties, rights, responsibilities, powers, "
+    };
+
     let mut published = 0usize;
     for law_name in &law_names {
         let sql = format!(
-            "SELECT name, duty_holder, rights_holder, responsibility_holder, power_holder, \
-                    duty_type, role, role_gvt, \
-                    duties, rights, responsibilities, powers, \
+            "SELECT name, {drrp}\
                     fitness_entities, fitness_scope_dimensions, \
                     fitness_mention_count, fitness_applies_count, fitness_disapplies_count, \
                     compiled_applicability, \
@@ -189,7 +198,8 @@ pub(crate) async fn cmd_sync_publish(
                     significance_parts, \
                     application_regions, application_source, application_evidence \
              FROM legislation WHERE name = '{}'",
-            law_name.replace('\'', "''")
+            law_name.replace('\'', "''"),
+            drrp = drrp_cols,
         );
         let batches = store.query_arrow(&sql)?;
         if batches.is_empty() || batches.iter().all(|b| b.num_rows() == 0) {
@@ -201,10 +211,13 @@ pub(crate) async fn cmd_sync_publish(
             .await
             .map_err(|e| anyhow::anyhow!("failed to publish {law_name}: {e}"))?;
 
-        store.execute(&format!(
-            "UPDATE legislation SET published_hash = taxa_hash WHERE name = '{}'",
-            law_name.replace('\'', "''")
-        ))?;
+        // DRRP wasn't sent, so don't record it as published
+        if !fitness_only {
+            store.execute(&format!(
+                "UPDATE legislation SET published_hash = taxa_hash WHERE name = '{}'",
+                law_name.replace('\'', "''")
+            ))?;
+        }
 
         published += 1;
     }

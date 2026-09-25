@@ -61,6 +61,11 @@ enum Command {
         /// Publish laws recently enriched but not yet published
         #[arg(long)]
         pending: bool,
+        /// Omit DRRP columns (duty_type, duties, holders ...) — publish fitness,
+        /// trees, significance and application only. sertantai-legal treats
+        /// absent DRRP as "no verdict", so is_making is left unchanged.
+        #[arg(long)]
+        fitness_only: bool,
     },
     /// Pull legislation text (LAT) from sertantai via zenoh
     PullLat {
@@ -446,6 +451,7 @@ async fn main() -> anyhow::Result<()> {
             changed,
             provisions,
             pending,
+            fitness_only,
         } => {
             if provisions {
                 sync::cmd_sync_publish_provisions(
@@ -454,7 +460,7 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .await
             } else {
-                sync::cmd_sync_publish(&data_dir, &zenoh, laws, family, all, changed).await
+                sync::cmd_sync_publish(&data_dir, &zenoh, laws, family, all, changed, fitness_only).await
             }
         }
         Command::PullLat {
