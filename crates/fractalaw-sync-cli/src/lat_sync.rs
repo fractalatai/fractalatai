@@ -85,7 +85,7 @@ impl LawOutcome {
     /// Text changed or rows inserted: the law needs parse → reconcile → backfill.
     pub fn needs_reparse(&self) -> bool {
         self.action == Action::Applied
-            && self.plan.as_ref().is_some_and(|p| !p.text_changed.is_empty() || !p.inserted.is_empty())
+            && self.plan.as_ref().is_some_and(|p| !p.text_changed.is_empty() || !p.grown.is_empty() || !p.inserted.is_empty())
     }
 }
 
@@ -260,16 +260,16 @@ fn csv_field(s: &str) -> String {
 
 fn write_law_report(path: &Path, outcomes: &[LawOutcome]) -> anyhow::Result<()> {
     let mut s = String::from(
-        "law,action,hub_rows,legal_rows,unchanged,sort_key_changed,text_changed,renamed_map,renamed_text,renamed_marker,inserted,held,archived,actors_carried,note\n",
+        "law,action,hub_rows,legal_rows,unchanged,sort_key_changed,text_changed,grown,renamed_map,renamed_text,renamed_marker,inserted,held,archived,actors_carried,note\n",
     );
     for o in outcomes {
         let p = o.plan.clone().unwrap_or_default();
         let by = |src| p.renamed.iter().filter(|r| r.2 == src).count();
         let _ = writeln!(
             s,
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             o.law, o.action.as_str(), o.hub_rows, o.legal_rows, p.unchanged.len(), p.sort_key_changed,
-            p.text_changed.len(), by(RenameSource::LegalMap), by(RenameSource::TextMatch), by(RenameSource::MarkerMatch), p.inserted.len(),
+            p.text_changed.len(), p.grown.len(), by(RenameSource::LegalMap), by(RenameSource::TextMatch), by(RenameSource::MarkerMatch), p.inserted.len(),
             p.held.len(), p.archived.len(),
             o.report.as_ref().map(|r| r.after.provision_actors.to_string()).unwrap_or_default(),
             csv_field(&o.note)

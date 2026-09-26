@@ -23,9 +23,10 @@ description: Keep the Postgres hub's LAT (provision text) in step with sertantai
 
   | Bucket | Meaning | Effect |
   |---|---|---|
-  | unchanged | same id, same text | tier data kept, LAT columns refreshed (sort_key-only changes land here) |
-  | renamed | legal's rename map first, then a unique exact text match | tier data moves to the new id |
-  | text_changed | same id, new text | old row snapshotted to `lat_archive`; tier data cleared; needs re-parse |
+  | unchanged | same id; same text, or only numbering/markers/spacing differ (`match_key`) | tier data kept, LAT columns refreshed (sort_key-only changes land here) |
+  | renamed | legal's rename map first, then a unique match on exact text, then on `match_key` (leading `[F…`, `(n)`, `27 `, `4.—` stripped) | tier data moves to the new id |
+  | grown | same id, new text contains the old (≥ 15 chars) | tier data kept; needs re-parse for the added text |
+  | text_changed | same id, other new text, including a parent that has shed its children's text | old row snapshotted to `lat_archive`; tier data cleared; needs re-parse. (Parse never removes actor rows it doesn't find again, so stale tier data isn't carried.) |
   | inserted | new rows | needs parse |
   | archived | hub rows whose text is gone | moved to `lat_archive` with their actor/fitness rows |
   | held | ambiguous (duplicate text, colliding renames, legal `ambiguous`) | left untouched for review |

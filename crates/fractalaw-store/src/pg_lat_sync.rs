@@ -322,7 +322,7 @@ impl PgStore {
         .bind(manifest.row_count as i32)
         .bind(renames_through)
         .bind(&plan.held)
-        .bind(!plan.text_changed.is_empty() || !plan.inserted.is_empty())
+        .bind(!plan.text_changed.is_empty() || !plan.grown.is_empty() || !plan.inserted.is_empty())
         .execute(&mut *tx)
         .await
         .map_err(db("lat_sync_state"))?;
@@ -475,25 +475,29 @@ mod tests {
             ("reg.39(e)", "2", "any other prescribed matter"),  // renamed (text match)
             ("reg.4(4)", "3", "4.—(1) Paragraphs (2) and (3) apply"), // text changed
             ("reg.5(5)", "4", "5.—(1) Ministers may issue"),    // removed
+            ("reg.6", "5", "The operator must retain the logs"), // grown
         ]).await;
         let legal = vec![batch(law, &[
             ("reg.1", "1b", "The operator  must keep records"),
             ("reg.39(2)(e)", "2", "any other prescribed matter"),
             ("reg.4(4)", "3", "Paragraphs (2) and (3) do not apply"),
             ("reg.4(2)", "3a", "A person must not deploy any fishing gear"),
+            ("reg.6", "5", "The operator must retain the logs for five years"),
         ])];
         let hub = s.hub_lat_rows(law).await.unwrap();
         let plan = plan_diff(&hub, &fractalaw_core::lat_sync::lat_rows_from_batches(&legal).unwrap(), &[]);
         assert_eq!(plan.renamed.len(), 1);
         let r = s.apply_lat_diff(law, &legal, &plan, &manifest(law, &legal), None).await.unwrap();
         assert!(r.committed && r.gate_passed(), "{r:?}");
-        assert_eq!(r.before.provision_actors, 2);
+        assert_eq!(plan.grown, vec![format!("{law}:reg.6")]);
+        assert_eq!(r.before.provision_actors, 3);
         assert_eq!(r.archived_rows, 2);
 
         assert_eq!(actors_of(&s, &format!("{law}:reg.1")).await, 1);
         assert_eq!(actors_of(&s, &format!("{law}:reg.39(2)(e)")).await, 1, "tier data follows rename");
         assert_eq!(actors_of(&s, &format!("{law}:reg.39(e)")).await, 0);
         assert_eq!(actors_of(&s, &format!("{law}:reg.4(4)")).await, 0, "changed text loses stale actors");
+        assert_eq!(actors_of(&s, &format!("{law}:reg.6")).await, 1, "grown text keeps its actors");
         let (drrp, text): (Option<Vec<String>>, String) = sqlx::query_as(
             "SELECT drrp_types, text FROM legislation_text WHERE section_id = $1")
             .bind(format!("{law}:reg.4(4)")).fetch_one(s.pool()).await.unwrap();

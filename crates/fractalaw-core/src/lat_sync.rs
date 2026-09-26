@@ -237,6 +237,9 @@ pub struct DiffPlan {
     pub sort_key_changed: usize,
     /// Same id, different text: snapshot archived, tier data cleared, re-parse
     pub text_changed: Vec<String>,
+    /// Same id, new text contains the old (≥ 15 chars): every mention the tier
+    /// data came from is still there, so it is kept; re-parse for the rest
+    pub grown: Vec<String>,
     /// Hub id → legal id; tier data carried to the new id
     pub renamed: Vec<(String, String, RenameSource)>,
     /// Legal-only ids with no predecessor: new rows, need parse
@@ -251,6 +254,7 @@ impl DiffPlan {
     /// True when applying the plan changes nothing but LAT metadata.
     pub fn is_noop(&self) -> bool {
         self.text_changed.is_empty()
+            && self.grown.is_empty()
             && self.renamed.is_empty()
             && self.inserted.is_empty()
             && self.held.is_empty()
@@ -262,10 +266,17 @@ impl DiffPlan {
     pub fn carried(&self) -> Vec<(String, String)> {
         self.unchanged
             .iter()
+            .chain(&self.grown)
             .map(|s| (s.clone(), s.clone()))
             .chain(self.renamed.iter().map(|(o, n, _)| (o.clone(), n.clone())))
             .collect()
     }
+}
+
+/// The new text contains the old one (compared on [`match_key`], old ≥ 15 chars).
+fn grew(old: Option<&str>, new: Option<&str>) -> bool {
+    let (o, n) = (match_key(old), match_key(new));
+    o.chars().count() >= 15 && n.len() > o.len() && n.contains(&o)
 }
 
 /// Follow a rename chain (A→B, B→C) to its final id. Stops on a cycle.
@@ -304,7 +315,12 @@ pub fn plan_diff(hub: &[LatRow], legal: &[LatRow], renames: &[Rename]) -> DiffPl
                     plan.sort_key_changed += 1;
                 }
                 plan.unchanged.push(r.section_id.clone());
+            } else if grew(r.text.as_deref(), l.text.as_deref()) {
+                plan.grown.push(r.section_id.clone());
             } else {
+                // Includes old ⊇ new (a parent that held its children's text):
+                // its tier data may belong to the children, and parse never
+                // removes actor rows it doesn't find again.
                 plan.text_changed.push(r.section_id.clone());
             }
         }
@@ -395,7 +411,7 @@ pub fn plan_diff(hub: &[LatRow], legal: &[LatRow], renames: &[Rename]) -> DiffPl
     plan.archived.extend(hub_only.iter().map(|s| s.to_string()));
 
     plan.inserted = legal_only.into_iter().map(String::from).collect();
-    for v in [&mut plan.unchanged, &mut plan.text_changed, &mut plan.inserted, &mut plan.held, &mut plan.archived] {
+    for v in [&mut plan.unchanged, &mut plan.text_changed, &mut plan.grown, &mut plan.inserted, &mut plan.held, &mut plan.archived] {
         v.sort();
     }
     plan.renamed.sort();
@@ -580,6 +596,28 @@ mod tests {
         assert!(p.text_changed.is_empty());
         assert_eq!(p.renamed, vec![("L:reg.5(5)".into(), "L:reg.5(1)".into(), RenameSource::MarkerMatch)]);
         assert!(p.archived.is_empty() && p.inserted.is_empty());
+    }
+
+    #[test]
+    fn grown_text_keeps_tier_data_shrunk_text_does_not() {
+        let hub = [
+            row("L:reg.2", "1", "The operator must keep records"),
+            row("L:reg.3", "2", "3.—(1) The operator must notify SEPA; (2) the Agency must publish"),
+            row("L:reg.4", "3", "A short one"),
+        ];
+        let legal = [
+            // new ⊇ old: kept, re-parse
+            row("L:reg.2", "1", "The operator must keep records for five years"),
+            // old ⊇ new (parent that held its children's text): cleared
+            row("L:reg.3", "2", "The operator must notify SEPA;"),
+            // under 15 chars: never counts as containment
+            row("L:reg.4", "3", "A short one more"),
+        ];
+        let p = plan_diff(&hub, &legal, &[]);
+        assert_eq!(p.grown, vec!["L:reg.2"]);
+        assert_eq!(p.text_changed, vec!["L:reg.3", "L:reg.4"]);
+        assert_eq!(p.carried(), vec![("L:reg.2".to_string(), "L:reg.2".to_string())]);
+        assert!(!p.is_noop());
     }
 
     #[test]
