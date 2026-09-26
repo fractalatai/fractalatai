@@ -4,13 +4,14 @@ Local-first fractal architecture for ESH (environment, safety, health) regulator
 
 ## Project Structure
 
-Rust workspace monorepo with 6 crates:
+Rust workspace monorepo with 8 crates:
 
 - `fractalaw-core` — Arrow schemas, DRRP parser, shared types (pure Rust, no optional deps). See `crates/fractalaw-core/CLAUDE.md`.
 - `fractalaw-store` — DuckDB, LanceDB, PgStore, DataFusion (feature-gated)
 - `fractalaw-ai` — ONNX Runtime embeddings/classification (feature-gated)
 - `fractalaw-sync` — Zenoh pub/sub, Arrow IPC sync (feature-gated)
 - `fractalaw-host` — Wasmtime WASI Component Model runtime
+- `fractalaw-sipmath` — Metalog distributions, HDR PRNG, SIPmath 3.0 for uncertainty arithmetic
 - `fractalaw-cli` — Binary entry point (`fractalaw` binary). See `crates/fractalaw-cli/CLAUDE.md`.
 - `fractalaw-sync-cli` — Zenoh sync binary (`fractalaw-sync`): publish, pull LAT/LRT, sync watch, triage. See `crates/fractalaw-sync-cli/CLAUDE.md`.
 
