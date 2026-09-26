@@ -12,6 +12,7 @@ Rust workspace monorepo with 6 crates:
 - `fractalaw-sync` — Zenoh pub/sub, Arrow IPC sync (feature-gated)
 - `fractalaw-host` — Wasmtime WASI Component Model runtime
 - `fractalaw-cli` — Binary entry point (`fractalaw` binary). See `crates/fractalaw-cli/CLAUDE.md`.
+- `fractalaw-sync-cli` — Zenoh sync binary (`fractalaw-sync`): publish, pull LAT/LRT, sync watch, triage. See `crates/fractalaw-sync-cli/CLAUDE.md`.
 
 ### Directory Layout
 
