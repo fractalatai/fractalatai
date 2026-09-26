@@ -50,3 +50,28 @@ LAT sync from legal to the hub is one-way and lossy. `upsert_lat` never deletes 
   - #58's verdict comparison didn't filter on `status`. **Open for Jason:** re-send or leave those verdicts, and add a revoked guard to enrichment/publish.
 - **5 regnal-year duplicates**, which legal holds under modern names (e.g. `UK_ukpga_1875_Vict/38-39/17` → `UK_ukpga_1875_17`). These are the 3 #57 publish skips. **Drop or rename for Jason's approval.**
 - **5 in force with no legal LAT** (UK_ssi_2005_157, UK_uksi_1998_892, UK_uksi_2015_10, UK_wsi_2014_3303, UK_ukpga_1994_27): legal's gap, queued for LAT parse.
+
+## Legal updates (2026-09-26, later)
+
+- **The 5 in-force hub-only laws are now LAT-parsed in legal:**
+
+  | Law | Rows |
+  |---|---|
+  | UK_ssi_2005_157 | 258 |
+  | UK_uksi_2015_10 | 141 |
+  | UK_wsi_2014_3303 | 133 |
+  | UK_ukpga_1994_27 | 20 |
+  | UK_uksi_1998_892 | 9 |
+
+  - `lat` events were emitted.
+  - The hub holds stale copies. A plain `pull-lat` would leave the old-generation rows next to the new ones, so these wait for diff-apply, or for a one-off clean re-pull if Jason approves.
+  - The last 4 are marked enriched in legal from stale hub LAT and need re-enrichment on fresh LAT.
+- **Legal bug: `sort_key` ordering** (legal fix session pending).
+  - Lettered items (c) and (d) are encoded as Roman numerals, so they sort after (g). Also, every `signed` row has an all-zero sort_key and sorts first.
+  - This doesn't affect `lat_hash`, which orders by section_id.
+  - **Fractalaw's exposure:**
+    - `fitness.rs:540` concatenates child text in sort_key order, so stem + child text can arrive scrambled;
+    - `pg.rs:544-553` assigns each part by the preceding sort_key. The signed row sorts first, but paragraph misorder stays within a section, so this is probably harmless;
+    - `pg.rs:61/68` loads provisions in sort_key order;
+    - `scripts/compliance/generate_controls.py:131`.
+  - Nothing to change until legal re-parses. Section ids and text are unaffected.
