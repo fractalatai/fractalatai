@@ -98,3 +98,23 @@ LAT sync from legal to the hub is one-way and lossy. `upsert_lat` never deletes 
   - **386 laws** carry sort_keys from older parser generations and need a legal re-parse. That can shift section_ids, and 101 of them are enriched.
   - **Parent-drop bug:** after a nested sub-paragraph the parser can drop the parent paragraph, e.g. UK_wsi_2025_1321 `reg.39(e)`, which should be `reg.39(2)(e)`. The fix changes section_ids.
   - Both rely on the text-match carry-over to preserve tier data.
+
+## Legal handoff: ready to build (2026-09-26)
+
+Legal's side is complete on @dev. Events arrive on `fractalaw/@dev/events/sync` (table `lat`), sent after commit, each with law_name + row_count + lat_hash:
+- `persist`;
+- `lat_deleted` (0 rows, empty hash);
+- `persist` with `reason: section_ids_fixed`.
+
+The `lat/{law}` queryable returns the full row set ordered by sort_key.
+
+**What the first diff-apply run will see:**
+- 579 laws with sort_key-only changes;
+- 66 revoked hub-only laws, as delete candidates for Jason's approval;
+- 5 regnal-year duplicates, pending Jason;
+- 5 freshly parsed in-force laws, 4 needing re-enrichment;
+- the 345 drifted laws.
+
+**Legal will schedule after diff-apply lands:** the 386-law older-generation re-parse and the parent-drop fix.
+
+**Also ready in legal, pending Jason's launch:** 2 PDF-only laws, UK_uksi_1979_791 (58 rows) and UK_uksi_1947_805 (3 rows, an amending order).
