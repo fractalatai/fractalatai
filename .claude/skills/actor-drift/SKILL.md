@@ -1,5 +1,5 @@
 ---
-description: Surface missing actors from benchmark or LanceDB QA cycles. Identifies duty-bearers not in the actor dictionary that cause DRRP false negatives.
+description: Surface missing actors from benchmark, LanceDB or Postgres hub QA cycles. Identifies duty-bearers not in the actor dictionary that cause DRRP false negatives.
 ---
 
 # Skill: Actor Drift — Dictionary Gap Surfacing
@@ -12,8 +12,9 @@ After any benchmark run, QA cycle, or enrichment that shows provisions with gold
 
 ## What It Does
 
-1. Scans benchmark provisions (NAS) or LanceDB for provisions where:
-   - Gold/expected DRRP exists but pipeline returns `drrp_types = []`
+1. Scans benchmark provisions (NAS), LanceDB or the Postgres hub for provisions where:
+   - Gold/expected DRRP exists but pipeline returns `drrp_types = []` (benchmark/LanceDB), or
+   - A substantive provision has no `provision_actors` rows at all (Postgres hub; amendment scope excluded)
    - A modal verb is present (shall/must/may) — no modal = LLM territory
 2. Extracts the grammatical subject before the modal — likely the missing actor
 3. Deduplicates and groups by entity name across families
@@ -33,7 +34,19 @@ After any benchmark run, QA cycle, or enrichment that shows provisions with gold
 
 # Scan full LanceDB corpus (no benchmarks needed)
 /usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/surface_missing_actors.py --source lancedb
+
+# Postgres hub (the primary store): actorless substantive provisions
+/usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/surface_missing_actors.py --source pg --laws UK_uksi_2015_398,UK_ssi_2016_88
+/usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/surface_missing_actors.py --source pg --law-file laws.txt --text
+/usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/surface_missing_actors.py --source pg --family "OH&S: Offshore" --min-count 3
 ```
+
+`--family` matches the DuckDB family with the emoji prefix stripped (substring, case-insensitive).
+
+**Before blaming the dictionary** (#58 lessons): actorless provisions are often not a dictionary gap. Check that
+- the law has been re-parsed since its last LAT re-pull (`provision_actors` cascades on `legislation_text` delete);
+- the matching entry has `regex_patterns` (entries with only `triggers` are LLM-only);
+- family-gated entries match the law's family (DuckDB families carry an emoji prefix; `normalize_family` strips it).
 
 ## Workflow: Fixing Actor Drift
 
@@ -61,7 +74,8 @@ After any benchmark run, QA cycle, or enrichment that shows provisions with gold
 ## Environment
 
 - `/usr/bin/python3` (system Python)
-- Dependencies: `lancedb`, `pyarrow`, `pyyaml`
+- Dependencies: `pyyaml`; `psycopg2` + `duckdb` (pg source); `lancedb`, `pyarrow` (benchmark/LanceDB sources)
+- Postgres hub at localhost:5433 (fractalaw/fractalaw)
 - LanceDB at `data/lancedb`
 - Actor dictionary at `crates/fractalaw-core/data/actor-dictionary.yaml`
 - Benchmarks at `/mnt/nas/sertantai-data/data/fractalaw-benchmarks/` (optional)

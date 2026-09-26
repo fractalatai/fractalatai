@@ -18,6 +18,9 @@ Usage:
 
     # Only show entities appearing 2+ times
     /usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/surface_missing_actors.py --min-count 2
+
+    # Against the Postgres hub: provisions with no provision_actors rows
+    /usr/bin/python3 ${CLAUDE_SKILL_DIR}/scripts/surface_missing_actors.py --source pg --law-file laws.txt
 """
 
 import argparse
@@ -28,7 +31,8 @@ import re
 import sys
 from collections import Counter, defaultdict
 
-import lancedb
+PG_DSN = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
+DUCKDB_PATH = "data/fractalaw.duckdb"
 
 HAS_MODAL = re.compile(r"(?i)\bshall\b|\bmust\b|\bmay\b|\brequir|\bensur")
 # Extract the subject: text from start-of-sentence to first modal
@@ -149,6 +153,7 @@ def normalise_entity(subject):
 
 def surface_from_benchmarks(known_keywords, show_text=False):
     """Surface missing actors from golden benchmark provisions."""
+    import lancedb
     import pyarrow.parquet as pq
 
     BENCHMARK_DIR = "/mnt/nas/sertantai-data/data/fractalaw-benchmarks"
@@ -227,6 +232,8 @@ def surface_from_benchmarks(known_keywords, show_text=False):
 
 def surface_from_lancedb(known_keywords, family_filter=None, show_text=False):
     """Surface missing actors from LanceDB provisions with no DRRP."""
+    import lancedb
+
     db = lancedb.connect("data/lancedb")
     tbl = db.open_table("legislation_text")
 
@@ -275,6 +282,76 @@ def surface_from_lancedb(known_keywords, family_filter=None, show_text=False):
     return entities
 
 
+def normalize_family(family):
+    """Strip the emoji prefix DuckDB families carry ("💙 OH&S: ..." -> "OH&S: ...")."""
+    return re.sub(r"^[^A-Za-z0-9]+", "", family or "")
+
+
+def load_families():
+    """law_name -> normalised family, from DuckDB (read-only)."""
+    try:
+        import duckdb
+
+        con = duckdb.connect(DUCKDB_PATH, read_only=True)
+        rows = con.execute("SELECT name, family FROM legislation").fetchall()
+        con.close()
+        return {n: normalize_family(f) for n, f in rows}
+    except Exception as e:
+        print(f"  (no DuckDB families: {e})")
+        return {}
+
+
+def surface_from_pg(known_keywords, family_filter=None, law_names=None):
+    """Surface missing actors from the Postgres hub.
+
+    Candidates are substantive provisions (amendment scope excluded, #57) with a
+    modal verb and no provision_actors rows: the duty text is there but no
+    duty-bearer was extracted (#58).
+    """
+    import psycopg2
+
+    families = load_families()
+    sql = """
+        SELECT lt.section_id, lt.law_name, lt.text
+        FROM legislation_text lt
+        WHERE lt.scope = 'substantive'
+          AND lt.text IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM provision_actors pa WHERE pa.section_id = lt.section_id)
+    """
+    params = []
+    if law_names:
+        sql += " AND lt.law_name = ANY(%s)"
+        params.append(list(law_names))
+    conn = psycopg2.connect(PG_DSN)
+    cur = conn.cursor()
+    cur.execute(sql, params)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    print(f"  {len(rows):,} actorless substantive provisions")
+
+    fam_norm = normalize_family(family_filter).lower() if family_filter else None
+    entities = defaultdict(lambda: {"count": 0, "families": set(), "examples": []})
+    for sid, law, text in rows:
+        family = families.get(law, "")
+        if fam_norm and fam_norm not in family.lower():
+            continue
+        if not HAS_MODAL.search(text):
+            continue
+        entity = normalise_entity(extract_subject(text))
+        if not entity:
+            continue
+        if entity in known_keywords or any(
+            kw in entity for kw in known_keywords if len(kw) > 4
+        ):
+            continue
+        entities[entity]["count"] += 1
+        entities[entity]["families"].add(family or law)
+        if len(entities[entity]["examples"]) < 2:
+            entities[entity]["examples"].append({"sid": sid, "text": text[:200]})
+    return entities
+
+
 def main():
     parser = argparse.ArgumentParser(description="Surface missing actors")
     parser.add_argument(
@@ -291,11 +368,20 @@ def main():
     )
     parser.add_argument(
         "--source",
-        choices=["benchmark", "lancedb", "both"],
+        choices=["benchmark", "lancedb", "pg", "both"],
         default="benchmark",
         help="Data source to scan",
     )
+    parser.add_argument("--laws", help="Comma-separated law names (pg mode)")
+    parser.add_argument("--law-file", help="File of law names, one per line (pg mode)")
     args = parser.parse_args()
+
+    law_names = None
+    if args.laws:
+        law_names = [n.strip() for n in args.laws.split(",") if n.strip()]
+    elif args.law_file:
+        with open(args.law_file) as f:
+            law_names = [l.strip() for l in f if l.strip()]
 
     print("Loading actor dictionary...")
     labels, keywords = load_actor_dictionary()
@@ -318,6 +404,11 @@ def main():
             all_entities[entity]["count"] += data["count"]
             all_entities[entity]["families"] |= data["families"]
             all_entities[entity]["examples"].extend(data["examples"])
+
+    if args.source == "pg":
+        print("=== Scanning Postgres hub ===")
+        for entity, data in surface_from_pg(keywords, args.family, law_names).items():
+            all_entities[entity] = data
 
     # Filter by min count
     filtered = {
