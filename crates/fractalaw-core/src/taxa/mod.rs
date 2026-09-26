@@ -45,6 +45,8 @@ pub mod signals;
 pub mod applicability;
 pub mod applicability_compile;
 pub mod application;
+pub mod law_significance;
+pub mod law_drrp;
 pub mod text_cleaner;
 
 use regex::Regex;

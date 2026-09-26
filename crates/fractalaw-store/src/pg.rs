@@ -502,6 +502,29 @@ impl PgStore {
         Ok(row)
     }
 
+    /// Provision texts/scopes and reconciled actor signals for the law-level DRRP roll-up.
+    pub async fn query_law_drrp_inputs(
+        &self,
+        law_name: &str,
+    ) -> Result<crate::provision_store::LawDrrpInputs, StoreError> {
+        let provisions = sqlx::query_as::<_, (String, Option<String>, Option<String>)>(
+            "SELECT section_id, text, scope FROM legislation_text WHERE law_name = $1",
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?;
+        let signals = sqlx::query_as::<_, (String, String, Option<String>, Option<String>)>(
+            "SELECT pa.section_id, pa.actor_label, pa.drrp, pa.extraction_method FROM provision_actors pa \
+             JOIN legislation_text lt ON lt.section_id = pa.section_id WHERE lt.law_name = $1",
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?;
+        Ok(crate::provision_store::LawDrrpInputs { provisions, signals })
+    }
+
     /// Query Part-level significance breakdown for large Acts.
     /// Returns JSON string: `[{"part":"pt.I","high":31,"medium":35,"low":69,"total":135}, ...]`
     /// Returns None if the law has no Part structural rows or <50 rated provisions.
@@ -1028,6 +1051,13 @@ impl crate::ProvisionStore for PgStore {
         law_name: &str,
     ) -> Result<Option<String>, StoreError> {
         self.query_significance_parts(law_name).await
+    }
+
+    async fn query_law_drrp_inputs(
+        &self,
+        law_name: &str,
+    ) -> Result<crate::provision_store::LawDrrpInputs, StoreError> {
+        self.query_law_drrp_inputs(law_name).await
     }
 
     async fn query_pending_slm_actors(

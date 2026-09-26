@@ -564,9 +564,71 @@ async fn main() -> anyhow::Result<()> {
                 let mut total = 0usize;
                 let mut sig_total = 0usize;
                 let mut parts_total = 0usize;
+                let mut law_sig_total = 0usize;
+                let drrp_types = commands::pipeline::drrp_column_types(&store)?;
+                let mut verdicts: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
                 for law_name in &law_names {
                     let updated = lance.backfill_from_actors(law_name).await?;
                     let sig = lance.backfill_significance(law_name).await?;
+
+                    // Law-level significance (Approach L + K profile) → DuckDB (#55)
+                    let (high, medium, low, _) = lance.query_significance_profile(law_name).await?;
+                    let law_sig = fractalaw_core::taxa::law_significance::law_significance(high, medium, low);
+                    let set = match &law_sig {
+                        Some(s) => {
+                            law_sig_total += 1;
+                            format!(
+                                "significance_rating = '{}', significance_score = {}, \
+                                 significance_high_count = {}, significance_medium_count = {}, \
+                                 significance_low_count = {}, significance_total_obligations = {}",
+                                s.rating, s.score, s.high, s.medium, s.low, s.total
+                            )
+                        }
+                        None => "significance_rating = NULL, significance_score = NULL, \
+                                 significance_high_count = NULL, significance_medium_count = NULL, \
+                                 significance_low_count = NULL, significance_total_obligations = NULL"
+                            .to_string(),
+                    };
+                    store.execute(&format!(
+                        "UPDATE legislation SET {set} WHERE name = '{}'",
+                        law_name.replace('\'', "''")
+                    ))?;
+
+                    // Law-level DRRP from reconciled provision_actors → DuckDB (#55).
+                    // Only where DRRP ran (parsed provisions); otherwise leave it as is.
+                    let inputs = lance.query_law_drrp_inputs(law_name).await?;
+                    let unreconciled = inputs.signals.iter().any(|(_, _, _, method)| method.is_none());
+                    if unreconciled {
+                        // Reconcile hasn't run: no verdict rather than a false "no obligations"
+                        eprintln!("  {law_name}: unreconciled provision_actors, law-level DRRP left unchanged (run taxa reconcile)");
+                        *verdicts.entry("unreconciled").or_default() += 1;
+                    } else if inputs.signals.is_empty() {
+                        // No actor rows: parse found no duty-bearer it could name (actor model gap),
+                        // so there is no evidence either way. Leave law-level DRRP unchanged.
+                        eprintln!("  {law_name}: no provision_actors, law-level DRRP left unchanged");
+                        *verdicts.entry("no_actors").or_default() += 1;
+                    } else if inputs.provisions.iter().any(|(_, _, scope)| scope.is_some()) {
+                        use fractalaw_core::taxa::law_drrp::{ActorSignal, aggregate};
+                        let texts: std::collections::HashMap<&str, &str> = inputs
+                            .provisions
+                            .iter()
+                            .filter_map(|(sid, text, _)| text.as_deref().map(|t| (sid.as_str(), t)))
+                            .collect();
+                        let signals: Vec<ActorSignal> = inputs
+                            .signals
+                            .iter()
+                            .map(|(sid, label, drrp, _)| ActorSignal {
+                                section_id: sid.clone(),
+                                actor_label: label.clone(),
+                                drrp: drrp.clone().unwrap_or_default(),
+                            })
+                            .collect();
+                        let law = aggregate(&signals, |sid| texts.get(sid).map(|t| t.to_string()));
+                        commands::pipeline::write_law_drrp(&store, law_name, &law, &drrp_types)?;
+                        *verdicts.entry(law.verdict().as_str()).or_default() += 1;
+                    } else {
+                        *verdicts.entry("not_run").or_default() += 1;
+                    }
 
                     // Part-level significance breakdown for large Acts
                     if let Some(parts_json) = lance.query_significance_parts(law_name).await? {
@@ -585,9 +647,10 @@ async fn main() -> anyhow::Result<()> {
                     sig_total += sig;
                 }
                 println!(
-                    "Backfilled {total} provisions, {sig_total} significance, {parts_total} Part breakdowns across {} laws",
+                    "Backfilled {total} provisions, {sig_total} significance, {law_sig_total} law-level ratings, {parts_total} Part breakdowns across {} laws",
                     law_names.len()
                 );
+                println!("Law-level DRRP verdicts: {verdicts:?}");
                 Ok(())
             }
             TaxaAction::Slm { laws } => {

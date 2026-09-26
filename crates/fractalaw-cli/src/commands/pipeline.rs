@@ -1421,6 +1421,91 @@ async fn write_provision_taxa(
 }
 
 /// Check taxa hash, write law-level taxa to DuckDB if changed.
+/// DuckDB column types for typed empty lists (`CAST([] AS ...)`): (list, struct list).
+pub(crate) fn drrp_column_types(store: &DuckStore) -> anyhow::Result<(String, String)> {
+    let mut list_type = "VARCHAR[]".to_string();
+    let mut struct_type = None;
+    for batch in store.query_arrow(
+        "SELECT column_name, data_type FROM information_schema.columns \
+         WHERE table_name = 'legislation' AND column_name IN ('duty_holder', 'duties')",
+    )? {
+        let (Some(n), Some(t)) = (
+            batch.column(0).as_any().downcast_ref::<arrow::array::StringArray>(),
+            batch.column(1).as_any().downcast_ref::<arrow::array::StringArray>(),
+        ) else {
+            continue;
+        };
+        for i in 0..batch.num_rows() {
+            match n.value(i) {
+                "duty_holder" => list_type = t.value(i).to_string(),
+                "duties" => struct_type = Some(t.value(i).to_string()),
+                _ => {}
+            }
+        }
+    }
+    Ok((list_type, struct_type.context("legislation.duties column type not found")?))
+}
+
+/// Write the law-level DRRP rolled up from reconciled provision_actors (#55).
+/// Empty sets are written as typed empty lists, not NULL: sertantai-legal reads
+/// NULL DRRP as "no verdict" and empty lists as "no obligations".
+pub(crate) fn write_law_drrp(
+    store: &DuckStore,
+    law_name: &str,
+    law: &fractalaw_core::taxa::law_drrp::LawDrrp,
+    types: &(String, String),
+) -> anyhow::Result<()> {
+    let (list_type, struct_type) = types;
+    let list = |set: &std::collections::BTreeSet<String>| {
+        if set.is_empty() {
+            format!("CAST([] AS {list_type})")
+        } else {
+            format_sql_list(set.iter().map(|s| s.as_str()))
+        }
+    };
+    let entries = |e: &[(String, String, String, String)]| {
+        if e.is_empty() {
+            format!("CAST([] AS {struct_type})")
+        } else {
+            format_sql_drrp_entries(e)
+        }
+    };
+    let hash = compute_taxa_hash(
+        &law.duty_holders,
+        &law.rights_holders,
+        &law.responsibility_holders,
+        &law.power_holders,
+        &law.duty_types,
+        &law.roles,
+        &law.roles_gvt,
+        &law.duties,
+        &law.rights,
+        &law.responsibilities,
+        &law.powers,
+    );
+    store.execute(&format!(
+        "UPDATE legislation SET \
+            duty_holder = {}, rights_holder = {}, responsibility_holder = {}, power_holder = {}, \
+            duty_type = {}, role = {}, role_gvt = {}, \
+            duties = {}, rights = {}, responsibilities = {}, powers = {}, \
+            taxa_hash = '{hash}' \
+         WHERE name = '{}'",
+        list(&law.duty_holders),
+        list(&law.rights_holders),
+        list(&law.responsibility_holders),
+        list(&law.power_holders),
+        list(&law.duty_types),
+        list(&law.roles),
+        list(&law.roles_gvt),
+        entries(&law.duties),
+        entries(&law.rights),
+        entries(&law.responsibilities),
+        entries(&law.powers),
+        law_name.replace('\'', "''"),
+    ))?;
+    Ok(())
+}
+
 fn write_law_taxa(
     store: &DuckStore,
     law_name: &str,

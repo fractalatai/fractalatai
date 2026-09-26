@@ -8,6 +8,15 @@ use async_trait::async_trait;
 
 use crate::StoreError;
 
+/// Provision texts and reconciled actor signals for one law (see `query_law_drrp_inputs`).
+#[derive(Debug, Default)]
+pub struct LawDrrpInputs {
+    /// (section_id, text, scope)
+    pub provisions: Vec<(String, Option<String>, Option<String>)>,
+    /// (section_id, actor_label, drrp, extraction_method); a NULL method means reconcile hasn't run
+    pub signals: Vec<(String, String, Option<String>, Option<String>)>,
+}
+
 /// Provision data store — implemented by LanceStore and PgStore.
 #[async_trait]
 pub trait ProvisionStore: Send + Sync {
@@ -67,6 +76,13 @@ pub trait ProvisionStore: Send + Sync {
         _law_name: &str,
     ) -> Result<(i64, i64, i64, i64), StoreError> {
         Ok((0, 0, 0, 0))
+    }
+
+    /// Inputs for the law-level DRRP roll-up (#55): every provision's
+    /// (section_id, text, scope), and every reconciled actor signal
+    /// (section_id, actor_label, drrp, extraction_method).
+    async fn query_law_drrp_inputs(&self, _law_name: &str) -> Result<LawDrrpInputs, StoreError> {
+        Ok(LawDrrpInputs::default())
     }
 
     /// Query Part-level significance breakdown (JSON blob) for large Acts.
