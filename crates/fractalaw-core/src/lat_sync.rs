@@ -44,6 +44,27 @@ pub fn normalise(text: Option<&str>) -> String {
     out
 }
 
+static SPACE_BEFORE_PUNCT: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"\s+([—–,;:.])").unwrap());
+/// Leading markers that differ between parser generations: amendment markers
+/// `[F345`, enumerators `(11)` / `(a)`, bare provision numbers `27 ` / `59ZA `
+/// (legal's `LatMerge.match_key`), plus the hub's article prefixes `4.—` / `3. `.
+static LEADING_MARKERS: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+    regex::Regex::new(
+        r"^(?:\[F\d+\s*|\([0-9A-Za-z]{1,6}\)\s*|\d+[A-Z]*\.(?:\s*[—–-]\s*|\s+)|\d+[A-Z]*\s+)+",
+    )
+    .unwrap()
+});
+
+/// Key for matching rows across parser generations: [`normalise`], no space
+/// before punctuation, leading markers stripped. Used only to pair rows,
+/// never hashed.
+pub fn match_key(text: Option<&str>) -> String {
+    let n = normalise(text);
+    let n = SPACE_BEFORE_PUNCT.replace_all(&n, "$1");
+    LEADING_MARKERS.replace(&n, "").into_owned()
+}
+
 /// One LAT row as served by legal (or held in the hub).
 #[derive(Debug, Clone, PartialEq)]
 pub struct LatRow {
@@ -202,6 +223,8 @@ pub enum RenameSource {
     LegalMap,
     /// Fallback: unique exact match of normalised text within the law
     TextMatch,
+    /// Fallback: unique match once leading markers/enumerators are stripped
+    MarkerMatch,
 }
 
 /// What diff-apply does to one law's hub rows. Every hub and legal
@@ -270,7 +293,13 @@ pub fn plan_diff(hub: &[LatRow], legal: &[LatRow], renames: &[Rename]) -> DiffPl
     // 1. Same id on both sides: compare text.
     for r in hub {
         if let Some(l) = legal_by_id.get(r.section_id.as_str()) {
-            if normalise(r.text.as_deref()) == normalise(l.text.as_deref()) {
+            let same = normalise(r.text.as_deref()) == normalise(l.text.as_deref());
+            // Only numbering/marker/spacing differs between parser generations
+            let same_key = !same && {
+                let k = match_key(r.text.as_deref());
+                !k.is_empty() && k == match_key(l.text.as_deref())
+            };
+            if same || same_key {
                 if r.sort_key != l.sort_key {
                     plan.sort_key_changed += 1;
                 }
@@ -335,26 +364,35 @@ pub fn plan_diff(hub: &[LatRow], legal: &[LatRow], renames: &[Rename]) -> DiffPl
     }
     hub_only.retain(|s| !resolved.contains(s));
 
-    // 3. Fallback: unique exact match of normalised text among what's left.
-    let mut hub_text: HashMap<String, Vec<&str>> = HashMap::new();
-    for &sid in &hub_only {
-        hub_text.entry(normalise(hub_by_id[sid].text.as_deref())).or_default().push(sid);
-    }
-    let mut legal_text: HashMap<String, Vec<&str>> = HashMap::new();
-    for &sid in &legal_only {
-        legal_text.entry(normalise(legal_by_id[sid].text.as_deref())).or_default().push(sid);
-    }
-    for (text, olds) in hub_text {
-        let news = legal_text.get(&text).filter(|_| !text.is_empty());
-        match news {
-            Some(news) if olds.len() == 1 && news.len() == 1 => {
-                plan.renamed.push((olds[0].to_string(), news[0].to_string(), RenameSource::TextMatch));
-                legal_only.remove(news[0]);
-            }
-            Some(_) => plan.held.extend(olds.iter().map(|s| s.to_string())),
-            None => plan.archived.extend(olds.iter().map(|s| s.to_string())),
+    // 3. Fallback: unique match among what's left, first on exact normalised
+    //    text, then on the marker-stripped match_key. Never guessed.
+    for (pass, key_of) in [
+        (RenameSource::TextMatch, normalise as fn(Option<&str>) -> String),
+        (RenameSource::MarkerMatch, match_key),
+    ] {
+        let mut hub_text: HashMap<String, Vec<&str>> = HashMap::new();
+        for &sid in &hub_only {
+            hub_text.entry(key_of(hub_by_id[sid].text.as_deref())).or_default().push(sid);
         }
+        let mut legal_text: HashMap<String, Vec<&str>> = HashMap::new();
+        for &sid in &legal_only {
+            legal_text.entry(key_of(legal_by_id[sid].text.as_deref())).or_default().push(sid);
+        }
+        let mut unmatched = Vec::new();
+        for (text, olds) in hub_text {
+            match legal_text.get(&text).filter(|_| !text.is_empty()) {
+                Some(news) if olds.len() == 1 && news.len() == 1 => {
+                    plan.renamed.push((olds[0].to_string(), news[0].to_string(), pass));
+                    legal_only.remove(news[0]);
+                }
+                Some(_) => plan.held.extend(olds.iter().map(|s| s.to_string())),
+                None => unmatched.extend(olds),
+            }
+        }
+        hub_only = unmatched;
     }
+    // Text gone: archive
+    plan.archived.extend(hub_only.iter().map(|s| s.to_string()));
 
     plan.inserted = legal_only.into_iter().map(String::from).collect();
     for v in [&mut plan.unchanged, &mut plan.text_changed, &mut plan.inserted, &mut plan.held, &mut plan.archived] {
@@ -459,9 +497,10 @@ mod tests {
         let p = plan_diff(&hub, &legal, &[]);
         assert_eq!(p.unchanged, vec!["L:reg.3(3)"]); // whitespace-only difference
         assert_eq!(p.text_changed, vec!["L:reg.4(4)"]); // id reused for different text
-        assert_eq!(p.archived, vec!["L:reg.5(5)"]); // "5.—(1)" prefix: no exact match
-        assert_eq!(p.inserted, vec!["L:reg.4(1)", "L:reg.4(2)", "L:reg.5(1)"]);
-        assert!(p.renamed.is_empty() && p.held.is_empty());
+        // "5.—(1)" prefix stripped by match_key: carried to the split row
+        assert_eq!(p.renamed, vec![("L:reg.5(5)".into(), "L:reg.5(1)".into(), RenameSource::MarkerMatch)]);
+        assert_eq!(p.inserted, vec!["L:reg.4(1)", "L:reg.4(2)"]);
+        assert!(p.archived.is_empty() && p.held.is_empty());
     }
 
     #[test]
@@ -512,6 +551,35 @@ mod tests {
         assert_eq!(p.renamed, vec![("L:a".into(), "L:a3".into(), RenameSource::LegalMap)]);
         assert_eq!(p.held, vec!["L:b", "L:c"]);
         assert_eq!(p.inserted, vec!["L:bc"]);
+    }
+
+    #[test]
+    fn match_key_strips_generation_markers() {
+        assert_eq!(match_key(Some("4.—(1) Paragraphs (2) and (3) apply")), "Paragraphs (2) and (3) apply");
+        assert_eq!(match_key(Some("3. For the purposes of this Order")), "For the purposes of this Order");
+        assert_eq!(match_key(Some("[F345(11) 27 The operator must , keep")), "The operator must, keep");
+        assert_eq!(match_key(Some("59ZA The Authority")), "The Authority");
+        assert_eq!(match_key(Some("(a) any gear")), "any gear");
+        // Decimals are not article prefixes
+        assert_eq!(match_key(Some("1.5 tonnes or more")), "1.5 tonnes or more");
+    }
+
+    #[test]
+    fn marker_match_carries_old_generation_rows() {
+        let hub = [
+            row("L:reg.5(5)", "05", "5.—(1) The Scottish Ministers may issue a permit"),
+            row("L:reg.6", "06", "(11) Every employer must keep records"),
+        ];
+        let legal = [
+            row("L:reg.5(1)", "051", "The Scottish Ministers may issue a permit"),
+            row("L:reg.6", "06", "Every employer must keep records"),
+        ];
+        let p = plan_diff(&hub, &legal, &[]);
+        // Same id, only the enumerator differs: carried as unchanged
+        assert_eq!(p.unchanged, vec!["L:reg.6"]);
+        assert!(p.text_changed.is_empty());
+        assert_eq!(p.renamed, vec![("L:reg.5(5)".into(), "L:reg.5(1)".into(), RenameSource::MarkerMatch)]);
+        assert!(p.archived.is_empty() && p.inserted.is_empty());
     }
 
     #[test]
