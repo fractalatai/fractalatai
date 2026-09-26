@@ -360,7 +360,20 @@ LAWS=$(cat data/sertantai/<customer>-applicable-laws.csv)
 
 ### Step 9: Backfill (final)
 
-Aggregate provision_actors → legislation_text AND compute `significance_overall` from all 5 dimensions.
+Aggregate provision_actors → legislation_text, compute `significance_overall` from all 5 dimensions, **and roll both up to the law level in DuckDB** (fractalatai #55). The law-level DRRP and significance that `sync publish` sends to sertantai come from this step:
+- **DRRP:** law-level `duty_type`/`duties`/`rights`/… from reconciled `provision_actors.drrp`.
+  - Obligation → duties, or responsibilities for Gvt/EU actors.
+  - Liberty → rights, or powers for Gvt actors.
+  - Amendment-insertion text is excluded.
+  - Empty lists when nothing is found.
+- **Significance:** `significance_rating/score/*_count` (Approach L; LOW ≤ 6.14, HIGH ≥ 11.06).
+
+**Prerequisites:**
+- **Reconcile (step 5/8) must have run.** A law with any unreconciled `provision_actors` row (NULL `extraction_method`) is skipped, and its law-level DRRP is left unchanged.
+- **Actor rows must exist.** A law with zero actor rows is skipped too; that is an actor-model gap (#58).
+- **Hierarchy (step 8b) must have run,** or `significance_overall` stays NULL.
+
+Law-level DRRP drives sertantai-legal's `is_making`. Before publishing a batch, diff the verdicts against legal's `making_funnel` (`is_making`, `is_making_source`) and have Jason review any true→false.
 
 ```bash
 LAWS=$(cat data/sertantai/<customer>-applicable-laws.csv)

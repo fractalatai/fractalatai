@@ -79,6 +79,8 @@ Compiler (`fractalaw-core/src/taxa/applicability_compile.rs`):
 - Output normalised: duplicates removed, Or-Matches merged (L1)
 - Laws with a tree but no mentions left are repaired in place (`repair_tree`)
 
+Law-level DRRP and significance are rolled up by `taxa backfill` (see `customer-batch-parse` step 9; #55). Use `sync publish --fitness-only` to send fitness/trees/application without DRRP.
+
 `taxa_hash` does **not** cover fitness or tree fields, so `publish --changed` never picks up tree changes. Publish with explicit `--laws`.
 
 ### Step 6: Publish to sertantai
