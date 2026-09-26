@@ -23,7 +23,7 @@ LAT sync from legal to the hub is one-way and lossy. `upsert_lat` never deletes 
 
 ## Dependencies
 
-- ⬜ Legal: LAT manifest queryable, LatHash module, hash on events (legal pending session)
+- ✅ Legal: LAT manifest queryable, stored lat_hash (triggers), hash on events after commit; cross-checked 980/980
 - ✅ Legal: updated test vectors, cross-checked by an independent Python implementation (synthetic, empty, 3 live laws all match)
 - ✅ Legal: classified the 76 hub-only laws (66 revoked, 5 regnal-year duplicates, 5 in force awaiting legal LAT)
 - ✅ Measurement (`parsing/09-26-26-stale-lat-repull.md`, `data/qq-readiness/lat/lat_compare.csv`)
@@ -32,15 +32,16 @@ LAT sync from legal to the hub is one-way and lossy. `upsert_lat` never deletes 
 
 - **Manifest:** `fractalaw/@{tenant}/data/legislation/lat-manifest/{law_name}` and `/*`, returning `{law_name, row_count, lat_hash, updated_at}` (JSON; Arrow for `*`).
 - **Hash rows:** the full row set the LAT queryable serves, including empty-text structural rows (NULL → ""), ordered by section_id in byte order.
-  - Each row is `section_id \t normalise(text) \n`; the hash is the lowercase hex SHA-256.
+  - Each row is `section_id \t sort_key \t normalise(text) \n`: sort_key as-is, NULL → "", position excluded. The hash is the lowercase hex SHA-256.
+  - The sort_key change was proposed by both sides after legal's sort_key bug. Legal relayed Jason's approval; **to be confirmed by Jason in the fractalaw session.**
   - `normalise`: NFC → collapse runs of the explicit Unicode White_Space set to a space → trim. Zero-width characters are kept.
 - **Legal:** computes the hash on demand (~127 ms for the corpus); events carry the hash and row_count; `lat_deleted` = (0, sha256("")); the manifest is the source of truth.
 - **section_id isn't stable** (legal #120 rewrote ids in place without events). Diff-apply carries tier data on a unique exact normalised-text match.
 - **Test vectors:**
-  - **Pin:** synthetic `TEST:reg.1` / `"  A person  must   not\tdeploy.\u200b "` → `f6ae5038725aeb87b6b37e9684c92dedb5ca34422ea0db5a8e350eafc918f8a5`;
+  - **Pin:** synthetic `TEST:reg.1`, sort_key `00001~`, text `"  A person  must   not\tdeploy.\u200b "` → `79bc96eafd545bbab104423e759bb2787d4b8aae4c34a2545eb41249a67cf07b` (with sort_key);
   - **Pin:** empty law → sha256("") `e3b0c442…`;
   - legal's checked-in fixture law, to follow.
-  - Live values, not to pin (they change when legal re-parses): UK_ssi_2016_88 (28 rows, 347ca311…), UK_ukpga_1974_37 (835, 8263fdac…), UK_uksi_2015_1947 (1,323, e901ecda…).
+  - Live values with sort_key, not to pin: UK_ssi_2016_88 (28 rows, f75e2c32…), UK_ukpga_1974_37 (835, 979269b6…), UK_uksi_2015_1947 (1,323, be6964f8…).
   - All were verified 2026-09-26 by an independent Python implementation against `legal_articles`.
 
 ## 76 hub-only laws (legal's classification, 2026-09-26)
@@ -75,3 +76,16 @@ LAT sync from legal to the hub is one-way and lossy. `upsert_lat` never deletes 
     - `pg.rs:61/68` loads provisions in sort_key order;
     - `scripts/compliance/generate_controls.py:131`.
   - Nothing to change until legal re-parses. Section ids and text are unaffected.
+
+## Legal side live + cross-check (2026-09-26)
+
+- **Queryables:** `fractalaw/@dev/data/legislation/lat-manifest/{law}` and `/*`. Arrow IPC by default, `?format=json` for JSON.
+  - `*` lists only laws with LAT (980).
+  - A single law with no LAT returns row_count 0 and sha256("").
+- **Hash storage:** legal now stores `legal_register.lat_hash`, maintained by triggers on section_id, sort_key and text. Computing on demand turned out to take 8.4 s for the corpus, not 127 ms.
+- **Events:** `lat` persist and `lat_deleted` events carry row_count + lat_hash and are sent after commit. `lat.fix_section_ids` now emits events too.
+- **Fixture vectors:** `sertantai-legal/backend/test/fixtures/lat_hash/vectors.json` (synthetic, empty, fixture_law `UK_uksi_2099_1` with 9 rows, `aa3c16e4…`). Copy them into fractalaw-core tests when building.
+- **Cross-check** (scratch Python client, read-only):
+  - all 3 vectors match;
+  - 980/980 laws: the hash recomputed from `lat/{law}` rows matches the manifest on hash and row_count.
+- **Client note:** `lat/{law}` for a law with no LAT replies with a zero-length payload. Treat that as 0 rows.
