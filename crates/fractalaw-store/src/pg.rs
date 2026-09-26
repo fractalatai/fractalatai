@@ -158,22 +158,8 @@ impl PgStore {
 
     /// Upsert provisions (LAT from sertantai).
     pub async fn upsert_lat(&self, batches: Vec<RecordBatch>) -> Result<usize, StoreError> {
-        let mut total = 0usize;
-        for batch in &batches {
-            // Filter out rows where law_name is null (Postgres NOT NULL constraint)
-            if let Some(law_col) = batch.column_by_name("law_name") {
-                let not_null = arrow::compute::is_not_null(law_col)
-                    .map_err(|e| StoreError::Other(format!("filter null law_name: {e}")))?;
-                let filtered = arrow::compute::filter_record_batch(batch, &not_null)
-                    .map_err(|e| StoreError::Other(format!("filter batch: {e}")))?;
-                if filtered.num_rows() > 0 {
-                    total += upsert_record_batch(&self.pool, &filtered, "section_id").await?;
-                }
-            } else {
-                total += upsert_record_batch(&self.pool, batch, "section_id").await?;
-            }
-        }
-        Ok(total)
+        let mut conn = self.pool.acquire().await.map_err(|e| StoreError::Other(format!("acquire: {e}")))?;
+        upsert_lat_rows(&mut conn, &batches).await
     }
 
     /// Update embeddings for existing provisions.
@@ -772,12 +758,34 @@ fn pg_rows_to_record_batch(rows: &[sqlx::postgres::PgRow]) -> Result<RecordBatch
         .map_err(|e| StoreError::Other(format!("record_batch: {e}")))
 }
 
+
+/// Upsert LAT batches (rows with a null law_name are dropped) on one connection,
+/// so diff-apply can run it inside its transaction.
+pub(crate) async fn upsert_lat_rows(conn: &mut sqlx::PgConnection, batches: &[RecordBatch]) -> Result<usize, StoreError> {
+    let mut total = 0usize;
+    for batch in batches {
+        // Filter out rows where law_name is null (Postgres NOT NULL constraint)
+        if let Some(law_col) = batch.column_by_name("law_name") {
+            let not_null = arrow::compute::is_not_null(law_col)
+                .map_err(|e| StoreError::Other(format!("filter null law_name: {e}")))?;
+            let filtered = arrow::compute::filter_record_batch(batch, &not_null)
+                .map_err(|e| StoreError::Other(format!("filter batch: {e}")))?;
+            if filtered.num_rows() > 0 {
+                total += upsert_record_batch(&mut *conn, &filtered, "section_id").await?;
+            }
+        } else {
+            total += upsert_record_batch(&mut *conn, batch, "section_id").await?;
+        }
+    }
+    Ok(total)
+    }
+
 /// Upsert an Arrow RecordBatch into legislation_text.
 ///
 /// Converts each row to a dynamic SQL INSERT...ON CONFLICT.
 /// The RecordBatch may contain any subset of columns.
 async fn upsert_record_batch(
-    pool: &PgPool,
+    conn: &mut sqlx::PgConnection,
     batch: &RecordBatch,
     conflict_key: &str,
 ) -> Result<usize, StoreError> {
@@ -811,7 +819,7 @@ async fn upsert_record_batch(
         );
 
         sqlx::query(&sql)
-            .execute(pool)
+            .execute(&mut *conn)
             .await
             .map_err(|e| StoreError::Other(format!("upsert row {row}: {e}")))?;
         inserted += 1;

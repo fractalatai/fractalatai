@@ -61,6 +61,43 @@ pub struct SyncEventMetadata {
     /// Number of amendment annotation rows deleted (present only on `lat_deleted` events).
     #[serde(default)]
     pub annotations_deleted: Option<u64>,
+    /// LAT rows now held by legal (`lat` events, #62)
+    #[serde(default)]
+    pub row_count: Option<u64>,
+    /// Legal's `lat_hash` after the change (`lat` events, #62)
+    #[serde(default)]
+    pub lat_hash: Option<String>,
+    /// Why legal persisted, e.g. `section_ids_fixed`
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+/// One law in legal's LAT manifest (fractalatai #62).
+#[derive(Debug, Clone, Deserialize)]
+pub struct LatManifestEntry {
+    pub law_name: String,
+    pub row_count: u64,
+    pub lat_hash: String,
+    #[serde(default)]
+    pub struct_hash: Option<String>,
+    #[serde(default)]
+    pub updated_at: Option<String>,
+}
+
+/// One entry of legal's section_id rename log (fractalatai #62).
+#[derive(Debug, Clone, Deserialize)]
+pub struct LatRenameEntry {
+    pub law_name: String,
+    pub old_section_id: String,
+    #[serde(default)]
+    pub new_section_id: Option<String>,
+    /// `renamed` | `ambiguous` | `dropped`
+    pub status: String,
+    #[serde(default, rename = "match")]
+    pub match_kind: Option<String>,
+    #[serde(default)]
+    pub reparse_id: Option<String>,
+    pub created_at: String,
 }
 
 impl SyncEvent {
@@ -123,6 +160,20 @@ pub mod keys {
     /// Example: `fractalaw/@acme/data/legislation/lrt/UK_ukpga_1974_37`
     pub fn lrt(tenant: &str, law_name: &str) -> String {
         format!("{PREFIX}/@{tenant}/data/legislation/lrt/{law_name}")
+    }
+
+    /// Key expression for legal's per-law LAT manifest (`*` for all laws with LAT).
+    ///
+    /// Example: `fractalaw/@acme/data/legislation/lat-manifest/UK_ukpga_1974_37`
+    pub fn lat_manifest(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/data/legislation/lat-manifest/{law_name}")
+    }
+
+    /// Key expression for legal's section_id rename log for a law.
+    ///
+    /// Example: `fractalaw/@acme/data/legislation/lat-renames/UK_ukpga_1974_37`
+    pub fn lat_renames(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/data/legislation/lat-renames/{law_name}")
     }
 
     /// Key expression for a specific law's provision-level taxa data.
@@ -893,6 +944,65 @@ impl ZenohSync {
         Ok(all_batches)
     }
 
+    /// Query a JSON queryable (`?format=json`); a reply may be one object or an array.
+    async fn query_json_list(
+        &self,
+        key: &str,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<serde_json::Value>, ZenohError> {
+        let replies = self
+            .session
+            .get(format!("{key}?format=json"))
+            .timeout(timeout)
+            .await
+            .map_err(ZenohError::Session)?;
+        let mut out = Vec::new();
+        while let Ok(reply) = replies.recv_async().await {
+            if let Ok(sample) = reply.result() {
+                let bytes = sample.payload().to_bytes();
+                if bytes.is_empty() {
+                    continue;
+                }
+                match serde_json::from_slice::<serde_json::Value>(&bytes)? {
+                    serde_json::Value::Array(items) => out.extend(items),
+                    v => out.push(v),
+                }
+            }
+        }
+        Ok(out)
+    }
+
+    /// Query legal's LAT manifest: one law, or `*` for every law with LAT.
+    /// A single law legal holds no LAT for comes back as row_count 0 with the
+    /// empty hash; under `*` it is simply absent.
+    pub async fn query_lat_manifest(
+        &self,
+        law_name: &str,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<LatManifestEntry>, ZenohError> {
+        let key = keys::lat_manifest(&self.tenant, law_name);
+        info!(key = %key, "querying LAT manifest");
+        self.query_json_list(&key, timeout)
+            .await?
+            .into_iter()
+            .map(|v| serde_json::from_value(v).map_err(ZenohError::Json))
+            .collect()
+    }
+
+    /// Query legal's rename log for one law (oldest first, kept indefinitely).
+    pub async fn query_lat_renames(
+        &self,
+        law_name: &str,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<LatRenameEntry>, ZenohError> {
+        let key = keys::lat_renames(&self.tenant, law_name);
+        self.query_json_list(&key, timeout)
+            .await?
+            .into_iter()
+            .map(|v| serde_json::from_value(v).map_err(ZenohError::Json))
+            .collect()
+    }
+
     /// Query sertantai for a single law's legislation record (LRT) via zenoh.
     ///
     /// Response is Arrow IPC streaming format, same as LAT.
@@ -1277,6 +1387,38 @@ mod tests {
             keys::lrt("acme", "UK_ukpga_1974_37"),
             "fractalaw/@acme/data/legislation/lrt/UK_ukpga_1974_37"
         );
+    }
+
+    #[test]
+    fn key_lat_manifest_and_renames() {
+        assert_eq!(
+            keys::lat_manifest("dev", "*"),
+            "fractalaw/@dev/data/legislation/lat-manifest/*"
+        );
+        assert_eq!(
+            keys::lat_renames("dev", "UK_ssi_2016_88"),
+            "fractalaw/@dev/data/legislation/lat-renames/UK_ssi_2016_88"
+        );
+    }
+
+    #[test]
+    fn manifest_and_rename_entries_decode() {
+        let m: LatManifestEntry = serde_json::from_str(
+            r#"{"updated_at":"2026-04-24T14:25:26.000000Z","law_name":"UK_ssi_2016_88","lat_hash":"f75e","row_count":28}"#,
+        )
+        .unwrap();
+        assert_eq!(m.row_count, 28);
+        assert!(m.struct_hash.is_none());
+        let r: LatRenameEntry = serde_json::from_str(
+            r#"{"law_name":"L","old_section_id":"L:reg.39(e)","new_section_id":"L:reg.39(2)(e)","status":"renamed","match":"unique_text","reparse_id":"u","created_at":"2026-09-26T10:00:00Z"}"#,
+        )
+        .unwrap();
+        assert_eq!(r.match_kind.as_deref(), Some("unique_text"));
+        let e = SyncEvent::from_payload(
+            br#"{"table":"lat","action":"persist","metadata":{"law_name":"L","count":9,"row_count":9,"lat_hash":"aa3c","reason":"section_ids_fixed"},"timestamp":"t"}"#,
+        )
+        .unwrap();
+        assert_eq!(e.metadata.lat_hash.as_deref(), Some("aa3c"));
     }
 
     #[test]

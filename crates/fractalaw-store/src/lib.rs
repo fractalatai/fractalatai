@@ -21,6 +21,10 @@ mod pg;
 #[cfg(feature = "pg")]
 pub use pg::PgStore;
 #[cfg(feature = "pg")]
+mod pg_lat_sync;
+#[cfg(feature = "pg")]
+pub use pg_lat_sync::{LatApplyReport, LatSyncState, TierCounts};
+#[cfg(feature = "pg")]
 pub use sqlx::PgPool;
 
 #[cfg(all(feature = "duckdb", feature = "datafusion"))]

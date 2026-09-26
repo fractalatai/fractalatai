@@ -1185,6 +1185,21 @@ mod tests {
     // ── Mixed-content provision gate override tests (Fix 1) ───────────
 
     #[test]
+    fn wester_ross_prohibition_is_obligation() {
+        // UK_ssi_2016_88 reg.4(2), missing from the hub's stale LAT until #62
+        // re-synced it (#61). Legal's current row text:
+        let text = "A person must not deploy (by any means) or use any fishing gear \
+                    within the protected area.";
+        let record = parse_v2(text, None);
+        assert!(
+            record.duty_types.contains(&duty_type::DutyType::Obligation),
+            "prohibition should be an Obligation, got {:?} (actors {:?})",
+            record.duty_types,
+            record.governed_actors
+        );
+    }
+
+    #[test]
     fn mixed_content_provision_employer_duty_extracted() {
         // Product safety SI pattern: Interpretation-primary provision that
         // starts with definitions but contains real employer duties.

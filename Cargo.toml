@@ -48,6 +48,10 @@ loro = "1"
 # Cryptography
 rustls = "0.23"
 ring = "0.17"
+sha2 = "0.10"
+
+# Unicode
+unicode-normalization = "0.1"
 
 # CLI
 clap = { version = "4", features = ["derive", "env"] }

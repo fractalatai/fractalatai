@@ -16,6 +16,11 @@ Two classes of upstream issue silently degrade DRRP/fitness results:
 
 ## Checks
 
+### Check 0: Stale LAT (hub vs legal)
+
+The hub's copy of a law's text can drift from legal's: missing paragraphs, superseded old-generation rows, duplicates (fractalatai #61/#62). Run the `lat-sync` dry run first: `fractalaw-sync --pg … pull-lat --tenant dev --connect tcp/localhost:7447 --laws <laws>`. A law that isn't `in_sync` needs a `lat-sync` apply before any QA below means anything.
+
+
 ### Check 1: Enrichment Truncation
 
 Identify laws where LanceDB row count exceeds the enricher's 500-row limit.

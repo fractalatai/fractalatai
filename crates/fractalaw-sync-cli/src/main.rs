@@ -1,3 +1,4 @@
+mod lat_sync;
 mod sync;
 
 use std::path::PathBuf;
@@ -68,12 +69,35 @@ enum Command {
         fitness_only: bool,
     },
     /// Pull legislation text (LAT) from sertantai via zenoh
+    ///
+    /// With the Postgres hub (--pg), laws are compared against legal's LAT
+    /// manifest and diffed (fractalatai #62): a dry-run report by default,
+    /// `--apply` to apply. Tier data carries across renames; removed rows are
+    /// archived; a law whose tier data would be lost is rolled back.
     PullLat {
         #[command(flatten)]
         zenoh: ZenohArgs,
-        /// Law names to pull (comma-separated)
+        /// Law names (comma-separated, or a file of names)
         #[arg(long)]
-        laws: String,
+        laws: Option<String>,
+        /// Every law the hub holds whose manifest hashes differ from the last apply
+        #[arg(long, conflicts_with = "laws")]
+        stale: bool,
+        /// Apply the planned diffs (default: report only)
+        #[arg(long)]
+        apply: bool,
+        /// Apply to benchmark laws too (default: report only)
+        #[arg(long)]
+        allow_benchmark: bool,
+        /// Apply at most N laws this run (pilot / batches)
+        #[arg(long)]
+        limit: Option<usize>,
+        /// Archive these approved laws that legal no longer holds (comma-separated or file)
+        #[arg(long, conflicts_with_all = ["laws", "stale", "restore_laws"])]
+        archive_laws: Option<String>,
+        /// Restore laws archived with --archive-laws
+        #[arg(long, conflicts_with_all = ["laws", "stale"])]
+        restore_laws: Option<String>,
         /// Query timeout in seconds
         #[arg(long, default_value_t = 30)]
         timeout: u64,
@@ -127,6 +151,10 @@ enum Command {
         /// Query timeout in seconds (per-law pull)
         #[arg(long, default_value_t = 30)]
         timeout: u64,
+        /// Minutes between full LAT-manifest comparisons (Postgres hub; 0 = off).
+        /// Bounds how long a dropped sync event can go unnoticed.
+        #[arg(long, default_value_t = 60)]
+        manifest_interval_mins: u64,
     },
     /// CRDT document management and sync
     Crdt {
@@ -466,11 +494,30 @@ async fn main() -> anyhow::Result<()> {
         Command::PullLat {
             zenoh,
             laws,
+            stale,
+            apply,
+            allow_benchmark,
+            limit,
+            archive_laws,
+            restore_laws,
             timeout,
         } => {
-            let law_names: Vec<String> =
-                laws.split(',').map(|s| s.trim().to_string()).collect();
-            sync::cmd_sync_pull_lat(&data_dir, &zenoh, &law_names, timeout, pg_url.as_deref()).await
+            let timeout_d = std::time::Duration::from_secs(timeout);
+            if let Some(list) = archive_laws {
+                let laws = lat_sync::parse_law_list(&list)?;
+                return lat_sync::cmd_archive_laws(&data_dir, &zenoh, &laws, timeout_d, pg_url.as_deref()).await;
+            }
+            if let Some(list) = restore_laws {
+                return lat_sync::cmd_restore_laws(&lat_sync::parse_law_list(&list)?, pg_url.as_deref()).await;
+            }
+            let laws = laws.as_deref().map(lat_sync::parse_law_list).transpose()?;
+            if pg_url.is_none() {
+                // LanceDB (edge): plain upsert, no manifest
+                let laws = laws.context("specify --laws")?;
+                return sync::cmd_sync_pull_lat(&data_dir, &zenoh, &laws, timeout, None).await;
+            }
+            let opts = lat_sync::PullLatOpts { laws, stale, apply, allow_benchmark, limit, timeout: timeout_d };
+            lat_sync::cmd_pull_lat(&data_dir, &zenoh, &opts, pg_url.as_deref()).await
         }
         Command::PullLrt {
             zenoh,
@@ -506,8 +553,8 @@ async fn main() -> anyhow::Result<()> {
         } => {
             sync::cmd_sync_publish_evidence(&data_dir, &zenoh, laws, qq, all).await
         }
-        Command::Watch { zenoh, timeout } => {
-            sync::cmd_sync_watch(&data_dir, &zenoh, timeout, pg_url.as_deref()).await
+        Command::Watch { zenoh, timeout, manifest_interval_mins } => {
+            sync::cmd_sync_watch(&data_dir, &zenoh, timeout, manifest_interval_mins, pg_url.as_deref()).await
         }
         Command::Crdt { action } => match action {
             CrdtAction::Status { zenoh } => sync::cmd_crdt_status(&data_dir, &zenoh).await,

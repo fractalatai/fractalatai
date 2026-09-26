@@ -1141,10 +1141,17 @@ pub(crate) async fn cmd_sync_watch(
     data_dir: &std::path::Path,
     zenoh: &ZenohArgs,
     timeout_secs: u64,
+    manifest_interval_mins: u64,
     pg_url: Option<&str>,
 ) -> anyhow::Result<()> {
     let lance = open_provision_store(pg_url).await?;
+    // Postgres hub: LAT arrives via manifest-verified diff-apply (#62)
+    let lat_pg = match pg_url {
+        Some(_) => Some(crate::lat_sync::open_pg(pg_url).await?),
+        None => None,
+    };
     let duck = open_duck(data_dir)?;
+    let benchmarks = crate::lat_sync::benchmark_laws(&duck)?;
     duck.ensure_taxa_hash_columns()?;
     duck.ensure_provisions_published_column()?;
     duck.ensure_enrichment_queue_columns()?;
@@ -1211,6 +1218,9 @@ pub(crate) async fn cmd_sync_watch(
     let mut total_enriched = 0usize;
     let mut total_skipped = 0usize;
     let mut total_deletions = 0usize;
+    // First tick fires immediately: compare at startup, then every interval
+    let mut manifest_tick =
+        tokio::time::interval(std::time::Duration::from_secs(manifest_interval_mins.max(1) * 60));
 
     loop {
         tokio::select! {
@@ -1240,6 +1250,13 @@ pub(crate) async fn cmd_sync_watch(
                     continue;
                 }
 
+                if event.action == "lat_deleted" && lat_pg.is_some() {
+                    // Never delete on an event: the law becomes a delete candidate,
+                    // verified and approved via `pull-lat --stale` / `--archive-laws`.
+                    eprintln!("  {law_name}: lat_deleted → delete candidate (hub rows kept; review with pull-lat --stale)");
+                    total_deletions += 1;
+                    continue;
+                }
                 if event.action == "lat_deleted" {
                     eprint!("  {law_name}: lat_deleted");
                     let lat_count = lance.delete_law_lat(law_name).await.unwrap_or(0);
@@ -1281,7 +1298,45 @@ pub(crate) async fn cmd_sync_watch(
                 }
 
                 eprint!(" → pull LAT");
-                let lat_rows: usize = match sync.query_lat(law_name, timeout).await {
+                let lat_rows: usize = if let Some(pg) = &lat_pg {
+                    let manifest = match sync.query_lat_manifest(law_name, timeout).await {
+                        Ok(m) => m.first().map(crate::lat_sync::manifest_entry),
+                        Err(e) => {
+                            eprintln!(" → manifest query error: {e}");
+                            continue;
+                        }
+                    };
+                    let states = pg.lat_sync_states().await.unwrap_or_default();
+                    let hub_rows = pg.hub_law_row_counts().await.ok()
+                        .and_then(|c| c.get(law_name).copied()).unwrap_or(0);
+                    let apply = !benchmarks.contains(law_name);
+                    match crate::lat_sync::sync_law(pg, &sync, law_name, manifest.as_ref(), states.get(law_name), hub_rows, apply, timeout).await {
+                        Ok(o) => match o.action {
+                            crate::lat_sync::Action::Applied | crate::lat_sync::Action::InSync => {
+                                eprint!(" → {} ({} provisions)", if o.action == crate::lat_sync::Action::Applied { "applied" } else { "in sync" }, o.legal_rows);
+                                total_lat_pulls += 1;
+                                total_rows += o.legal_rows as usize;
+                                o.legal_rows as usize
+                            }
+                            crate::lat_sync::Action::Planned => {
+                                eprintln!(" → benchmark law: diff planned, not applied");
+                                continue;
+                            }
+                            crate::lat_sync::Action::GateFailed => {
+                                eprintln!(" → GATE FAILED, rolled back ({})", o.note);
+                                continue;
+                            }
+                            other => {
+                                eprintln!(" → {other:?} {}", o.note);
+                                continue;
+                            }
+                        },
+                        Err(e) => {
+                            eprintln!(" → LAT sync error: {e:#}");
+                            continue;
+                        }
+                    }
+                } else { match sync.query_lat(law_name, timeout).await {
                     Ok(batches) if batches.is_empty() => {
                         eprintln!(" → no LAT data");
                         continue;
@@ -1305,7 +1360,7 @@ pub(crate) async fn cmd_sync_watch(
                         eprintln!(" → LAT query error: {e}");
                         continue;
                     }
-                };
+                } };
 
                 // Mark LAT as pulled in DuckDB pipeline status
                 let escaped = law_name.replace('\'', "''");
@@ -1375,6 +1430,27 @@ pub(crate) async fn cmd_sync_watch(
                             triage_result.confidence * 100.0,
                         );
                     }
+                }
+            }
+            _ = manifest_tick.tick(), if lat_pg.is_some() && manifest_interval_mins > 0 => {
+                // Anti-entropy: catch events that were dropped (#62)
+                let pg = lat_pg.as_ref().expect("guarded");
+                println!("\n[manifest] comparing hub against legal's LAT manifest...");
+                let opts = crate::lat_sync::PullLatOpts {
+                    laws: None, stale: true, apply: true, allow_benchmark: false, limit: None, timeout,
+                };
+                match crate::lat_sync::stale_scope(pg, &sync, timeout).await {
+                    Ok((laws, manifest)) => {
+                        match crate::lat_sync::run_pass(pg, &sync, &benchmarks, &laws, &manifest, &opts).await {
+                            Ok(outcomes) => {
+                                if let Err(e) = crate::lat_sync::report_pass(data_dir, &sync, &duck, &outcomes, timeout).await {
+                                    eprintln!("[manifest] report error: {e:#}");
+                                }
+                            }
+                            Err(e) => eprintln!("[manifest] pass error: {e:#}"),
+                        }
+                    }
+                    Err(e) => eprintln!("[manifest] {e:#}"),
                 }
             }
             query = status_queryable.recv_async() => {
