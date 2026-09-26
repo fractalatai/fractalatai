@@ -15,7 +15,7 @@ LAT sync from legal to the hub is one-way and lossy. `upsert_lat` never deletes 
 - ✅ Agree the manifest contract with legal (see Contract; #62 comment)
 - ⬜ Hash function in `fractalaw-core` per contract (explicit White_Space set, NULL→"", all served rows) + legal's test vectors
 - ⬜ Store `lat_hash` per law (hub + DuckDB)
-- ⬜ Diff-apply in the store: delete rows legal no longer has; update changed rows (mark for re-parse); carry tier data across section_id renames on a unique exact normalised-text match; leave unchanged rows alone
+- ⬜ Diff-apply in the store: delete rows legal no longer has; text changed → update + mark for re-parse; sort_key-only change → update in place, no re-parse, tier data kept; carry tier data across section_id renames on a unique exact normalised-text match; leave unchanged rows alone
 - ⬜ `pull-lat --stale` (manifest compare → re-pull the drifted laws); `sync watch` runs the check at startup and on a schedule
 - ⬜ Protect benchmarks: report drift, apply only with approval
 - ⬜ Tests: Wester Ross reg.4(2) → Obligation; no duplicate normalised text within a law; tier data survives unchanged rows
@@ -89,3 +89,12 @@ LAT sync from legal to the hub is one-way and lossy. `upsert_lat` never deletes 
   - all 3 vectors match;
   - 980/980 laws: the hash recomputed from `lat/{law}` rows matches the manifest on hash and row_count.
 - **Client note:** `lat/{law}` for a law with no LAT replies with a zero-length payload. Treat that as 0 rows.
+
+## Legal sort_key fix (2026-09-26, later)
+
+- **Fixed:** paragraph segments are letters-only, so (c) and (d) no longer sort as Roman numerals, and `signed` rows sort after the body. The stored rows were rewritten in place: 20,848 rows in **579 laws**, sort_key only. **These 579 have a new lat_hash**, so the manifest will show them as stale.
+  - Diff-apply must treat a sort_key-only change as an in-place update: no re-parse, tier data kept.
+- **Still open on legal's side, held until fractalaw's diff-apply exists:**
+  - **386 laws** carry sort_keys from older parser generations and need a legal re-parse. That can shift section_ids, and 101 of them are enriched.
+  - **Parent-drop bug:** after a nested sub-paragraph the parser can drop the parent paragraph, e.g. UK_wsi_2025_1321 `reg.39(e)`, which should be `reg.39(2)(e)`. The fix changes section_ids.
+  - Both rely on the text-match carry-over to preserve tier data.
