@@ -15,9 +15,14 @@ LAT sync from legal to the hub is one-way and lossy. `upsert_lat` never deletes 
 - ✅ Agree the manifest contract with legal (see Contract; #62 comment)
 - ⬜ Hash function in `fractalaw-core` per contract (explicit White_Space set, NULL→"", all served rows) + legal's test vectors
 - ⬜ Store `lat_hash` per law (hub + DuckDB)
-- ⬜ Diff-apply in the store: delete rows legal no longer has; text changed → update + mark for re-parse; sort_key-only change → update in place, no re-parse, tier data kept; carry tier data across section_id renames on a unique exact normalised-text match; leave unchanged rows alone
+- ⬜ Consume legal's old→new section_id rename map (applied first; text match is only the fallback; ambiguous → held for review)
+- ⬜ Diff-apply in the store: archive (not hard-delete) rows legal no longer has; text changed → update + mark for re-parse; sort_key-only change → update in place, no re-parse, tier data kept; carry tier data across section_id renames on a unique exact normalised-text match; leave unchanged rows alone
 - ⬜ `pull-lat --stale` (manifest compare → re-pull the drifted laws); `sync watch` runs the check at startup and on a schedule
 - ⬜ Protect benchmarks: report drift, apply only with approval
+- ⬜ Gates per law: 100% tier-data carry-over on unchanged-text rows (report the rate, stop on regression); DuckDB + hub backup before the first run; pilot (1 unenriched law, 1 enriched law with renames), then batches of ~30
+- ⬜ Delete verification for laws legal doesn't hold: deterministic LRT check (revoked + rescinded_by + date, no conflict) → agent for the rest (LRT audit trail first, then legislation.gov.uk) → Jason approves; absence alone never deletes (proposed; awaiting Jason)
+- ⬜ Define the `sync watch` full-manifest compare interval (bounds how long a dropped event goes unnoticed)
+- ⬜ Hash blind spot: fractalaw stores more LAT columns than the hash covers (position, hierarchy_path, section_type, part/chapter/heading_group, extent_code, amendment counts). Decide: a second structural hash, or accept (awaiting Jason)
 - ⬜ Tests: Wester Ross reg.4(2) → Obligation; no duplicate normalised text within a law; tier data survives unchanged rows
 - ⬜ Resume `09-26-26-stale-lat-repull.md`: pilot, roll-out, parse → reconcile → backfill, held-downgrade diff
 
@@ -118,3 +123,19 @@ The `lat/{law}` queryable returns the full row set ordered by sort_key.
 **Legal will schedule after diff-apply lands:** the 386-law older-generation re-parse and the parent-drop fix.
 
 **Also ready in legal, pending Jason's launch:** 2 PDF-only laws, UK_uksi_1979_791 (58 rows) and UK_uksi_1947_805 (3 rows, an amending order).
+
+## Gemini review of the re-parse/sync plan (via legal, Jason agreed, 2026-09-26)
+
+Files: `sertantai-legal/backend/data/code-reviews/2026-09-26-lat-sync-enrichment-{brief,review}.md`
+
+- **Legal will preserve its own enrichment.** LatPersister will merge on re-parse instead of DELETE+INSERT: unchanged rows keep their data, text-matched renames carry it over, only changed text is blanked, ambiguous rows are flagged. Today any legal re-parse wipes its own enrichment (209K rows, 637 laws).
+- **Legal records an explicit rename map** (old→new section_id, with ambiguous cases flagged). Fractalaw applies it first and uses its own text match only as a fallback.
+- **For fractalaw:**
+  - archive rather than delete;
+  - per-law carry-over gate at 100% on unchanged-text rows;
+  - DuckDB/hub backup before the first run;
+  - define the watch full-compare interval.
+  
+  All added to the Todo.
+- **Hash blind spot (review point):** fixes to position or other structural columns don't change `lat_hash`.
+- **Timing:** the hub stays frozen (no re-pulls). Legal can go ahead with the parent-drop fix and the 386-law re-parse now; fractalaw's diff-apply will later see the hash changes plus the rename map.
