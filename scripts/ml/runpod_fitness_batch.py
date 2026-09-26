@@ -126,6 +126,7 @@ def query_gap_provisions(conn, limit=None, law_names=None):
         WHERE (fm.ft_entities IS NULL OR fm.ft_entities = '{}')
         AND fm.extraction_method != 'propagated'
         AND lt.text IS NOT NULL AND length(lt.text) > 20
+        AND lt.scope IS DISTINCT FROM 'amendment'  -- inserted text belongs to the amended instrument (#57)
     """
     if law_names:
         placeholders = ",".join(f"'{n}'" for n in law_names)

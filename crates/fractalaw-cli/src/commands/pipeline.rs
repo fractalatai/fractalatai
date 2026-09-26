@@ -251,6 +251,19 @@ fn parse_provisions(
 ) -> Vec<ProvisionTaxa> {
     let mut provision_taxa: Vec<ProvisionTaxa> = Vec::new();
 
+    // All provision texts, so a provision under an amendment instruction can be
+    // recognised by its ancestors (#57).
+    let mut texts: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for batch in batches {
+        if let (Some(sid_c), Some(text_c)) = (batch.column_by_name("section_id"), batch.column_by_name("text")) {
+            for row in 0..batch.num_rows() {
+                if let (Some(sid), Some(t)) = (get_string_value(sid_c.as_ref(), row), get_string_value(text_c.as_ref(), row)) {
+                    texts.insert(sid, t);
+                }
+            }
+        }
+    }
+
     for batch in batches {
         let prov_col = batch.column_by_name("provision");
         let text_col = batch.column_by_name("text");
@@ -306,6 +319,19 @@ fn parse_provisions(
                         ..ProvisionTaxa::empty()
                     });
                 }
+                continue;
+            }
+
+            // Amendment-insertion text belongs to the amended instrument: record the
+            // scope and extract nothing from it (#57).
+            if !section_id.is_empty()
+                && fractalaw_core::taxa::amendment::is_amendment_text(&section_id, |sid| texts.get(sid).cloned())
+            {
+                provision_taxa.push(ProvisionTaxa {
+                    section_id,
+                    scope: fractalaw_core::taxa::ProvisionScope::Amendment.as_str().to_string(),
+                    ..ProvisionTaxa::empty()
+                });
                 continue;
             }
 

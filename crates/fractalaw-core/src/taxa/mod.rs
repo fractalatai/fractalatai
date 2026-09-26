@@ -47,6 +47,7 @@ pub mod applicability_compile;
 pub mod application;
 pub mod law_significance;
 pub mod law_drrp;
+pub mod amendment;
 pub mod text_cleaner;
 
 use regex::Regex;
@@ -619,6 +620,10 @@ pub enum ProvisionScope {
     Structural,
     /// Full pipeline — embedded, classified, reconciled, SLM'd.
     Substantive,
+    /// Text an amending law inserts into another instrument (the instruction and
+    /// every sub-provision under it). Belongs to the amended instrument, so no
+    /// tier processes it and there is no modal override (fractalatai #57).
+    Amendment,
 }
 
 impl ProvisionScope {
@@ -627,6 +632,7 @@ impl ProvisionScope {
             Self::Out => "out",
             Self::Structural => "structural",
             Self::Substantive => "substantive",
+            Self::Amendment => "amendment",
         }
     }
 }

@@ -104,6 +104,7 @@ pub(crate) async fn cmd_fitness_extract(
             "SELECT lt.section_id, lt.text, lt.scope
              FROM legislation_text lt
              WHERE lt.text IS NOT NULL AND lt.text != ''
+             AND lt.scope IS DISTINCT FROM 'amendment'
              AND split_part(lt.section_id, ':', 1) = ANY($1)
              AND NOT EXISTS (
                  SELECT 1 FROM fitness_mentions fm
@@ -119,6 +120,7 @@ pub(crate) async fn cmd_fitness_extract(
             "SELECT lt.section_id, lt.text, lt.scope
              FROM legislation_text lt
              WHERE lt.text IS NOT NULL AND lt.text != ''
+             AND lt.scope IS DISTINCT FROM 'amendment'
              AND NOT EXISTS (
                  SELECT 1 FROM fitness_mentions fm
                  WHERE fm.section_id = lt.section_id
@@ -539,7 +541,8 @@ pub(crate) async fn load_law_meta(
                     FROM legislation_text c WHERE c.law_name = s.law_name \
                     AND c.section_id LIKE s.section_id || '(%'), '') \
          FROM legislation_text s \
-         WHERE s.text ~* '(these\\s+regulations|this\\s+(act|order|measure|scheme|instrument)|these\\s+(rules|byelaws))' \
+         WHERE s.scope IS DISTINCT FROM 'amendment' \
+         AND s.text ~* '(these\\s+regulations|this\\s+(act|order|measure|scheme|instrument)|these\\s+(rules|byelaws))' \
          AND s.text ~* '(appl(y|ies)|extends?)' {stem_filter}"
     ))
     .await?
@@ -691,6 +694,8 @@ pub(crate) async fn cmd_fitness_compile(
          FROM fitness_mentions \
          WHERE extraction_method != 'propagated' \
          AND entities IS NOT NULL AND entities != '{{}}' {} \
+         AND NOT EXISTS (SELECT 1 FROM legislation_text lt WHERE lt.section_id = fitness_mentions.section_id \
+                         AND lt.scope = 'amendment') \
          ORDER BY 1, section_id, polarity",
         if law_names.is_some() { law_filter } else { "" }
     );

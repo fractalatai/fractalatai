@@ -11,9 +11,6 @@
 //! that is an amendment instruction, or sits under one) are excluded.
 
 use std::collections::BTreeSet;
-use std::sync::LazyLock;
-
-use regex::Regex;
 
 /// One reconciled actor signal on one provision.
 #[derive(Debug, Clone)]
@@ -76,42 +73,7 @@ impl LawDrrp {
     }
 }
 
-static AMENDMENT_RE: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(
-        r"(?ix)
-        \b(?:insert|substitute|add)(?:ed)?\s*[—–:-]\s*   # 'insert—' '... there is substituted–' introducing quoted text
-        | \bfor\b[^.;]{0,160}?\bsubstitute\b             # 'for X substitute Y'
-        | \b(?:after|before|at\s+the\s+end\s+of)\b[^.;]{0,160}?\binsert\b
-        | \bomit\b
-        | \b(?:is|are|shall\s+be)\s+(?:further\s+)?amended\b
-        | \bthere\s+(?:is|are|shall\s+be)\s+(?:inserted|substituted|added)\b
-        | \bhas\s+effect\s+as\s+if\b[^.;]{0,160}?\b(?:substituted|inserted)\b
-        ",
-    )
-    .unwrap()
-});
-
-/// Is this provision text an amendment instruction?
-pub fn is_amendment_instruction(text: &str) -> bool {
-    AMENDMENT_RE.is_match(text)
-}
-
-/// Ancestors of a section id by stripping trailing `(...)` groups:
-/// `X:reg.2(3)(a)(ii)` → [`X:reg.2(3)(a)`, `X:reg.2(3)`, `X:reg.2`].
-pub fn ancestors(section_id: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut cur = section_id;
-    while cur.ends_with(')') {
-        match cur.rfind('(') {
-            Some(i) if i > 0 => {
-                cur = &cur[..i];
-                out.push(cur.to_string());
-            }
-            _ => break,
-        }
-    }
-    out
-}
+pub use super::amendment::{ancestors, is_amendment_instruction};
 
 /// Government-side actor (regulator/Crown/EU institution): its Obligation is a
 /// Responsibility and its Liberty a Power.
@@ -174,23 +136,6 @@ mod tests {
 
     fn sig(sid: &str, label: &str, drrp: &str) -> ActorSignal {
         ActorSignal { section_id: sid.into(), actor_label: label.into(), drrp: drrp.into() }
-    }
-
-    #[test]
-    fn ancestors_strip_brackets() {
-        assert_eq!(ancestors("L:reg.2(3)(a)(ii)"), vec!["L:reg.2(3)(a)", "L:reg.2(3)", "L:reg.2"]);
-        assert!(ancestors("L:sch.2.para.226").is_empty());
-    }
-
-    #[test]
-    fn amendment_instructions() {
-        assert!(is_amendment_instruction("After section 97B of the 1968 Act insert—"));
-        assert!(is_amendment_instruction("in subsection (5), for “the duty imposed by subsection (1)” substitute “a duty”"));
-        assert!(is_amendment_instruction("for sub paragraphs (1) and (2) there is substituted– Subject to sub paragraph (3) below, it shall be an offence"));
-        assert!(is_amendment_instruction("The Environmental Protection Act 1990 is amended as follows."));
-        assert!(is_amendment_instruction("In regulation 65 (offences), omit paragraph (b)."));
-        assert!(!is_amendment_instruction("A person has a duty to provide information to SEPA in writing"));
-        assert!(!is_amendment_instruction("Every employer shall ensure that a suitable notice is displayed"));
     }
 
     #[test]

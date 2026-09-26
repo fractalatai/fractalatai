@@ -614,9 +614,17 @@ async fn main() -> anyhow::Result<()> {
                             .iter()
                             .filter_map(|(sid, text, _)| text.as_deref().map(|t| (sid.as_str(), t)))
                             .collect();
+                        // Amendment-scope provisions belong to the amended instrument (#57)
+                        let amendment: std::collections::HashSet<&str> = inputs
+                            .provisions
+                            .iter()
+                            .filter(|(_, _, scope)| scope.as_deref() == Some("amendment"))
+                            .map(|(sid, _, _)| sid.as_str())
+                            .collect();
                         let signals: Vec<ActorSignal> = inputs
                             .signals
                             .iter()
+                            .filter(|(sid, _, _, _)| !amendment.contains(sid.as_str()))
                             .map(|(sid, label, drrp, _)| ActorSignal {
                                 section_id: sid.clone(),
                                 actor_label: label.clone(),

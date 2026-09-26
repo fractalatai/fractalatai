@@ -437,6 +437,7 @@ impl PgStore {
                FROM provision_actors pa \
                JOIN legislation_text lt2 ON pa.section_id = lt2.section_id \
                WHERE lt2.law_name = $1 AND pa.position IS NOT NULL \
+                 AND lt2.scope IS DISTINCT FROM 'amendment' \
                GROUP BY pa.section_id \
              ) agg \
              WHERE lt.section_id = agg.section_id"
@@ -493,7 +494,7 @@ impl PgStore {
                COALESCE(count(*) FILTER (WHERE significance_overall = 'MEDIUM'), 0), \
                COALESCE(count(*) FILTER (WHERE significance_overall = 'LOW'), 0), \
                COALESCE(count(*) FILTER (WHERE significance_overall IS NOT NULL), 0) \
-             FROM legislation_text WHERE law_name = $1",
+             FROM legislation_text WHERE law_name = $1 AND scope IS DISTINCT FROM 'amendment'",
         )
         .bind(law_name)
         .fetch_one(&self.pool)
@@ -552,6 +553,7 @@ impl PgStore {
                   ORDER BY p.sort_key DESC LIMIT 1) as part_id \
                FROM legislation_text lt \
                WHERE lt.law_name = $1 AND lt.significance_overall IS NOT NULL \
+                 AND lt.scope IS DISTINCT FROM 'amendment' \
              ) \
              SELECT \
                COALESCE(split_part(part_id, ':', 2), 'preamble') as part, \
