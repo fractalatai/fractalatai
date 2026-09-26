@@ -191,6 +191,22 @@
   triggers: [enforcing authority, enforcement authority, regulatory authority, regulator]
   drrp_keywords: [enforcing authority, authority]
 
+- label: "Gvt: Authority: Combined County"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:[Mm]ayoral )?(?:[Cc]ombined [Cc]ounty [Aa]uthorit(?:y|ies)|CCAs?)"
+  triggers: [combined county authority, combined county authorities, cca, mayoral cca]
+  drrp_keywords: [combined county authority, cca]
+
+- label: "Gvt: Mayor"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "[Mm]ayors?"
+  triggers: [mayor, mayors, mayor of london, elected mayor]
+  drrp_keywords: [mayor]
+
 - label: "Gvt: Authority: Local"
   type: government
   category: Gvt
@@ -308,7 +324,7 @@
   type: government
   category: Gvt
   regex_patterns:
-    - "(?:court|[Jj]ustice of the [Pp]eace|[Tt]ribunal|[Ss]heriff|[Mm]agistrate|prosecutor|Lord Advocate)"
+    - "(?:[Cc]ourt|[Jj]ustice of the [Pp]eace|[Tt]ribunal|[Ss]heriff|[Mm]agistrate|prosecutor|Lord Advocate)"
   triggers: [court, tribunal, judge, judiciary, employment tribunal, magistrates]
   drrp_keywords: [tribunal, court, sheriff, procurator fiscal]
 
@@ -608,6 +624,13 @@
     - "[Hh]irers?"
   triggers: [hirer, hirers, the hirer]
 
+- label: "Ind: Young Person"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "[Yy]oung (?:[Pp]ersons?|[Pp]eople|[Ww]orkers?)"
+  triggers: [young person, young persons, young people, young worker, young workers]
+
 - label: "Ind: Person"
   type: governed
   category: Ind
@@ -842,6 +865,8 @@
 - label: "Spc: Liquidator"
   type: governed
   category: Spc
+  regex_patterns:
+    - "[Ll]iquidators?"
   triggers: [liquidator, liquidators]
 
 - label: "Spc: Administrator"
@@ -857,49 +882,65 @@
 - label: "Spc: Trustee in Bankruptcy"
   type: governed
   category: Spc
+  regex_patterns:
+    - "[Tt]rustees? in [Bb]ankruptcy"
   triggers: [trustee in bankruptcy]
 
 - label: "EU: Certification Body"
   type: government
   category: EU
+  regex_patterns:
+    - "[Cc]ertification [Bb]od(?:y|ies)"
   triggers: [certification body, certification bodies]
 
 - label: "EU: Central Management"
   type: government
   category: EU
+  regex_patterns:
+    - "[Cc]entral [Mm]anagement"
   triggers: [central management]
 
 - label: "EU: Special Negotiating Body"
   type: government
   category: EU
+  regex_patterns:
+    - "[Ss]pecial [Nn]egotiating [Bb]od(?:y|ies)"
   triggers: [special negotiating body]
-
-- label: "Ind: Young Person"
-  type: governed
-  category: Ind
-  triggers: [young person, young persons, young people, young worker, young workers]
 
 - label: "Org: Trade Association"
   type: governed
   category: Org
+  regex_patterns:
+    - "[Tt]rade [Aa]ssociations?"
   triggers: [trade association, trade associations]
 
 - label: "Svc: Water Undertaker"
   type: governed
   category: Svc
+  regex_patterns:
+    - "(?:[Ww]ater|[Ss]ewerage|[Ii]ncumbent|[Rr]elevant) [Uu]ndertakers?"
+    - "[Ww]ater and [Ss]ewerage [Uu]ndertakers?"
   triggers: [water undertaker, water undertakers, sewerage undertaker]
 
 - label: "Spc: Appellant"
   type: governed
   category: Spc
+  regex_patterns:
+    - "[Aa]ppellants?"
   triggers: [appellant, appellants]
 
 - label: "Spc: Licence Holder"
   type: governed
   category: Spc
+  regex_patterns:
+    - "(?:[Ll]icen[cs]e|[Pp]ermit) [Hh]olders?"
+    - "holders? of (?:a|the) (?:licen[cs]e|permit)"
   triggers: [licence holder, license holder, the licence holder, the license holder]
 
 - label: "Gvt: Consultation Body"
   type: government
   category: Gvt
+  regex_patterns:
+    - "[Cc]onsultation [Bb]od(?:y|ies)"
+    - "[Cc]onsultees?"
   triggers: [consultation body, consultation bodies, consultee, consultees]

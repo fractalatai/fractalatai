@@ -214,7 +214,7 @@ pub fn extract_actors_for_family(text: &str, family: Option<&str>) -> ExtractedA
     let cleaned = apply_blacklist(text);
     let mut governed = run_patterns(&cleaned, &DICTIONARY.governed);
 
-    if let Some(fam) = family {
+    if let Some(fam) = family.map(super::normalize_family) {
         // Check each specialist family key — match if the law family starts with
         // the key (e.g., "OH&S: Offshore Safety" starts with "OH&S: Offshore")
         // or is an exact match (e.g., "PUBLIC" == "PUBLIC").
@@ -481,6 +481,33 @@ mod tests {
             "licensee should be extracted for offshore family, got: {:?}",
             actors.governed
         );
+    }
+
+    #[test]
+    fn licensee_extracted_for_emoji_prefixed_family() {
+        // Families come from DuckDB/sertantai with an emoji prefix (#58)
+        let text = "The licensee shall ensure that the well is designed";
+        let actors = extract_actors_for_family(text, Some("💙 OH&S: Offshore Safety"));
+        assert!(actors.governed.iter().any(|a| a.label == "Offshore: Licensee"), "{:?}", actors.governed);
+    }
+
+    #[test]
+    fn previously_trigger_only_and_new_actors_extracted() {
+        // #58: these duty-bearers had no regex patterns, or were missing
+        let cases = [
+            ("In each year a water undertaker must publish a report.", "Svc: Water Undertaker"),
+            ("The incumbent undertaker must give notice to the licensee.", "Svc: Water Undertaker"),
+            ("The licence holder shall keep records of all waste received.", "Spc: Licence Holder"),
+            ("An employer shall not employ a young person for work which is beyond his capacity.", "Ind: Young Person"),
+            ("Before making the regulations the Secretary of State must consult the mayor and the CCA.", "Gvt: Authority: Combined County"),
+            ("Before making the regulations the Secretary of State must consult the mayor and the CCA.", "Gvt: Mayor"),
+            ("The Court of Session may make an order under this section.", "Gvt: Judiciary"),
+        ];
+        for (text, label) in cases {
+            let a = extract_actors(text);
+            let all: Vec<&str> = a.governed.iter().chain(a.government.iter()).map(|x| x.label.as_str()).collect();
+            assert!(all.contains(&label), "{label} not extracted from {text:?}: {all:?}");
+        }
     }
 
     #[test]

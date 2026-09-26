@@ -608,6 +608,13 @@ pub fn should_skip_drrp(
     false
 }
 
+/// Law family without its display prefix: DuckDB/sertantai families carry an emoji
+/// ("💙 OH&S: Offshore Safety"), but family-gated dictionaries key on the plain name
+/// ("OH&S: Offshore"). Without this, no family gating ever matched (#58).
+pub fn normalize_family(family: &str) -> &str {
+    family.trim_start_matches(|c: char| !c.is_ascii_alphanumeric())
+}
+
 // ── Base case filter ────────────────────────────────────────────────
 
 /// Pipeline scope category for a provision.
@@ -838,6 +845,14 @@ pub fn is_descriptive_summary(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn normalize_family_strips_emoji_prefix() {
+        assert_eq!(normalize_family("💙 OH&S: Offshore Safety"), "OH&S: Offshore Safety");
+        assert_eq!(normalize_family("💚 WATER & WASTEWATER"), "WATER & WASTEWATER");
+        assert_eq!(normalize_family("PUBLIC"), "PUBLIC");
+        assert_eq!(normalize_family(""), "");
+    }
 
     #[test]
     fn parse_employer_duty() {

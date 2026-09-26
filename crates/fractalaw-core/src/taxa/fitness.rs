@@ -818,6 +818,7 @@ static NUCLEAR_PLANT_DICT: LazyLock<Vec<DictEntry>> = LazyLock::new(|| {
 /// OH&S, FIRE, and cross-domain families have specialists. Returns empty vec
 /// for unknown families — the core dictionaries still run.
 fn specialist_dicts_for(family: &str) -> Vec<(PDimension, &'static [DictEntry])> {
+    let family = super::normalize_family(family);
     if family.starts_with("OH&S") {
         vec![
             (PDimension::Person, &OHS_PERSON_DICT),

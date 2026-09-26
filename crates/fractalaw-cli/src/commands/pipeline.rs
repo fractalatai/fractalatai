@@ -223,7 +223,10 @@ pub(crate) async fn enrich_single_law(
             }
         }
         if !actor_rows.is_empty() {
-            lance.upsert_provision_actors(&actor_rows).await.ok();
+            // Never swallow this: a failure drops every remaining actor for the law (#58)
+            if let Err(e) = lance.upsert_provision_actors(&actor_rows).await {
+                eprintln!("  {law_name}: provision_actors upsert FAILED ({} rows): {e}", actor_rows.len());
+            }
         }
     }
 
