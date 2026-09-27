@@ -26,10 +26,19 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import psycopg2
 import requests
 
+try:  # enrichment provenance (#63); on a pod, copy fractalaw_provenance.py alongside
+    import fractalaw_provenance as provenance
+except ImportError:
+    provenance = None
+    print("warning: fractalaw_provenance.py not found; enrichment provenance will not be recorded")
+
 # ── Config ──────────────────────────────────────────────────────────────
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = "gemma3-significance"
+# Per-provision method (legislation_text.significance_method, #63)
+SIGNIFICANCE_METHOD = f"slm:{MODEL}"
+TOUCHED_LAWS = set()
 PG_DSN = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 
 SYSTEM_PROMPT = (
@@ -223,7 +232,8 @@ def write_batch(conn, updates):
             "significance_scope_protected_class = %s, "
             "significance_gravity = %s, "
             "significance_strength = %s, "
-            "significance_confidence = %s "
+            "significance_confidence = %s, "
+            "significance_method = %s "
             "WHERE section_id = %s",
             (
                 rating["scope_duty_bearer"],
@@ -231,9 +241,11 @@ def write_batch(conn, updates):
                 rating["gravity"],
                 rating["strength"],
                 rating.get("confidence"),
+                SIGNIFICANCE_METHOD,
                 sid,
             )
         )
+        TOUCHED_LAWS.add(sid.split(":")[0])
     conn.commit()
     cur.close()
 
@@ -270,6 +282,10 @@ def main():
         print(f"\nTEST MODE: {limit:,} of {total_count:,} provisions (5%)")
 
     conn = psycopg2.connect(PG_DSN)
+    # Per-provision method column (#63); additive, idempotent
+    with conn.cursor() as cur:
+        cur.execute("ALTER TABLE legislation_text ADD COLUMN IF NOT EXISTS significance_method TEXT")
+    conn.commit()
     provisions = query_obligation_provisions(conn, limit=limit, law_names=law_names)
     total = len(provisions)
     print(f"Loaded {total:,} Obligation provisions, {args.workers} workers\n", flush=True)
@@ -324,6 +340,9 @@ def main():
         for level in ["HIGH", "MEDIUM", "LOW"]:
             print(f"  {level:8s}: {dim_counts[d].get(level, 0):,}")
 
+    if provenance:
+        provenance.record(conn, TOUCHED_LAWS, "significance", "provision_scoring", "slm", MODEL,
+                          prompt_version=provenance.prompt_version(SYSTEM_PROMPT))
     conn.close()
 
 

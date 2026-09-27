@@ -1,6 +1,7 @@
 pub mod drrp;
 pub mod jsp;
 pub mod lat_sync;
+pub mod provenance;
 pub mod schema;
 pub mod sort_key;
 pub mod taxa;

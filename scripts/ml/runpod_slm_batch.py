@@ -36,10 +36,17 @@ import psycopg2
 import psycopg2.pool
 import requests
 
+try:  # enrichment provenance (#63); on a pod, copy fractalaw_provenance.py alongside
+    import fractalaw_provenance as provenance
+except ImportError:
+    provenance = None
+    print("warning: fractalaw_provenance.py not found; enrichment provenance will not be recorded")
+
 # ── Config ──────────────────────────────────────────────────────────────
 
 OLLAMA_URL = "http://localhost:11434/api/chat"
 MODEL = "gemma3-position"
+TOUCHED_LAWS = set()
 PG_DSN = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 
 SYSTEM_PROMPT = (
@@ -242,6 +249,7 @@ def write_batch(conn, updates):
             "WHERE section_id = %s AND actor_label = %s",
             (drrp, position, confidence, sid, label)
         )
+        TOUCHED_LAWS.add(sid.split(":")[0])
     conn.commit()
     cur.close()
 
@@ -340,6 +348,9 @@ def main():
     for d in ["Obligation", "Liberty", "none"]:
         print(f"  {d:15s}: {drrp_counts.get(d, 0):,}")
 
+    if provenance:
+        provenance.record(conn, TOUCHED_LAWS, "taxa", "slm", "slm", MODEL,
+                          prompt_version=provenance.prompt_version(SYSTEM_PROMPT))
     conn.close()
 
 

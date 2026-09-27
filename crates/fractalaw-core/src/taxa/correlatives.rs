@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-static RULES_YAML: &str = include_str!("../../data/correlative-rules.yaml");
+pub(crate) static RULES_YAML: &str = include_str!("../../data/correlative-rules.yaml");
 
 /// A correlative inference rule.
 #[derive(Debug, serde::Deserialize)]

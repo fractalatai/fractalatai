@@ -488,7 +488,7 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .await
             } else {
-                sync::cmd_sync_publish(&data_dir, &zenoh, laws, family, all, changed, fitness_only).await
+                sync::cmd_sync_publish(&data_dir, &zenoh, laws, family, all, changed, fitness_only, pg_url.as_deref()).await
             }
         }
         Command::PullLat {
@@ -1005,6 +1005,18 @@ async fn cmd_triage(
             "\nTriage: {} making, {} not_making, {} uncertain ({} disagree with sertantai)",
             making_count, not_making_count, uncertain_count, disagree_count,
         );
+    }
+
+    // Enrichment provenance (#63): hub only, never fails the command
+    if let Some(url) = pg_url {
+        let stage = fractalaw_core::provenance::StageInfo::new(
+            fractalaw_core::provenance::TRIAGE, "making_detection", "regex", "fractalaw-making",
+        )
+        .version(fractalaw_core::provenance::VERSION);
+        let recorded = async { fractalaw_store::PgStore::connect(url).await?.record_run(Some(&law_names), &[stage]).await };
+        if let Err(e) = recorded.await {
+            eprintln!("warning: enrichment provenance not recorded: {e}");
+        }
     }
 
     Ok(())

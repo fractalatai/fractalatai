@@ -34,8 +34,8 @@ Also extracts commencement dates as temporal entities.
 For provisions where dictionaries found polarity but no entities. See `/runpod-batch-inference` skill.
 
 ```bash
-# On RunPod (after tunnel + Ollama setup):
-python3 -u /workspace/scripts/runpod_fitness_batch.py --workers 4
+# On RunPod (after tunnel + Ollama setup; fractalaw_provenance.py uploaded alongside, #63):
+FRACTALAW_VERSION=<local commit> python3 -u /workspace/scripts/runpod_fitness_batch.py --workers 4
 ```
 
 Writes to `ft_entities` column (fine-tuned model) or `slm_entities` column (base model). Each tier has its own column — never overwrites other tiers.

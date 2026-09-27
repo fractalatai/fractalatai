@@ -2,6 +2,7 @@ mod commands;
 mod display;
 mod embed;
 mod llm;
+mod provenance;
 mod utils;
 
 use std::path::PathBuf;
@@ -548,13 +549,17 @@ async fn main() -> anyhow::Result<()> {
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_infer(lance.as_ref(), &law_names).await
+                let r = cmd_taxa_infer(lance.as_ref(), &law_names).await;
+                if r.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_infer()).await; }
+                r
             }
             TaxaAction::Reconcile { laws } => {
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_reconcile(lance.as_ref(), &law_names).await
+                let r = cmd_taxa_reconcile(lance.as_ref(), &law_names).await;
+                if r.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_reconcile()).await; }
+                r
             }
             TaxaAction::Backfill { laws } => {
                 let store = open_duck(&data_dir)?;
@@ -567,6 +572,7 @@ async fn main() -> anyhow::Result<()> {
                 let mut law_sig_total = 0usize;
                 let drrp_types = commands::pipeline::drrp_column_types(&store)?;
                 let mut verdicts: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
+                let mut drrp_rolled_up: Vec<String> = Vec::new();
                 for law_name in &law_names {
                     let updated = lance.backfill_from_actors(law_name).await?;
                     let sig = lance.backfill_significance(law_name).await?;
@@ -634,6 +640,7 @@ async fn main() -> anyhow::Result<()> {
                         let law = aggregate(&signals, |sid| texts.get(sid).map(|t| t.to_string()));
                         commands::pipeline::write_law_drrp(&store, law_name, &law, &drrp_types)?;
                         *verdicts.entry(law.verdict().as_str()).or_default() += 1;
+                        drrp_rolled_up.push(law_name.clone());
                     } else {
                         *verdicts.entry("not_run").or_default() += 1;
                     }
@@ -659,13 +666,19 @@ async fn main() -> anyhow::Result<()> {
                     law_names.len()
                 );
                 println!("Law-level DRRP verdicts: {verdicts:?}");
+                // Provenance (#63): DRRP roll-up only where it wrote a verdict; significance for all
+                let [drrp_stage, sig_stage]: [_; 2] = provenance::taxa_backfill().try_into().expect("two stages");
+                provenance::record(pg_url.as_deref(), Some(&drrp_rolled_up), vec![drrp_stage]).await;
+                provenance::record(pg_url.as_deref(), Some(&law_names), vec![sig_stage]).await;
                 Ok(())
             }
             TaxaAction::Slm { laws } => {
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_slm(lance.as_ref(), &law_names).await
+                let r = cmd_taxa_slm(lance.as_ref(), &law_names).await;
+                if r.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_slm()).await; }
+                r
             }
             TaxaAction::AuditFitness {
                 laws,
@@ -678,6 +691,7 @@ async fn main() -> anyhow::Result<()> {
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
                 cmd_taxa_parse(lance.as_ref(), &store, &law_names, force).await?;
+                provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_parse()).await;
                 if let Some(trace_path) = trace {
                     cmd_taxa_trace(lance.as_ref(), &store, &law_names, &trace_path).await?;
                 }
@@ -690,6 +704,7 @@ async fn main() -> anyhow::Result<()> {
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
                 let result = cmd_taxa_embed(lance.as_ref(), &law_names).await;
+                if result.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_embed()).await; }
                 for name in &law_names {
                     let escaped = name.replace('\'', "''");
                     let _ = store.execute(&format!(
@@ -705,6 +720,7 @@ async fn main() -> anyhow::Result<()> {
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
                 let result = cmd_taxa_classify(lance.as_ref(), &law_names).await;
+                if result.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_classify()).await; }
                 for name in &law_names {
                     let escaped = name.replace('\'', "''");
                     let _ = store.execute(&format!(
@@ -718,7 +734,9 @@ async fn main() -> anyhow::Result<()> {
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
-                cmd_taxa_escalate(lance.as_ref(), &store, &law_names).await
+                let r = cmd_taxa_escalate(lance.as_ref(), &store, &law_names).await;
+                if r.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_escalate()).await; }
+                r
             }
             TaxaAction::Validate {
                 laws,
@@ -732,6 +750,9 @@ async fn main() -> anyhow::Result<()> {
                 let law_names: Vec<String> =
                     laws.split(',').map(|s| s.trim().to_string()).collect();
                 let result = cmd_taxa_validate(lance.as_ref(), &store, &law_names, &audit_dir, dry_run, apply).await;
+                if result.is_ok() && apply && !dry_run {
+                    provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_validate()).await;
+                }
                 if !dry_run {
                     for name in &law_names {
                         let escaped = name.replace('\'', "''");
@@ -774,7 +795,9 @@ async fn main() -> anyhow::Result<()> {
                     .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
                 let duck = open_duck(&data_dir)?;
-                commands::fitness::cmd_fitness_extract(pg_url, &duck, law_names.as_deref(), force).await
+                let r = commands::fitness::cmd_fitness_extract(pg_url, &duck, law_names.as_deref(), force).await;
+                if r.is_ok() { provenance::record(Some(pg_url), law_names.as_deref(), provenance::fitness_extract()).await; }
+                r
             }
             FitnessAction::Status { laws, law_file } => {
                 let pg_url = pg_url
@@ -788,7 +811,9 @@ async fn main() -> anyhow::Result<()> {
                     .as_deref()
                     .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
-                commands::fitness::cmd_fitness_reconcile(pg_url, law_names.as_deref(), dry_run).await
+                let r = commands::fitness::cmd_fitness_reconcile(pg_url, law_names.as_deref(), dry_run).await;
+                if r.is_ok() && !dry_run { provenance::record(Some(pg_url), law_names.as_deref(), provenance::fitness_reconcile()).await; }
+                r
             }
             FitnessAction::Application { laws, law_file, out } => {
                 let pg_url = pg_url
@@ -796,7 +821,10 @@ async fn main() -> anyhow::Result<()> {
                     .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
                 let duck = open_duck(&data_dir)?;
-                commands::fitness::cmd_fitness_application(pg_url, &duck, law_names.as_deref(), out.as_deref()).await
+                let r = commands::fitness::cmd_fitness_application(pg_url, &duck, law_names.as_deref(), out.as_deref()).await;
+                // --out writes JSONL for review, not DuckDB: nothing enriched
+                if r.is_ok() && out.is_none() { provenance::record(Some(pg_url), law_names.as_deref(), provenance::fitness_application()).await; }
+                r
             }
             FitnessAction::Compile { laws, law_file, out } => {
                 let pg_url = pg_url
@@ -804,7 +832,9 @@ async fn main() -> anyhow::Result<()> {
                     .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
                 let duck = open_duck(&data_dir)?;
-                commands::fitness::cmd_fitness_compile(pg_url, &duck, law_names.as_deref(), out.as_deref()).await
+                let r = commands::fitness::cmd_fitness_compile(pg_url, &duck, law_names.as_deref(), out.as_deref()).await;
+                if r.is_ok() && out.is_none() { provenance::record(Some(pg_url), law_names.as_deref(), provenance::fitness_compile()).await; }
+                r
             }
         },
 

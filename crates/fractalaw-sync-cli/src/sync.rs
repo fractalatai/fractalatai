@@ -69,9 +69,24 @@ pub(crate) async fn cmd_sync_publish(
     all: bool,
     changed: bool,
     fitness_only: bool,
+    pg_url: Option<&str>,
 ) -> anyhow::Result<()> {
     let store = open_duck(data_dir)?;
     store.ensure_taxa_hash_columns()?;
+    // Enrichment provenance (#63) comes from the hub; without it the payload is verdict-only
+    let prov_pg = match pg_url {
+        Some(url) => {
+            let pg = fractalaw_store::PgStore::connect(url).await.context("connecting to PostgreSQL")?;
+            pg.ensure_provenance_schema().await?;
+            Some(pg)
+        }
+        None => None,
+    };
+    // The families this payload carries (fitness-only still sends significance columns)
+    let families: &[&str] = {
+        use fractalaw_core::provenance::{FITNESS, SIGNIFICANCE, TAXA, TRIAGE};
+        if fitness_only { &[FITNESS, SIGNIFICANCE] } else { &[TRIAGE, TAXA, FITNESS, SIGNIFICANCE] }
+    };
     // ZENOH-SPEC v2.4 application fields (written by `fitness application`)
     for ddl in [
         "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS application_regions VARCHAR[]",
@@ -201,10 +216,18 @@ pub(crate) async fn cmd_sync_publish(
             law_name.replace('\'', "''"),
             drrp = drrp_cols,
         );
-        let batches = store.query_arrow(&sql)?;
+        let mut batches = store.query_arrow(&sql)?;
         if batches.is_empty() || batches.iter().all(|b| b.num_rows() == 0) {
             eprintln!("  {law_name}: no data, skipping");
             continue;
+        }
+        if let Some(pg) = &prov_pg {
+            let records = pg.stage_records(law_name).await?;
+            let counts = pg.provision_method_counts(law_name).await?;
+            let entries = fractalaw_core::provenance::build_entries(families, &records, &counts);
+            if entries.as_array().is_some_and(|a| !a.is_empty()) {
+                batches = with_provenance(&batches, &entries.to_string())?;
+            }
         }
 
         sync.publish_taxa(law_name, &batches)
@@ -224,6 +247,26 @@ pub(crate) async fn cmd_sync_publish(
 
     println!("Published {published}/{} laws.", law_names.len());
     Ok(())
+}
+
+/// Append the `provenance` column (a JSON list of per-family entries, #63) to
+/// the law-level payload.
+pub(crate) fn with_provenance(
+    batches: &[arrow::record_batch::RecordBatch],
+    json: &str,
+) -> anyhow::Result<Vec<arrow::record_batch::RecordBatch>> {
+    use arrow::datatypes::{DataType, Field, Schema};
+    use std::sync::Arc;
+    batches
+        .iter()
+        .map(|b| {
+            let mut fields: Vec<_> = b.schema().fields().iter().cloned().collect();
+            fields.push(Arc::new(Field::new("provenance", DataType::Utf8, true)));
+            let mut cols = b.columns().to_vec();
+            cols.push(Arc::new(arrow::array::StringArray::from(vec![json; b.num_rows()])));
+            Ok(arrow::record_batch::RecordBatch::try_new(Arc::new(Schema::new(fields)), cols)?)
+        })
+        .collect()
 }
 
 pub(crate) async fn cmd_sync_publish_provisions(
@@ -1972,4 +2015,22 @@ async fn build_triage_response(
     }
 
     results
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn provenance_column_appended_to_payload() {
+        use arrow::array::StringArray;
+        use arrow::datatypes::{DataType, Field, Schema};
+        use std::sync::Arc;
+        let schema = Arc::new(Schema::new(vec![Field::new("name", DataType::Utf8, false)]));
+        let b = arrow::record_batch::RecordBatch::try_new(schema, vec![Arc::new(StringArray::from(vec!["L"]))]).unwrap();
+        let out = with_provenance(&[b], r#"[{"family":"taxa"}]"#).unwrap();
+        let col = out[0].column_by_name("provenance").unwrap();
+        assert_eq!(get_string_value(col.as_ref(), 0).as_deref(), Some(r#"[{"family":"taxa"}]"#));
+        assert_eq!(out[0].num_columns(), 2);
+    }
 }

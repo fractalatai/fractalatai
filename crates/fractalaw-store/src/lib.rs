@@ -23,6 +23,8 @@ pub use pg::PgStore;
 #[cfg(feature = "pg")]
 mod pg_lat_sync;
 #[cfg(feature = "pg")]
+mod pg_provenance;
+#[cfg(feature = "pg")]
 pub use pg_lat_sync::{LatApplyReport, LatSyncState, TierCounts};
 #[cfg(feature = "pg")]
 pub use sqlx::PgPool;

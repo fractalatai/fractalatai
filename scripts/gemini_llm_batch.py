@@ -20,6 +20,14 @@ from collections import Counter
 import psycopg2
 import requests
 
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "ml"))
+try:  # enrichment provenance (#63); on a pod, copy fractalaw_provenance.py alongside
+    import fractalaw_provenance as provenance
+except ImportError:
+    provenance = None
+    print("warning: fractalaw_provenance.py not found; enrichment provenance will not be recorded")
+TOUCHED_LAWS = set()
+
 PG_DSN = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 GEMINI_MODEL = "gemini-2.5-flash"
 
@@ -155,6 +163,7 @@ def write_batch(conn, updates):
             "WHERE section_id = %s AND actor_label = %s",
             (drrp, position, sid, label)
         )
+        TOUCHED_LAWS.add(sid.split(":")[0])
     conn.commit()
     cur.close()
 
@@ -249,6 +258,9 @@ def main():
     for d in ["Obligation", "Liberty", "none"]:
         print(f"  {d:15s}: {drrp_counts.get(d, 0):,}")
 
+    if provenance:
+        provenance.record(conn, TOUCHED_LAWS, "taxa", "llm", "llm", GEMINI_MODEL,
+                          prompt_version=provenance.prompt_version(SYSTEM_PROMPT))
     conn.close()
 
 

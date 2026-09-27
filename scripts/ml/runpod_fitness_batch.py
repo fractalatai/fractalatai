@@ -28,6 +28,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import psycopg2
 import requests
 
+try:  # enrichment provenance (#63); on a pod, copy fractalaw_provenance.py alongside
+    import fractalaw_provenance as provenance
+except ImportError:
+    provenance = None
+    print("warning: fractalaw_provenance.py not found; enrichment provenance will not be recorded")
+
 # ── Config ──────────────────────────────────────────────────────────────
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
@@ -221,8 +227,12 @@ def extract_entities(mention_id, section_id, polarity, text, timeout=90):
 
 # ── Write ──────────────────────────────────────────────────────────────
 
+WRITTEN_IDS = set()
+
+
 def write_one(cur, mention_id, entities, scopes):
     """Write a single result to ft_* columns immediately."""
+    WRITTEN_IDS.add(mention_id)
     cur.execute(
         """UPDATE fitness_mentions
            SET ft_entities = %s,
@@ -327,6 +337,10 @@ def main():
     print(f"  Stats:     {dict(stats)}")
     print(f"{'=' * 60}")
 
+    if provenance:
+        laws = {sid.split(":")[0] for mid, sid, _, _ in rows if mid in WRITTEN_IDS}
+        provenance.record(write_conn, laws, "fitness", "slm_ft", "slm", MODEL,
+                          prompt_version=provenance.prompt_version(SYSTEM_PROMPT))
     write_cur.close()
     write_conn.close()
     conn.close()

@@ -113,7 +113,7 @@ struct CompiledDictionary {
 }
 
 /// The YAML file, embedded at compile time.
-static ACTOR_YAML: &str = include_str!("../../data/actor-dictionary.yaml");
+pub(crate) static ACTOR_YAML: &str = include_str!("../../data/actor-dictionary.yaml");
 
 /// The single compiled dictionary, built on first access.
 static DICTIONARY: LazyLock<CompiledDictionary> = LazyLock::new(|| {

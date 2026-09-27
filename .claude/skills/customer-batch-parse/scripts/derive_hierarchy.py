@@ -11,7 +11,17 @@ Usage:
 """
 
 import argparse
+import os
+import sys
+
 import psycopg2
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "scripts", "ml"))
+try:  # enrichment provenance (#63); on a pod, copy fractalaw_provenance.py alongside
+    import fractalaw_provenance as provenance
+except ImportError:
+    provenance = None
+    print("warning: fractalaw_provenance.py not found; enrichment provenance will not be recorded")
 
 PG_DSN = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 
@@ -69,11 +79,15 @@ def main():
           END
         WHERE lt.significance_gravity IS NOT NULL
         {law_filter}
+        RETURNING lt.law_name
     """
 
     cur.execute(sql)
     count = cur.rowcount
+    touched_laws = {r[0] for r in cur.fetchall()}
     conn.commit()
+    if provenance:
+        provenance.record(conn, touched_laws, "significance", "hierarchy", "rule", "fractalaw-derive-hierarchy")
     cur.close()
     conn.close()
 

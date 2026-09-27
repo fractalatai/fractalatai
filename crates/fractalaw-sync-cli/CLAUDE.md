@@ -27,6 +27,8 @@ cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/127.0.0.1:
 cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/127.0.0.1:7447 --pending
 ```
 
+With `--pg`, the law-level payload also carries the `provenance` column (#63): one JSON entry per family (triage/taxa/fitness/significance; fitness + significance with `--fitness-only`). Each entry gives the run, version, models and the LAT hashes each family read. Without `--pg`, the publish is verdict-only.
+
 ### Publish Provisions (from Postgres)
 ```bash
 cargo run -p fractalaw-sync-cli -- publish --tenant dev --connect tcp/127.0.0.1:7447 --provisions --pg postgres://... --laws UK_ukpga_1974_37

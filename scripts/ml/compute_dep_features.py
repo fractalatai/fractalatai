@@ -14,6 +14,12 @@ import argparse
 import psycopg2
 import spacy
 
+try:  # enrichment provenance (#63); on a pod, copy fractalaw_provenance.py alongside
+    import fractalaw_provenance as provenance
+except ImportError:
+    provenance = None
+    print("warning: fractalaw_provenance.py not found; enrichment provenance will not be recorded")
+
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 
 
@@ -158,6 +164,7 @@ def main():
 
     # Process in batches
     total_updated = 0
+    touched_laws = set()
     texts = [(sid, text[:500]) for sid, text in provisions]
 
     for i, (sid, text) in enumerate(texts):
@@ -177,6 +184,7 @@ def main():
                 (*feats, sid, actor_label),
             )
             total_updated += 1
+            touched_laws.add(sid.split(":")[0])
 
         if (i + 1) % 500 == 0:
             conn.commit()
@@ -184,6 +192,9 @@ def main():
 
     conn.commit()
     print(f"\nDone. {total_updated} actors updated across {len(texts)} provisions.")
+    if provenance:
+        provenance.record(conn, touched_laws, "taxa", "dep_features", "dependency", args.model,
+                          model_version=f"spacy-{spacy.__version__}")
 
     cur.close()
     conn.close()

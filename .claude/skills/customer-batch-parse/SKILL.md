@@ -291,7 +291,7 @@ Note the `pending_slm` count — this is the SLM workload. At ~0.3 actors/s, est
 
 Classify pending_slm actors via RunPod GPU. Position, significance, and fitness all run on the same pod.
 
-**See `/runpod-batch-inference` skill for pod setup, SSH tunnel, Ollama configuration, verification, and known issues.** Models and scripts persist on `/workspace` — no upload needed.
+**See `/runpod-batch-inference` skill for pod setup, SSH tunnel, Ollama configuration, verification, and known issues.** Models persist on `/workspace`. **Re-upload the scripts plus `fractalaw_provenance.py` if they've changed** (step 4 of that skill), and prefix each run with `FRACTALAW_VERSION=<local commit>` so the enrichment provenance names the version (#63).
 
 All three scripts support `--laws` to scope to this batch. **Always pass `--laws`** — without it, the scripts process the entire global queue.
 

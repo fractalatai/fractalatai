@@ -47,13 +47,19 @@ ollama pull gemma3:4b
 
 **`OLLAMA_NUM_PARALLEL` must be set BEFORE `ollama serve` starts.** Setting it after has no effect. Must kill and restart if changing.
 
-### 4. Upload batch script
+### 4. Upload batch scripts
+
+Upload the batch scripts **and `fractalaw_provenance.py`**. Without the module the scripts still run, but they record no enrichment provenance (#63). Re-upload whenever the scripts change, because copies persisted on `/workspace` go stale.
 
 ```bash
 scp -o StrictHostKeyChecking=no -P <PORT> -i ~/.ssh/id_ed25519 \
-  scripts/ml/runpod_fitness_batch.py \
-  root@<IP>:/workspace/
+  scripts/ml/runpod_slm_batch.py scripts/ml/runpod_significance_batch.py \
+  scripts/ml/runpod_fitness_batch.py scripts/ml/fractalaw_provenance.py \
+  root@<IP>:/workspace/scripts/
 ```
+
+The pod has no git checkout, so pass the local commit when running a batch script:
+`FRACTALAW_VERSION=$(git rev-parse --short=12 HEAD)` locally, then `FRACTALAW_VERSION=<sha> python3 -u /workspace/scripts/…` on the pod.
 
 ### 5. Open reverse SSH tunnel (in a separate terminal)
 
