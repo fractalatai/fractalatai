@@ -24,8 +24,10 @@ use fractalaw_sync::{LatManifestEntry, ZenohSync};
 
 use crate::{get_string_value, open_duck, ZenohArgs};
 
-/// Archive reason for laws legal no longer holds.
-const NOT_IN_LEGAL: &str = "not_in_legal";
+/// Archive reasons for laws legal no longer serves LAT for: revoked/absent
+/// (`not_in_legal`), or deliberately discarded by legal after enrichment found
+/// them not Making (`not_making`; legal archives its own copy too).
+pub(crate) const ARCHIVE_REASONS: &[&str] = &["not_in_legal", "not_making"];
 
 pub(crate) struct PullLatOpts {
     pub laws: Option<Vec<String>>,
@@ -477,9 +479,11 @@ pub(crate) async fn cmd_archive_laws(
     data_dir: &Path,
     zenoh: &ZenohArgs,
     laws: &[String],
+    reason: &str,
     timeout: Duration,
     pg_url: Option<&str>,
 ) -> anyhow::Result<()> {
+    anyhow::ensure!(ARCHIVE_REASONS.contains(&reason), "archive reason must be one of {ARCHIVE_REASONS:?}");
     let pg = open_pg(pg_url).await?;
     let sync = connect(zenoh).await?;
     let benchmarks = benchmark_laws(&open_duck(data_dir)?)?;
@@ -494,7 +498,7 @@ pub(crate) async fn cmd_archive_laws(
         } else if rows == 0 {
             eprintln!("  {law}: nothing in the hub");
         } else {
-            let n = pg.archive_law(law, NOT_IN_LEGAL).await?;
+            let n = pg.archive_law(law, reason).await?;
             eprintln!("  {law}: archived {n} rows (restore with --restore-laws)");
         }
     }
@@ -502,10 +506,11 @@ pub(crate) async fn cmd_archive_laws(
 }
 
 /// Restore laws archived by `--archive-laws`.
-pub(crate) async fn cmd_restore_laws(laws: &[String], pg_url: Option<&str>) -> anyhow::Result<()> {
+pub(crate) async fn cmd_restore_laws(laws: &[String], reason: &str, pg_url: Option<&str>) -> anyhow::Result<()> {
+    anyhow::ensure!(ARCHIVE_REASONS.contains(&reason), "archive reason must be one of {ARCHIVE_REASONS:?}");
     let pg = open_pg(pg_url).await?;
     for law in laws {
-        let n = pg.restore_archived_law(law, NOT_IN_LEGAL).await?;
+        let n = pg.restore_archived_law(law, reason).await?;
         eprintln!("  {law}: restored {n} rows");
     }
     Ok(())

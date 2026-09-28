@@ -98,6 +98,10 @@ enum Command {
         /// Restore laws archived with --archive-laws
         #[arg(long, conflicts_with_all = ["laws", "stale"])]
         restore_laws: Option<String>,
+        /// Why the laws are archived: not_in_legal (revoked/absent) or not_making
+        /// (legal discarded their LAT after enrichment found them not Making)
+        #[arg(long, default_value = "not_in_legal")]
+        archive_reason: String,
         /// Query timeout in seconds
         #[arg(long, default_value_t = 30)]
         timeout: u64,
@@ -500,15 +504,16 @@ async fn main() -> anyhow::Result<()> {
             limit,
             archive_laws,
             restore_laws,
+            archive_reason,
             timeout,
         } => {
             let timeout_d = std::time::Duration::from_secs(timeout);
             if let Some(list) = archive_laws {
                 let laws = lat_sync::parse_law_list(&list)?;
-                return lat_sync::cmd_archive_laws(&data_dir, &zenoh, &laws, timeout_d, pg_url.as_deref()).await;
+                return lat_sync::cmd_archive_laws(&data_dir, &zenoh, &laws, &archive_reason, timeout_d, pg_url.as_deref()).await;
             }
             if let Some(list) = restore_laws {
-                return lat_sync::cmd_restore_laws(&lat_sync::parse_law_list(&list)?, pg_url.as_deref()).await;
+                return lat_sync::cmd_restore_laws(&lat_sync::parse_law_list(&list)?, &archive_reason, pg_url.as_deref()).await;
             }
             let laws = laws.as_deref().map(lat_sync::parse_law_list).transpose()?;
             if pg_url.is_none() {
