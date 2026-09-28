@@ -98,7 +98,8 @@ enum Command {
         /// Restore laws archived with --archive-laws
         #[arg(long, conflicts_with_all = ["laws", "stale"])]
         restore_laws: Option<String>,
-        /// Why the laws are archived: not_in_legal (revoked/absent) or not_making
+        /// Why the laws are archived: not_in_legal (revoked/absent), revoked_unapplied
+        /// (revoked by an effect not yet applied to the text), or not_making
         /// (legal discarded their LAT after enrichment found them not Making)
         #[arg(long, default_value = "not_in_legal")]
         archive_reason: String,

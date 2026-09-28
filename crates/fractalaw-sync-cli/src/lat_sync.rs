@@ -25,9 +25,10 @@ use fractalaw_sync::{LatManifestEntry, ZenohSync};
 use crate::{get_string_value, open_duck, ZenohArgs};
 
 /// Archive reasons for laws legal no longer serves LAT for: revoked/absent
-/// (`not_in_legal`), or deliberately discarded by legal after enrichment found
-/// them not Making (`not_making`; legal archives its own copy too).
-pub(crate) const ARCHIVE_REASONS: &[&str] = &["not_in_legal", "not_making"];
+/// (`not_in_legal`), revoked by an effect legislation.gov.uk hasn't yet applied
+/// to the text (`revoked_unapplied`), or deliberately discarded by legal after
+/// enrichment found them not Making (`not_making`; legal archives its own copy too).
+pub(crate) const ARCHIVE_REASONS: &[&str] = &["not_in_legal", "revoked_unapplied", "not_making"];
 
 pub(crate) struct PullLatOpts {
     pub laws: Option<Vec<String>>,
