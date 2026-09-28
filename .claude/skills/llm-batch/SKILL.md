@@ -11,6 +11,8 @@ After SLM classification and reconciliation. Two modes:
 1. **Default**: Actors with `extraction_method = 'pending_llm'` — reconciliation flagged these as unresolved.
 2. **Significance-gated**: Low-confidence SLM actors on HIGH/MEDIUM significance provisions — targeted QA of the most important obligations.
 
+> **Alternative:** the `llm-agent-review` skill has a Claude agent adjudicate the same `pending_llm` queue, with the same labels and LLM tier columns plus a rationale per decision.
+
 ## Prerequisites
 
 - `GEMINI_API_KEY` set in environment (source ~/.bashrc)

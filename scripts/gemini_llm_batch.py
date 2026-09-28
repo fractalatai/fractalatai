@@ -43,12 +43,22 @@ SYSTEM_PROMPT = (
     "- counterparty: To whom the duty is owed or subject to the power.\n"
     "- beneficiary: Benefits but is neither duty-bearer nor direct correlative.\n"
     "- mentioned: Referenced but no active legal role.\n\n"
+    "Offences and penalties are not obligations: a provision that makes something an "
+    "offence, or says a person guilty of an offence is liable to a fine or imprisonment, "
+    "is none (the person is mentioned). A provision that only references, conditions, "
+    "details, defines or exempts a duty or power created elsewhere is also none.\n\n"
     'Respond with ONLY a JSON object: {"drrp": "Obligation"|"Liberty"|"none", '
     '"position": "active"|"counterparty"|"beneficiary"|"mentioned"}'
 )
 
 VALID_POSITIONS = {"active", "counterparty", "beneficiary", "mentioned"}
 VALID_DRRP = {"Obligation", "Liberty", "none"}
+
+
+def read_law_file(path):
+    """Law names from a CSV line or one-per-line file, as a comma string."""
+    with open(path) as f:
+        return ",".join(n.strip() for n in f.read().replace("\n", ",").split(",") if n.strip())
 
 
 def query_pending_llm(conn, limit=None, significance=None, max_confidence=None, law_file=None):
@@ -69,10 +79,8 @@ def query_pending_llm(conn, limit=None, significance=None, max_confidence=None, 
         """
         params = [significance, max_confidence]
         if law_file:
-            with open(law_file) as f:
-                laws_csv = f.read().strip()
             sql += " AND lt.law_name IN (SELECT unnest(string_to_array(%s, ',')))"
-            params.append(laws_csv)
+            params.append(read_law_file(law_file))
         sql += " ORDER BY pa.slm_confidence, pa.section_id"
     else:
         # Default: pending_llm actors
@@ -83,8 +91,11 @@ def query_pending_llm(conn, limit=None, significance=None, max_confidence=None, 
             WHERE pa.extraction_method = 'pending_llm'
             AND pa.llm_position IS NULL
             AND lt.law_name NOT IN (SELECT DISTINCT split_part(section_id, ':', 1) FROM gold_benchmarks)
-            ORDER BY pa.section_id, pa.actor_label
         """
+        if law_file:
+            sql += " AND lt.law_name IN (SELECT unnest(string_to_array(%s, ',')))"
+            params.append(read_law_file(law_file))
+        sql += " ORDER BY pa.section_id, pa.actor_label"
 
     if limit:
         sql += f" LIMIT {limit}"
@@ -176,7 +187,7 @@ def main():
                         help="Target provisions by significance level (requires --max-confidence)")
     parser.add_argument("--max-confidence", type=float, default=0.9,
                         help="SLM confidence threshold (default: 0.9)")
-    parser.add_argument("--law-file", help="CSV file of law names to scope to")
+    parser.add_argument("--law-file", help="Law names to scope to (CSV line or one per line); applies to both modes")
     args = parser.parse_args()
 
     api_key = os.environ.get("GEMINI_API_KEY") or ""

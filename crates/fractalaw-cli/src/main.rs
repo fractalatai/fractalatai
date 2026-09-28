@@ -573,6 +573,7 @@ async fn main() -> anyhow::Result<()> {
                 let drrp_types = commands::pipeline::drrp_column_types(&store)?;
                 let mut verdicts: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
                 let mut drrp_rolled_up: Vec<String> = Vec::new();
+                let mut no_duty_text: Vec<String> = Vec::new();
                 for law_name in &law_names {
                     let updated = lance.backfill_from_actors(law_name).await?;
                     let sig = lance.backfill_significance(law_name).await?;
@@ -608,9 +609,24 @@ async fn main() -> anyhow::Result<()> {
                         // Reconcile hasn't run: no verdict rather than a false "no obligations"
                         eprintln!("  {law_name}: unreconciled provision_actors, law-level DRRP left unchanged (run taxa reconcile)");
                         *verdicts.entry("unreconciled").or_default() += 1;
+                    } else if inputs.signals.is_empty()
+                        && inputs.duty_text_provisions == 0
+                        && inputs.substantive_provisions > 0
+                    {
+                        // No actors and no duty text in any substantive provision: parse ran and
+                        // found nothing to impose — evidence of no obligations, not an actor gap.
+                        let law = fractalaw_core::taxa::law_drrp::LawDrrp::default();
+                        commands::pipeline::write_law_drrp(&store, law_name, &law, &drrp_types)?;
+                        eprintln!(
+                            "  {law_name}: no duty text in {} substantive provisions → no_obligations",
+                            inputs.substantive_provisions
+                        );
+                        *verdicts.entry("no_obligations_no_duty_text").or_default() += 1;
+                        no_duty_text.push(law_name.clone());
                     } else if inputs.signals.is_empty() {
-                        // No actor rows: parse found no duty-bearer it could name (actor model gap),
-                        // so there is no evidence either way. Leave law-level DRRP unchanged.
+                        // No actor rows but duty text present (or nothing parsed): parse found no
+                        // duty-bearer it could name (actor model gap), so there is no evidence
+                        // either way. Leave law-level DRRP unchanged.
                         eprintln!("  {law_name}: no provision_actors, law-level DRRP left unchanged");
                         *verdicts.entry("no_actors").or_default() += 1;
                     } else if inputs.provisions.iter().any(|(_, _, scope)| scope.is_some()) {
@@ -668,7 +684,13 @@ async fn main() -> anyhow::Result<()> {
                 println!("Law-level DRRP verdicts: {verdicts:?}");
                 // Provenance (#63): DRRP roll-up only where it wrote a verdict; significance for all
                 let [drrp_stage, sig_stage]: [_; 2] = provenance::taxa_backfill().try_into().expect("two stages");
+                // The verdict's basis stays auditable: no-duty-text verdicts are recorded as such
+                let mut no_duty_stage = drrp_stage.clone();
+                no_duty_stage.model = "fractalaw-law-drrp:no_duty_text".to_string();
                 provenance::record(pg_url.as_deref(), Some(&drrp_rolled_up), vec![drrp_stage]).await;
+                if !no_duty_text.is_empty() {
+                    provenance::record(pg_url.as_deref(), Some(&no_duty_text), vec![no_duty_stage]).await;
+                }
                 provenance::record(pg_url.as_deref(), Some(&law_names), vec![sig_stage]).await;
                 Ok(())
             }

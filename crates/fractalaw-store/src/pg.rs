@@ -509,7 +509,15 @@ impl PgStore {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?;
-        Ok(crate::provision_store::LawDrrpInputs { provisions, signals })
+        let (substantive_provisions, duty_text_provisions): (i64, i64) = sqlx::query_as(
+            "SELECT count(*), count(*) FILTER (WHERE drrp_types && ARRAY['Obligation', 'Liberty']) \
+             FROM legislation_text WHERE law_name = $1 AND scope = 'substantive'",
+        )
+        .bind(law_name)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?;
+        Ok(crate::provision_store::LawDrrpInputs { provisions, signals, duty_text_provisions, substantive_provisions })
     }
 
     /// Query Part-level significance breakdown for large Acts.

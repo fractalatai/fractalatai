@@ -15,6 +15,13 @@ pub struct LawDrrpInputs {
     pub provisions: Vec<(String, Option<String>, Option<String>)>,
     /// (section_id, actor_label, drrp, extraction_method); a NULL method means reconcile hasn't run
     pub signals: Vec<(String, String, Option<String>, Option<String>)>,
+    /// Substantive (non-amendment) provisions that parse found duty text in
+    /// (`drrp_types` has Obligation or Liberty). Zero actors *and* zero duty
+    /// text is evidence of no obligations; zero actors with duty text is an
+    /// actor-model gap.
+    pub duty_text_provisions: i64,
+    /// Substantive (non-amendment) provisions
+    pub substantive_provisions: i64,
 }
 
 /// Provision data store — implemented by LanceStore and PgStore.
