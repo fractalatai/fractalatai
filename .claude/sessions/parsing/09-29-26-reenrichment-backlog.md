@@ -12,8 +12,12 @@ The first #62 hub sync (2026-09-27) flagged 422 laws `reparse_needed`: their tex
 
 ## Todo
 
-- ⬜ Build the backlog list: `lat_sync_state.reparse_needed` ∪ legal's `reenrichment-list.csv` (101) ∪ extent re-parse 4 (UK_ukpga_1990_16, UK_ukpga_1988_52, UK_ukpga_1993_11, UK_anaw_2017_2), minus laws legal discarded as not Making (lean LAT) and the benchmark laws (#65)
+- ⬜ Build the backlog list: `lat_sync_state.reparse_needed` ∪ legal's `reenrichment-list.csv` (101) ∪ extent re-parse sync 6 (UK_ukpga_1990_16, UK_ukpga_1988_52, UK_ukpga_1993_11, UK_anaw_2017_2, UK_ukpga_1989_14, UK_uksi_2000_3184 — the last is served by legal again after being archived as revoked), minus laws legal discarded as not Making (lean LAT) and the benchmark laws (#65)
 - ⬜ Prioritise with legal: Making laws in customer registers first; QQ tiers beyond Tier 0
+- ⬜ **Rename recovery first** (cheaper than recomputing SLM work). A bug meant the first #62 sync (2026-09-27) consumed none of legal's rename log: the naive `created_at` failed RFC 3339 parsing and was silently skipped (fixed 2026-09-29). Renamed rows were archived + re-inserted, so their actor rows sit in `lat_archive` (reason `removed`).
+  - For laws not re-enriched since (not Tier 0 or the live-fix 8), map archived old ids → new ids via legal's `lat-renames` (status `renamed`).
+  - Where the new row's text still matches (`match_key` equal), restore the archived actor/fitness rows onto the new id.
+  - Mark the law reparse_needed and record provenance.
 - ⬜ Run the pipeline in batches (customer-batch-parse): parse → dep → embed → classify → infer → reconcile → pod SLM (position/significance/fitness) → LLM tier (Gemini, fixed prompt, test batch of 10 then 50s) → hierarchy → backfill → fitness → verdict diff → Jason review → publish with provenance
 - ⬜ 6 Tier 0 actors still `pending_slm` (next pod)
 - ⬜ Audit the earlier corpus LLM labels (~2,449 `llm` actors) for the penalty-clause error fixed in `e7bc2ab`: find Obligation labels on offence/penalty text, clear, re-run with the fixed prompt
