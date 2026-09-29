@@ -137,6 +137,38 @@ pub struct ManifestEntry {
     pub lat_hash: String,
     /// Absent until legal serves it
     pub struct_hash: Option<String>,
+    /// `full` | `partial` (legal #166 scoped LAT); None = full
+    pub coverage: Option<String>,
+    /// Scope purposes, e.g. [`ENABLING_EXTENT`], [`RELEVANCE`]
+    pub scope_purposes: Vec<String>,
+    /// Raw scope JSON (`{fragments, purposes}`)
+    pub scope: Option<String>,
+}
+
+/// Scoped LAT purpose: a non-Making parent Act holds only the sections its SIs
+/// are made under, as extent evidence. Never triaged, enriched or Making.
+pub const ENABLING_EXTENT: &str = "enabling_extent";
+/// Scoped LAT purpose: the relevant Part(s) of a large Act; enriched in scope.
+pub const RELEVANCE: &str = "relevance";
+
+impl ManifestEntry {
+    pub fn is_partial(&self) -> bool {
+        self.coverage.as_deref() == Some("partial")
+    }
+
+    /// Extent evidence only: must not be triaged, enriched or given a verdict.
+    pub fn is_enabling_extent(&self) -> bool {
+        self.scope_purposes.iter().any(|p| p == ENABLING_EXTENT)
+    }
+}
+
+/// Purposes from a scope JSON value (`{"fragments": [...], "purposes": [...]}`).
+pub fn scope_purposes(scope: Option<&serde_json::Value>) -> Vec<String> {
+    scope
+        .and_then(|s| s.get("purposes"))
+        .and_then(|p| p.as_array())
+        .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_default()
 }
 
 /// Render one Arrow cell as the contract string: NULL → None, integers in
@@ -670,6 +702,20 @@ mod tests {
         let depth = STRUCT_COLUMNS.iter().position(|c| *c == "depth").unwrap();
         assert_eq!(s[0].1[depth].as_deref(), Some("2"));
         assert!(s[0].1.iter().enumerate().all(|(i, v)| i == depth || v.is_none()));
+    }
+
+    #[test]
+    fn scope_purposes_parse() {
+        let v: serde_json::Value =
+            serde_json::from_str(r#"{"fragments":["section/2"],"purposes":["enabling_extent"]}"#).unwrap();
+        let purposes = scope_purposes(Some(&v));
+        assert_eq!(purposes, vec!["enabling_extent"]);
+        let m = ManifestEntry {
+            law_name: "L".into(), row_count: 2, lat_hash: "h".into(), struct_hash: None,
+            coverage: Some("partial".into()), scope_purposes: purposes, scope: Some(v.to_string()),
+        };
+        assert!(m.is_partial() && m.is_enabling_extent());
+        assert!(scope_purposes(None).is_empty());
     }
 
     #[test]

@@ -35,6 +35,9 @@ pub struct LatSyncState {
     /// Text changed or rows inserted since the last parse
     pub reparse_needed: bool,
     pub applied_at: DateTime<Utc>,
+    /// Legal #166 scoped LAT: `full` | `partial` (None = full)
+    pub coverage: Option<String>,
+    pub scope_purposes: Vec<String>,
 }
 
 /// Tier data on a set of provisions. Diff-apply requires the carried rows'
@@ -77,6 +80,9 @@ CREATE TABLE IF NOT EXISTS lat_sync_state (
     reparse_needed    BOOLEAN NOT NULL DEFAULT false,
     applied_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS coverage TEXT;
+ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS scope_purposes TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS scope JSONB;
 CREATE TABLE IF NOT EXISTS lat_archive (
     id                BIGSERIAL PRIMARY KEY,
     law_name          TEXT NOT NULL,
@@ -133,7 +139,7 @@ impl PgStore {
     pub async fn lat_sync_states(&self) -> Result<HashMap<String, LatSyncState>, StoreError> {
         let rows = sqlx::query(
             "SELECT law_name, lat_hash, struct_hash, row_count, renames_through,
-                    held_section_ids, reparse_needed, applied_at
+                    held_section_ids, reparse_needed, applied_at, coverage, scope_purposes
              FROM lat_sync_state",
         )
         .fetch_all(self.pool())
@@ -151,10 +157,40 @@ impl PgStore {
                     held_section_ids: r.get(5),
                     reparse_needed: r.get(6),
                     applied_at: r.get(7),
+                    coverage: r.get(8),
+                    scope_purposes: r.get(9),
                 };
                 (s.law_name.clone(), s)
             })
             .collect())
+    }
+
+    /// Record a law's scope when it changed without a LAT change (in-sync laws).
+    pub async fn update_lat_coverage(&self, manifest: &ManifestEntry) -> Result<(), StoreError> {
+        sqlx::query(
+            "UPDATE lat_sync_state SET coverage = $2, scope_purposes = $3, scope = $4::jsonb
+             WHERE law_name = $1 AND (coverage IS DISTINCT FROM $2 OR scope_purposes IS DISTINCT FROM $3)",
+        )
+        .bind(&manifest.law_name)
+        .bind(&manifest.coverage)
+        .bind(&manifest.scope_purposes)
+        .bind(&manifest.scope)
+        .execute(self.pool())
+        .await
+        .map_err(db("update coverage"))?;
+        Ok(())
+    }
+
+    /// Laws whose LAT is `enabling_extent` extent evidence only (legal #166):
+    /// never triage, enrich, roll up or publish a verdict for them.
+    pub async fn enabling_extent_laws(&self) -> Result<std::collections::HashSet<String>, StoreError> {
+        let rows: Vec<(String,)> = sqlx::query_as(
+            "SELECT law_name FROM lat_sync_state WHERE 'enabling_extent' = ANY(scope_purposes)",
+        )
+        .fetch_all(self.pool())
+        .await
+        .map_err(db("enabling_extent laws"))?;
+        Ok(rows.into_iter().map(|(l,)| l).collect())
     }
 
     /// Distinct laws with LAT in the hub, with row counts.
@@ -306,11 +342,13 @@ impl PgStore {
 
         sqlx::query(
             "INSERT INTO lat_sync_state
-                (law_name, lat_hash, struct_hash, row_count, renames_through, held_section_ids, reparse_needed, applied_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+                (law_name, lat_hash, struct_hash, row_count, renames_through, held_section_ids, reparse_needed,
+                 coverage, scope_purposes, scope, applied_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, now())
              ON CONFLICT (law_name) DO UPDATE SET
                 lat_hash = EXCLUDED.lat_hash, struct_hash = EXCLUDED.struct_hash,
                 row_count = EXCLUDED.row_count,
+                coverage = EXCLUDED.coverage, scope_purposes = EXCLUDED.scope_purposes, scope = EXCLUDED.scope,
                 renames_through = COALESCE(EXCLUDED.renames_through, lat_sync_state.renames_through),
                 held_section_ids = EXCLUDED.held_section_ids,
                 reparse_needed = lat_sync_state.reparse_needed OR EXCLUDED.reparse_needed,
@@ -323,6 +361,9 @@ impl PgStore {
         .bind(renames_through)
         .bind(&plan.held)
         .bind(!plan.text_changed.is_empty() || !plan.grown.is_empty() || !plan.inserted.is_empty())
+        .bind(&manifest.coverage)
+        .bind(&manifest.scope_purposes)
+        .bind(&manifest.scope)
         .execute(&mut *tx)
         .await
         .map_err(db("lat_sync_state"))?;
@@ -496,7 +537,10 @@ mod tests {
 
     fn manifest(law: &str, legal: &[RecordBatch]) -> ManifestEntry {
         let rows = fractalaw_core::lat_sync::lat_rows_from_batches(legal).unwrap();
-        ManifestEntry { law_name: law.into(), row_count: rows.len() as u64, lat_hash: lat_hash(&rows), struct_hash: None }
+        ManifestEntry {
+            law_name: law.into(), row_count: rows.len() as u64, lat_hash: lat_hash(&rows), struct_hash: None,
+            coverage: None, scope_purposes: vec![], scope: None,
+        }
     }
 
     #[tokio::test]
@@ -599,6 +643,30 @@ mod tests {
         assert_eq!(s.archive_held_rows(law).await.unwrap(), 0, "idempotent");
         assert_eq!(s.restore_archived_law(law, "held_duplicate").await.unwrap(), 2);
         assert_eq!(actors_of(&s, &format!("{law}:reg.9")).await, 1);
+    }
+
+    #[tokio::test]
+    async fn scoped_coverage_recorded_and_enabling_extent_listed() {
+        let Some(s) = store().await else { eprintln!("test DB unavailable, skipping"); return };
+        let law = "TEST_lat_scoped";
+        seed(&s, law, &[("pt.1", "1", "PART I"), ("s.2", "2", "General implementation of Treaties")]).await;
+        let legal = vec![batch(law, &[("pt.1", "1", "PART I"), ("s.2", "2", "General implementation of Treaties")])];
+        let mut m = manifest(law, &legal);
+        m.coverage = Some("partial".into());
+        m.scope_purposes = vec!["enabling_extent".into()];
+        m.scope = Some(r#"{"fragments":["section/2"],"purposes":["enabling_extent"]}"#.into());
+        let plan = plan_diff(&s.hub_lat_rows(law).await.unwrap(),
+            &fractalaw_core::lat_sync::lat_rows_from_batches(&legal).unwrap(), &[]);
+        assert!(s.apply_lat_diff(law, &legal, &plan, &m, None).await.unwrap().committed);
+        let st = &s.lat_sync_states().await.unwrap()[law];
+        assert_eq!(st.coverage.as_deref(), Some("partial"));
+        assert!(s.enabling_extent_laws().await.unwrap().contains(law));
+        // Scope widened to full without a LAT change: recorded for in-sync laws
+        m.coverage = Some("full".into());
+        m.scope_purposes = vec![];
+        m.scope = None;
+        s.update_lat_coverage(&m).await.unwrap();
+        assert!(!s.enabling_extent_laws().await.unwrap().contains(law));
     }
 
     #[tokio::test]

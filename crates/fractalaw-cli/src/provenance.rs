@@ -92,3 +92,37 @@ mod tests {
         assert_eq!((s[1].family, s[1].model_version.as_deref()), (SIGNIFICANCE, Some(SIGNIFICANCE_ROLLUP_VERSION)));
     }
 }
+
+/// Drop laws whose LAT is legal #166 `enabling_extent` extent evidence: they
+/// are never triaged, enriched or given a verdict. Without the hub, unchanged.
+pub(crate) async fn without_enabling_extent(pg_url: Option<&str>, laws: Vec<String>) -> anyhow::Result<Vec<String>> {
+    let Some(url) = pg_url else { return Ok(laws) };
+    let pg = fractalaw_store::PgStore::connect(url).await?;
+    pg.ensure_lat_sync_tables().await?;
+    let scoped = pg.enabling_extent_laws().await?;
+    let (skip, keep): (Vec<String>, Vec<String>) = laws.into_iter().partition(|l| scoped.contains(l));
+    if !skip.is_empty() {
+        eprintln!("Skipping {} enabling_extent law(s) (extent evidence only, legal #166): {}", skip.len(), skip.join(", "));
+    }
+    Ok(keep)
+}
+
+/// Fitness commands: an explicit list is filtered; a whole-corpus run becomes
+/// every hub law except `enabling_extent` ones (when there are any).
+pub(crate) async fn fitness_scope(pg_url: Option<&str>, laws: Option<Vec<String>>) -> anyhow::Result<Option<Vec<String>>> {
+    match laws {
+        Some(l) => Ok(Some(without_enabling_extent(pg_url, l).await?)),
+        None => {
+            let Some(url) = pg_url else { return Ok(None) };
+            let pg = fractalaw_store::PgStore::connect(url).await?;
+            pg.ensure_lat_sync_tables().await?;
+            let scoped = pg.enabling_extent_laws().await?;
+            if scoped.is_empty() {
+                return Ok(None);
+            }
+            let all = pg.hub_law_names().await?;
+            eprintln!("Excluding {} enabling_extent law(s) from the whole-corpus run (legal #166)", scoped.len());
+            Ok(Some(all.into_iter().filter(|l| !scoped.contains(l)).collect()))
+        }
+    }
+}

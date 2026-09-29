@@ -82,6 +82,24 @@ pub struct LatManifestEntry {
     pub struct_hash: Option<String>,
     #[serde(default)]
     pub updated_at: Option<String>,
+    /// `full` | `partial` (legal #166 scoped LAT)
+    #[serde(default)]
+    pub coverage: Option<String>,
+    /// `{fragments, purposes}` for a scoped law; null otherwise. Legal may send
+    /// it as a JSON object or as a JSON-encoded string.
+    #[serde(default)]
+    pub scope: Option<serde_json::Value>,
+}
+
+impl LatManifestEntry {
+    /// The scope as a JSON object, decoding a JSON-string encoding if needed.
+    pub fn scope_value(&self) -> Option<serde_json::Value> {
+        match &self.scope {
+            Some(serde_json::Value::String(s)) => serde_json::from_str(s).ok(),
+            Some(serde_json::Value::Null) | None => None,
+            Some(v) => Some(v.clone()),
+        }
+    }
 }
 
 /// One entry of legal's section_id rename log (fractalatai #62).

@@ -157,6 +157,11 @@ pub(crate) async fn cmd_sync_publish(
         );
     };
 
+    let law_names = crate::lat_sync::publishable(prov_pg.as_ref(), law_names).await?;
+    let lat_states = match &prov_pg {
+        Some(pg) => pg.lat_sync_states().await?,
+        None => Default::default(),
+    };
     if law_names.is_empty() {
         println!("No laws with taxa data to publish.");
         return Ok(());
@@ -224,7 +229,13 @@ pub(crate) async fn cmd_sync_publish(
         if let Some(pg) = &prov_pg {
             let records = pg.stage_records(law_name).await?;
             let counts = pg.provision_method_counts(law_name).await?;
-            let entries = fractalaw_core::provenance::build_entries(families, &records, &counts);
+            let mut entries = fractalaw_core::provenance::build_entries(families, &records, &counts);
+            // Scoped LAT (legal #166): the families read part of the law, so the verdict is scope-relative
+            if let Some(st) = lat_states.get(law_name).filter(|st| st.coverage.as_deref() == Some("partial")) {
+                for e in entries.as_array_mut().into_iter().flatten() {
+                    e["lat_coverage"] = serde_json::json!({"coverage": "partial", "purposes": st.scope_purposes});
+                }
+            }
             if entries.as_array().is_some_and(|a| !a.is_empty()) {
                 batches = with_provenance(&batches, &entries.to_string())?;
             }
@@ -376,6 +387,11 @@ pub(crate) async fn cmd_sync_publish_provisions(
         );
     };
 
+    let prov_filter_pg = match pg_url {
+        Some(url) => Some(fractalaw_store::PgStore::connect(url).await.context("connecting to PostgreSQL")?),
+        None => None,
+    };
+    let law_names = crate::lat_sync::publishable(prov_filter_pg.as_ref(), law_names).await?;
     if law_names.is_empty() {
         println!("No laws with taxa data to publish.");
         return Ok(());
@@ -1359,6 +1375,11 @@ pub(crate) async fn cmd_sync_watch(
                                 eprint!(" → {} ({} provisions)", if o.action == crate::lat_sync::Action::Applied { "applied" } else { "in sync" }, o.legal_rows);
                                 total_lat_pulls += 1;
                                 total_rows += o.legal_rows as usize;
+                                if manifest.as_ref().is_some_and(|m| m.is_enabling_extent()) {
+                                    // Extent evidence only (legal #166): no triage, publish or queueing
+                                    eprintln!(" → enabling_extent: synced only");
+                                    continue;
+                                }
                                 o.legal_rows as usize
                             }
                             crate::lat_sync::Action::Planned => {

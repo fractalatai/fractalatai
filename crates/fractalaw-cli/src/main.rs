@@ -547,16 +547,22 @@ async fn main() -> anyhow::Result<()> {
             }
             TaxaAction::Infer { laws } => {
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
-                let law_names: Vec<String> =
-                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                let law_names = provenance::without_enabling_extent(
+                    pg_url.as_deref(),
+                    laws.split(',').map(|s| s.trim().to_string()).collect(),
+                )
+                .await?;
                 let r = cmd_taxa_infer(lance.as_ref(), &law_names).await;
                 if r.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_infer()).await; }
                 r
             }
             TaxaAction::Reconcile { laws } => {
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
-                let law_names: Vec<String> =
-                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                let law_names = provenance::without_enabling_extent(
+                    pg_url.as_deref(),
+                    laws.split(',').map(|s| s.trim().to_string()).collect(),
+                )
+                .await?;
                 let r = cmd_taxa_reconcile(lance.as_ref(), &law_names).await;
                 if r.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_reconcile()).await; }
                 r
@@ -564,8 +570,11 @@ async fn main() -> anyhow::Result<()> {
             TaxaAction::Backfill { laws } => {
                 let store = open_duck(&data_dir)?;
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
-                let law_names: Vec<String> =
-                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                let law_names = provenance::without_enabling_extent(
+                    pg_url.as_deref(),
+                    laws.split(',').map(|s| s.trim().to_string()).collect(),
+                )
+                .await?;
                 let mut total = 0usize;
                 let mut sig_total = 0usize;
                 let mut parts_total = 0usize;
@@ -696,8 +705,11 @@ async fn main() -> anyhow::Result<()> {
             }
             TaxaAction::Slm { laws } => {
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
-                let law_names: Vec<String> =
-                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                let law_names = provenance::without_enabling_extent(
+                    pg_url.as_deref(),
+                    laws.split(',').map(|s| s.trim().to_string()).collect(),
+                )
+                .await?;
                 let r = cmd_taxa_slm(lance.as_ref(), &law_names).await;
                 if r.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_slm()).await; }
                 r
@@ -710,8 +722,11 @@ async fn main() -> anyhow::Result<()> {
             TaxaAction::Parse { laws, force, trace } => {
                 let store = open_duck(&data_dir)?;
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
-                let law_names: Vec<String> =
-                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                let law_names = provenance::without_enabling_extent(
+                    pg_url.as_deref(),
+                    laws.split(',').map(|s| s.trim().to_string()).collect(),
+                )
+                .await?;
                 cmd_taxa_parse(lance.as_ref(), &store, &law_names, force).await?;
                 provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_parse()).await;
                 if let Some(trace_path) = trace {
@@ -723,8 +738,11 @@ async fn main() -> anyhow::Result<()> {
                 let store = open_duck(&data_dir)?;
                 store.ensure_pipeline_status_columns()?;
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
-                let law_names: Vec<String> =
-                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                let law_names = provenance::without_enabling_extent(
+                    pg_url.as_deref(),
+                    laws.split(',').map(|s| s.trim().to_string()).collect(),
+                )
+                .await?;
                 let result = cmd_taxa_embed(lance.as_ref(), &law_names).await;
                 if result.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_embed()).await; }
                 for name in &law_names {
@@ -739,8 +757,11 @@ async fn main() -> anyhow::Result<()> {
                 let store = open_duck(&data_dir)?;
                 store.ensure_pipeline_status_columns()?;
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
-                let law_names: Vec<String> =
-                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                let law_names = provenance::without_enabling_extent(
+                    pg_url.as_deref(),
+                    laws.split(',').map(|s| s.trim().to_string()).collect(),
+                )
+                .await?;
                 let result = cmd_taxa_classify(lance.as_ref(), &law_names).await;
                 if result.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_classify()).await; }
                 for name in &law_names {
@@ -754,8 +775,11 @@ async fn main() -> anyhow::Result<()> {
             TaxaAction::Escalate { laws } => {
                 let store = open_duck(&data_dir)?;
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
-                let law_names: Vec<String> =
-                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                let law_names = provenance::without_enabling_extent(
+                    pg_url.as_deref(),
+                    laws.split(',').map(|s| s.trim().to_string()).collect(),
+                )
+                .await?;
                 let r = cmd_taxa_escalate(lance.as_ref(), &store, &law_names).await;
                 if r.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_escalate()).await; }
                 r
@@ -769,8 +793,11 @@ async fn main() -> anyhow::Result<()> {
                 let store = open_duck(&data_dir)?;
                 store.ensure_pipeline_status_columns()?;
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
-                let law_names: Vec<String> =
-                    laws.split(',').map(|s| s.trim().to_string()).collect();
+                let law_names = provenance::without_enabling_extent(
+                    pg_url.as_deref(),
+                    laws.split(',').map(|s| s.trim().to_string()).collect(),
+                )
+                .await?;
                 let result = cmd_taxa_validate(lance.as_ref(), &store, &law_names, &audit_dir, dry_run, apply).await;
                 if result.is_ok() && apply && !dry_run {
                     provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_validate()).await;
@@ -816,6 +843,7 @@ async fn main() -> anyhow::Result<()> {
                     .as_deref()
                     .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
+                let law_names = provenance::fitness_scope(Some(pg_url), law_names).await?;
                 let duck = open_duck(&data_dir)?;
                 let r = commands::fitness::cmd_fitness_extract(pg_url, &duck, law_names.as_deref(), force).await;
                 if r.is_ok() { provenance::record(Some(pg_url), law_names.as_deref(), provenance::fitness_extract()).await; }
@@ -833,6 +861,7 @@ async fn main() -> anyhow::Result<()> {
                     .as_deref()
                     .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
+                let law_names = provenance::fitness_scope(Some(pg_url), law_names).await?;
                 let r = commands::fitness::cmd_fitness_reconcile(pg_url, law_names.as_deref(), dry_run).await;
                 if r.is_ok() && !dry_run { provenance::record(Some(pg_url), law_names.as_deref(), provenance::fitness_reconcile()).await; }
                 r
@@ -842,6 +871,7 @@ async fn main() -> anyhow::Result<()> {
                     .as_deref()
                     .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
+                let law_names = provenance::fitness_scope(Some(pg_url), law_names).await?;
                 let duck = open_duck(&data_dir)?;
                 let r = commands::fitness::cmd_fitness_application(pg_url, &duck, law_names.as_deref(), out.as_deref()).await;
                 // --out writes JSONL for review, not DuckDB: nothing enriched
@@ -853,6 +883,7 @@ async fn main() -> anyhow::Result<()> {
                     .as_deref()
                     .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
+                let law_names = provenance::fitness_scope(Some(pg_url), law_names).await?;
                 let duck = open_duck(&data_dir)?;
                 let r = commands::fitness::cmd_fitness_compile(pg_url, &duck, law_names.as_deref(), out.as_deref()).await;
                 if r.is_ok() && out.is_none() { provenance::record(Some(pg_url), law_names.as_deref(), provenance::fitness_compile()).await; }

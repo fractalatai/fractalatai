@@ -93,11 +93,15 @@ impl LawOutcome {
 }
 
 pub(crate) fn manifest_entry(m: &LatManifestEntry) -> ManifestEntry {
+    let scope = m.scope_value();
     ManifestEntry {
         law_name: m.law_name.clone(),
         row_count: m.row_count,
         lat_hash: m.lat_hash.clone(),
         struct_hash: m.struct_hash.clone(),
+        coverage: m.coverage.clone(),
+        scope_purposes: lat_sync::scope_purposes(scope.as_ref()),
+        scope: scope.map(|s| s.to_string()),
     }
 }
 
@@ -144,6 +148,8 @@ pub(crate) async fn sync_law(
         return Ok(LawOutcome::new(law, action, hub_rows, 0));
     };
     if in_sync(state, m) {
+        // Scope can change without the LAT changing (legal #166)
+        pg.update_lat_coverage(m).await?;
         return Ok(LawOutcome::new(law, Action::InSync, hub_rows, m.row_count));
     }
 
@@ -485,6 +491,19 @@ pub(crate) async fn cmd_pull_lat(
     );
     let outcomes = run_pass(&pg, &sync, &benchmarks, &laws, &manifest, opts).await?;
     report_pass(data_dir, &sync, &duck, &outcomes, opts.timeout).await
+}
+
+/// Drop `enabling_extent` laws (legal #166 extent evidence) from a publish:
+/// they never carry a verdict, trees or provisions for enrichment.
+pub(crate) async fn publishable(pg: Option<&PgStore>, laws: Vec<String>) -> anyhow::Result<Vec<String>> {
+    let Some(pg) = pg else { return Ok(laws) };
+    pg.ensure_lat_sync_tables().await?;
+    let scoped = pg.enabling_extent_laws().await?;
+    let (skip, keep): (Vec<String>, Vec<String>) = laws.into_iter().partition(|l| scoped.contains(l));
+    if !skip.is_empty() {
+        println!("Skipping {} enabling_extent law(s) (legal #166): {}", skip.len(), skip.join(", "));
+    }
+    Ok(keep)
 }
 
 /// Archive approved laws legal no longer holds (reversible).
