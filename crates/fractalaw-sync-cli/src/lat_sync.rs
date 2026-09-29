@@ -115,6 +115,18 @@ pub(crate) fn benchmark_laws(duck: &DuckStore) -> anyhow::Result<HashSet<String>
     Ok(out)
 }
 
+/// Legal's timestamps: RFC 3339, or naive (`timestamp without time zone`,
+/// written in UTC), e.g. `2026-09-26T20:58:17.472603`.
+pub(crate) fn parse_legal_timestamp(s: &str) -> Option<DateTime<Utc>> {
+    if let Ok(d) = DateTime::parse_from_rfc3339(s) {
+        return Some(d.with_timezone(&Utc));
+    }
+    ["%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%d %H:%M:%S%.f"]
+        .iter()
+        .find_map(|f| chrono::NaiveDateTime::parse_from_str(s, f).ok())
+        .map(|n| n.and_utc())
+}
+
 /// Pull, verify and plan one law; apply when asked. Never removes a law.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn sync_law(
@@ -155,9 +167,9 @@ pub(crate) async fn sync_law(
     let mut renames = Vec::new();
     let mut renames_through = since;
     for r in sync.query_lat_renames(law, timeout).await.with_context(|| format!("query renames {law}"))? {
-        let Ok(at) = DateTime::parse_from_rfc3339(&r.created_at).map(|d| d.with_timezone(&Utc)) else {
-            continue;
-        };
+        // Never skip silently: a dropped rename loses the tier data it would carry
+        let at = parse_legal_timestamp(&r.created_at)
+            .with_context(|| format!("{law}: unparseable rename created_at {:?}", r.created_at))?;
         if since.is_some_and(|s| at <= s) {
             continue;
         }
@@ -556,6 +568,15 @@ mod tests {
         assert_eq!(delete_verdict(Some("✔ In force"), Some(&d("in_force", false, 0, None))), "legal_gap_in_force");
         // Legal has no record (e.g. regnal-year duplicate)
         assert_eq!(delete_verdict(None, None), "unknown_to_legal");
+    }
+
+    #[test]
+    fn legal_timestamps_parse() {
+        let naive = parse_legal_timestamp("2026-09-26T20:58:17.472603").unwrap();
+        assert_eq!(naive.to_rfc3339(), "2026-09-26T20:58:17.472603+00:00");
+        assert!(parse_legal_timestamp("2026-09-26 20:58:17").is_some());
+        assert_eq!(parse_legal_timestamp("2026-09-26T20:58:17Z").unwrap(), parse_legal_timestamp("2026-09-26T20:58:17").unwrap());
+        assert!(parse_legal_timestamp("not a date").is_none());
     }
 
     #[test]
