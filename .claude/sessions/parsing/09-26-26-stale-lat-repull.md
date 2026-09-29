@@ -1,10 +1,22 @@
 ---
 session: Stale LAT Re-pull
-status: suspended
+status: closed
 opened: 2026-09-26
+closed: 2026-09-29
+outcome: superseded
+
+summary: >
+  Found that "unsplit" articles (#61) were stale, older-generation LAT in the hub: 345/802 laws were missing legal text.
+  Suspended in favour of #62 (robust LAT sync), whose first run and follow-up work did the re-pull, pilot, roll-out and
+  held-downgrade re-check. See 09-26-26-robust-lat-sync.md.
+
+depends_on:
+  - 09-26-26-actor-model-gaps.md
+enables:
+  - 09-26-26-robust-lat-sync.md
 ---
 
-# Session: Stale LAT Re-pull (SUSPENDED)
+# Session: Stale LAT Re-pull (CLOSED — superseded by #62)
 
 ## Suspended (2026-09-26)
 

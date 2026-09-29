@@ -56,7 +56,17 @@ A law the hub holds that legal serves no LAT for is a **delete candidate**. **Be
    - `unknown_to_legal`: legal has no LRT row (e.g. a regnal-year duplicate of a modern-named law).
 2. **Agent review** for `needs_review` and `unknown_to_legal` (spawn an agent per batch). For each law:
    - Read the LRT audit trail first, in DuckDB `legislation`: `status`, `status_conflict_detail`, `rescinded_by` (names, dates), `latest_rescind_date`, `amended_by`. Check whether the revoking instruments revoke the whole law or part of it, and whether they're in force.
-   - Only if that's inconclusive, check the source: legislation.gov.uk `https://www.legislation.gov.uk/{type}/{year}/{number}/contents` (status banner, "revoked by" annotations).
+   - Only if that's inconclusive, check the source. Use **legislation.gov.uk's changes table** (`https://www.legislation.gov.uk/changes/affected/{type}/{year}/{number}`), the one legal reads. `data.xml` effects are incomplete: GPSR 1994's revocation is only in the changes table.
+     - A whole-instrument revoked/repealed row counts **whether or not it has been applied**: legislation.gov.uk is often years behind in applying effects.
+     - **Not whole revocations:** commencement rows ("appointed day for spec. repeals"); revocations whose extent is only part of the UK (e.g. Scotland-only repeal, E+W-only revocation); revocations with savings (note them).
+     - Titles marked "(revoked)" / "(repealed)" confirm an applied whole revocation.
+     - **Matching rules** (from legal's `ChangesFeed`/`LiveStatus.whole?`, 2026-09-28; the feed is `/changes/affected/{type}/{year}/{number}/data.feed`):
+       - Any revocation type counts: `rev`, `rep`, `revoked`, `repealed`, `revoked (with savings)`, `revoked in so far as not already revoked`, …
+       - Not whole, and not UK: `partial repeal`, `revoked in part`/`in pt`, overseas types such as `revoked (Pitcairn)`.
+       - Blank `AffectedProvisions` = the whole instrument, as are "Regulations"/"Act"/"Order", and for EU law "Regulation"/"Directive"/"Decision".
+       - `Applied="false"` still counts: a revocation not yet worked into the text.
+       - `AffectingEffectsExtent="S+A+M+E+A+S+A+F+F+E+C+T+E+D"` means *same as affected*. Don't parse it as regions.
+     - Once legal's status fix has covered a law, its `live_evidence` JSONB already carries the decision (kind `revoked`/`revoked_unapplied`/`territorial`/`part_revoked`, with_savings, revokers, regions). Prefer reading that to re-deriving it.
    - Regnal-year names: find the modern-named law in legal (`legal_register`, read-only) and mark it `duplicate_of:<name>`.
    - Write `data/lat-sync/delete_review_<ts>.csv` with columns `law,verdict,evidence,source`. The verdict is one of `revoked` | `keep` | `legal_gap` | `duplicate_of:<law>`.
 3. **Jason approves** the list: `verified_revoked` plus agent-confirmed `revoked`/`duplicate_of`.
@@ -68,3 +78,20 @@ A law the hub holds that legal serves no LAT for is a **delete candidate**. **Be
 - Removed and changed rows are always archived (`lat_archive`, JSONB snapshots), never hard-deleted.
 - An empty manifest (legal server restarting) aborts the pass rather than treating every law as a delete candidate.
 - Without `--pg` (LanceDB edge), `pull-lat --laws` keeps the old plain upsert.
+
+## Tests
+
+The store tests (`cargo test -p fractalaw-store --features pg pg_lat_sync pg_provenance`) run against a scratch database, **never the hub**. They skip if it's missing. To recreate it (schema + three real laws):
+
+```bash
+export PGPASSWORD=fractalaw; P="-h localhost -p 5433 -U fractalaw"
+psql $P fractalaw -c "create database fractalaw_lat_test"
+pg_dump $P --schema-only --no-owner fractalaw | psql $P -q fractalaw_lat_test
+LAWS="'UK_ssi_2016_88','UK_uksi_2016_614','UK_wsi_2021_77'"
+for t in legislation_text provision_actors fitness_mentions; do
+  W=$([ $t = legislation_text ] && echo "law_name in ($LAWS)" || echo "section_id in (select section_id from legislation_text where law_name in ($LAWS))")
+  psql $P fractalaw -c "\\copy (select * from $t where $W) to '/tmp/$t.copy'"
+  psql $P fractalaw_lat_test -c "\\copy $t from '/tmp/$t.copy'"
+done
+```
+

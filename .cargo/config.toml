@@ -6,4 +6,4 @@
 [env]
 CXX = "ccache /home/linuxbrew/.linuxbrew/bin/g++"
 CC = "ccache /home/linuxbrew/.linuxbrew/bin/gcc"
-LIBRARY_PATH = "/home/linuxbrew/.linuxbrew/Cellar/gcc/15.2.0_1/lib/gcc/15"
+LIBRARY_PATH = "/home/linuxbrew/.linuxbrew/opt/gcc/lib/gcc/current"
