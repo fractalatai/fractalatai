@@ -407,6 +407,7 @@ impl PgStore {
                  jsonb_agg(jsonb_build_object( \
                    'label', pa.actor_label, \
                    'position', pa.position, \
+                   'drrp', pa.drrp, \
                    'label_source', 'canonical', \
                    'reason', pa.extraction_method, \
                    'relates_to', null \
