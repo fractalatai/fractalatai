@@ -210,8 +210,40 @@ pub(crate) async fn cmd_taxa_infer(
                 .push((label.clone(), category.clone(), drrp.clone(), pos.clone()));
         }
 
-        // Apply rules
-        let inferred = fractalaw_core::taxa::correlatives::apply_rules(&rules, &by_section);
+        // Apply rules, then implied access rights (#67). Access rights come
+        // last so they win over a correlative non-active inference for the same actor.
+        let mut inferred = fractalaw_core::taxa::correlatives::apply_rules(&rules, &by_section);
+        let texts: std::collections::HashMap<String, String> = lance
+            .query_law_drrp_inputs(law_name)
+            .await?
+            .provisions
+            .into_iter()
+            .filter(|(_, _, scope)| scope.as_deref() != Some("amendment"))
+            .filter_map(|(sid, text, _)| text.map(|t| (sid, t)))
+            .collect();
+        // The access rule reads each actor's best signal (what reconcile would
+        // choose without inference), not the raw regex tier: duties are often
+        // SLM-only, and regex positions are often corrected by later tiers.
+        let mut best_by_section: std::collections::HashMap<
+            String,
+            Vec<(String, String, Option<String>, Option<String>)>,
+        > = std::collections::HashMap::new();
+        let category: std::collections::HashMap<(&str, &str), &str> = actors
+            .iter()
+            .map(|(sid, label, cat, _, _)| ((sid.as_str(), label.as_str()), cat.as_str()))
+            .collect();
+        for (sid, label, regex_drrp, regex_pos, _cd, cls_pos, cls_conf, _idrrp, _ipos, slm_drrp, slm_pos, slm_conf, llm_drrp, llm_pos)
+            in lance.query_all_actor_signals(law_name).await?
+        {
+            let drrp = reconcile_drrp(&regex_drrp, &slm_drrp, &llm_drrp, &None, &None);
+            let pos = reconcile_position(&regex_pos, &cls_pos, &cls_conf, &None, &slm_pos, &slm_conf, &llm_pos)
+                .map(|(p, _, _)| p);
+            let cat = category.get(&(sid.as_str(), label.as_str())).copied().unwrap_or("").to_string();
+            best_by_section.entry(sid.clone()).or_default().push((label, cat, drrp, pos));
+        }
+        let access = fractalaw_core::taxa::correlatives::infer_access_rights(&texts, &best_by_section);
+        *rule_counts.entry("implied Liberty (access, #67)".to_string()).or_default() += access.len();
+        inferred.extend(access);
 
         if inferred.is_empty() {
             continue;
@@ -303,14 +335,22 @@ fn reconcile_position(
     }
 }
 
-/// Reconcile DRRP type from multi-tier signals: LLM > SLM > regex.
+/// Reconcile DRRP type from multi-tier signals: LLM > inferred-active > SLM > regex.
+///
+/// An inferred DRRP counts only when the inference also makes the actor
+/// active: implied rights (#67) give a counterparty/beneficiary its own Liberty.
+/// Correlative rules that infer non-active positions don't change the DRRP.
 fn reconcile_drrp(
     regex_drrp: &Option<String>,
     slm_drrp: &Option<String>,
     llm_drrp: &Option<String>,
+    inferred_drrp: &Option<String>,
+    inferred_pos: &Option<String>,
 ) -> Option<String> {
     if llm_drrp.is_some() {
         llm_drrp.clone()
+    } else if inferred_drrp.is_some() && inferred_pos.as_deref() == Some("active") {
+        inferred_drrp.clone()
     } else if slm_drrp.is_some() {
         slm_drrp.clone()
     } else {
@@ -337,10 +377,10 @@ pub(crate) async fn cmd_taxa_reconcile(
         let mut updates: Vec<(String, String, Option<String>, String, String, String)> = Vec::new();
 
         for (sid, label, regex_drrp, regex_pos, _cls_drrp, cls_pos, cls_conf,
-             _inferred_drrp, inferred_pos, slm_drrp, slm_pos, slm_conf,
+             inferred_drrp, inferred_pos, slm_drrp, slm_pos, slm_conf,
              llm_drrp, llm_pos) in &signals
         {
-            let final_drrp = reconcile_drrp(regex_drrp, slm_drrp, llm_drrp);
+            let final_drrp = reconcile_drrp(regex_drrp, slm_drrp, llm_drrp, inferred_drrp, inferred_pos);
 
             let Some((final_pos, method, confidence)) = reconcile_position(
                 regex_pos, cls_pos, cls_conf, inferred_pos, slm_pos, slm_conf, llm_pos,
@@ -3961,7 +4001,7 @@ mod tests {
     #[test]
     fn drrp_llm_wins() {
         assert_eq!(
-            reconcile_drrp(&s("Obligation"), &s("Liberty"), &s("Power")),
+            reconcile_drrp(&s("Obligation"), &s("Liberty"), &s("Power"), &None, &None),
             s("Power")
         );
     }
@@ -3969,7 +4009,7 @@ mod tests {
     #[test]
     fn drrp_slm_wins_over_regex() {
         assert_eq!(
-            reconcile_drrp(&s("Obligation"), &s("Liberty"), &None),
+            reconcile_drrp(&s("Obligation"), &s("Liberty"), &None, &None, &None),
             s("Liberty")
         );
     }
@@ -3977,13 +4017,23 @@ mod tests {
     #[test]
     fn drrp_falls_back_to_regex() {
         assert_eq!(
-            reconcile_drrp(&s("Obligation"), &None, &None),
+            reconcile_drrp(&s("Obligation"), &None, &None, &None, &None),
             s("Obligation")
         );
     }
 
     #[test]
     fn drrp_all_none() {
-        assert_eq!(reconcile_drrp(&None, &None, &None), None);
+        assert_eq!(reconcile_drrp(&None, &None, &None, &None, &None), None);
+    }
+
+    #[test]
+    fn drrp_inferred_active_beats_slm_and_regex_not_llm() {
+        // Implied right (#67): public inferred Liberty/active over its Obligation reading
+        let inf = (s("Liberty"), s("active"));
+        assert_eq!(reconcile_drrp(&s("Obligation"), &s("Obligation"), &None, &inf.0, &inf.1), s("Liberty"));
+        assert_eq!(reconcile_drrp(&s("Obligation"), &None, &s("none"), &inf.0, &inf.1), s("none"));
+        // Non-active inference (correlative counterparty) leaves the DRRP alone
+        assert_eq!(reconcile_drrp(&s("Obligation"), &None, &None, &s("Liberty"), &s("counterparty")), s("Obligation"));
     }
 }
