@@ -396,6 +396,11 @@ impl PgStore {
 
     /// Backfill legislation_text.actors, drrp_types, extraction_method
     /// from reconciled provision_actors data for a given law.
+    ///
+    /// `drrp_types` is the union of the **active** actors' own types (legal
+    /// types DRRP per active actor, #67); a counterparty's Obligation reading
+    /// must not add an Obligation no active actor holds. Falls back to all
+    /// actors' types only when no actor is active.
     pub async fn backfill_from_actors(&self, law_name: &str) -> Result<usize, StoreError> {
         let result = sqlx::query(
             "UPDATE legislation_text lt SET \
@@ -412,9 +417,14 @@ impl PgStore {
                    'reason', pa.extraction_method, \
                    'relates_to', null \
                  )) AS actors_json, \
-                 ARRAY(SELECT DISTINCT unnest FROM unnest( \
-                   ARRAY_AGG(pa.drrp) FILTER (WHERE pa.drrp IS NOT NULL) \
-                 )) AS drrp_arr, \
+                 COALESCE( \
+                   NULLIF(ARRAY(SELECT DISTINCT unnest FROM unnest( \
+                     ARRAY_AGG(pa.drrp) FILTER (WHERE pa.drrp IS NOT NULL AND pa.position = 'active') \
+                   )), '{}'), \
+                   ARRAY(SELECT DISTINCT unnest FROM unnest( \
+                     ARRAY_AGG(pa.drrp) FILTER (WHERE pa.drrp IS NOT NULL) \
+                   )) \
+                 ) AS drrp_arr, \
                  CASE \
                    WHEN bool_or(pa.extraction_method = 'llm') THEN 'llm' \
                    WHEN bool_or(pa.extraction_method LIKE 'reconciled%') THEN 'reconciled' \
