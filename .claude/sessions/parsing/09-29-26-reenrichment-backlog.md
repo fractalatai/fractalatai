@@ -13,6 +13,10 @@ The first #62 hub sync (2026-09-27) flagged 422 laws `reparse_needed`: their tex
 ## Todo
 
 - ⬜ Build the backlog list: `lat_sync_state.reparse_needed` ∪ legal's `reenrichment-list.csv` (101) ∪ extent re-parse sync 6 (UK_ukpga_1990_16, UK_ukpga_1988_52, UK_ukpga_1993_11, UK_anaw_2017_2, UK_ukpga_1989_14, UK_uksi_2000_3184 — the last is served by legal again after being archived as revoked), minus laws legal discarded as not Making (lean LAT) and the benchmark laws (#65)
+- ⬜ From legal's Tier 1 writes (2026-09-29):
+  - **Re-enrich** after the Tier 1 sync (applied 2026-09-29, 26 hub laws; 136 renames from legal's log, 13,763 actors carried): UK_ukpga_2023_55, UK_ukpga_1996_18, UK_ukpga_1991_22, UK_ukpga_2008_29 (reparse_needed).
+  - **24 Making Acts newly parsed with full LAT** (31,264 rows), candidates for full enrichment when Jason schedules it: UK_anaw_2017_3, UK_asc_2023_2, UK_asp_2002_3, UK_asp_2003_3, UK_asp_2005_15, UK_asp_2005_3, UK_asp_2009_6, UK_asp_2011_9, UK_asp_2024_13, UK_ukpga_1967_8, UK_ukpga_1973_26, UK_ukpga_1987_53, UK_ukpga_1991_46, UK_ukpga_1995_21, UK_ukpga_1995_23, UK_ukpga_1996_8, UK_ukpga_1997_28, UK_ukpga_1999_29, UK_ukpga_2002_40, UK_ukpga_2004_18, UK_ukpga_2021_26, UK_ukpga_2023_52, UK_ukpga_2023_6, UK_ukpga_2025_5.
+  - **89 non-Making Acts with scoped `enabling_extent` LAT** (7,556 rows): never triage, enrich or derive Making from them (needs the scoped-LAT handling first).
 - ⬜ Prioritise with legal: Making laws in customer registers first; QQ tiers beyond Tier 0
 - ⬜ **Rename recovery first** (cheaper than recomputing SLM work). A bug meant the first #62 sync (2026-09-27) consumed none of legal's rename log: the naive `created_at` failed RFC 3339 parsing and was silently skipped (fixed 2026-09-29). Renamed rows were archived + re-inserted, so their actor rows sit in `lat_archive` (reason `removed`).
   - For laws not re-enriched since (not Tier 0 or the live-fix 8), map archived old ids → new ids via legal's `lat-renames` (status `renamed`).
