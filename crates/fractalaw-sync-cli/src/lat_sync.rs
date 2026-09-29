@@ -28,7 +28,7 @@ use crate::{get_string_value, open_duck, ZenohArgs};
 /// (`not_in_legal`), revoked by an effect legislation.gov.uk hasn't yet applied
 /// to the text (`revoked_unapplied`), or deliberately discarded by legal after
 /// enrichment found them not Making (`not_making`; legal archives its own copy too).
-pub(crate) const ARCHIVE_REASONS: &[&str] = &["not_in_legal", "revoked_unapplied", "not_making"];
+pub(crate) const ARCHIVE_REASONS: &[&str] = &["not_in_legal", "revoked_unapplied", "not_making", "held_duplicate"];
 
 pub(crate) struct PullLatOpts {
     pub laws: Option<Vec<String>>,
@@ -503,6 +503,24 @@ pub(crate) async fn cmd_archive_laws(
             eprintln!("  {law}: archived {n} rows (restore with --restore-laws)");
         }
     }
+    Ok(())
+}
+
+/// Archive every law's held rows (ambiguous matches left by diff-apply) as
+/// `held_duplicate`; their text already exists under legal's current ids.
+pub(crate) async fn cmd_archive_held(pg_url: Option<&str>) -> anyhow::Result<()> {
+    let pg = open_pg(pg_url).await?;
+    let (mut laws, mut rows) = (0usize, 0u64);
+    for (law, st) in pg.lat_sync_states().await? {
+        if st.held_section_ids.is_empty() {
+            continue;
+        }
+        let n = pg.archive_held_rows(&law).await?;
+        eprintln!("  {law}: archived {n} held rows");
+        laws += 1;
+        rows += n;
+    }
+    println!("Archived {rows} held rows across {laws} laws (restore: --restore-laws <law> --archive-reason held_duplicate)");
     Ok(())
 }
 

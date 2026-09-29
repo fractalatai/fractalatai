@@ -367,6 +367,39 @@ impl PgStore {
         Ok(n)
     }
 
+    /// Archive a law's held rows (ambiguous matches left by diff-apply) with
+    /// their child tier rows, remove them, and clear the held list. Reversible
+    /// with [`Self::restore_archived_law`] (reason `held_duplicate`).
+    pub async fn archive_held_rows(&self, law_name: &str) -> Result<u64, StoreError> {
+        let mut tx = self.pool().begin().await.map_err(db("begin"))?;
+        let held: Option<Vec<String>> =
+            sqlx::query_scalar("SELECT held_section_ids FROM lat_sync_state WHERE law_name = $1")
+                .bind(law_name)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(db("held ids"))?;
+        let Some(held) = held.filter(|h| !h.is_empty()) else { return Ok(0) };
+        let n = sqlx::query(ARCHIVE_SQL)
+            .bind(&held)
+            .bind("held_duplicate")
+            .execute(&mut *tx)
+            .await
+            .map_err(db("archive held"))?
+            .rows_affected();
+        sqlx::query("DELETE FROM legislation_text WHERE section_id = ANY($1)")
+            .bind(&held)
+            .execute(&mut *tx)
+            .await
+            .map_err(db("delete held"))?;
+        sqlx::query("UPDATE lat_sync_state SET held_section_ids = '{}' WHERE law_name = $1")
+            .bind(law_name)
+            .execute(&mut *tx)
+            .await
+            .map_err(db("clear held"))?;
+        tx.commit().await.map_err(db("commit"))?;
+        Ok(n)
+    }
+
     /// Restore a law's most recent archive batch with the given reason
     /// (rows and child tier rows). Rows whose section_id exists again are skipped.
     pub async fn restore_archived_law(&self, law_name: &str, reason: &str) -> Result<u64, StoreError> {
@@ -548,6 +581,24 @@ mod tests {
         assert_eq!(s.lat_sync_states().await.unwrap()[law].row_count, 0);
         assert_eq!(s.restore_archived_law(law, "revoked").await.unwrap(), 2);
         assert_eq!(actors_of(&s, &format!("{law}:reg.2")).await, 1);
+    }
+
+    #[tokio::test]
+    async fn held_rows_archived_and_restorable() {
+        let Some(s) = store().await else { eprintln!("test DB unavailable, skipping"); return };
+        let law = "TEST_lat_held";
+        seed(&s, law, &[("reg.8", "1", "revoked"), ("reg.9", "2", "revoked"), ("reg.10", "3", "kept")]).await;
+        let legal = vec![batch(law, &[("reg.8A", "1", "revoked"), ("reg.9A", "2", "revoked"), ("reg.10", "3", "kept")])];
+        let plan = plan_diff(&s.hub_lat_rows(law).await.unwrap(),
+            &fractalaw_core::lat_sync::lat_rows_from_batches(&legal).unwrap(), &[]);
+        assert_eq!(plan.held.len(), 2);
+        assert!(s.apply_lat_diff(law, &legal, &plan, &manifest(law, &legal), None).await.unwrap().committed);
+        assert_eq!(s.archive_held_rows(law).await.unwrap(), 2);
+        assert_eq!(actors_of(&s, &format!("{law}:reg.8")).await, 0);
+        assert!(s.lat_sync_states().await.unwrap()[law].held_section_ids.is_empty());
+        assert_eq!(s.archive_held_rows(law).await.unwrap(), 0, "idempotent");
+        assert_eq!(s.restore_archived_law(law, "held_duplicate").await.unwrap(), 2);
+        assert_eq!(actors_of(&s, &format!("{law}:reg.9")).await, 1);
     }
 
     #[tokio::test]

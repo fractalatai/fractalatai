@@ -98,6 +98,9 @@ enum Command {
         /// Restore laws archived with --archive-laws
         #[arg(long, conflicts_with_all = ["laws", "stale"])]
         restore_laws: Option<String>,
+        /// Archive every law's held rows (ambiguous matches left by diff-apply) as held_duplicate
+        #[arg(long, conflicts_with_all = ["laws", "stale", "archive_laws", "restore_laws"])]
+        archive_held: bool,
         /// Why the laws are archived: not_in_legal (revoked/absent), revoked_unapplied
         /// (revoked by an effect not yet applied to the text), or not_making
         /// (legal discarded their LAT after enrichment found them not Making)
@@ -506,8 +509,12 @@ async fn main() -> anyhow::Result<()> {
             archive_laws,
             restore_laws,
             archive_reason,
+            archive_held,
             timeout,
         } => {
+            if archive_held {
+                return lat_sync::cmd_archive_held(pg_url.as_deref()).await;
+            }
             let timeout_d = std::time::Duration::from_secs(timeout);
             if let Some(list) = archive_laws {
                 let laws = lat_sync::parse_law_list(&list)?;
