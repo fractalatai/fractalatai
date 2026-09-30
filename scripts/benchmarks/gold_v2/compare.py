@@ -64,7 +64,8 @@ def main() -> None:
     with connect() as conn:
         raw = conn.execute(
             "SELECT section_id, law_name, text_md5, model, response FROM gold_v2_raw "
-            "WHERE law_name = ANY(%s) AND prompt_version = %s AND error IS NULL", (laws, PROMPT_VERSION)).fetchall()
+            "WHERE law_name = ANY(%s) AND prompt_version = %s AND error IS NULL AND model = ANY(%s)",
+            (laws, PROMPT_VERSION, list(MODELS.values()))).fetchall()
         texts = dict(conn.execute("SELECT section_id, text FROM legislation_text WHERE law_name = ANY(%s)", (laws,)).fetchall())
         by = {}
         for sid, law, md5, model, resp in raw:

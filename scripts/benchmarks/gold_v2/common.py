@@ -19,7 +19,9 @@ import yaml
 
 PG = "postgres://fractalaw:fractalaw@localhost:5433/fractalaw"
 PROMPT_VERSION = "gold-v2-2026-09-30.3"
-MODELS = {"gemini": "gemini-2.5-pro", "openai": "gpt-5.5"}
+# Model tags; an OpenAI tag may carry a reasoning effort as "<model>:<effort>" (Jason, 2026-09-30:
+# Gemini Flash + GPT-5.5 low, after the pilot comparison).
+MODELS = {"gemini": "gemini-3.8-flash", "openai": "gpt-5.5:low"}
 DICTIONARY = "crates/fractalaw-core/data/actor-dictionary.yaml"
 
 SCHEMA_DDL = """
@@ -219,14 +221,15 @@ def call_gemini(system: str, user: str) -> dict:
 
 
 def call_openai(system: str, user: str) -> dict:
+    model, _, effort = MODELS["openai"].partition(":")
     body = {
-        "model": MODELS["openai"],
+        "model": model,
         "instructions": system,
         "input": user,
         "text": {"format": {"type": "json_schema", "name": "provision_labels", "schema": RESPONSE_SCHEMA, "strict": True}},
     }
-    if os.environ.get("GOLD_OPENAI_EFFORT"):  # minimal | low | medium | high
-        body["reasoning"] = {"effort": os.environ["GOLD_OPENAI_EFFORT"]}
+    if effort:  # minimal | low | medium | high
+        body["reasoning"] = {"effort": effort}
     r = _post("https://api.openai.com/v1/responses", body, {"Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"})
     text = next(c["text"] for o in r["output"] if o.get("type") == "message" for c in o["content"] if c.get("type") == "output_text")
     out = json.loads(text)
