@@ -44,9 +44,9 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
 - **Position:** adjudicated > LLM > inferred > SLM (≥0.9 conf) > regex/classifier agree > classifier (≥0.7) > `pending_slm` > regex.
 - The final values are `provision_actors.drrp`, `provision_actors.position` and `provision_actors.extraction_method`.
 
-### Layer 1b: Correlatives (per non-active actor) — PROPOSED (#72, pending legal review)
+### Layer 1b: Correlatives (per actor, against each other active holder) — PROPOSED (#72, pending legal review)
 
-**Correlatives** record what a non-active actor holds *because of* another actor's Obligation or Liberty in the same provision. Layer 1 records only what an actor itself holds, so without this layer, "what are my rights?" misses the duties owed to that actor.
+**Correlatives** record what an actor holds *because of* another active holder's Obligation or Liberty in the same provision. They are computed for each (actor, other active holder) pair. Layer 1 records only what an actor itself holds, so without this layer, "what are my rights?" misses the duties owed to that actor.
 
 | This actor's position | Active holder holds | Holder class | Correlative |
 |---|---|---|---|
@@ -57,6 +57,9 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
 | `beneficiary` | Liberty | any | none |
 | `mentioned` | any | any | none |
 | any | none (holder unknown) | — | none |
+| `active`, Liberty inferred by the #67 access rule | Obligation (the access duty) | government | `claim_right` → the duty holder |
+
+**Scope.** Non-active actors use the table by their position. An active actor gets a correlative only in the #67 case: the governed party given an inferred access Liberty also holds a `claim_right` against the government actor whose access Obligation it is. No other active actor gets a correlative, e.g. two co-holders of the same Obligation don't get correlatives against each other.
 
 - **Derived, not predicted.** Backfill computes correlatives from the reconciled positions (layer 2), the holder class (layer 3) and `relates_to`. There is no model tier. Legal stores them as received.
 - **A list of pairs.** Each item is `actors[].correlatives = [{type, to}]`, where `to` is the active holder's label.
@@ -71,8 +74,15 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
   - "My rights" = active Liberty (Right) ∪ `claim_right`.
   - "My protections" = `claim_right` ∪ `protected`.
   - "What can be imposed on me" = `liability`.
-- **Law level.** `claim_holder`, `liability_holder` and `protected_holder` list who holds each correlative, from non-active actors only, beside `duty_holder` and the others. They are never counted in the verdict.
+- **Law level.** `claim_holder`, `liability_holder` and `protected_holder` list who holds each correlative, beside `duty_holder` and the others: non-active actors, plus #67-inferred actors for `claim_holder`. They are never counted in the verdict.
+  - **Both holder classes appear.** For example, a regulator owed a notification holds a `claim_right`. The never-cross-assign rule (layer 4) applies only to DRRP holder lists, not to these.
+  - **Holder lists only.** There are no entry lists with clauses (like `duties`/`rights`) for now.
 - **Prerequisite.** The counterparty/beneficiary split must be consistent. HSWA s.2(1) (employees) is counterparty but s.3(1) (persons not employed) is beneficiary. Check reconcile/SLM positions for this pattern before trusting the split.
+- **Rollout order.**
+  1. Fix the counterparty/beneficiary consistency (prerequisite).
+  2. Fractalaw code and tests: backfill derivation and the payload fields.
+  3. Legal adds three `legal_register` columns and the actor pass-through, with tests, and confirms.
+  4. First publish.
 
 ### Layer 2: Position (per actor)
 
@@ -143,6 +153,7 @@ Law-level holder fields (`duty_holder`, `rights_holder`, `responsibility_holder`
   - non-active actors carry `none`;
   - legal types DRRP from active actors only.
 - Legal expands to DRRP per active actor using its holder class. With no active actor, it keeps the raw type (holder unknown).
+- `actors[]` also carries `correlatives: [{type, to}]` (layer 1b). The field is always present: `[]` when there are none, never NULL or absent.
 - **Every row of an enriched law is sent, and `drrp_types`/`actors` are never NULL** (legal reads NULL as "not in this payload" and keeps stale values):
   - a provision with no actors sends `actors = []`;
   - amendment text (#57) sends `drrp_types = []`, `actors = []`;
@@ -158,22 +169,29 @@ Law-level holder fields (`duty_holder`, `rights_holder`, `responsibility_holder`
 
 Never send NULL to clear a verdict: legal can't tell it apart from "not in this payload".
 
+**Correlative holder lists (layer 1b).** The law payload's DRRP section also carries `claim_holder`, `liability_holder` and `protected_holder`, in the same format as `duty_holder` (a list of labels).
+- They are `[]` in any payload that carries the DRRP section.
+- They are NULL only in the "no DRRP in this payload" shape.
+- They never feed the verdict.
+
 **The verdict is one input to legal's `is_making`, not the final word.** sertantai-legal's `Legal.Making` resolves in this order: human review > enrichment (this verdict) > legacy DRRP > triage > legacy flag > detector > default. E.g. UK_uksi_2008_198 and UK_uksi_2014_2868 stay Making by human review despite a `no_obligations` verdict. Legal's "Housekeeping" corresponds to `no_obligations`. Legacy law-level `duty_type = Obligation` (pre-DRRP) counts as holder unknown, not as Making.
 
 ## Worked examples
 
-| Provision | Actors (type/position) | DRRP |
-|---|---|---|
-| EPA 1990 s.20(7): "It shall be the duty of each enforcing authority— (a) to secure that the registers … are available … for inspection by the public" | Enforcement authority Obligation/active; Public Liberty/active (inferred) | **Responsibility** + **Right** |
-| Communications Act 2003 s.108(6): "OFCOM must make the register available for public inspection" | OFCOM Obligation/active; Public Liberty/active (inferred) | Responsibility + Right |
-| Water Act 1989 s.82(2)(c): Minister may … | Minister Liberty/active; Company none/counterparty | **Power** |
-| Medicines Act 1968 s.97E(3) | Responsible Undertaking Obligation/active; Driver none/beneficiary | **Duty** |
-| "The authority shall serve a notice on the operator requiring…" | Authority Obligation/active; Operator none/counterparty | Responsibility only (no Right) |
-| "The register shall be kept at the principal office" (passive, no holder) | none | raw Obligation, holder unknown |
-| "Records shall be kept for five years" (passive, no holder) | none | raw Obligation, holder unknown |
-| "Every workplace shall be ventilated…" (thing-subject) | none (holder via #60, e.g. the employer in the stem) | raw Obligation, holder unknown |
-| "A notice shall be treated as served if it is sent by post…" (deeming) | none | no type, no DRRP |
-| "A person guilty of an offence under this section is liable…" | Person none/mentioned | no DRRP |
+| Provision | Actors (type/position) | DRRP | Correlatives (layer 1b) |
+|---|---|---|---|
+| EPA 1990 s.20(7): "It shall be the duty of each enforcing authority— (a) to secure that the registers … are available … for inspection by the public" | Enforcement authority Obligation/active; Public Liberty/active (inferred) | **Responsibility** + **Right** | Public: `claim_right` → Enforcement authority (plus its Right) |
+| Communications Act 2003 s.108(6): "OFCOM must make the register available for public inspection" | OFCOM Obligation/active; Public Liberty/active (inferred) | Responsibility + Right | Public: `claim_right` → OFCOM (plus its Right) |
+| Water Act 1989 s.82(2)(c): Minister may … | Minister Liberty/active; Company none/counterparty | **Power** | Company: `liability` → Minister |
+| Medicines Act 1968 s.97E(3) | Responsible Undertaking Obligation/active; Driver none/beneficiary | **Duty** | Driver: `protected` → Responsible Undertaking |
+| "The authority shall serve a notice on the operator requiring…" | Authority Obligation/active; Operator none/counterparty | Responsibility only (no Right) | Operator: `claim_right` → Authority |
+| "The register shall be kept at the principal office" (passive, no holder) | none | raw Obligation, holder unknown | none |
+| "Records shall be kept for five years" (passive, no holder) | none | raw Obligation, holder unknown | none |
+| "Every workplace shall be ventilated…" (thing-subject) | none (holder via #60, e.g. the employer in the stem) | raw Obligation, holder unknown | none |
+| "A notice shall be treated as served if it is sent by post…" (deeming) | none | no type, no DRRP | none |
+| "A person guilty of an offence under this section is liable…" | Person none/mentioned | no DRRP | none |
+| HSWA 1974 s.2(1): "It shall be the duty of every employer to ensure … the health, safety and welfare at work of all his employees" | Employer Obligation/active; Employee none/counterparty | **Duty** | Employee: `claim_right` → Employer |
+| HSWA 1974 s.3(1): duty "to ensure … that persons not in his employment … are not thereby exposed to risks" | Employer Obligation/active; Person none/beneficiary | **Duty** | Person: `protected` → Employer (see the layer 1b prerequisite: s.2/s.3 consistency) |
 
 ## Conformance: fractalaw vs this spec (2026-09-30)
 
