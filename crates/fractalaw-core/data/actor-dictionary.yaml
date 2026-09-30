@@ -419,8 +419,10 @@
 
 # ── Governed ─────────────────────────────────────────────────────────
 
+# HM Forces is government (the Crown's forces; DRRP-CLASSIFICATION.md, #68).
+# Kept in this position so regex match order is unchanged.
 - label: HM Forces
-  type: governed
+  type: government
   category: other
   regex_patterns:
     - "(?:(?:His|Her) Majesty['\u2019]s forces|armed forces)"

@@ -48,3 +48,4 @@ Historical Zenoh design docs (ZENOH-SYNC.md, LAT wire format, deletion signal, s
 | File | Description |
 |------|-------------|
 | `SCHEMA-REFERENCE.md` | Auto-generated schema for Postgres + DuckDB tables |
+| `DRRP-CLASSIFICATION.md` | DRRP classification schema: per-actor type, position, holder class, DRRP, law verdict, payload contract (#68) |
