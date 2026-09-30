@@ -561,8 +561,13 @@
     - "(?:[Ss]upervisor|[Pp]erson in control|individual in charge)"
   triggers: [supervisor, supervisors]
 
+# Government holder class (Jason, 2026-09-30): an authorised person exercises an
+# enforcing authority's powers as its agent (e.g. HSWA s.19). None of the 534 hub
+# uses was licence-authorised. Like Spc: Notifying Authority, the label keeps its
+# prefix; the dictionary type decides the class (DRRP-CLASSIFICATION.md layer 3).
 - label: "Spc: Authorised Person"
-  type: governed
+  type: government
+  match_group: governed  # keep matching before "Ind: Person"; class is still government
   category: Spc
   regex_patterns:
     - "[Aa]uthoris?ed [Pp]ersons?"

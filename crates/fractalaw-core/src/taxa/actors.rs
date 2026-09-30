@@ -95,6 +95,11 @@ struct ActorDef {
     families: Vec<String>,
     #[serde(default)]
     category: String,
+    /// Regex bucket override: `governed` keeps a government-type entry matching
+    /// in the governed pass, ahead of the generic patterns it shadows (e.g.
+    /// "authorised person" before "person"). Holder class still comes from `type`.
+    #[serde(default)]
+    match_group: Option<String>,
 }
 
 /// Compiled dictionary: all actor patterns parsed from YAML and ready to match.
@@ -170,7 +175,7 @@ static DICTIONARY: LazyLock<CompiledDictionary> = LazyLock::new(|| {
                     .or_default()
                     .extend(compiled.iter().cloned());
             }
-        } else if def.actor_type == "government" {
+        } else if def.actor_type == "government" && def.match_group.as_deref() != Some("governed") {
             government.extend(compiled);
         } else {
             governed.extend(compiled);
@@ -333,6 +338,7 @@ mod tests {
         assert!(is_government("Gvt: Authority: Enforcement"));
         assert!(is_government("EU: Commission"));
         assert!(!is_government("Spc: Administrator"));
+        assert!(is_government("Spc: Authorised Person"));
         assert!(!is_government("Org: Employer"));
         assert!(!is_government("Public"));
         // Not in the dictionary: family prefix

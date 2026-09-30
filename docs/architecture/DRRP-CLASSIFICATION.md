@@ -99,8 +99,8 @@ Defined by the **actor dictionary** (`crates/fractalaw-core/data/actor-dictionar
 
 | Class | Members |
 |---|---|
-| **government** | every entry with `type: government`: all `Gvt*`, all `EU:*`, `Crown`, `HM Forces`, `Spc: Notifying Authority` |
-| **governed** | every entry with `type: governed`: `Ind:*`, `Org:*`, `SC:*`, `Spc:*` (except Notifying Authority), `Svc:*`, `Public*`, `Offshore*`, … |
+| **government** | every entry with `type: government`: all `Gvt*`, all `EU:*`, `Crown`, `HM Forces`, `Spc: Notifying Authority`, `Spc: Authorised Person` (2026-09-30) |
+| **governed** | every entry with `type: governed`: `Ind:*`, `Org:*`, `SC:*`, `Spc:*` (except Notifying Authority and Authorised Person), `Svc:*`, `Public*`, `Offshore*`, … |
 
 `HM Forces` is government, as the Crown's forces (Jason, 2026-09-29), which matches sertantai-legal's `ActorDefinitions.government_label?/1`. A label-prefix check misses `Crown`, `HM Forces` and `Spc: Notifying Authority`, so code must read the dictionary `type`.
 
