@@ -63,11 +63,13 @@ def main() -> None:
     with ThreadPoolExecutor(args.workers) as pool, connect() as conn:
         for fut in as_completed([pool.submit(run, j) for j in jobs]):
             (sid, law, md5, _), resp, error = fut.result()
+            usage = resp.pop("_usage", None) if resp else None
             conn.execute(
-                "INSERT INTO gold_v2_raw (section_id, law_name, text_md5, model, prompt_version, response, error) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (section_id, text_md5, model, prompt_version) "
-                "DO UPDATE SET response = EXCLUDED.response, error = EXCLUDED.error, created_at = now()",
-                (sid, law, md5, model, PROMPT_VERSION, json.dumps(resp) if resp else None, error),
+                "INSERT INTO gold_v2_raw (section_id, law_name, text_md5, model, prompt_version, response, error, usage) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (section_id, text_md5, model, prompt_version) "
+                "DO UPDATE SET response = EXCLUDED.response, error = EXCLUDED.error, usage = EXCLUDED.usage, created_at = now()",
+                (sid, law, md5, model, PROMPT_VERSION, json.dumps(resp) if resp else None, error,
+                 json.dumps(usage) if usage else None),
             )
             conn.commit()
             ok, err = ok + (error is None), err + (error is not None)

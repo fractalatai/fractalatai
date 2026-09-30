@@ -49,6 +49,32 @@
     - "Attorney General"
   triggers: [attorney general]
 
+# Devolved executives before "Gvt: Minister" so "Scottish Ministers" / "Welsh
+# Ministers" aren't caught by the generic Minister pattern (gold v2, 2026-09-30).
+- label: "Gvt: Devolved Admin: Scottish Ministers"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "Scottish Ministers"
+  triggers: [scottish ministers, the scottish ministers]
+  drrp_keywords: [scottish ministers, regulations made]
+
+- label: "Gvt: Devolved Admin: Welsh Ministers"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:Welsh Ministers|Welsh Government)"
+  triggers: [welsh ministers, the welsh ministers, welsh government]
+  drrp_keywords: [welsh ministers, regulations made]
+
+# NHS and health bodies are public bodies (government holder class).
+- label: "Gvt: Authority: Health Body"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:(?:Local |Special )?Health Boards?|NHS (?:Foundation )?Trusts?|NHS [Bb]od(?:y|ies)|NHS England|Health and Social Care (?:Trusts?|Board))"
+  triggers: [health board, local health board, nhs trust, nhs body, nhs england, health and social care trust]
+
 - label: "Gvt: Minister"
   type: government
   category: Gvt
@@ -400,7 +426,7 @@
   category: Gvt
   regex_patterns:
     - "Scottish Parliament"
-  triggers: [scottish parliament, scottish ministers]
+  triggers: [scottish parliament]
   drrp_keywords: [parliament]
 
 - label: "Gvt: Devolved Admin: Northern Ireland Assembly"
@@ -504,6 +530,22 @@
   regex_patterns:
     - "(?:[Dd]uty [Hh]olders?|[Dd]utyholder)"
   triggers: [duty holder, the duty holder]
+
+# Before "Ind: Manager" and "Ind: Person": "the person having the management and
+# control of …" is a person in control, not a manager (gold v2, 2026-09-30).
+- label: "Ind: Person in Control"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "[Pp]ersons? (?:who (?:has|have)|having|in) (?:the )?(?:management (?:and|or) )?control of"
+  triggers: [person in control, person having control, person in control of premises, person having the management and control]
+
+- label: "Ind: Claimant"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "[Cc]laimants?"
+  triggers: [claimant, claimants, the claimant]
 
 - label: "Ind: Manager"
   type: governed
@@ -924,11 +966,10 @@
     - "[Ww]ater and [Ss]ewerage [Uu]ndertakers?"
   triggers: [water undertaker, water undertakers, sewerage undertaker]
 
+# Duplicate of "Ind: Appellant" (same pattern): kept for existing rows, matches nothing new.
 - label: "Spc: Appellant"
   type: governed
   category: Spc
-  regex_patterns:
-    - "[Aa]ppellants?"
   triggers: [appellant, appellants]
 
 - label: "Spc: Licence Holder"

@@ -304,6 +304,26 @@ fn run_patterns(text: &str, patterns: &[(String, Regex)]) -> Vec<ActorMatch> {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn gold_v2_dictionary_entries_match_first() {
+        let labels = |t: &str| {
+            let ex = super::extract_actors(t);
+            ex.government_labels().into_iter().chain(ex.governed_labels()).collect::<Vec<_>>()
+        };
+        let l = labels(" The Scottish Ministers may by regulations prescribe fees. ");
+        assert!(l.contains(&"Gvt: Devolved Admin: Scottish Ministers".to_string()), "{l:?}");
+        assert!(!l.contains(&"Gvt: Minister".to_string()), "{l:?}");
+        let l = labels(" The Welsh Ministers must publish guidance. ");
+        assert!(l.contains(&"Gvt: Devolved Admin: Welsh Ministers".to_string()), "{l:?}");
+        let l = labels(" The person having the management and control of a hospital building must display notices. ");
+        assert!(l.contains(&"Ind: Person in Control".to_string()), "{l:?}");
+        let l = labels(" A Health Board must provide the information to the claimant. ");
+        assert!(l.contains(&"Gvt: Authority: Health Body".to_string()), "{l:?}");
+        assert!(l.contains(&"Ind: Claimant".to_string()), "{l:?}");
+        assert!(super::is_government("Gvt: Devolved Admin: Scottish Ministers"));
+        assert!(!super::is_government("Ind: Person in Control"));
+    }
+
+    #[test]
     fn holder_class_reads_dictionary_type() {
         use super::is_government;
         // Government by dictionary type, whatever the prefix (#68)

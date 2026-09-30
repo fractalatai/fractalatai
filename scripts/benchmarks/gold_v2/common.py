@@ -18,7 +18,7 @@ import psycopg
 import yaml
 
 PG = "postgres://fractalaw:fractalaw@localhost:5433/fractalaw"
-PROMPT_VERSION = "gold-v2-2026-09-30.2"
+PROMPT_VERSION = "gold-v2-2026-09-30.3"
 MODELS = {"gemini": "gemini-2.5-pro", "openai": "gpt-5.5"}
 DICTIONARY = "crates/fractalaw-core/data/actor-dictionary.yaml"
 
@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS gold_v2_raw (
     model text NOT NULL, prompt_version text NOT NULL, response jsonb, error text,
     created_at timestamptz DEFAULT now(),
     PRIMARY KEY (section_id, text_md5, model, prompt_version));
+ALTER TABLE gold_v2_raw ADD COLUMN IF NOT EXISTS usage jsonb;
 CREATE TABLE IF NOT EXISTS gold_v2 (
     section_id text NOT NULL, law_name text NOT NULL, text_md5 text NOT NULL,
     actor_label text NOT NULL, position text NOT NULL, holds text NOT NULL,
@@ -80,15 +81,23 @@ For each ACTOR (person, body or class of persons) the provision refers to, give:
 - **Implied access rights.** Where a GOVERNMENT actor's Obligation is to make something available for inspection/copying by, or to supply copies on request/payment to, a governed party named in the provision (e.g. "the public", "any person"), that governed party is `active`, holds `Liberty`, `inferred: true`. Enforcement or notice-service provisions never qualify.
 - **Holder named in a referenced provision.** You are also given the text of provisions this one refers to (REFERENCED PROVISIONS). When the provision's holder is identified only there (e.g. "Regulations under subsection (2) may prescribe…", where subsection (2) says "The Scottish Ministers may by regulations…"; or "A power under this section may be exercised by force", where the section confers the power on an authorised officer), that holder is `active` in this provision. Only use a holder that the referenced text actually names; otherwise the holder is unknown.
 - **Content lists of schemes, regulations and notices.** "A scheme under this section must— (a) …", "Regulations may— (a) …": each item completes the stem's Obligation or Liberty, so relation `yes` with the same type. The holder is the scheme or regulation maker (resolved from the stem or referenced provisions), otherwise raw_type with no active actor.
+- **Details nested inside a content list.** Below a content-list item, a sub-item that only states an eligibility criterion or defines a class of persons (e.g. "(i) the person's residence is in Scotland") is a detail → relation `no`. The Obligation/Liberty stays on the item above it.
+- **Instruments are never actors.** A scheme, regulations, an order, a notice or a licence is not an actor. "The scheme may specify…" is a Liberty of the scheme maker when the stem or referenced provisions name it; otherwise raw_type with no active actor.
+- **Applications to a court or tribunal.** "On the application of X, the court may…" → the court (`Gvt: Judiciary`) is `active` with Liberty. X is `mentioned`: its application is a condition, not a liberty of X.
 - **Statutory defences.** "It is a defence for an accused … to prove that …" → relation `no`; the accused is `mentioned`. A defence qualifies the offence, and offences are not relations.
 - **Commencement and citation.** A short title ("This Act may be cited as …") or a list of commencement dates → relation `no`. A POWER to commence ("on such day as the Secretary of State may by order appoint") is a Liberty held by that actor (`active`).
 - **Procedural time limits.** "Proceedings may be commenced within 6 months …" → relation `no`: a limit on proceedings, not a liberty anyone holds.
 - **Amending text** ("in section 5, for 'X' substitute 'Y'", inserted text) → relation `no`; actors `mentioned`.
 - **Legal fiction.** "shall be treated as", "shall be deemed" → not an Obligation.
 - A provision can have several active holders, e.g. an authority's Obligation and the public's implied Liberty.
+- **Beneficiaries must be explicit.** Use `beneficiary` only where the text makes the protective or beneficial purpose explicit ("for the protection of", "a right of appeal against a refusal"). Persons whose eligibility or treatment a scheme may set, or who are merely described, are `mentioned`.
+- **One entry per label.** If two different persons fit the same label, list the label once, with its strongest role (active > counterparty > beneficiary > mentioned).
 
 ## Actor labels
 Use ONLY labels from this dictionary (exact spelling). [government] vs [governed] is the holder class. If no label fits, use "OTHER: <short description>". Use the most specific label that fits. Don't invent actors that the provision (with its stem) doesn't refer to.
+- An officer, inspector or "authorised person" authorised by a government body (council, regulator, enforcing authority, Minister) is `Gvt: Officer`, never `Spc: Authorised Person`.
+- "The Scottish Ministers" is `Gvt: Devolved Admin: Scottish Ministers` and "the Welsh Ministers" is `Gvt: Devolved Admin: Welsh Ministers`, not the Parliament or Assembly.
+- "The person having (the management and) control of …" is `Ind: Person in Control`.
 
 {dictionary}
 
@@ -204,7 +213,9 @@ def call_gemini(system: str, user: str) -> dict:
     }
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODELS['gemini']}:generateContent?key={os.environ['GEMINI_API_KEY']}"
     r = _post(url, body, {})
-    return json.loads(r["candidates"][0]["content"]["parts"][0]["text"])
+    out = json.loads(r["candidates"][0]["content"]["parts"][0]["text"])
+    out["_usage"] = r.get("usageMetadata")
+    return out
 
 
 def call_openai(system: str, user: str) -> dict:
@@ -214,9 +225,13 @@ def call_openai(system: str, user: str) -> dict:
         "input": user,
         "text": {"format": {"type": "json_schema", "name": "provision_labels", "schema": RESPONSE_SCHEMA, "strict": True}},
     }
+    if os.environ.get("GOLD_OPENAI_EFFORT"):  # minimal | low | medium | high
+        body["reasoning"] = {"effort": os.environ["GOLD_OPENAI_EFFORT"]}
     r = _post("https://api.openai.com/v1/responses", body, {"Authorization": f"Bearer {os.environ['OPENAI_API_KEY']}"})
     text = next(c["text"] for o in r["output"] if o.get("type") == "message" for c in o["content"] if c.get("type") == "output_text")
-    return json.loads(text)
+    out = json.loads(text)
+    out["_usage"] = r.get("usage")
+    return out
 
 
 CALLERS = {"gemini": call_gemini, "openai": call_openai}
