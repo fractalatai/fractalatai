@@ -256,6 +256,7 @@ pub(crate) async fn cmd_sync_publish(
         published += 1;
     }
 
+    republish_dictionary(&sync).await;
     println!("Published {published}/{} laws.", law_names.len());
     Ok(())
 }
@@ -450,11 +451,23 @@ pub(crate) async fn cmd_sync_publish_provisions(
         published += 1;
     }
 
+    republish_dictionary(&sync).await;
     println!(
         "Published {total_provisions} provisions across {published}/{} laws.",
         law_names.len()
     );
     Ok(())
+}
+
+/// The dictionary put at the start of a publish can go out before the router
+/// has propagated a subscriber's interest (sertantai-legal missed it twice), so
+/// put it again at the end, once the session's routes are settled.
+async fn republish_dictionary(sync: &fractalaw_sync::ZenohSync) {
+    if let Ok(dict_yaml) = std::fs::read("crates/fractalaw-core/data/actor-dictionary.yaml") {
+        if let Err(e) = sync.publish_dictionary(&dict_yaml).await {
+            eprintln!("warning: end-of-publish dictionary put failed: {e}");
+        }
+    }
 }
 
 pub(crate) async fn cmd_sync_publish_controls(
