@@ -148,8 +148,7 @@ pub fn parse_v2_with_trail(
     let has_governed = !extracted.governed.is_empty();
     let has_government = !extracted.government.is_empty();
 
-    let purpose_gated =
-        should_skip_drrp(&purposes, has_governed, has_government);
+    let purpose_gated = purpose_gated(&purposes, &cleaned, has_governed, has_government);
     let desc_summary = is_descriptive_summary(&cleaned);
 
     if purpose_gated || desc_summary {
@@ -606,6 +605,65 @@ pub fn should_skip_drrp(
     }
 
     false
+}
+
+/// The purpose gate for a provision's text: [`should_skip_drrp`], except that
+/// an Interpretation-primary provision is let through when a separate,
+/// non-definitional sentence puts a duty on a governed actor ("In this
+/// regulation, 'X' means…. Every employer shall ensure…").
+///
+/// `should_skip_drrp` gates Interpretation-primary provisions on government
+/// actors only, because governed actors inside definitions don't bear duties
+/// (5b623e4). A governed actor that is the subject of its own duty sentence does.
+pub fn purpose_gated(purposes: &[&str], text: &str, has_governed_actor: bool, has_government_actor: bool) -> bool {
+    if !should_skip_drrp(purposes, has_governed_actor, has_government_actor) {
+        return false;
+    }
+    !(purposes.first() == Some(&purpose::INTERPRETATION) && has_governed_actor && has_governed_duty_sentence(text))
+}
+
+// Full stops only: a ';' continues a definition list ("'landlord' means…; the person…")
+static SENTENCE_SPLIT_RE: LazyLock<regex::Regex> = LazyLock::new(|| regex::Regex::new(r"\.\s+").unwrap());
+// Modal phrasings that apply, construe or deem rather than impose a duty
+static NON_DUTY_MODAL_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r"(?i)\b(?:shall|must)\s+(?:not\s+)?(?:(?:also\s+)?apply|be\s+(?:construed|considered|taken|treated|deemed|read|regarded))\b|\bmeans\b|\bincludes\b").unwrap()
+});
+
+/// Is there a sentence that, parsed on its own, is a governed actor's duty?
+/// The sentence must not itself read as structural (definition, amendment,
+/// repeal, commencement), an offence/defence, or an application rule, and must
+/// not be a legal fiction.
+fn has_governed_duty_sentence(text: &str) -> bool {
+    const NOT_DUTY: &[&str] = &[
+        purpose::INTERPRETATION,
+        purpose::AMENDMENT,
+        purpose::REPEAL_REVOCATION,
+        purpose::ENACTMENT,
+        purpose::OFFENCE,
+        purpose::DEFENCE_APPEAL,
+        purpose::APPLICATION_SCOPE,
+    ];
+    SENTENCE_SPLIT_RE.split(text).any(|sentence| {
+        if !MODAL_RE.is_match(sentence) || NON_DUTY_MODAL_RE.is_match(sentence) {
+            return false;
+        }
+        let purposes = purpose::classify(sentence);
+        if purposes.iter().any(|p| NOT_DUTY.contains(p)) {
+            return false;
+        }
+        let lower = sentence.to_lowercase();
+        if is_legal_fiction(&lower) {
+            return false;
+        }
+        let ex = actors::extract_actors(sentence);
+        if ex.governed.is_empty() {
+            return false;
+        }
+        let set = signals::extract_all(&lower, &ex.governed, &ex.government, &purposes, false, false, false);
+        let (cr, _) = decision::decide(&set);
+        cr.duty_types.contains(&DutyType::Obligation)
+            && cr.classification.is_some_and(|c| c.family == duty_patterns::DutyFamily::Governed)
+    })
 }
 
 /// Law family without its display prefix: DuckDB/sertantai families carry an emoji
@@ -1197,6 +1255,21 @@ mod tests {
             record.duty_types,
             record.governed_actors
         );
+    }
+
+    #[test]
+    fn definition_mentioning_governed_actor_stays_gated() {
+        // A governed actor inside a definition bears no duty (5b623e4), even with a modal
+        for text in [
+            "In these Regulations, \"relevant employer\" means an employer who shall have \
+             carried out the assessment under regulation 6.",
+            "In this regulation, \"employee\" includes a trainee; and an employer shall be \
+             treated as the occupier of the premises.",
+        ] {
+            let record = parse_v2(text, None);
+            assert!(record.purposes.first() == Some(&purpose::INTERPRETATION), "{text}");
+            assert!(record.duty_types.is_empty(), "definition should stay gated: {text}, got {:?}", record.duty_types);
+        }
     }
 
     #[test]

@@ -1288,8 +1288,9 @@ pub(crate) async fn cmd_taxa_qa(
                 let cleaned = fractalaw_core::taxa::text_cleaner::clean(&text);
                 if fractalaw_core::taxa::is_descriptive_summary(&cleaned) {
                     stats.gate_descriptive += 1;
-                } else if fractalaw_core::taxa::should_skip_drrp(
+                } else if fractalaw_core::taxa::purpose_gated(
                     &record.purposes,
+                    &cleaned,
                     !record.governed_actors.is_empty(),
                     !record.government_actors.is_empty(),
                 ) {
