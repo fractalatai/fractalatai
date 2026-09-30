@@ -44,6 +44,36 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
 - **Position:** adjudicated > LLM > inferred > SLM (≥0.9 conf) > regex/classifier agree > classifier (≥0.7) > `pending_slm` > regex.
 - The final values are `provision_actors.drrp`, `provision_actors.position` and `provision_actors.extraction_method`.
 
+### Layer 1b: Correlatives (per non-active actor) — PROPOSED (#72, pending legal review)
+
+**Correlatives** record what a non-active actor holds *because of* another actor's Obligation or Liberty in the same provision. Layer 1 records only what an actor itself holds, so without this layer, "what are my rights?" misses the duties owed to that actor.
+
+| This actor's position | Active holder holds | Holder class | Correlative |
+|---|---|---|---|
+| `counterparty` | Obligation | any | `claim_right`: the duty is owed to this actor |
+| `counterparty` | Liberty | government (Power) | `liability`: exposed to the power |
+| `counterparty` | Liberty | governed (Right) | `no_right`: cannot prevent it |
+| `beneficiary` | Obligation | any | `protected`: the duty protects this actor (Jason, 2026-09-30) |
+| `beneficiary` | Liberty | any | none |
+| `mentioned` | any | any | none |
+| any | none (holder unknown) | — | none |
+
+- **Derived, not predicted.** Backfill computes correlatives from the reconciled positions (layer 2), the holder class (layer 3) and `relates_to`. There is no model tier. Legal stores them as received.
+- **A list of pairs.** Each item is `actors[].correlatives = [{type, to}]`, where `to` is the active holder's label.
+  - When `relates_to` names the holder, there is one pair.
+  - Otherwise there is one pair per active holder, so a counterparty to a government Power and a governed Right gets both `liability` and `no_right`.
+  - An actor with no correlative sends `[]`, never NULL.
+- **Never feeds layers 4–5.** DRRP types, the holder lists, the verdict and `is_making` stay based only on held types.
+- **`protected` is a compliance category, not Hohfeldian.** A beneficiary isn't the direct correlative party. Many "owed to" duties give no enforceable claim either: HSWA s.47 excludes civil action for breach of ss.2–8. `protected` answers "what protects me".
+- **Implied rights (#67) stay.** "Available for inspection by the public" gives the Public an inferred **Liberty** (active → Right: it may inspect) *and* a `claim_right` (the authority owes it an available register). These are two relations. Only the Liberty counts in DRRP (Jason, 2026-09-30).
+- **Query semantics.**
+  - "My obligations" = active Obligation (Duty/Responsibility).
+  - "My rights" = active Liberty (Right) ∪ `claim_right`.
+  - "My protections" = `claim_right` ∪ `protected`.
+  - "What can be imposed on me" = `liability`.
+- **Law level.** `claim_holder`, `liability_holder` and `protected_holder` list who holds each correlative, from non-active actors only, beside `duty_holder` and the others. They are never counted in the verdict.
+- **Prerequisite.** The counterparty/beneficiary split must be consistent. HSWA s.2(1) (employees) is counterparty but s.3(1) (persons not employed) is beneficiary. Check reconcile/SLM positions for this pattern before trusting the split.
+
 ### Layer 2: Position (per actor)
 
 | Value | Meaning | Holds a type? |
