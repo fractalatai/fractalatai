@@ -88,22 +88,24 @@ impl PgStore {
     /// Every row of an enriched law, never NULL `drrp_types`/`actors`:
     /// sertantai-legal reads NULL as "not in this payload" and keeps stale
     /// values (#68). A row with no actors sends `actors = []`. Amendment text
-    /// (#57) and rows not classified (`extraction_method` NULL: `out`, or not
-    /// yet parsed) send `drrp_types = []` and `actors = []`, with
-    /// `extraction_method` NULL marking them unclassified. A law with no
-    /// enriched row publishes nothing.
+    /// (#57) sends `drrp_types = []` and `actors = []`. Rows not classified
+    /// (scope `out`, whatever method an older pipeline left, or not yet
+    /// parsed) send `drrp_types = []`, `actors = []` and `extraction_method`
+    /// NULL, marking them unclassified. A law with no enriched row publishes
+    /// nothing.
     pub async fn query_provision_taxa(
         &self,
         law_name: &str,
     ) -> Result<Vec<RecordBatch>, StoreError> {
         let rows = sqlx::query(
             "SELECT section_id, \
-             CASE WHEN extraction_method IS NULL OR scope = 'amendment' THEN '{}'::text[] \
+             CASE WHEN extraction_method IS NULL OR scope IN ('amendment', 'out') THEN '{}'::text[] \
                   ELSE COALESCE(drrp_types, '{}'::text[]) END AS drrp_types, \
              duty_family, duty_sub_type, popimar, purposes, \
              clause_refined, taxa_confidence, taxa_classified_at, \
-             extraction_method, holder_inferred_from, ancestor_distance, \
-             CASE WHEN extraction_method IS NULL OR scope = 'amendment' THEN '[]'::jsonb \
+             CASE WHEN scope = 'out' THEN NULL ELSE extraction_method END AS extraction_method, \
+             holder_inferred_from, ancestor_distance, \
+             CASE WHEN extraction_method IS NULL OR scope IN ('amendment', 'out') THEN '[]'::jsonb \
                   ELSE COALESCE(actors, '[]'::jsonb) END AS actors, \
              significance_scope_duty_bearer, significance_scope_protected_class, \
              significance_gravity, significance_strength, significance_hierarchy, \

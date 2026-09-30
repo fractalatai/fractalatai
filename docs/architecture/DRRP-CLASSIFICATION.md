@@ -116,7 +116,7 @@ Law-level holder fields (`duty_holder`, `rights_holder`, `responsibility_holder`
 - **Every row of an enriched law is sent, and `drrp_types`/`actors` are never NULL** (legal reads NULL as "not in this payload" and keeps stale values):
   - a provision with no actors sends `actors = []`;
   - amendment text (#57) sends `drrp_types = []`, `actors = []`;
-  - an unclassified row (`extraction_method` NULL: scope `out`, or not yet parsed) sends `drrp_types = []`, `actors = []`, `extraction_method = null`. That means "not classified", not "classified as having no type".
+  - an unclassified row (scope `out`, whatever method an older pipeline left on it, or not yet parsed) sends `drrp_types = []`, `actors = []`, `extraction_method = null`. That means "not classified", not "classified as having no type".
 
 **Law payload** (`taxa/enrichment/{law}`, from DuckDB `legislation`): the layer-5 holder fields, significance, fitness and application fields, plus `provenance` (#63). The DRRP section has three shapes:
 
