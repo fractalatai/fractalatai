@@ -84,19 +84,34 @@ impl PgStore {
     }
 
     /// Query provision taxa for zenoh publish.
+    ///
+    /// Every row of an enriched law, never NULL `drrp_types`/`actors`:
+    /// sertantai-legal reads NULL as "not in this payload" and keeps stale
+    /// values (#68). A row with no actors sends `actors = []`. Amendment text
+    /// (#57) and rows not classified (`extraction_method` NULL: `out`, or not
+    /// yet parsed) send `drrp_types = []` and `actors = []`, with
+    /// `extraction_method` NULL marking them unclassified. A law with no
+    /// enriched row publishes nothing.
     pub async fn query_provision_taxa(
         &self,
         law_name: &str,
     ) -> Result<Vec<RecordBatch>, StoreError> {
         let rows = sqlx::query(
-            "SELECT section_id, drrp_types, duty_family, duty_sub_type, popimar, purposes, \
+            "SELECT section_id, \
+             CASE WHEN extraction_method IS NULL OR scope = 'amendment' THEN '{}'::text[] \
+                  ELSE COALESCE(drrp_types, '{}'::text[]) END AS drrp_types, \
+             duty_family, duty_sub_type, popimar, purposes, \
              clause_refined, taxa_confidence, taxa_classified_at, \
-             extraction_method, holder_inferred_from, ancestor_distance, actors, \
+             extraction_method, holder_inferred_from, ancestor_distance, \
+             CASE WHEN extraction_method IS NULL OR scope = 'amendment' THEN '[]'::jsonb \
+                  ELSE COALESCE(actors, '[]'::jsonb) END AS actors, \
              significance_scope_duty_bearer, significance_scope_protected_class, \
              significance_gravity, significance_strength, significance_hierarchy, \
              significance_confidence, significance_overall \
              FROM legislation_text \
-             WHERE law_name = $1 AND extraction_method IS NOT NULL"
+             WHERE law_name = $1 \
+               AND EXISTS (SELECT 1 FROM legislation_text e \
+                           WHERE e.law_name = $1 AND e.extraction_method IS NOT NULL)"
         )
         .bind(law_name)
         .fetch_all(&self.pool)
