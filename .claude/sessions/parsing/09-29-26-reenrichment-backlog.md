@@ -23,7 +23,11 @@ The first #62 hub sync (2026-09-27) flagged 422 laws `reparse_needed`: their tex
   - Where the new row's text still matches (`match_key` equal), restore the archived actor/fitness rows onto the new id.
   - Mark the law reparse_needed and record provenance.
 - ⬜ Run the pipeline in batches (customer-batch-parse): parse → dep → embed → classify → infer → reconcile → pod SLM (position/significance/fitness) → LLM tier (Gemini, fixed prompt, test batch of 10 then 50s) → hierarchy → backfill → fitness → verdict diff → Jason review → publish with provenance
-- ⬜ 6 Tier 0 actors still `pending_slm` (next pod)
+- ✅ #67 implied rights: done in its own session `parsing/2026-09-29-issue-67.md` (closed)
+- ⬜ **pending_slm added 2026-09-30:** 3,785 in the 20 benchmark laws after their LAT sync (893 + 2,892) and 310 in 5 re-parsed held laws (UK_uksi_1999_1676, 2003_751, 2005_1726, 2010_768, 2013_1119). Add them to the next pod batch, re-backfill and republish; legal then re-checks the holder-unknown share
+- ⬜ **(Jason)** Decide whether revoked laws are excluded from pod/LLM runs (64 DuckDB-revoked laws, ~87K substantive provisions; verify statuses first). See memory `feedback_revoked_laws`
+- ✅ 6 Tier 0 pending_slm actors: resolved (0 pending as of 2026-09-29)
+- ⬜ **Batch 1** (EPA 1990 + 24 new Making Acts): local steps done 2026-09-29 (17,137 actors reconciled, 7,845 pending_slm; 1,447 fitness mentions). Pod workload: position ~16,342 actors, significance ~2,351+ obligation provisions (after re-reconcile), fitness 1,447 mentions. DuckDB snapshot `fractalaw_pre_batch1_20260929.duckdb`
 - ⬜ Audit the earlier corpus LLM labels (~2,449 `llm` actors) for the penalty-clause error fixed in `e7bc2ab`: find Obligation labels on offence/penalty text, clear, re-run with the fixed prompt
 - ⬜ After legal #166 scopes large Acts: re-enrich the 6 Tier 0 big Acts on scoped LAT (Companies Act 2006, PH(S)A 2008, IPA 2016, PCA 2017, CTBSA 2019, EU(W)A 2018)
 - ⬜ Keep DuckDB snapshots before each batch's parse (parse rewrites law-level DRRP); restore held/zero-actor laws afterwards
