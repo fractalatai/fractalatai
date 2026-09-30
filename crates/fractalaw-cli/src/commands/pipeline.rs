@@ -1473,13 +1473,15 @@ pub(crate) fn drrp_column_types(store: &DuckStore) -> anyhow::Result<(String, St
 }
 
 /// The law-level verdict DuckDB currently holds (as sertantai-legal reads it):
-/// `None` when the DRRP columns are all NULL (no verdict).
+/// `None` when the DRRP columns are all NULL; `holder_unknown` for the #68
+/// no-verdict shape (raw Obligation, no Duty/Responsibility).
 pub(crate) fn read_law_verdict(store: &DuckStore, law_name: &str) -> anyhow::Result<Option<&'static str>> {
     let mut out = None;
     for batch in store.query_arrow(&format!(
         "SELECT CASE \
            WHEN duties IS NULL AND responsibilities IS NULL AND rights IS NULL AND powers IS NULL THEN NULL \
            WHEN coalesce(len(duties), 0) + coalesce(len(responsibilities), 0) > 0 THEN 'making' \
+           WHEN list_contains(duty_type, 'Obligation') THEN 'holder_unknown' \
            WHEN coalesce(len(rights), 0) + coalesce(len(powers), 0) > 0 THEN 'empowering' \
            ELSE 'no_obligations' END \
          FROM legislation WHERE name = '{}'",
@@ -1493,6 +1495,7 @@ pub(crate) fn read_law_verdict(store: &DuckStore, law_name: &str) -> anyhow::Res
                 out = match col.value(i) {
                     "making" => Some("making"),
                     "empowering" => Some("empowering"),
+                    "holder_unknown" => Some("holder_unknown"),
                     _ => Some("no_obligations"),
                 };
             }
