@@ -628,6 +628,20 @@ impl crate::ProvisionStore for LanceStore {
         self.legislation_text_count().await
     }
 
+    async fn search_similar(&self, query_vector: &[f32], limit: usize) -> Result<Vec<RecordBatch>, StoreError> {
+        self.search_text(query_vector, limit).await
+    }
+
+    async fn law_names(&self) -> Result<Vec<String>, StoreError> {
+        let mut names = std::collections::BTreeSet::new();
+        for batch in LanceStore::query_legislation_text(self, "", 1_000_000, 0).await? {
+            if let Some(col) = batch.column_by_name("law_name").and_then(|c| c.as_any().downcast_ref::<arrow::array::StringArray>()) {
+                names.extend(col.iter().flatten().map(str::to_string));
+            }
+        }
+        Ok(names.into_iter().collect())
+    }
+
     async fn delete_law_annotations(&self, law_name: &str) -> Result<usize, StoreError> {
         self.delete_law_annotations(law_name).await
     }

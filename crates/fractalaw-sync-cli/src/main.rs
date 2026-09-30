@@ -18,9 +18,9 @@ struct Cli {
     #[arg(long, default_value = "./data", global = true)]
     data_dir: PathBuf,
 
-    /// Use PostgreSQL+pgvector instead of LanceDB for provision store
-    #[arg(long, global = true, env = "FRACTALAW_PG")]
-    pg: Option<String>,
+    /// Hub provision store, PostgreSQL+pgvector (the default, #71)
+    #[arg(long, global = true, env = "FRACTALAW_PG", default_value = fractalaw_store::HUB_PG_URL)]
+    pg: String,
 
     #[command(subcommand)]
     command: Command,
@@ -469,7 +469,7 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let cli = Cli::parse();
-    let pg_url = cli.pg.clone();
+    let pg_url = Some(cli.pg.clone());
 
     let data_dir = cli
         .data_dir

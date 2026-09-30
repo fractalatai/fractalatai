@@ -26,9 +26,14 @@ struct Cli {
     #[arg(long, default_value = "./data", global = true)]
     data_dir: PathBuf,
 
-    /// Use PostgreSQL+pgvector instead of LanceDB
-    #[arg(long, global = true, env = "FRACTALAW_PG")]
-    pg: Option<String>,
+    /// Hub provision store, PostgreSQL+pgvector (the default, #71)
+    #[arg(long, global = true, env = "FRACTALAW_PG", default_value = fractalaw_store::HUB_PG_URL)]
+    pg: String,
+
+    /// Use the LanceDB provision store (data/lancedb) instead of the hub
+    /// Postgres. For edge/offline use only: the hub's LanceDB is not kept current.
+    #[arg(long, global = true)]
+    lance: bool,
 
     #[command(subcommand)]
     command: Command,
@@ -390,7 +395,19 @@ enum FitnessAction {
     },
 }
 
-/// Open the provision store (PgStore if --pg is set, otherwise LanceStore).
+/// Commands not yet ported to the hub Postgres (#71) run only with an
+/// explicit `--lance`, so they never read the stale LanceDB by default.
+fn require_lance(pg_url: Option<&str>, command: &str) -> anyhow::Result<()> {
+    if pg_url.is_some() {
+        anyhow::bail!(
+            "`{command}` still reads LanceDB only (not yet ported to the hub Postgres, fractalatai #71). \
+             Re-run with --lance to use data/lancedb, which is not kept current."
+        );
+    }
+    Ok(())
+}
+
+/// Open the provision store: the hub Postgres, or LanceDB with `--lance`.
 async fn open_provision_store(
     data_dir: &std::path::Path,
     pg_url: Option<&str>,
@@ -401,6 +418,7 @@ async fn open_provision_store(
             .context("connecting to PostgreSQL")?;
         Ok(Box::new(store))
     } else {
+        tracing::warn!(path = %data_dir.join("lancedb").display(), "provision store: LanceDB (--lance), not the hub Postgres");
         let store = LanceStore::open(&data_dir.join("lancedb"))
             .await
             .context("opening LanceDB")?;
@@ -460,7 +478,8 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let cli = Cli::parse();
-    let pg_url = cli.pg.clone();
+    // Postgres unless --lance: never fall back to LanceDB silently (#71)
+    let pg_url = (!cli.lance).then(|| cli.pg.clone());
 
     let data_dir = cli
         .data_dir
@@ -474,12 +493,14 @@ async fn main() -> anyhow::Result<()> {
         Command::Graph { name, hops } => cmd_graph(&open_duck(&data_dir)?, &name, hops),
         Command::Stats => cmd_stats(&open_duck(&data_dir)?),
         Command::Validate { model_dir } => {
+            require_lance(pg_url.as_deref(), "validate")?;
             cmd_validate(&open_duck(&data_dir)?, &data_dir, &model_dir).await
         }
         Command::Classify {
             domain_threshold,
             subject_threshold,
         } => {
+            require_lance(pg_url.as_deref(), "classify")?;
             cmd_classify(
                 &open_duck(&data_dir)?,
                 &data_dir,
@@ -490,20 +511,32 @@ async fn main() -> anyhow::Result<()> {
         }
         Command::Import => cmd_import(&data_dir),
 
-        // LanceDB-only commands — no DuckDB needed.
-        Command::Embed { model_dir } => cmd_embed(&data_dir, &model_dir).await,
-        Command::Text { name, limit } => cmd_text(&data_dir, &name, limit).await,
+        // Provision-store commands — no DuckDB needed.
+        Command::Embed { model_dir } => {
+            require_lance(pg_url.as_deref(), "embed")?;
+            cmd_embed(&data_dir, &model_dir).await
+        }
+        Command::Text { name, limit } => {
+            let store = open_provision_store(&data_dir, pg_url.as_deref()).await?;
+            cmd_text(store.as_ref(), &name, limit).await
+        }
         Command::Search {
             query,
             limit,
             model_dir,
-        } => cmd_search(&data_dir, &query, limit, &model_dir).await,
+        } => {
+            let store = open_provision_store(&data_dir, pg_url.as_deref()).await?;
+            cmd_search(store.as_ref(), &query, limit, &model_dir).await
+        }
 
         // Model-only commands — no data store needed.
         Command::Tokenize { text, model_dir } => cmd_tokenize(&text, &model_dir),
 
         // WASM micro-app commands.
-        Command::Run { component, fuel } => cmd_run(&data_dir, &component, fuel).await,
+        Command::Run { component, fuel } => {
+            require_lance(pg_url.as_deref(), "run")?;
+            cmd_run(&data_dir, &component, fuel).await
+        }
 
         // Taxa classification.
         Command::Taxa { action } => match action {
@@ -512,7 +545,7 @@ async fn main() -> anyhow::Result<()> {
                 limit,
                 misses,
                 clauses,
-            } => cmd_taxa_show(&data_dir, &name, limit, misses, clauses).await,
+            } => cmd_taxa_show(open_provision_store(&data_dir, pg_url.as_deref()).await?.as_ref(), &data_dir, &name, limit, misses, clauses).await,
             TaxaAction::Enrich {
                 laws,
                 family,
@@ -583,9 +616,9 @@ async fn main() -> anyhow::Result<()> {
                 limit,
             } => {
                 let law_names: Vec<&str> = laws.split(',').map(|l| l.trim()).collect();
-                cmd_taxa_eyeball(&data_dir, &law_names, &output, limit).await
+                cmd_taxa_eyeball(open_provision_store(&data_dir, pg_url.as_deref()).await?.as_ref(), &law_names, &output, limit).await
             }
-            TaxaAction::Qa { laws, family } => cmd_taxa_qa(&data_dir, laws, family).await,
+            TaxaAction::Qa { laws, family } => cmd_taxa_qa(open_provision_store(&data_dir, pg_url.as_deref()).await?.as_ref(), &data_dir, laws, family).await,
             TaxaAction::Status {
                 laws,
                 law_file,
@@ -776,7 +809,7 @@ async fn main() -> anyhow::Result<()> {
                 laws,
                 family,
                 limit,
-            } => cmd_taxa_audit_fitness(&data_dir, laws, family, limit).await,
+            } => cmd_taxa_audit_fitness(open_provision_store(&data_dir, pg_url.as_deref()).await?.as_ref(), &data_dir, laws, family, limit).await,
             TaxaAction::Parse { laws, force, trace } => {
                 let store = open_duck(&data_dir)?;
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
@@ -880,7 +913,7 @@ async fn main() -> anyhow::Result<()> {
             min_match_ratio,
         } => {
             cmd_export_training_data(
-                &data_dir,
+                open_provision_store(&data_dir, pg_url.as_deref()).await?.as_ref(),
                 &open_duck(&data_dir)?,
                 &output,
                 val_laws.as_deref(),
@@ -899,7 +932,7 @@ async fn main() -> anyhow::Result<()> {
             } => {
                 let pg_url = pg_url
                     .as_deref()
-                    .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
+                    .unwrap_or(fractalaw_store::HUB_PG_URL);
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
                 let law_names = provenance::fitness_scope(Some(pg_url), law_names).await?;
                 let duck = open_duck(&data_dir)?;
@@ -910,14 +943,14 @@ async fn main() -> anyhow::Result<()> {
             FitnessAction::Status { laws, law_file } => {
                 let pg_url = pg_url
                     .as_deref()
-                    .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
+                    .unwrap_or(fractalaw_store::HUB_PG_URL);
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
                 commands::fitness::cmd_fitness_status(pg_url, law_names.as_deref()).await
             }
             FitnessAction::Reconcile { laws, law_file, dry_run } => {
                 let pg_url = pg_url
                     .as_deref()
-                    .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
+                    .unwrap_or(fractalaw_store::HUB_PG_URL);
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
                 let law_names = provenance::fitness_scope(Some(pg_url), law_names).await?;
                 let r = commands::fitness::cmd_fitness_reconcile(pg_url, law_names.as_deref(), dry_run).await;
@@ -927,7 +960,7 @@ async fn main() -> anyhow::Result<()> {
             FitnessAction::Application { laws, law_file, out } => {
                 let pg_url = pg_url
                     .as_deref()
-                    .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
+                    .unwrap_or(fractalaw_store::HUB_PG_URL);
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
                 let law_names = provenance::fitness_scope(Some(pg_url), law_names).await?;
                 let duck = open_duck(&data_dir)?;
@@ -939,7 +972,7 @@ async fn main() -> anyhow::Result<()> {
             FitnessAction::Compile { laws, law_file, out } => {
                 let pg_url = pg_url
                     .as_deref()
-                    .unwrap_or("postgres://fractalaw:fractalaw@localhost:5433/fractalaw");
+                    .unwrap_or(fractalaw_store::HUB_PG_URL);
                 let law_names = resolve_law_names(laws.as_deref(), law_file.as_deref())?;
                 let law_names = provenance::fitness_scope(Some(pg_url), law_names).await?;
                 let duck = open_duck(&data_dir)?;

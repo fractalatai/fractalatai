@@ -1,6 +1,6 @@
 use anyhow::Context;
 use arrow::array::Array;
-use fractalaw_store::{DuckStore, LanceStore, ProvisionStore};
+use fractalaw_store::{DuckStore, ProvisionStore};
 
 use crate::llm::*;
 use crate::open_duck;
@@ -572,15 +572,14 @@ pub(crate) async fn cmd_taxa_slm(
 }
 
 pub(crate) async fn cmd_taxa_show(
+    provisions: &dyn ProvisionStore,
     data_dir: &std::path::Path,
     name: &str,
     limit: usize,
     misses: bool,
     clauses: bool,
 ) -> anyhow::Result<()> {
-    let lance = LanceStore::open(&data_dir.join("lancedb"))
-        .await
-        .context("opening LanceDB")?;
+    let lance = provisions;
 
     // Look up law's family from DuckDB for family-gated specialist actors.
     let family: Option<String> = {
@@ -1017,16 +1016,14 @@ pub(crate) fn cmd_taxa_show_clauses(
 
 
 pub(crate) async fn cmd_taxa_eyeball(
-    data_dir: &std::path::Path,
+    provisions: &dyn ProvisionStore,
     law_names: &[&str],
     output: &std::path::Path,
     limit: usize,
 ) -> anyhow::Result<()> {
     use std::fmt::Write;
 
-    let lance = LanceStore::open(&data_dir.join("lancedb"))
-        .await
-        .context("opening LanceDB")?;
+    let lance = provisions;
 
     let mut md = String::new();
     writeln!(md, "# Clause Eyeball Review")?;
@@ -1152,6 +1149,7 @@ pub(crate) async fn cmd_taxa_eyeball(
 // ── Taxa QA Report ──────────────────────────────────────────────────
 
 pub(crate) async fn cmd_taxa_qa(
+    provisions: &dyn ProvisionStore,
     data_dir: &std::path::Path,
     laws: Option<String>,
     family: Option<String>,
@@ -1159,9 +1157,7 @@ pub(crate) async fn cmd_taxa_qa(
     use fractalaw_core::taxa::purpose;
     use std::collections::HashMap;
 
-    let lance = LanceStore::open(&data_dir.join("lancedb"))
-        .await
-        .context("opening LanceDB")?;
+    let lance = provisions;
 
     // Resolve law names.
     let law_names: Vec<String> = if let Some(ref l) = laws {
@@ -1176,18 +1172,7 @@ pub(crate) async fn cmd_taxa_qa(
         names
     } else {
         // All laws with LanceDB text.
-        let all_batches = lance.query_legislation_text("", 200_000, 0).await?;
-        let mut names = std::collections::BTreeSet::new();
-        for batch in &all_batches {
-            if let Some(col) = batch.column_by_name("law_name") {
-                for i in 0..batch.num_rows() {
-                    if let Some(name) = get_string_value(col.as_ref(), i) {
-                        names.insert(name);
-                    }
-                }
-            }
-        }
-        names.into_iter().collect()
+        lance.law_names().await?
     };
 
     if law_names.is_empty() {
@@ -1552,6 +1537,7 @@ pub(crate) async fn cmd_taxa_qa(
 /// Audit p-dimension dictionary coverage: find Application+Scope provisions
 /// where polarity was detected but zero p-dimension tags were extracted.
 pub(crate) async fn cmd_taxa_audit_fitness(
+    provisions: &dyn ProvisionStore,
     data_dir: &std::path::Path,
     laws: Option<String>,
     family: Option<String>,
@@ -1560,9 +1546,7 @@ pub(crate) async fn cmd_taxa_audit_fitness(
     use fractalaw_core::taxa::{fitness, purpose};
     use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-    let lance = LanceStore::open(&data_dir.join("lancedb"))
-        .await
-        .context("opening LanceDB")?;
+    let lance = provisions;
     let store = open_duck(data_dir)?;
 
     // Resolve law names (same pattern as cmd_taxa_qa)
@@ -1576,18 +1560,7 @@ pub(crate) async fn cmd_taxa_audit_fitness(
         println!("Family '{}': {} laws\n", fam, names.len());
         names
     } else {
-        let all_batches = lance.query_legislation_text("", 200_000, 0).await?;
-        let mut names = std::collections::BTreeSet::new();
-        for batch in &all_batches {
-            if let Some(col) = batch.column_by_name("law_name") {
-                for i in 0..batch.num_rows() {
-                    if let Some(name) = get_string_value(col.as_ref(), i) {
-                        names.insert(name);
-                    }
-                }
-            }
-        }
-        names.into_iter().collect()
+        lance.law_names().await?
     };
 
     if law_names.is_empty() {
@@ -3575,21 +3548,8 @@ pub(crate) async fn cmd_taxa_enrich(
         eprintln!("  Done — all taxa columns set to NULL.");
     }
 
-    // Get distinct law names from LanceDB (only laws with full text can be enriched).
-    let lance_law_names: std::collections::BTreeSet<String> = {
-        let all_batches = lance.query_legislation_text("", 200_000, 0).await?;
-        let mut names = std::collections::BTreeSet::new();
-        for batch in &all_batches {
-            if let Some(col) = batch.column_by_name("law_name") {
-                for i in 0..batch.num_rows() {
-                    if let Some(name) = get_string_value(col.as_ref(), i) {
-                        names.insert(name);
-                    }
-                }
-            }
-        }
-        names
-    };
+    // Distinct law names with provision text (only laws with full text can be enriched).
+    let lance_law_names: std::collections::BTreeSet<String> = lance.law_names().await?.into_iter().collect();
 
     // If specific laws requested, use those; otherwise find laws without taxa data
     let law_names: Vec<String> = if let Some(filter) = law_filter {

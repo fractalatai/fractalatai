@@ -110,6 +110,12 @@ pub trait ProvisionStore: Send + Sync {
     /// Count total provisions.
     async fn legislation_text_count(&self) -> Result<usize, StoreError>;
 
+    /// The provisions nearest an embedding (vector search), closest first.
+    async fn search_similar(&self, query_vector: &[f32], limit: usize) -> Result<Vec<RecordBatch>, StoreError>;
+
+    /// Every law that has provision text, sorted.
+    async fn law_names(&self) -> Result<Vec<String>, StoreError>;
+
     /// Delete annotations for a law (LanceDB-only, no-op for Postgres).
     async fn delete_law_annotations(&self, _law_name: &str) -> Result<usize, StoreError> {
         Ok(0)

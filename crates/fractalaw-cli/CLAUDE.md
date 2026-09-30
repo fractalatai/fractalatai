@@ -2,6 +2,8 @@
 
 Binary entry point. Depends on all crates with all features enabled.
 
+**Provision store:** the hub Postgres by default (`--pg` / `FRACTALAW_PG`, default `localhost:5433`). `--lance` opts into `data/lancedb`, which is not kept current and logs a warning. `validate`, `classify`, `embed` and `run` aren't ported yet and refuse to run without `--lance` (#71).
+
 ## Commands
 
 ### Taxa Pipeline

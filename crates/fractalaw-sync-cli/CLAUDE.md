@@ -4,6 +4,8 @@ Zenoh sync CLI binary. Handles all publish/subscribe communication with sertanta
 
 Binary name: `fractalaw-sync` (built from `fractalaw-sync-cli` crate).
 
+`--pg` defaults to the hub Postgres (`localhost:5433`, or `FRACTALAW_PG`) (#71), so "With `--pg`" below is the default. Law-level publishes always carry provenance.
+
 ## Commands
 
 All commands run via: `cargo run -p fractalaw-sync-cli -- <command> [args]`

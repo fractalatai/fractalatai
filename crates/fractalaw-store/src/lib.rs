@@ -6,6 +6,9 @@ pub use error::StoreError;
 mod provision_store;
 pub use provision_store::{LawDrrpInputs, ProvisionStore};
 
+/// The hub's primary provision store (Postgres + pgvector): the CLIs' default (#71).
+pub const HUB_PG_URL: &str = "postgres://fractalaw:fractalaw@localhost:5433/fractalaw";
+
 #[cfg(feature = "duckdb")]
 mod duck;
 #[cfg(feature = "duckdb")]

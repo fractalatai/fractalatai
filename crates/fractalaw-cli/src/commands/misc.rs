@@ -2,7 +2,7 @@ use anyhow::Context;
 use arrow::array::Array;
 use arrow::record_batch::RecordBatch;
 use arrow::util::pretty::print_batches;
-use fractalaw_store::{DuckStore, FusionStore, LanceStore, StoreError};
+use fractalaw_store::{DuckStore, FusionStore, LanceStore, ProvisionStore, StoreError};
 
 use crate::{display, embed, open_duck};
 use crate::utils::*;
@@ -160,13 +160,10 @@ pub(crate) async fn cmd_embed(data_dir: &std::path::Path, model_dir: &std::path:
     Ok(())
 }
 
-pub(crate) async fn cmd_text(data_dir: &std::path::Path, name: &str, limit: usize) -> anyhow::Result<()> {
-    let lance = LanceStore::open(&data_dir.join("lancedb"))
-        .await
-        .context("opening LanceDB")?;
+pub(crate) async fn cmd_text(provisions: &dyn ProvisionStore, name: &str, limit: usize) -> anyhow::Result<()> {
+    let lance = provisions;
 
-    let filter = format!("law_name = '{name}'");
-    let batches = lance.query_legislation_text(&filter, limit, 0).await?;
+    let batches = lance.query_legislation_text(name, limit, 0).await?;
 
     let total: usize = batches.iter().map(|b| b.num_rows()).sum();
     if total == 0 {
@@ -185,7 +182,7 @@ pub(crate) async fn cmd_text(data_dir: &std::path::Path, name: &str, limit: usiz
 
 
 pub(crate) async fn cmd_export_training_data(
-    data_dir: &std::path::Path,
+    provisions: &dyn ProvisionStore,
     store: &DuckStore,
     output: &std::path::Path,
     val_laws_file: Option<&std::path::Path>,
@@ -283,9 +280,7 @@ pub(crate) async fn cmd_export_training_data(
     println!("  Test laws:              {:>8}", test_laws.len());
 
     // 5. Open LanceDB for source text.
-    let lance = LanceStore::open(&data_dir.join("lancedb"))
-        .await
-        .context("opening LanceDB")?;
+    let lance = provisions;
 
     // 6. Process law-by-law, generating silver labels.
     let mut train_examples: Vec<TrainingExample> = Vec::new();
@@ -305,8 +300,7 @@ pub(crate) async fn cmd_export_training_data(
         };
 
         // Query LanceDB for all sections of this law.
-        let filter = format!("law_name = '{}'", law_name.replace('\'', "''"));
-        let lat_batches = lance.query_legislation_text(&filter, 100_000, 0).await?;
+        let lat_batches = lance.query_legislation_text(law_name, 100_000, 0).await?;
 
         // Build provision → text map.
         let mut prov_text: HashMap<String, String> = HashMap::new();
@@ -492,7 +486,7 @@ pub(crate) async fn cmd_export_training_data(
 }
 
 pub(crate) async fn cmd_search(
-    data_dir: &std::path::Path,
+    provisions: &dyn ProvisionStore,
     query: &str,
     limit: usize,
     model_dir: &std::path::Path,
@@ -504,12 +498,10 @@ pub(crate) async fn cmd_search(
     let mut embedder =
         fractalaw_ai::Embedder::load(&model_dir).context("loading embedding model")?;
 
-    let lance = LanceStore::open(&data_dir.join("lancedb"))
-        .await
-        .context("opening LanceDB")?;
+    let lance = provisions;
 
     let query_vec = embedder.embed(query).context("embedding query")?;
-    let batches = lance.search_text(&query_vec, limit).await?;
+    let batches = lance.search_similar(&query_vec, limit).await?;
 
     let total: usize = batches.iter().map(|b| b.num_rows()).sum();
     if total == 0 {
@@ -519,7 +511,7 @@ pub(crate) async fn cmd_search(
 
     let projected = project_batches(
         &batches,
-        &["law_name", "provision", "section_type", "text", "_distance"],
+        &["law_name", "provision", "section_type", "text", "_distance", "similarity"],
     );
     print_batches(&projected)?;
     Ok(())

@@ -1141,6 +1141,17 @@ impl crate::ProvisionStore for PgStore {
         self.legislation_text_count().await
     }
 
+    async fn search_similar(&self, query_vector: &[f32], limit: usize) -> Result<Vec<RecordBatch>, StoreError> {
+        self.search_text(query_vector, None, limit).await
+    }
+
+    async fn law_names(&self) -> Result<Vec<String>, StoreError> {
+        sqlx::query_scalar::<_, String>("SELECT DISTINCT law_name FROM legislation_text ORDER BY 1")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| StoreError::Other(format!("law_names: {e}")))
+    }
+
     async fn upsert_provision_actors(
         &self,
         actors: &[(String, String, String, Option<String>, String, String, Option<f32>)],
