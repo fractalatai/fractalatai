@@ -166,6 +166,16 @@ pub trait ProvisionStore: Send + Sync {
         Ok(vec![])
     }
 
+    /// Adjudicated (human/gold) actor signals for a law: the top tier, which
+    /// reconcile never overrides. Keyed by (section_id, actor_label) →
+    /// (drrp, position).
+    async fn query_adjudicated_actors(
+        &self,
+        _law_name: &str,
+    ) -> Result<std::collections::HashMap<(String, String), (Option<String>, String)>, StoreError> {
+        Ok(Default::default())
+    }
+
     /// Query dep parsing features for a law's actors.
     /// Returns: Vec<(section_id, actor_label, [7 dep features])>
     async fn query_dep_features(

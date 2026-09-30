@@ -40,8 +40,8 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
 **Non-active actors hold nothing.** An actor whose position isn't `active` has type `none`, whatever the model predicted. `provision_actors.drrp` keeps the tier's reading (the provision's type from that actor's side), which is used only as the raw type when the holder is unknown. The payload and the roll-up expose `none`.
 
 **Source and precedence** (reconcile, `fractalaw-cli/src/commands/taxa.rs`):
-- **Type:** LLM > inferred-active > SLM > regex. An inferred type counts only when the inference also makes the actor active.
-- **Position:** LLM > inferred > SLM (≥0.9 conf) > regex/classifier agree > classifier (≥0.7) > `pending_slm` > regex.
+- **Type:** adjudicated > LLM > inferred-active > SLM > regex. An inferred type counts only when the inference also makes the actor active.
+- **Position:** adjudicated > LLM > inferred > SLM (≥0.9 conf) > regex/classifier agree > classifier (≥0.7) > `pending_slm` > regex.
 - The final values are `provision_actors.drrp`, `provision_actors.position` and `provision_actors.extraction_method`.
 
 ### Layer 2: Position (per actor)
@@ -102,7 +102,7 @@ Law-level holder fields (`duty_holder`, `rights_holder`, `responsibility_holder`
 | **Implied rights** | Where a government actor's active Obligation grants a governed party access (inspection by the public, facilities for copies, supply on request/payment), the governed party named in the clause gets an **inferred Liberty, active**, so a Right. Depends on the wording: enforcement or notice-service provisions never qualify. Marked `extraction_method = inferred` (#67). |
 | **Scoped LAT** | `enabling_extent`: never classified. `relevance`: classified within the scope; the verdict is scope-relative, and provenance carries `lat_coverage` (#66). |
 | **Revoked laws** | Classified as while in force. A revoked Making law was Making; status and DRRP are independent (Jason, 2026-09-28). |
-| **Human adjudication** | An `adjudicated` actor type (human-review) is the top source tier and survives reconcile. |
+| **Human adjudication** | The `adjudicated` tier (`provision_actors.adj_drrp`/`adj_position`/`adj_note`) is the top source tier: reconcile never overrides it and `taxa infer` never deletes its rows. First used for benchmark gold labels carried across a LAT sync (`scripts/benchmarks/carry_forward_gold.py`). |
 
 ## Payload contract (fractalaw → sertantai-legal)
 

@@ -302,7 +302,9 @@ impl PgStore {
              WHERE pa.section_id = lt.section_id AND lt.law_name = $1 \
              AND pa.regex_drrp IS NULL AND pa.regex_position IS NULL \
              AND pa.cls_drrp IS NULL AND pa.cls_position IS NULL \
-             AND pa.llm_drrp IS NULL AND pa.llm_position IS NULL"
+             AND pa.llm_drrp IS NULL AND pa.llm_position IS NULL \
+             AND pa.slm_drrp IS NULL AND pa.slm_position IS NULL \
+             AND pa.adj_position IS NULL"
         )
         .bind(law_name)
         .execute(&self.pool)
@@ -448,6 +450,7 @@ impl PgStore {
                    )) \
                  ) AS drrp_arr, \
                  CASE \
+                   WHEN bool_or(pa.extraction_method = 'adjudicated') THEN 'adjudicated' \
                    WHEN bool_or(pa.extraction_method = 'llm') THEN 'llm' \
                    WHEN bool_or(pa.extraction_method LIKE 'reconciled%') THEN 'reconciled' \
                    WHEN bool_or(pa.extraction_method = 'inferred') THEN 'inferred' \
@@ -1178,6 +1181,22 @@ impl crate::ProvisionStore for PgStore {
     }
 
     #[allow(clippy::type_complexity)]
+    async fn query_adjudicated_actors(
+        &self,
+        law_name: &str,
+    ) -> Result<std::collections::HashMap<(String, String), (Option<String>, String)>, StoreError> {
+        let rows = sqlx::query_as::<_, (String, String, Option<String>, String)>(
+            "SELECT pa.section_id, pa.actor_label, pa.adj_drrp, pa.adj_position FROM provision_actors pa \
+             JOIN legislation_text lt ON pa.section_id = lt.section_id \
+             WHERE lt.law_name = $1 AND pa.adj_position IS NOT NULL",
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_adjudicated_actors: {e}")))?;
+        Ok(rows.into_iter().map(|(s, l, d, p)| ((s, l), (d, p))).collect())
+    }
+
     async fn query_all_actor_signals(
         &self,
         law_name: &str,

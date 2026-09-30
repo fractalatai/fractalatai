@@ -228,6 +228,7 @@ pub(crate) async fn cmd_taxa_infer(
             String,
             Vec<(String, String, Option<String>, Option<String>)>,
         > = std::collections::HashMap::new();
+        let adjudicated = lance.query_adjudicated_actors(law_name).await?;
         let category: std::collections::HashMap<(&str, &str), &str> = actors
             .iter()
             .map(|(sid, label, cat, _, _)| ((sid.as_str(), label.as_str()), cat.as_str()))
@@ -235,9 +236,14 @@ pub(crate) async fn cmd_taxa_infer(
         for (sid, label, regex_drrp, regex_pos, _cd, cls_pos, cls_conf, _idrrp, _ipos, slm_drrp, slm_pos, slm_conf, llm_drrp, llm_pos)
             in lance.query_all_actor_signals(law_name).await?
         {
-            let drrp = reconcile_drrp(&regex_drrp, &slm_drrp, &llm_drrp, &None, &None);
-            let pos = reconcile_position(&regex_pos, &cls_pos, &cls_conf, &None, &slm_pos, &slm_conf, &llm_pos)
-                .map(|(p, _, _)| p);
+            let (drrp, pos) = match adjudicated.get(&(sid.clone(), label.clone())) {
+                Some((d, p)) => (d.clone(), Some(p.clone())),
+                None => (
+                    reconcile_drrp(&regex_drrp, &slm_drrp, &llm_drrp, &None, &None),
+                    reconcile_position(&regex_pos, &cls_pos, &cls_conf, &None, &slm_pos, &slm_conf, &llm_pos)
+                        .map(|(p, _, _)| p),
+                ),
+            };
             let cat = category.get(&(sid.as_str(), label.as_str())).copied().unwrap_or("").to_string();
             best_by_section.entry(sid.clone()).or_default().push((label, cat, drrp, pos));
         }
@@ -375,11 +381,19 @@ pub(crate) async fn cmd_taxa_reconcile(
         }
 
         let mut updates: Vec<(String, String, Option<String>, String, String, String)> = Vec::new();
+        // Adjudicated (human/gold) is the top tier: reconcile never overrides it
+        let adjudicated = lance.query_adjudicated_actors(law_name).await?;
 
         for (sid, label, regex_drrp, regex_pos, _cls_drrp, cls_pos, cls_conf,
              inferred_drrp, inferred_pos, slm_drrp, slm_pos, slm_conf,
              llm_drrp, llm_pos) in &signals
         {
+            if let Some((adj_drrp, adj_pos)) = adjudicated.get(&(sid.clone(), label.clone())) {
+                *counts.entry("adjudicated").or_default() += 1;
+                updates.push((sid.clone(), label.clone(), adj_drrp.clone(), adj_pos.clone(), "adjudicated".into(), "HIGHEST".into()));
+                total += 1;
+                continue;
+            }
             let final_drrp = reconcile_drrp(regex_drrp, slm_drrp, llm_drrp, inferred_drrp, inferred_pos);
 
             let Some((final_pos, method, confidence)) = reconcile_position(
