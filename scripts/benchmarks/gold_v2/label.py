@@ -14,7 +14,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from common import CALLERS, PROMPT_VERSION, MODELS, ancestors, connect, system_prompt, user_prompt  # noqa: E402
+from common import CALLERS, PROMPT_VERSION, MODELS, ancestors, connect, references, system_prompt, user_prompt  # noqa: E402
 
 
 def main() -> None:
@@ -47,7 +47,7 @@ def main() -> None:
         if f"{sid}|{md5}" in done:
             continue
         stems = [(a, texts[a]) for a in ancestors(sid) if texts.get(a)]
-        jobs.append((sid, law, md5, user_prompt(sid, text, stems)))
+        jobs.append((sid, law, md5, user_prompt(sid, text, stems, references(sid, text, texts))))
     if args.limit:
         jobs = jobs[: args.limit]
     print(f"{model}: {len(jobs)} provisions to label ({len(rows)} substantive, {len(rows) - len(jobs)} already done or skipped)")

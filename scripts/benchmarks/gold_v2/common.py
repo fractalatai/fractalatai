@@ -18,7 +18,7 @@ import psycopg
 import yaml
 
 PG = "postgres://fractalaw:fractalaw@localhost:5433/fractalaw"
-PROMPT_VERSION = "gold-v2-2026-09-30.1"
+PROMPT_VERSION = "gold-v2-2026-09-30.2"
 MODELS = {"gemini": "gemini-2.5-pro", "openai": "gpt-5.5"}
 DICTIONARY = "crates/fractalaw-core/data/actor-dictionary.yaml"
 
@@ -78,6 +78,11 @@ For each ACTOR (person, body or class of persons) the provision refers to, give:
 - **Passive and thing-subject duties are Obligations with an unknown holder.** "records shall be kept", "equipment must be provided", "the register shall be available" with no named doer → relation `yes`, raw_type `Obligation`, and no actor is active unless the text names who must act.
 - **Stems and list items.** You are given the provision's ancestors (its stem) as CONTEXT. Label the actors of the provision read together with its stem. If the provision completes a duty or power sentence begun in the stem (e.g. stem "It shall be the duty of each enforcing authority—", item "(a) to secure that the registers are available…"), the stem's holder is `active` in this provision too. Don't label a legal relation that exists only in the stem and not in this provision's own text.
 - **Implied access rights.** Where a GOVERNMENT actor's Obligation is to make something available for inspection/copying by, or to supply copies on request/payment to, a governed party named in the provision (e.g. "the public", "any person"), that governed party is `active`, holds `Liberty`, `inferred: true`. Enforcement or notice-service provisions never qualify.
+- **Holder named in a referenced provision.** You are also given the text of provisions this one refers to (REFERENCED PROVISIONS). When the provision's holder is identified only there (e.g. "Regulations under subsection (2) may prescribe…", where subsection (2) says "The Scottish Ministers may by regulations…"; or "A power under this section may be exercised by force", where the section confers the power on an authorised officer), that holder is `active` in this provision. Only use a holder that the referenced text actually names; otherwise the holder is unknown.
+- **Content lists of schemes, regulations and notices.** "A scheme under this section must— (a) …", "Regulations may— (a) …": each item completes the stem's Obligation or Liberty, so relation `yes` with the same type. The holder is the scheme or regulation maker (resolved from the stem or referenced provisions), otherwise raw_type with no active actor.
+- **Statutory defences.** "It is a defence for an accused … to prove that …" → relation `no`; the accused is `mentioned`. A defence qualifies the offence, and offences are not relations.
+- **Commencement and citation.** A short title ("This Act may be cited as …") or a list of commencement dates → relation `no`. A POWER to commence ("on such day as the Secretary of State may by order appoint") is a Liberty held by that actor (`active`).
+- **Procedural time limits.** "Proceedings may be commenced within 6 months …" → relation `no`: a limit on proceedings, not a liberty anyone holds.
 - **Amending text** ("in section 5, for 'X' substitute 'Y'", inserted text) → relation `no`; actors `mentioned`.
 - **Legal fiction.** "shall be treated as", "shall be deemed" → not an Obligation.
 - A provision can have several active holders, e.g. an authority's Obligation and the public's implied Liberty.
@@ -136,9 +141,38 @@ def ancestors(section_id: str) -> list[str]:
     return out
 
 
-def user_prompt(section_id: str, text: str, stems: list[tuple[str, str]]) -> str:
+_PREFIX = {"section": "s.", "regulation": "reg.", "article": "art.Article "}
+_OWN_REF = re.compile(r"\b(section|regulation|article)\s+(\d+[A-Z]*)((?:\s*\(\w{1,4}\))*)(?!\s+(?:of|to)\s+(?:the|that)\b)", re.I)
+_SUB_REF = re.compile(r"\b(?:subsection|paragraph)s?\s+\((\w{1,4})\)(?!\s+of\s+(?:section|regulation|article|schedule)\b)", re.I)
+_THIS_REF = re.compile(r"\bthis\s+(section|regulation|article)\b", re.I)
+
+
+def references(section_id: str, text: str, texts: dict[str, str]) -> list[tuple[str, str]]:
+    """Provisions of the same law this one refers to ("subsection (2)", "regulation 5(1)", "this section")."""
+    law, local = section_id.split(":", 1)
+    base = local.split("(", 1)[0]
+    found = []
+    for m in _SUB_REF.finditer(text):
+        found.append(f"{law}:{base}({m.group(1)})")
+    for m in _OWN_REF.finditer(text):
+        brackets = re.sub(r"\s+", "", m.group(3) or "")
+        found.append(f"{law}:{_PREFIX[m.group(1).lower()]}{m.group(2)}{brackets}")
+    if _THIS_REF.search(text):
+        found += [f"{law}:{base}", f"{law}:{base}(1)"]
+    own = {section_id, *ancestors(section_id)}
+    out = []
+    for sid in dict.fromkeys(found):
+        cand = sid if texts.get(sid) else sid.split("(", 1)[0] if texts.get(sid.split("(", 1)[0]) else None
+        if cand and cand not in own and cand not in {c for c, _ in out}:
+            out.append((cand, texts[cand]))
+    return out[:4]
+
+
+def user_prompt(section_id: str, text: str, stems: list[tuple[str, str]], refs: list[tuple[str, str]] = ()) -> str:
     ctx = "\n".join(f"[{sid}] {t[:1500]}" for sid, t in reversed(stems)) or "(none)"
-    return f"STEM CONTEXT (ancestors, outermost first):\n{ctx}\n\nPROVISION TO LABEL [{section_id}]:\n{text[:6000]}"
+    ref = "\n".join(f"[{sid}] {t[:1500]}" for sid, t in refs) or "(none)"
+    return (f"STEM CONTEXT (ancestors, outermost first):\n{ctx}\n\nREFERENCED PROVISIONS (same law):\n{ref}\n\n"
+            f"PROVISION TO LABEL [{section_id}]:\n{text[:6000]}")
 
 
 def _post(url: str, body: dict, headers: dict, timeout: int = 180) -> dict:
