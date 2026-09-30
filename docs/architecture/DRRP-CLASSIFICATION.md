@@ -149,7 +149,7 @@ Law-level holder fields (`duty_holder`, `rights_holder`, `responsibility_holder`
 | **Procedural time limits** | "Proceedings may be commenced within 6 months …" → none: a limitation on proceedings, not a liberty anyone holds. (Jason, 2026-09-30) |
 | **Implied rights** | Where a government actor's active Obligation grants a governed party access (inspection by the public, facilities for copies, supply on request/payment), the governed party named in the clause gets an **inferred Liberty, active**, so a Right. Depends on the wording: enforcement or notice-service provisions never qualify. Marked `extraction_method = inferred` (#67). |
 | **Scoped LAT** | `enabling_extent`: never classified. `relevance`: classified within the scope; the verdict is scope-relative, and provenance carries `lat_coverage` (#66). |
-| **Revoked laws** | Classified as while in force. A revoked Making law was Making; status and DRRP are independent (Jason, 2026-09-28). |
+| **Revoked laws** | Status never changes classification: revocation doesn't affect what the law did while it was live, so a revoked Making law stays Making and is never re-marked non-Making because it is revoked (Jason, 2026-09-28). This is **not** a reason to re-process dead laws: their existing verdict stands, and no earlier text is fetched for them (Jason, 2026-09-30). |
 | **Human adjudication** | The `adjudicated` tier (`provision_actors.adj_drrp`/`adj_position`/`adj_note`) is the top source tier: reconcile never overrides it and `taxa infer` never deletes its rows. First used for benchmark gold labels carried across a LAT sync (`scripts/benchmarks/carry_forward_gold.py`). |
 
 ## Payload contract (fractalaw → sertantai-legal)
