@@ -170,8 +170,8 @@ pub fn extract_rule_signals(
         };
 
         matches.push(PatternSignal {
-            tier: SignalTier::Rule,
-            family: DutyFamily::Rule,
+            tier: SignalTier::ThingSubject,
+            family: DutyFamily::ThingSubject,
             sub_type,
             confidence: 0.55,
             span: None,
@@ -229,7 +229,7 @@ pub fn match_rule(text: &str) -> Option<DutyClassification> {
         };
 
         return Some(DutyClassification {
-            family: DutyFamily::Rule,
+            family: DutyFamily::ThingSubject,
             sub_type,
             confidence: 0.55,
             span: None,
@@ -248,14 +248,14 @@ mod tests {
     #[test]
     fn traffic_routes_must_be_suitable() {
         let text = "every traffic routes must be suitable for the persons or vehicles using them";
-        assert_eq!(match_rule(text).map(|dc| dc.family), Some(DutyFamily::Rule));
+        assert_eq!(match_rule(text).map(|dc| dc.family), Some(DutyFamily::ThingSubject));
     }
 
     #[test]
     fn cofferdam_must_be_suitable() {
         let text = "a cofferdam must be of suitable design and construction";
         let result = match_rule(text).unwrap();
-        assert_eq!(result.family, DutyFamily::Rule);
+        assert_eq!(result.family, DutyFamily::ThingSubject);
         assert_eq!(result.sub_type, DutySubType::ThingObligation);
     }
 
@@ -263,21 +263,21 @@ mod tests {
     fn equipment_must_be_provided() {
         let text = "suitable and sufficient fire-fighting equipment must be provided";
         let result = match_rule(text).unwrap();
-        assert_eq!(result.family, DutyFamily::Rule);
+        assert_eq!(result.family, DutyFamily::ThingSubject);
     }
 
     #[test]
     fn workplace_shall_be_ventilated() {
         let text = "every workplace shall be ventilated by a sufficient quantity of fresh air";
         let result = match_rule(text).unwrap();
-        assert_eq!(result.family, DutyFamily::Rule);
+        assert_eq!(result.family, DutyFamily::ThingSubject);
     }
 
     #[test]
     fn scaffolding_must_be_inspected() {
         let text = "scaffolding must be inspected before being taken into use";
         let result = match_rule(text).unwrap();
-        assert_eq!(result.family, DutyFamily::Rule);
+        assert_eq!(result.family, DutyFamily::ThingSubject);
     }
 
     #[test]
@@ -310,6 +310,6 @@ mod tests {
     fn lighting_shall_be_sufficient() {
         let text = "suitable and sufficient lighting shall be provided in every workplace";
         let result = match_rule(text).unwrap();
-        assert_eq!(result.family, DutyFamily::Rule);
+        assert_eq!(result.family, DutyFamily::ThingSubject);
     }
 }

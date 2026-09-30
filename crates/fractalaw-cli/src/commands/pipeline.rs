@@ -507,7 +507,7 @@ fn parse_provisions(
             for dt in &record.duty_types {
                 taxa.duty_types.insert(format!("{dt:?}"));
                 // Map 3-class types to DuckDB columns (backward compatible):
-                // Obligation → duty_holder, Liberty → rights_holder, Rule → duty_holder
+                // Obligation → duty_holder, Liberty → rights_holder
                 // responsibility_holder and power_holder left empty (Phase 3)
                 let (holders_set, entries) = match dt {
                     fractalaw_core::taxa::duty_type::DutyType::Obligation => {
@@ -515,9 +515,6 @@ fn parse_provisions(
                     }
                     fractalaw_core::taxa::duty_type::DutyType::Liberty => {
                         (&mut taxa.rights_holders, &mut taxa.rights)
-                    }
-                    fractalaw_core::taxa::duty_type::DutyType::Rule => {
-                        (&mut taxa.duty_holders, &mut taxa.duties)
                     }
                 };
                 for actor in &record.governed_actors {
@@ -1473,6 +1470,35 @@ pub(crate) fn drrp_column_types(store: &DuckStore) -> anyhow::Result<(String, St
         }
     }
     Ok((list_type, struct_type.context("legislation.duties column type not found")?))
+}
+
+/// The law-level verdict DuckDB currently holds (as sertantai-legal reads it):
+/// `None` when the DRRP columns are all NULL (no verdict).
+pub(crate) fn read_law_verdict(store: &DuckStore, law_name: &str) -> anyhow::Result<Option<&'static str>> {
+    let mut out = None;
+    for batch in store.query_arrow(&format!(
+        "SELECT CASE \
+           WHEN duties IS NULL AND responsibilities IS NULL AND rights IS NULL AND powers IS NULL THEN NULL \
+           WHEN coalesce(len(duties), 0) + coalesce(len(responsibilities), 0) > 0 THEN 'making' \
+           WHEN coalesce(len(rights), 0) + coalesce(len(powers), 0) > 0 THEN 'empowering' \
+           ELSE 'no_obligations' END \
+         FROM legislation WHERE name = '{}'",
+        law_name.replace('\'', "''")
+    ))? {
+        let Some(col) = batch.column(0).as_any().downcast_ref::<arrow::array::StringArray>() else {
+            continue;
+        };
+        for i in 0..batch.num_rows() {
+            if !col.is_null(i) {
+                out = match col.value(i) {
+                    "making" => Some("making"),
+                    "empowering" => Some("empowering"),
+                    _ => Some("no_obligations"),
+                };
+            }
+        }
+    }
+    Ok(out)
 }
 
 /// Write the law-level DRRP rolled up from reconciled provision_actors (#55).

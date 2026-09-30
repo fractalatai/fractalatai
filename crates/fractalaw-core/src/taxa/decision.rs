@@ -58,7 +58,7 @@ const TIER_ORDER: &[SignalTier] = &[
     SignalTier::GovernmentV1,
     SignalTier::GovernmentV2,
     SignalTier::OffenceAsDuty,
-    SignalTier::Rule,
+    SignalTier::ThingSubject,
 ];
 
 /// Given a complete SignalSet, pick the best classification.
@@ -166,7 +166,7 @@ fn map_to_duty_types(dc: &DutyClassification) -> Vec<DutyType> {
                 }
             }
         },
-        DutyFamily::Rule => match dc.sub_type {
+        DutyFamily::ThingSubject => match dc.sub_type {
             DutySubType::Enabling => vec![DutyType::Liberty],
             _ => vec![DutyType::Obligation],
         },

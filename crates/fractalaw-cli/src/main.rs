@@ -301,6 +301,9 @@ enum TaxaAction {
         /// Specific laws (comma-separated)
         #[arg(long)]
         laws: String,
+        /// Write nothing: print each law's current vs new law-level verdict (TSV)
+        #[arg(long)]
+        dry_run: bool,
     },
     /// Classify pending_llm actors via local SLM (Ollama gemma3-position)
     Slm {
@@ -403,6 +406,53 @@ async fn open_provision_store(
             .context("opening LanceDB")?;
         Ok(Box::new(store))
     }
+}
+
+/// Law-level DRRP outcome for one law (#55, #68): the verdict or the reason
+/// there's none, and the roll-up to write where there is one. Shared by
+/// `taxa backfill` and its `--dry-run`.
+fn law_drrp_for(
+    inputs: &fractalaw_store::LawDrrpInputs,
+) -> (&'static str, Option<fractalaw_core::taxa::law_drrp::LawDrrp>) {
+    use fractalaw_core::taxa::law_drrp::{ActorSignal, LawDrrp, aggregate};
+    if inputs.signals.iter().any(|(_, _, _, method, _)| method.is_none()) {
+        return ("unreconciled", None);
+    }
+    if inputs.signals.is_empty() {
+        return if inputs.duty_text_provisions == 0 && inputs.substantive_provisions > 0 {
+            ("no_obligations_no_duty_text", Some(LawDrrp::default()))
+        } else {
+            ("no_actors", None)
+        };
+    }
+    if !inputs.provisions.iter().any(|(_, _, scope)| scope.is_some()) {
+        return ("not_run", None);
+    }
+    let texts: std::collections::HashMap<&str, &str> = inputs
+        .provisions
+        .iter()
+        .filter_map(|(sid, text, _)| text.as_deref().map(|t| (sid.as_str(), t)))
+        .collect();
+    // Amendment-scope provisions belong to the amended instrument (#57)
+    let amendment: std::collections::HashSet<&str> = inputs
+        .provisions
+        .iter()
+        .filter(|(_, _, scope)| scope.as_deref() == Some("amendment"))
+        .map(|(sid, _, _)| sid.as_str())
+        .collect();
+    let signals: Vec<ActorSignal> = inputs
+        .signals
+        .iter()
+        .filter(|(sid, ..)| !amendment.contains(sid.as_str()))
+        .map(|(sid, label, drrp, _, position)| ActorSignal {
+            section_id: sid.clone(),
+            actor_label: label.clone(),
+            drrp: drrp.clone().unwrap_or_default(),
+            position: position.clone().unwrap_or_default(),
+        })
+        .collect();
+    let law = aggregate(&signals, &inputs.holder_unknown, |sid| texts.get(sid).map(|t| t.to_string()));
+    (law.verdict().map_or("holder_unknown", |v| v.as_str()), Some(law))
 }
 
 #[tokio::main]
@@ -567,7 +617,7 @@ async fn main() -> anyhow::Result<()> {
                 if r.is_ok() { provenance::record(pg_url.as_deref(), Some(&law_names), provenance::taxa_reconcile()).await; }
                 r
             }
-            TaxaAction::Backfill { laws } => {
+            TaxaAction::Backfill { laws, dry_run } => {
                 let store = open_duck(&data_dir)?;
                 let lance = open_provision_store(&data_dir, pg_url.as_deref()).await?;
                 let law_names = provenance::without_enabling_extent(
@@ -583,7 +633,27 @@ async fn main() -> anyhow::Result<()> {
                 let mut verdicts: std::collections::BTreeMap<&str, usize> = std::collections::BTreeMap::new();
                 let mut drrp_rolled_up: Vec<String> = Vec::new();
                 let mut no_duty_text: Vec<String> = Vec::new();
+                let mut transitions: std::collections::BTreeMap<(String, String), usize> = std::collections::BTreeMap::new();
+                if dry_run {
+                    println!("law\tcurrent\tnew\tduties\tresponsibilities\trights\tpowers\tholder_unknown\tnon_active_excluded");
+                }
                 for law_name in &law_names {
+                    if dry_run {
+                        // Same inputs and branches as the real run, nothing written
+                        let current = commands::pipeline::read_law_verdict(&store, law_name)?.unwrap_or("-");
+                        let inputs = lance.query_law_drrp_inputs(law_name).await?;
+                        let (new, law) = law_drrp_for(&inputs);
+                        let row = law.map(|l| {
+                            format!(
+                                "{}\t{}\t{}\t{}\t{}\t{}",
+                                l.duties.len(), l.responsibilities.len(), l.rights.len(), l.powers.len(),
+                                l.holder_unknown, l.excluded_non_active
+                            )
+                        });
+                        println!("{law_name}\t{current}\t{new}\t{}", row.unwrap_or_else(|| "\t\t\t\t\t".into()));
+                        *transitions.entry((current.to_string(), new.to_string())).or_default() += 1;
+                        continue;
+                    }
                     let updated = lance.backfill_from_actors(law_name).await?;
                     let sig = lance.backfill_significance(law_name).await?;
 
@@ -613,62 +683,43 @@ async fn main() -> anyhow::Result<()> {
                     // Law-level DRRP from reconciled provision_actors → DuckDB (#55).
                     // Only where DRRP ran (parsed provisions); otherwise leave it as is.
                     let inputs = lance.query_law_drrp_inputs(law_name).await?;
-                    let unreconciled = inputs.signals.iter().any(|(_, _, _, method)| method.is_none());
-                    if unreconciled {
-                        // Reconcile hasn't run: no verdict rather than a false "no obligations"
-                        eprintln!("  {law_name}: unreconciled provision_actors, law-level DRRP left unchanged (run taxa reconcile)");
-                        *verdicts.entry("unreconciled").or_default() += 1;
-                    } else if inputs.signals.is_empty()
-                        && inputs.duty_text_provisions == 0
-                        && inputs.substantive_provisions > 0
-                    {
-                        // No actors and no duty text in any substantive provision: parse ran and
-                        // found nothing to impose — evidence of no obligations, not an actor gap.
-                        let law = fractalaw_core::taxa::law_drrp::LawDrrp::default();
-                        commands::pipeline::write_law_drrp(&store, law_name, &law, &drrp_types)?;
-                        eprintln!(
-                            "  {law_name}: no duty text in {} substantive provisions → no_obligations",
-                            inputs.substantive_provisions
-                        );
-                        *verdicts.entry("no_obligations_no_duty_text").or_default() += 1;
-                        no_duty_text.push(law_name.clone());
-                    } else if inputs.signals.is_empty() {
-                        // No actor rows but duty text present (or nothing parsed): parse found no
-                        // duty-bearer it could name (actor model gap), so there is no evidence
-                        // either way. Leave law-level DRRP unchanged.
-                        eprintln!("  {law_name}: no provision_actors, law-level DRRP left unchanged");
-                        *verdicts.entry("no_actors").or_default() += 1;
-                    } else if inputs.provisions.iter().any(|(_, _, scope)| scope.is_some()) {
-                        use fractalaw_core::taxa::law_drrp::{ActorSignal, aggregate};
-                        let texts: std::collections::HashMap<&str, &str> = inputs
-                            .provisions
-                            .iter()
-                            .filter_map(|(sid, text, _)| text.as_deref().map(|t| (sid.as_str(), t)))
-                            .collect();
-                        // Amendment-scope provisions belong to the amended instrument (#57)
-                        let amendment: std::collections::HashSet<&str> = inputs
-                            .provisions
-                            .iter()
-                            .filter(|(_, _, scope)| scope.as_deref() == Some("amendment"))
-                            .map(|(sid, _, _)| sid.as_str())
-                            .collect();
-                        let signals: Vec<ActorSignal> = inputs
-                            .signals
-                            .iter()
-                            .filter(|(sid, _, _, _)| !amendment.contains(sid.as_str()))
-                            .map(|(sid, label, drrp, _)| ActorSignal {
-                                section_id: sid.clone(),
-                                actor_label: label.clone(),
-                                drrp: drrp.clone().unwrap_or_default(),
-                            })
-                            .collect();
-                        let law = aggregate(&signals, |sid| texts.get(sid).map(|t| t.to_string()));
-                        commands::pipeline::write_law_drrp(&store, law_name, &law, &drrp_types)?;
-                        *verdicts.entry(law.verdict().as_str()).or_default() += 1;
-                        drrp_rolled_up.push(law_name.clone());
-                    } else {
-                        *verdicts.entry("not_run").or_default() += 1;
+                    let (outcome, law) = law_drrp_for(&inputs);
+                    match (outcome, law) {
+                        ("unreconciled", _) => {
+                            // Reconcile hasn't run: no verdict rather than a false "no obligations"
+                            eprintln!("  {law_name}: unreconciled provision_actors, law-level DRRP left unchanged (run taxa reconcile)");
+                        }
+                        ("no_obligations_no_duty_text", Some(law)) => {
+                            // No actors and no duty text in any substantive provision: parse ran and
+                            // found nothing to impose — evidence of no obligations, not an actor gap.
+                            commands::pipeline::write_law_drrp(&store, law_name, &law, &drrp_types)?;
+                            eprintln!(
+                                "  {law_name}: no duty text in {} substantive provisions → no_obligations",
+                                inputs.substantive_provisions
+                            );
+                            no_duty_text.push(law_name.clone());
+                        }
+                        ("no_actors", _) => {
+                            // No actor rows but duty text present (or nothing parsed): parse found no
+                            // duty-bearer it could name (actor model gap), so there is no evidence
+                            // either way. Leave law-level DRRP unchanged.
+                            eprintln!("  {law_name}: no provision_actors, law-level DRRP left unchanged");
+                        }
+                        ("holder_unknown", Some(law)) => {
+                            // No Duty/Responsibility, but Obligations whose holder we can't name:
+                            // no verdict, not empowering or no_obligations (#68). Raw duty_type
+                            // with empty lists, so legal overwrites the stale verdict.
+                            commands::pipeline::write_law_drrp(&store, law_name, &law.holder_unknown_payload(), &drrp_types)?;
+                            eprintln!("  {law_name}: {} holder-unknown Obligation provisions → no verdict", law.holder_unknown);
+                            drrp_rolled_up.push(law_name.clone());
+                        }
+                        (_, Some(law)) => {
+                            commands::pipeline::write_law_drrp(&store, law_name, &law, &drrp_types)?;
+                            drrp_rolled_up.push(law_name.clone());
+                        }
+                        _ => {}
                     }
+                    *verdicts.entry(outcome).or_default() += 1;
 
                     // Part-level significance breakdown for large Acts
                     if let Some(parts_json) = lance.query_significance_parts(law_name).await? {
@@ -685,6 +736,13 @@ async fn main() -> anyhow::Result<()> {
 
                     total += updated;
                     sig_total += sig;
+                }
+                if dry_run {
+                    eprintln!("Verdict transitions (current → new) across {} laws:", law_names.len());
+                    for ((from, to), n) in &transitions {
+                        eprintln!("  {from} → {to}: {n}");
+                    }
+                    return Ok(());
                 }
                 println!(
                     "Backfilled {total} provisions, {sig_total} significance, {law_sig_total} law-level ratings, {parts_total} Part breakdowns across {} laws",

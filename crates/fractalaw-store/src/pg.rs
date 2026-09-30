@@ -400,7 +400,12 @@ impl PgStore {
     /// `drrp_types` is the union of the **active** actors' own types (legal
     /// types DRRP per active actor, #67); a counterparty's Obligation reading
     /// must not add an Obligation no active actor holds. Falls back to all
-    /// actors' types only when no actor is active.
+    /// actors' types only when no actor is active (holder unknown: raw types).
+    ///
+    /// Each actor's `drrp` in the payload is what that actor holds: `none`
+    /// unless it is active (DRRP-CLASSIFICATION.md layer 1, #68). The
+    /// non-active reading stays in `provision_actors.drrp` as the raw type
+    /// for the holder-unknown fallback.
     pub async fn backfill_from_actors(&self, law_name: &str) -> Result<usize, StoreError> {
         let result = sqlx::query(
             "UPDATE legislation_text lt SET \
@@ -412,7 +417,7 @@ impl PgStore {
                  jsonb_agg(jsonb_build_object( \
                    'label', pa.actor_label, \
                    'position', pa.position, \
-                   'drrp', pa.drrp, \
+                   'drrp', CASE WHEN pa.position = 'active' THEN pa.drrp ELSE 'none' END, \
                    'label_source', 'canonical', \
                    'reason', pa.extraction_method, \
                    'relates_to', null \
@@ -512,9 +517,24 @@ impl PgStore {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?;
-        let signals = sqlx::query_as::<_, (String, String, Option<String>, Option<String>)>(
-            "SELECT pa.section_id, pa.actor_label, pa.drrp, pa.extraction_method FROM provision_actors pa \
+        let signals = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, Option<String>)>(
+            "SELECT pa.section_id, pa.actor_label, pa.drrp, pa.extraction_method, pa.position FROM provision_actors pa \
              JOIN legislation_text lt ON lt.section_id = pa.section_id WHERE lt.law_name = $1",
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?;
+        // Read from provision_actors, not the backfilled drrp_types, so a dry run sees the same
+        let holder_unknown = sqlx::query_scalar::<_, String>(
+            "SELECT lt.section_id FROM legislation_text lt \
+             WHERE lt.law_name = $1 AND lt.scope = 'substantive' \
+               AND NOT EXISTS (SELECT 1 FROM provision_actors pa \
+                               WHERE pa.section_id = lt.section_id AND pa.position = 'active') \
+               AND (EXISTS (SELECT 1 FROM provision_actors pa \
+                            WHERE pa.section_id = lt.section_id AND pa.drrp = 'Obligation') \
+                    OR (NOT EXISTS (SELECT 1 FROM provision_actors pa WHERE pa.section_id = lt.section_id) \
+                        AND lt.drrp_types && ARRAY['Obligation', 'Rule']))",
         )
         .bind(law_name)
         .fetch_all(&self.pool)
@@ -528,7 +548,7 @@ impl PgStore {
         .fetch_one(&self.pool)
         .await
         .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?;
-        Ok(crate::provision_store::LawDrrpInputs { provisions, signals, duty_text_provisions, substantive_provisions })
+        Ok(crate::provision_store::LawDrrpInputs { provisions, signals, holder_unknown, duty_text_provisions, substantive_provisions })
     }
 
     /// Query Part-level significance breakdown for large Acts.

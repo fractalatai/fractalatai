@@ -37,7 +37,7 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
 - **Passive and thing-subject duties** ("records shall be kept", "equipment must be provided", "traffic routes must be suitable") are `Obligation` with the holder unknown until #60 resolves it (e.g. stem inheritance). A thing can't hold a duty, so these are never a separate type or a sub-type that blocks holder resolution.
 - **Definitions, deeming, application and extent** ("'premises' includes…", "a notice shall be treated as served…", "this Part applies to…") create no relation, so they get no type. A positive provision-level label for them (constitutive provisions) is proposed separately as a provision-function field outside DRRP (#69). The missing Hohfeldian positions (Immunity etc.) are proposed in #70.
 
-**Non-active actors hold nothing.** An actor whose position isn't `active` has type `none`, whatever the model predicted.
+**Non-active actors hold nothing.** An actor whose position isn't `active` has type `none`, whatever the model predicted. `provision_actors.drrp` keeps the tier's reading (the provision's type from that actor's side), which is used only as the raw type when the holder is unknown. The payload and the roll-up expose `none`.
 
 **Source and precedence** (reconcile, `fractalaw-cli/src/commands/taxa.rs`):
 - **Type:** LLM > inferred-active > SLM > regex. An inferred type counts only when the inference also makes the actor active.
@@ -84,8 +84,10 @@ Rolled up over the law's provisions, **excluding** amendment scope (inserted tex
 |---|---|
 | **making** | at least one Duty or Responsibility |
 | **empowering** | Rights and/or Powers only |
-| **no_obligations** | parsed and reconciled, with no DRRP; **or** zero actors and no duty text in any substantive provision (evidenced, provenance model `fractalaw-law-drrp:no_duty_text`) |
-| *(no verdict)* | actors not yet reconciled; **or** zero actors but duty text present (actor gap, #58/#60); **or** the LAT is `enabling_extent` |
+| **no_obligations** | parsed and reconciled, with no DRRP and no holder-unknown Obligation; **or** zero actors and no duty text in any substantive provision (evidenced, provenance model `fractalaw-law-drrp:no_duty_text`) |
+| *(no verdict)* | actors not yet reconciled; **or** zero actors but duty text present (actor gap, #58/#60); **or** no Duty/Responsibility but at least one substantive provision has an Obligation with no known holder (it may be a Duty); **or** the LAT is `enabling_extent` |
+
+A holder-unknown Obligation never makes a law Making, and it also stops a law being called empowering or no_obligations. That no-verdict case has an explicit payload shape (see the payload contract), not NULL.
 
 Law-level holder fields (`duty_holder`, `rights_holder`, `responsibility_holder`, `power_holder`, `duties`, `rights`, `responsibilities`, `powers`) list **who holds** each DRRP, which means active actors only.
 
@@ -112,7 +114,15 @@ Law-level holder fields (`duty_holder`, `rights_holder`, `responsibility_holder`
   - legal types DRRP from active actors only.
 - Legal expands to DRRP per active actor using its holder class. With no active actor, it keeps the raw type (holder unknown).
 
-**Law payload** (`taxa/enrichment/{law}`, from DuckDB `legislation`): the layer-5 holder fields, significance, fitness and application fields, plus `provenance` (#63).
+**Law payload** (`taxa/enrichment/{law}`, from DuckDB `legislation`): the layer-5 holder fields, significance, fitness and application fields, plus `provenance` (#63). The DRRP section has three shapes:
+
+| Shape | Meaning to legal |
+|---|---|
+| holder lists and `duties`/`responsibilities`/`rights`/`powers` populated or empty, `duty_type` = DRRP types | the verdict (making / empowering / no_obligations) |
+| `duty_type` keeps the raw `"Obligation"` beside any known Right/Power types (e.g. `["Obligation","Liberty"]`); `duties`, `responsibilities`, `duty_holder`, `responsibility_holder` = `[]`; `rights`, `powers` and their holder lists populated when known, `[]` when none | **holder unknown, no verdict**: legal overwrites stale DRRP, keeps the known Rights/Powers and the unowned Obligation, and sets `making_enrichment_verdict = NULL` (legal e36161b, 03f0154) |
+| every DRRP column NULL | no DRRP in this payload: legal keeps what it has (e.g. a fitness-only publish) |
+
+Never send NULL to clear a verdict: legal can't tell it apart from "not in this payload".
 
 **The verdict is one input to legal's `is_making`, not the final word.** sertantai-legal's `Legal.Making` resolves in this order: human review > enrichment (this verdict) > legacy DRRP > triage > legacy flag > detector > default. E.g. UK_uksi_2008_198 and UK_uksi_2014_2868 stay Making by human review despite a `no_obligations` verdict. Legal's "Housekeeping" corresponds to `no_obligations`. Legacy law-level `duty_type = Obligation` (pre-DRRP) counts as holder unknown, not as Making.
 
@@ -131,15 +141,15 @@ Law-level holder fields (`duty_holder`, `rights_holder`, `responsibility_holder`
 | "A notice shall be treated as served if it is sent by post…" (deeming) | none | no type, no DRRP |
 | "A person guilty of an offence under this section is liable…" | Person none/mentioned | no DRRP |
 
-## Conformance: fractalaw vs this spec (2026-09-29)
+## Conformance: fractalaw vs this spec (2026-09-30)
 
 | Area | Status | Action |
 |---|---|---|
-| Layer 3 holder class | ❌ `law_drrp::is_government_actor` checks the `Gvt*`/`EU:` prefix, so `Crown`, `HM Forces` and `Spc: Notifying Authority` roll up as governed (Duties/Rights instead of Responsibilities/Powers) | Use the dictionary `type`; one shared function for the roll-up and the #67 access rule |
-| Layer 1 `Rule` | ⚠️ never emitted (the thing-subject tier already maps to `Obligation`, `duty_type.rs`), but `DutyType::Rule` and its branch in `pipeline.rs` remain | Remove the variant and the dead branch; rename the tier's family (thing-subject) so it isn't read as a type |
-| Layer 1 non-active type | ❌ non-active actors carry the provision's type (44,275 of 99,728 OL signals) | Normalise to `none` in reconcile/backfill |
+| Layer 3 holder class | ✅ `actors::is_government` reads the dictionary `type` (prefix fallback only for labels not in the dictionary); used by the roll-up, the #67 access rule and the LLM tier | none |
+| Layer 1 `Rule` | ✅ `DutyType::Rule` removed; the thing-subject tier is `DutyFamily::ThingSubject` and yields `Obligation` | none |
+| Layer 1 non-active type | ✅ payload `actors[].drrp` is `none` unless active (`backfill_from_actors`); the roll-up skips non-active actors | Takes effect on the next backfill + republish |
 | Layer 4 union | ✅ active-actor union (`bb0d4ff`); raw fallback = holder unknown | none |
-| Layer 5 roll-up | ❌ counts every actor's type, whatever the position: holder lists include beneficiaries/counterparties; 9 laws are Making only via non-active Obligations | Count active actors only; dry run and review before publishing |
+| Layer 5 roll-up | ✅ active actors only, holder-unknown guard (`law_drrp::aggregate`); `taxa backfill --dry-run` reports current vs new verdicts | Dry run 2026-09-30 awaiting Jason's review before the backfill + publish |
 | Prompts (SLM/LLM) | ⚠️ ask for "the DRRP type of the provision for this actor" | Align to "what this actor holds"; check against the benchmarks (#65) |
 | `HM Forces` class | ✅ dictionary now `type: government` (matches legal) | Existing rows take effect on the next roll-up/backfill |
 | Legal docs | ⚠️ FUNCTION_VALUES out of date; Housekeeping ↔ no_obligations; legacy OL = holder unknown | Legal aligns and links here |

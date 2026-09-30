@@ -110,6 +110,8 @@ struct CompiledDictionary {
     government_keywords: Vec<String>,
     /// All labels from every entry (core + specialist + trigger-only).
     all_labels: HashSet<String>,
+    /// Labels whose dictionary `type` is `government` (holder class, DRRP-CLASSIFICATION.md layer 3).
+    government_labels: HashSet<String>,
 }
 
 /// The YAML file, embedded at compile time.
@@ -125,9 +127,13 @@ static DICTIONARY: LazyLock<CompiledDictionary> = LazyLock::new(|| {
     let mut specialist: HashMap<String, Vec<(String, Regex)>> = HashMap::new();
     let mut government_keywords = Vec::new();
     let mut all_labels = HashSet::new();
+    let mut government_labels = HashSet::new();
 
     for def in &defs {
         all_labels.insert(def.label.clone());
+        if def.actor_type == "government" {
+            government_labels.insert(def.label.clone());
+        }
 
         // Collect drrp_keywords from government-type actors.
         if def.actor_type == "government" {
@@ -177,6 +183,7 @@ static DICTIONARY: LazyLock<CompiledDictionary> = LazyLock::new(|| {
         specialist,
         government_keywords,
         all_labels,
+        government_labels,
     }
 });
 
@@ -187,6 +194,20 @@ static DICTIONARY: LazyLock<CompiledDictionary> = LazyLock::new(|| {
 /// Used by Tier 3 LLM to validate that returned labels match the dictionary.
 pub fn all_actor_labels() -> HashSet<String> {
     DICTIONARY.all_labels.clone()
+}
+
+/// Holder class (DRRP-CLASSIFICATION.md layer 3): true when the actor is
+/// government, so its Obligation is a Responsibility and its Liberty a Power.
+///
+/// Read from the dictionary `type`, never the label prefix: `Crown`,
+/// `HM Forces` and `Spc: Notifying Authority` are government. A label that
+/// isn't in the dictionary (legacy or LLM discovery) falls back to its family
+/// prefix: `Gvt`, `EU:`, `HM Forces:`.
+pub fn is_government(label: &str) -> bool {
+    if DICTIONARY.all_labels.contains(label) {
+        return DICTIONARY.government_labels.contains(label);
+    }
+    label.starts_with("Gvt") || label.starts_with("EU:") || label.starts_with("HM Forces:")
 }
 
 /// Downcased government keywords for `has_government_actor()` in duty_patterns.
@@ -282,6 +303,24 @@ fn run_patterns(text: &str, patterns: &[(String, Regex)]) -> Vec<ActorMatch> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn holder_class_reads_dictionary_type() {
+        use super::is_government;
+        // Government by dictionary type, whatever the prefix (#68)
+        assert!(is_government("Crown"));
+        assert!(is_government("HM Forces"));
+        assert!(is_government("Spc: Notifying Authority"));
+        assert!(is_government("Gvt: Authority: Enforcement"));
+        assert!(is_government("EU: Commission"));
+        assert!(!is_government("Spc: Administrator"));
+        assert!(!is_government("Org: Employer"));
+        assert!(!is_government("Public"));
+        // Not in the dictionary: family prefix
+        assert!(is_government("Gvt: Something New"));
+        assert!(is_government("HM Forces: Army"));
+        assert!(!is_government("Ind: Something New"));
+    }
+
     use super::*;
 
     /// Helper: check if an actor list contains a label.

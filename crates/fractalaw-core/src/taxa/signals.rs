@@ -15,7 +15,7 @@ pub enum SignalTier {
     GovernmentV1,
     GovernmentV2,
     OffenceAsDuty,
-    Rule,
+    ThingSubject,
 }
 
 /// A single positive pattern hit from the regex cascade.

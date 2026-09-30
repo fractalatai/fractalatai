@@ -13,8 +13,12 @@ use crate::StoreError;
 pub struct LawDrrpInputs {
     /// (section_id, text, scope)
     pub provisions: Vec<(String, Option<String>, Option<String>)>,
-    /// (section_id, actor_label, drrp, extraction_method); a NULL method means reconcile hasn't run
-    pub signals: Vec<(String, String, Option<String>, Option<String>)>,
+    /// (section_id, actor_label, drrp, extraction_method, position); a NULL method means reconcile hasn't run
+    pub signals: Vec<(String, String, Option<String>, Option<String>, Option<String>)>,
+    /// Substantive provisions with an Obligation and no known holder: no
+    /// active actor, and either a non-active actor reads Obligation or there
+    /// are no actors and parse found Obligation text (DRRP-CLASSIFICATION.md)
+    pub holder_unknown: Vec<String>,
     /// Substantive (non-amendment) provisions that parse found duty text in
     /// (`drrp_types` has Obligation or Liberty). Zero actors *and* zero duty
     /// text is evidence of no obligations; zero actors with duty text is an

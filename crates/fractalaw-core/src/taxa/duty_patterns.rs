@@ -17,7 +17,9 @@ use regex::Regex;
 pub enum DutyFamily {
     Government,
     Governed,
-    Rule,
+    /// Thing-subject duty ("equipment must be provided"): an Obligation whose
+    /// holder is implied, not named (DRRP-CLASSIFICATION.md: no `Rule` type)
+    ThingSubject,
     Unknown,
 }
 

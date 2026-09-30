@@ -1,10 +1,12 @@
 //! Top-level duty type classifier.
 //!
 //! Orchestrates the three pattern tiers (government v1 → v2 → governed → unknown)
-//! and maps the result to three categories:
-//! - **Obligation** — duty/responsibility on any actor (government or governed)
+//! and maps the result to two types:
+//! - **Obligation** — duty/responsibility on any actor (government or governed),
+//!   including thing-subject and passive duties whose holder is implied
 //! - **Liberty** — permission/power granted to any actor
-//! - **Rule** — thing-subject obligation (no person-actor)
+//!
+//! There is no `Rule` type (docs/architecture/DRRP-CLASSIFICATION.md, #68).
 //!
 //! The Duty/Responsibility and Right/Power distinctions are derivable from
 //! the actor label (governed vs government) at display time.
@@ -17,12 +19,11 @@ use super::duty_patterns_offence;
 use super::duty_patterns_rule;
 use super::duty_patterns_v2;
 
-/// The three duty-type labels (Obligation / Liberty / Rule).
+/// The duty-type labels (Obligation / Liberty).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum DutyType {
     Obligation,
     Liberty,
-    Rule,
 }
 
 impl DutyType {
@@ -31,7 +32,6 @@ impl DutyType {
         match self {
             Self::Obligation => "Obligation",
             Self::Liberty => "Liberty",
-            Self::Rule => "Rule",
         }
     }
 
@@ -40,7 +40,6 @@ impl DutyType {
         match self {
             Self::Obligation => 1,
             Self::Liberty => 2,
-            Self::Rule => 3,
         }
     }
 }
@@ -125,7 +124,7 @@ fn map_to_duty_type(dc: &DutyClassification) -> Vec<DutyType> {
                 }
             }
         }
-        DutyFamily::Rule => match dc.sub_type {
+        DutyFamily::ThingSubject => match dc.sub_type {
             DutySubType::Enabling => vec![DutyType::Liberty],
             _ => vec![DutyType::Obligation], // thing-subject obligations — implied duty-holder resolved by classifier/LLM
         },
@@ -254,12 +253,11 @@ mod tests {
             DutyType::Liberty,
             DutyType::Obligation,
             DutyType::Obligation,
-            DutyType::Rule,
         ];
         sort_duty_types(&mut types);
         assert_eq!(
             types,
-            vec![DutyType::Obligation, DutyType::Liberty, DutyType::Rule]
+            vec![DutyType::Obligation, DutyType::Liberty]
         );
     }
 
@@ -267,7 +265,6 @@ mod tests {
     fn duty_type_as_str() {
         assert_eq!(DutyType::Obligation.as_str(), "Obligation");
         assert_eq!(DutyType::Liberty.as_str(), "Liberty");
-        assert_eq!(DutyType::Rule.as_str(), "Rule");
     }
 
     // ── Offence-as-duty tier ─────────────────────────────────────────

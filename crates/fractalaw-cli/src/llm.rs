@@ -108,20 +108,10 @@ impl ActorMatcher {
         None
     }
 
-    /// Check if a canonical label is a government/EU actor.
+    /// Check if a canonical label is a government actor: the dictionary
+    /// `type` (holder class, DRRP-CLASSIFICATION.md layer 3).
     pub(crate) fn is_government(&self, canonical_label: &str) -> bool {
-        for entry in &self.entries {
-            if entry.canonical() == canonical_label {
-                // Prefer the explicit type field from unified YAML
-                if let Some(ref t) = entry.actor_type {
-                    return t == "government";
-                }
-                // Fallback to category for backward compatibility
-                let cat = entry.category.as_deref().unwrap_or("other");
-                return cat == "Gvt" || cat == "EU";
-            }
-        }
-        false
+        fractalaw_core::taxa::actors::is_government(canonical_label)
     }
 }
 

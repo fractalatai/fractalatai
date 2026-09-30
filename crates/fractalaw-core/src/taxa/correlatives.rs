@@ -5,6 +5,8 @@
 
 use std::collections::HashMap;
 
+use super::actors::is_government;
+
 pub(crate) static RULES_YAML: &str = include_str!("../../data/correlative-rules.yaml");
 
 /// A correlative inference rule.
@@ -108,10 +110,6 @@ static PUBLIC_RE: std::sync::LazyLock<regex::Regex> =
     std::sync::LazyLock::new(|| regex::Regex::new(r"(?i)\b(the public|members of the public|public inspection)\b").unwrap());
 static PERSON_RE: std::sync::LazyLock<regex::Regex> =
     std::sync::LazyLock::new(|| regex::Regex::new(r"(?i)\b(any|a|every) person\b|\bpersons\b").unwrap());
-
-fn is_government(label: &str) -> bool {
-    label.starts_with("Gvt") || label.starts_with("EU:")
-}
 
 /// The governed actor an access clause is addressed to, by label.
 fn addressed(label: &str, text: &str) -> bool {
