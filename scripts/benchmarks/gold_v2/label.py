@@ -23,8 +23,11 @@ def main() -> None:
     ap.add_argument("--laws", required=True)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--model-name", help="override the provider's default model (e.g. gpt-5.4-mini)")
     args = ap.parse_args()
     laws = [x.strip() for x in args.laws.split(",") if x.strip()]
+    if args.model_name:
+        MODELS[args.model] = args.model_name
     model = MODELS[args.model]
     system = system_prompt()
     call = CALLERS[args.model]
@@ -32,7 +35,9 @@ def main() -> None:
     with connect() as conn:
         rows = conn.execute(
             "SELECT section_id, law_name, text FROM legislation_text "
-            "WHERE law_name = ANY(%s) AND scope = 'substantive' AND text IS NOT NULL ORDER BY law_name, sort_key",
+            # Schedules are out of scope for gold v2 (Jason, 2026-09-30)
+            "WHERE law_name = ANY(%s) AND scope = 'substantive' AND text IS NOT NULL "
+            "AND section_id NOT LIKE '%%:sch.%%' ORDER BY law_name, sort_key",
             (laws,),
         ).fetchall()
         texts = dict(conn.execute(
