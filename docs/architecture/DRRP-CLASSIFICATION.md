@@ -44,7 +44,7 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
 - **Position:** adjudicated > LLM > inferred > SLM (≥0.9 conf) > regex/classifier agree > classifier (≥0.7) > `pending_slm` > regex.
 - The final values are `provision_actors.drrp`, `provision_actors.position` and `provision_actors.extraction_method`.
 
-### Layer 1b: Correlatives (per actor, against each other active holder) — PROPOSED (#72, pending legal review)
+### Layer 1b: Correlatives (per actor, against each other active holder) (#72, agreed 2026-09-30)
 
 **Correlatives** record what an actor holds *because of* another active holder's Obligation or Liberty in the same provision. They are computed for each (actor, other active holder) pair. Layer 1 records only what an actor itself holds, so without this layer, "what are my rights?" misses the duties owed to that actor.
 
@@ -205,5 +205,6 @@ Never send NULL to clear a verdict: legal can't tell it apart from "not in this 
 | Prompts (SLM/LLM) | ⚠️ ask for "the DRRP type of the provision for this actor" | Align to "what this actor holds"; check against the benchmarks (#65) |
 | `HM Forces` class | ✅ dictionary now `type: government` (matches legal) | Existing rows take effect on the next roll-up/backfill |
 | Legal docs | ⚠️ FUNCTION_VALUES out of date; Housekeeping ↔ no_obligations; legacy OL = holder unknown | Legal aligns and links here |
+| Layer 1b correlatives (#72) | ❌ not implemented | Prerequisite: counterparty/beneficiary consistency; then backfill derivation, payload `correlatives` and law-level holder lists; legal migration before first publish |
 
 Tests follow the tables: one table-driven case per row of layers 4–5 and per special case.
