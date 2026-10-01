@@ -87,6 +87,12 @@ pub trait ProvisionStore: Send + Sync {
         Ok(0)
     }
 
+    /// Stored purposes per law for the purpose profile (legal#172): (the
+    /// `purposes` array joined with '|', rows), over rows that carry one.
+    async fn query_purpose_counts(&self, _law_name: &str) -> Result<Vec<(String, i64)>, StoreError> {
+        Ok(vec![])
+    }
+
     /// Write layer-1b correlatives into each actor of `legislation_text.actors`
     /// (#72): `rows` = (section_id, actor_label, correlatives JSON array).
     /// Every actor gets a `correlatives` key, `[]` when it has none.

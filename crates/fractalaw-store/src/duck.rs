@@ -691,12 +691,18 @@ impl DuckStore {
     }
 
     /// Ensure the layer-1b correlative holder columns exist (#72):
-    /// `claim_holder`, `liability_holder`, `protected_holder`. Idempotent.
+    /// `claim_holder`, `liability_holder`, `protected_holder`, and the purpose
+    /// profile (sertantai-legal#172). Idempotent.
     pub fn ensure_correlative_columns(&self) -> Result<(), StoreError> {
         for col in ["claim_holder", "liability_holder", "protected_holder"] {
             self.conn
                 .execute_batch(&format!("ALTER TABLE legislation ADD COLUMN IF NOT EXISTS {col} VARCHAR[]"))?;
         }
+        // Purpose profile (sertantai-legal#172); NULL = not profiled (not in the payload)
+        self.conn.execute_batch(
+            "ALTER TABLE legislation ADD COLUMN IF NOT EXISTS purpose_profile \
+             STRUCT(purpose VARCHAR, count BIGINT, share DOUBLE)[]",
+        )?;
         Ok(())
     }
 

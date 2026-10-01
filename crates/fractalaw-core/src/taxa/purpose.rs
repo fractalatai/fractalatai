@@ -379,6 +379,29 @@ pub fn inherit_from_stem<'a>(own: &'a str, ancestor_purposes: impl IntoIterator<
     ancestor_purposes.into_iter().find(|p| *p != UNCLASSIFIED).unwrap_or(own)
 }
 
+/// One law's purpose profile (sertantai-legal#172): each published purpose's
+/// count and share of the law's provisions that carry a purpose, sorted by
+/// count. Whole law (later-repealed included); inserted text has no purpose
+/// and isn't counted. `counts` = (stored `purposes` joined with '|', rows).
+///
+/// `None` when any row still carries the old vocabulary (several labels, or a
+/// retired label): the law hasn't been re-parsed, so it gets no profile and
+/// legal keeps its current value. `Some([])` when no row has a purpose.
+pub fn purpose_profile(counts: &[(String, i64)]) -> Option<Vec<(&'static str, i64, f64)>> {
+    let mut out: Vec<(&'static str, i64)> = Vec::new();
+    for (label, n) in counts {
+        let p = PUBLISHED_PURPOSES.iter().find(|p| **p == label.as_str())?;
+        out.push((p, *n));
+    }
+    let total: i64 = out.iter().map(|(_, n)| n).sum();
+    out.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
+    Some(
+        out.into_iter()
+            .map(|(p, n)| (p, n, ((n as f64 / total as f64) * 1000.0).round() / 1000.0))
+            .collect(),
+    )
+}
+
 // ── Tests ────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -869,5 +892,21 @@ mod tests {
         // An item that does something itself keeps it
         assert_eq!(inherit_from_stem(EXEMPTION, [REQUIREMENT]), EXEMPTION);
         assert_eq!(p("...."), UNCLASSIFIED);
+    }
+
+    #[test]
+    fn profile_whole_law_or_none_for_old_vocabulary() {
+        let prof = purpose_profile(&[
+            ("Requirement".into(), 6),
+            ("Interpretation+Definition".into(), 2),
+            ("Unclassified".into(), 2),
+        ])
+        .unwrap();
+        assert_eq!(prof[0], (REQUIREMENT, 6, 0.6));
+        assert_eq!(prof.len(), 3);
+        // Not re-parsed: old multi-label or retired label → no profile
+        assert!(purpose_profile(&[("Process+Rule+Constraint+Condition".into(), 5)]).is_none());
+        assert!(purpose_profile(&[("Interpretation+Definition|Process+Rule+Constraint+Condition".into(), 1)]).is_none());
+        assert_eq!(purpose_profile(&[]), Some(vec![]));
     }
 }

@@ -483,6 +483,19 @@ impl PgStore {
         Ok(result.rows_affected() as usize)
     }
 
+    /// Stored purposes per law for the purpose profile (legal#172): (the
+    /// `purposes` array joined with '|', rows), over rows that carry one.
+    pub async fn query_purpose_counts(&self, law_name: &str) -> Result<Vec<(String, i64)>, StoreError> {
+        sqlx::query_as::<_, (String, i64)>(
+            "SELECT array_to_string(purposes, '|'), count(*) FROM legislation_text \
+             WHERE law_name = $1 AND cardinality(purposes) > 0 GROUP BY 1",
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_purpose_counts: {e}")))
+    }
+
     /// Merge layer-1b correlatives into each actor of the law's
     /// `legislation_text.actors` (#72). Run after `backfill_from_actors`, which
     /// rebuilds the JSON. Every actor gets `correlatives`, `[]` when none.
@@ -1204,6 +1217,10 @@ impl crate::ProvisionStore for PgStore {
         rows: &[(String, String, String)],
     ) -> Result<usize, StoreError> {
         self.write_actor_correlatives(law_name, rows).await
+    }
+
+    async fn query_purpose_counts(&self, law_name: &str) -> Result<Vec<(String, i64)>, StoreError> {
+        self.query_purpose_counts(law_name).await
     }
 
     async fn query_significance_profile(

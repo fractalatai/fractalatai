@@ -1585,6 +1585,33 @@ pub(crate) fn write_law_current(
     Ok(())
 }
 
+/// Write the law's purpose profile (sertantai-legal#172): whole law, sorted by
+/// count, `[]` when empty. `None` (old vocabulary, not re-parsed) leaves it
+/// NULL so it isn't published and legal keeps its current value.
+pub(crate) fn write_purpose_profile(
+    store: &DuckStore,
+    law_name: &str,
+    profile: Option<&[(&str, i64, f64)]>,
+) -> anyhow::Result<()> {
+    let value = match profile {
+        None => "NULL".to_string(),
+        Some([]) => "CAST([] AS STRUCT(purpose VARCHAR, count BIGINT, share DOUBLE)[])".to_string(),
+        Some(items) => format!(
+            "[{}]",
+            items
+                .iter()
+                .map(|(p, n, sh)| format!("{{'purpose': '{}', 'count': {n}, 'share': {sh}}}", p.replace('\'', "''")))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    };
+    store.execute(&format!(
+        "UPDATE legislation SET purpose_profile = {value} WHERE name = '{}'",
+        law_name.replace('\'', "''")
+    ))?;
+    Ok(())
+}
+
 /// Write the law-level DRRP rolled up from reconciled provision_actors (#55).
 /// Empty sets are written as typed empty lists, not NULL: sertantai-legal reads
 /// NULL DRRP as "no verdict" and empty lists as "no obligations".

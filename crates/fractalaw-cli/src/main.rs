@@ -818,6 +818,10 @@ async fn main() -> anyhow::Result<()> {
                     let inputs = lance.query_law_drrp_inputs(law_name).await?;
                     // Layer-1b correlatives into the provision actors JSON (#72)
                     lance.write_actor_correlatives(law_name, &provision_correlatives(&inputs)).await?;
+                    // Purpose profile over the whole law (sertantai-legal#172)
+                    let counts = lance.query_purpose_counts(law_name).await?;
+                    let profile = fractalaw_core::taxa::purpose::purpose_profile(&counts);
+                    commands::pipeline::write_purpose_profile(&store, law_name, profile.as_deref())?;
                     let sig = lance.backfill_significance(law_name).await?;
 
                     // Law-level significance (Approach L + K profile) → DuckDB (#55)

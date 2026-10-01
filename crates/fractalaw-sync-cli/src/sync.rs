@@ -207,7 +207,7 @@ pub(crate) async fn cmd_sync_publish(
          duties, rights, responsibilities, powers, \
          current_verdict, current_duty_type, current_duty_holder, current_rights_holder, \
          current_responsibility_holder, current_power_holder, \
-         claim_holder, liability_holder, protected_holder, "
+         claim_holder, liability_holder, protected_holder, purpose_profile, "
     };
 
     let mut published = 0usize;
