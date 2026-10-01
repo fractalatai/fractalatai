@@ -1,6 +1,6 @@
 # Purpose Classification (AGREED, 2026-10-01)
 
-**Status:** agreed. Jason signed it off on 2026-10-01, single label included, after reviews by Gemini and sertantai-legal (adopted changes below). The law-level profile shape is still to agree on sertantai-legal#172.
+**Status:** agreed. Jason signed it off on 2026-10-01, single label included, after reviews by Gemini and sertantai-legal (adopted changes below). The law-level profile is agreed on sertantai-legal#172 and built.
 **Fixes:** #40 (Process+Rule too broad), #47 (Offence/Enforcement coverage). **Supersedes:** #69 (provision function).
 
 ## What purpose is
@@ -92,7 +92,11 @@ Purpose isn't cosmetic. `provision_scope` uses it to decide **structural vs subs
   - What kind of law it is (making, amending, commencing…) is legal's **Function**; purpose doesn't repeat it.
   - Legal's `legal_register.purpose` today runs the regex over the whole law's text, so most laws get nearly every label.
   - Instead, fractalaw publishes `purpose_profile`: each purpose's count and share of the law's own provisions, e.g. `[{purpose: "Requirement", count: 132, share: 0.55}, …]`. Amendment instructions count; inserted text is excluded.
-  - Legal stores it, derives its multi-select from it, and retires its law-level classifier. Shape, base (live or whole law) and fallback are agreed on #172.
+  - Legal stores it, derives its multi-select from it, and retires its law-level classifier. **Agreed on #172 (Jason and legal, 2026-10-01); built:**
+  - Shape: `purpose_profile: [{purpose, count, share}]`, sorted by count. `[]` when empty; NULL or absent = not in this payload.
+  - Base: the **whole law**, the same view as the other law fields, so revoked laws keep a profile. A `current_purpose_profile` can come later if needed.
+  - Legal stores it in a new column and derives `purpose.values` from it (share ≥ 0.05, never `Unclassified`). The column keeps its `{values}` shape, so compliance needs no change.
+  - Fallback: unprofiled laws keep legal's current values, and legal retires its TaxaParser classifier. Fractalaw leaves the profile NULL for laws still on the old vocabulary.
 - **Compliance controls** (`scripts/compliance/generate_controls.py`, fractalaw's, so legal and compliance need no change): select `Requirement` positively instead of excluding purposes, and **attach the `Procedure+Detail` provisions that qualify it** (same law, referring to it) as prompt context. "The record required by regulation 5 must contain…" and a table of limits are what a control needs, so they mustn't be dropped (legal).
 - **Fractalaw:** `purpose.rs` labels, `STRUCTURAL_PURPOSES`, `making.rs` counts, and the `classify_title` mapping.
 - **Data:** purposes are re-derived in the single run. No separate pass.
