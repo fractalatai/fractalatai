@@ -78,7 +78,9 @@ Purpose isn't cosmetic. `provision_scope` uses it to decide **structural vs subs
 
 - **Labels:** the definitive prompt (#72 model completion) labels purpose per provision beside the actors. The same prompt feeds gold v2 (two models + Claude referee, used as the benchmark) and the SLM training set (one model).
 - **SLM:** trained on both tasks: actor position/type and provision purpose.
-- **Regex (`purpose.rs`)** stays as pass 1 at parse time (scope needs a purpose before actor extraction). It's rewritten to the new labels with the stem rule and is measured against gold v2.
+- **Regex (`purpose.rs`)** stays as pass 1 at parse time. **Built (2026-10-01, `9aa7f57`):** `purpose::primary` with the stem rule writes the published purpose.
+  - The original multi-match patterns stay as **internal signals** for DRRP gating (`should_skip_drrp`) and scope (`provision_scope`), unchanged, so DRRP parsing doesn't drift. Moving gating and scope onto the published purpose (machinery and `Procedure+Detail` structural, as above) is a later change, measured against gold v2.
+  - **Survey of 244,624 hub rows:** the catch-all (98,783) and multi-label rows (18,771) are gone, and the stem rule resolves 74,452 items. Unclassified falls from 96K to 54.7K. Of those, 52.5K are list items under condition or definition stems the regex can't classify; the LLM/SLM tiers handle them.
 - **Reconcile:** adjudicated > LLM > SLM > regex, as for DRRP. Scope is re-evaluated after reconcile.
 
 ## Contract and migration
