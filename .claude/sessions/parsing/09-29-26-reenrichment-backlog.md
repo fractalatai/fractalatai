@@ -50,6 +50,8 @@ This session runs the **single run**: one enrichment pass and **one** publish, a
 
 ## Dependencies
 
+- ⬜ SLM retrained on drrp-v1.0 labels (`parsing/2026-10-01-training-labels-slm.md`): the run uses it
+
 - ✅ #62 hub sync + diff-apply; #63 provenance; refined zero-actor guard (`e7bc2ab`)
 - ⬜ RunPod per batch (Jason launches when the local steps are done)
 - ⬜ Legal's snapshots per publish; sertantai-legal #166 for the big Acts
