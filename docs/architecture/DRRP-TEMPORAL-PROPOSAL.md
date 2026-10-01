@@ -279,6 +279,7 @@ Renumbering is one `renamed` entry (also in lat-renames, match `renumbered`). `i
    - Current state stays in `legislation_text` / `provision_actors`.
    - History of a provision = its versions (oldest first) + the current row.
 3. **Idempotent:** unique on (law_name, section_id, op_key, change). A re-delivered log is a no-op.
+   **Atomic (Gemini):** the snapshot and the apply for a law run in **one transaction** with `apply_lat_diff` / `apply_lat_status`, so history can't be lost to a half-applied change. On any failure the whole law rolls back and the watermark doesn't advance, so a retry resumes cleanly.
 4. **Renamed:** the snapshot is keyed on `old_section_id`, plus a `renamed_to` pointer, so history follows the provision across ids. Tier data is already carried by the rename pass.
 5. **inserted:** no snapshot (nothing was superseded). **removed:** a snapshot of the last state.
 6. parser / scope / correction / unattributed entries: **no version**. They're applied as today (L3).
@@ -305,6 +306,9 @@ The effect items carry **no commencement date**, so flipping a provision to none
 3. **Whole-provision omission or repeal** (`omitted`, `repealed`, `revoked`, exactly mapped): flip to none **only** if legal can supply the effect's in-force date and it has passed (status runs ahead of the text, L2). Until then, flag only.
 4. **Law-level** whole-law revocation (legal LiveStatus `revoked_unapplied`) feeds `current_verdict = revoked` when the verdict split is built (R1). The revocation is in force; only its application to the text lags.
 5. **Unmapped effects** (null `section_id`): law-level flag only.
+6. **The flag clears itself (Gemini):** `unapplied_effects` is recomputed from legal's manifest on every refresh, so once legislation.gov.uk applies the effect it drops out, and the new text arrives through the normal change log (L9).
+
+**Reviews:** Gemini agrees with L9 (with the atomicity changes above) and with L10 as proposed (`data/code-review/drrp-temporal-L9-L10-gemini.md`). Legal: pending.
 
 **Ask of legal:** the in-force date (or `in_force: bool`) per unapplied effect, if the changes feed exposes it.
 
