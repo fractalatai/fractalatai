@@ -1,6 +1,6 @@
 # DRRP over time: "as made" and "as amended" (PROPOSAL)
 
-- **Status:** draft, revised after reviews by sertantai-legal and Gemini (2026-09-30). Section L (the LAT change contract) was added on 2026-10-01 for a second review. Awaiting Jason's decisions D1–D4.
+- **Status:** draft, revised after reviews by sertantai-legal and Gemini (2026-09-30). Section L (the LAT change contract) was added and reviewed on 2026-10-01. D1–D4 were approved by Jason on 2026-10-01; build per L8.
 - **Relates to:** DRRP-CLASSIFICATION.md (#68), especially the "Revoked laws" special case; LAT sync (#62); correlatives (#72).
 - **Nothing is implemented.** This document proposes a model and asks questions.
 
@@ -260,7 +260,7 @@ Changed provisions + the law level, after each applied change. A status-only rep
   4. dependents (L4);
   5. the verdict split + payload (R1/R4).
 
-### Decisions for Jason
+### Decisions for Jason: D1–D4 APPROVED (Jason, 2026-10-01), as recommended
 - **D1, prospective provisions:** classify and flag them ("coming into force" is visible, but excluded from current obligations), or `none` until commenced? Legal recommends: none until commenced; partly commenced → `in_force_partial`, classified and counted (flagged).
 - **D2, savings:** `repealed_saved` status, or rely on the savings clause itself being classified? Legal recommends: `repealed_saved` only where a savings note exists (detectable from the notes); never inferred.
 - **D3:** approve the sequencing, starting with legal's `status` column and our switch to it.
