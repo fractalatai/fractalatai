@@ -8,9 +8,17 @@ Usage:
     GEMINI_API_KEY=... /usr/bin/python3 scripts/gemini_llm_batch.py
     GEMINI_API_KEY=... /usr/bin/python3 scripts/gemini_llm_batch.py --dry-run
     GEMINI_API_KEY=... /usr/bin/python3 scripts/gemini_llm_batch.py --limit 10
+
+Position correction (#72): re-label counterparty/beneficiary actors on live
+provisions with an active Obligation holder at the agreed rule (the SLM was
+trained on the old split). Sample first, nothing written:
+    /usr/bin/python3 scripts/gemini_llm_batch.py --position-correction \
+        --exclude-law-file revoked.txt --limit 50 --sample-out data/audit/poscorr_sample.tsv
 """
 
 import argparse
+import csv
+import hashlib
 import json
 import os
 import sys
@@ -53,6 +61,8 @@ SYSTEM_PROMPT = (
 )
 
 VALID_POSITIONS = {"active", "counterparty", "beneficiary", "mentioned"}
+# Per-row prompt version (llm_prompt_version): which labels the current prompt made
+PROMPT_VERSION = "sha:" + hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest()[:12]
 VALID_DRRP = {"Obligation", "Liberty", "none"}
 
 
@@ -62,14 +72,42 @@ def read_law_file(path):
         return ",".join(n.strip() for n in f.read().replace("\n", ",").split(",") if n.strip())
 
 
-def query_pending_llm(conn, limit=None, significance=None, max_confidence=None, law_file=None):
+def query_pending_llm(conn, limit=None, significance=None, max_confidence=None, law_file=None,
+                      position_correction=False, exclude_law_file=None):
+    """Rows of (section_id, actor_label, actor_category, regex_drrp, text, position)."""
     cur = conn.cursor()
     params = []
 
-    if significance and max_confidence:
+    if position_correction:
+        # #72: non-active actors that would carry a correlative (claim_right /
+        # protected) against an active Obligation holder, on live substantive
+        # provisions; benchmark laws out; skip rows already at this prompt
+        sql = """
+            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text, pa.position
+            FROM provision_actors pa
+            JOIN legislation_text lt ON pa.section_id = lt.section_id
+            WHERE pa.position IN ('counterparty', 'beneficiary')
+            AND lt.scope = 'substantive'
+            AND coalesce(lt.status, '') NOT IN ('repealed', 'prospective')
+            AND NOT unapplied_repealed(lt.law_name, lt.section_id)
+            AND EXISTS (SELECT 1 FROM provision_actors h WHERE h.section_id = pa.section_id
+                        AND h.position = 'active' AND h.drrp = 'Obligation')
+            AND pa.llm_prompt_version IS DISTINCT FROM %s
+            AND lt.law_name NOT IN (SELECT DISTINCT split_part(section_id, ':', 1) FROM gold_benchmarks)
+        """
+        params = [PROMPT_VERSION]
+        if law_file:
+            sql += " AND lt.law_name IN (SELECT unnest(string_to_array(%s, ',')))"
+            params.append(read_law_file(law_file))
+        if exclude_law_file:
+            sql += " AND lt.law_name NOT IN (SELECT unnest(string_to_array(%s, ',')))"
+            params.append(read_law_file(exclude_law_file))
+        # Random order so a --limit sample spreads across laws
+        sql += " ORDER BY md5(pa.section_id || pa.actor_label)"
+    elif significance and max_confidence:
         # Target: SLM-classified actors on provisions with specific significance and low confidence
         sql = """
-            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text
+            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text, pa.position
             FROM provision_actors pa
             JOIN legislation_text lt ON pa.section_id = lt.section_id
             WHERE lt.significance_overall = %s
@@ -86,7 +124,7 @@ def query_pending_llm(conn, limit=None, significance=None, max_confidence=None, 
     else:
         # Default: pending_llm actors
         sql = """
-            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text
+            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text, pa.position
             FROM provision_actors pa
             JOIN legislation_text lt ON pa.section_id = lt.section_id
             WHERE pa.extraction_method = 'pending_llm'
@@ -171,9 +209,9 @@ def write_batch(conn, updates):
     cur = conn.cursor()
     for sid, label, drrp, position in updates:
         cur.execute(
-            "UPDATE provision_actors SET llm_drrp = %s, llm_position = %s "
+            "UPDATE provision_actors SET llm_drrp = %s, llm_position = %s, llm_prompt_version = %s "
             "WHERE section_id = %s AND actor_label = %s",
-            (drrp, position, sid, label)
+            (drrp, position, PROMPT_VERSION, sid, label)
         )
         TOUCHED_LAWS.add(sid.split(":")[0])
     conn.commit()
@@ -188,7 +226,11 @@ def main():
                         help="Target provisions by significance level (requires --max-confidence)")
     parser.add_argument("--max-confidence", type=float, default=0.9,
                         help="SLM confidence threshold (default: 0.9)")
-    parser.add_argument("--law-file", help="Law names to scope to (CSV line or one per line); applies to both modes")
+    parser.add_argument("--law-file", help="Law names to scope to (CSV line or one per line); applies to all modes")
+    parser.add_argument("--position-correction", action="store_true",
+                        help="#72: re-label counterparty/beneficiary actors under active Obligations at the agreed rule")
+    parser.add_argument("--exclude-law-file", help="Law names to leave out (e.g. revoked laws), position correction only")
+    parser.add_argument("--sample-out", help="Classify and write old → new to this TSV; nothing written to the DB")
     args = parser.parse_args()
 
     api_key = os.environ.get("GEMINI_API_KEY") or ""
@@ -203,15 +245,22 @@ def main():
         sys.exit(1)
 
     conn = psycopg2.connect(PG_DSN)
+    cur = conn.cursor()
+    cur.execute("ALTER TABLE provision_actors ADD COLUMN IF NOT EXISTS llm_prompt_version text")
+    conn.commit()
+    cur.close()
     actors = query_pending_llm(conn, limit=args.limit,
-                                significance=args.significance,
+                                significance=None if args.position_correction else args.significance,
                                 max_confidence=args.max_confidence,
-                                law_file=args.law_file)
-    mode = f"significance={args.significance} conf<{args.max_confidence}" if args.significance else "pending_llm"
+                                law_file=args.law_file,
+                                position_correction=args.position_correction,
+                                exclude_law_file=args.exclude_law_file)
+    mode = ("position-correction" if args.position_correction
+            else f"significance={args.significance} conf<{args.max_confidence}" if args.significance else "pending_llm")
     print(f"Loaded {len(actors):,} actors ({mode})")
 
     if args.dry_run:
-        for sid, label, cat, drrp, text in actors[:5]:
+        for sid, label, cat, drrp, text, _ in actors[:5]:
             print(f"  {sid} | {label} | {text[:100]}...")
         if len(actors) > 5:
             print(f"  ... and {len(actors) - 5} more")
@@ -224,13 +273,17 @@ def main():
     pos_counts = Counter()
     drrp_counts = Counter()
     t0 = time.time()
+    sample = []
 
-    for i, (sid, label, category, regex_drrp, text) in enumerate(actors):
+    for i, (sid, label, category, regex_drrp, text, old_position) in enumerate(actors):
         result = classify_actor(api_key, text, label)
 
         if result:
             drrp, position = result
-            updates.append((sid, label, drrp, position))
+            if args.sample_out:
+                sample.append((sid, label, old_position, position, drrp, " ".join((text or "").split())[:400]))
+            else:
+                updates.append((sid, label, drrp, position))
             classified += 1
             pos_counts[position] += 1
             drrp_counts[drrp] += 1
@@ -255,6 +308,16 @@ def main():
     if updates:
         write_batch(conn, updates)
 
+    if args.sample_out:
+        with open(args.sample_out, "w", newline="") as f:
+            w = csv.writer(f, delimiter="\t")
+            w.writerow(["section_id", "actor", "old_position", "new_position", "llm_drrp", "text"])
+            w.writerows(sample)
+        moved = Counter((o, n) for _, _, o, n, _, _ in sample)
+        print(f"Sample written to {args.sample_out} (nothing written to the DB)")
+        for (o, n), c in sorted(moved.items()):
+            print(f"  {o} → {n}: {c}")
+
     elapsed = time.time() - t0
     print(f"\n{'=' * 60}")
     print(f"Gemini LLM Batch Complete")
@@ -270,7 +333,7 @@ def main():
     for d in ["Obligation", "Liberty", "none"]:
         print(f"  {d:15s}: {drrp_counts.get(d, 0):,}")
 
-    if provenance:
+    if provenance and not args.sample_out:
         provenance.record(conn, TOUCHED_LAWS, "taxa", "llm", "llm", GEMINI_MODEL,
                           prompt_version=provenance.prompt_version(SYSTEM_PROMPT))
     conn.close()
