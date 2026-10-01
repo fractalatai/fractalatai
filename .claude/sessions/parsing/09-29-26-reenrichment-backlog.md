@@ -6,6 +6,8 @@ opened: 2026-09-29
 
 # Session: Re-enrichment Backlog (PENDING)
 
+**Blocked (Jason, 2026-10-01): waits until the data models are finished** (#73 verdict split + as made, #72 correlatives), so the re-run populates the final model in one pass.
+
 ## Problem
 
 The first #62 hub sync (2026-09-27) flagged 422 laws `reparse_needed`: their text changed, and 15,296 changed-text snapshots plus 38,161 superseded rows were archived with their tier data. Only QQ Tier 0 (122) and the live-fix 8 have been re-enriched since. Further laws have joined from legal: its 101-law re-enrichment list after the LAT re-parse, and 4 from the 42-parent-Act extent re-parse. Until re-enriched, these laws' law-level results in DuckDB (and in legal) reflect old actors, and they carry no provenance.
