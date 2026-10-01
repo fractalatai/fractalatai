@@ -1,6 +1,6 @@
-# Purpose Classification (PROPOSED, 2026-10-01)
+# Purpose Classification (AGREED, 2026-10-01)
 
-**Status:** proposed by fractalaw. Gemini and sertantai-legal reviewed it (2026-10-01; adopted changes below). Waiting for Jason's sign-off, and his decision on the law-level `purpose` (raised by legal).
+**Status:** agreed. Jason signed it off on 2026-10-01, single label included, after reviews by Gemini and sertantai-legal (adopted changes below). The law-level profile shape is still to agree on sertantai-legal#172.
 **Fixes:** #40 (Process+Rule too broad), #47 (Offence/Enforcement coverage). **Supersedes:** #69 (provision function).
 
 ## What purpose is
@@ -105,7 +105,7 @@ Purpose isn't cosmetic. `provision_scope` uses it to decide **structural vs subs
 
 Not adopted:
 - **"The DRRP consistency check is fundamentally flawed."** That critique reads `Procedure+Detail` as any procedural "must". Under the detail ruling it covers only provisions qualifying a relation created elsewhere, which are relation `none` by definition. A procedural duty created in its own text is `Requirement`. With the test above the check holds.
-- **Primary + secondary purpose.** Its counter-examples resolve with a single label: HSWA s.2(3) is a qualified duty, and a body "which shall exercise the functions conferred" is `Establishment` (the functions are created elsewhere). A secondary label brings back the ambiguity this proposal removes, and the operative detail is already in DRRP. **For Jason to confirm.**
+- **Primary + secondary purpose.** Its counter-examples resolve with a single label: HSWA s.2(3) is a qualified duty, and a body "which shall exercise the functions conferred" is `Establishment` (the functions are created elsewhere). A secondary label brings back the ambiguity this proposal removes, and the operative detail is already in DRRP. **Jason: single label (2026-10-01).**
 
 **sertantai-legal.** Agrees with the value changes and with one value per provision. Keep Liability and Defence+Appeal separate ("shall not be liable" protects; a defence answers a charge); keep Establishment. Adopted:
 - technical schedules and tables → `Procedure+Detail`, attached to their duty in controls;
