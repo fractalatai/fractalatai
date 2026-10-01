@@ -2,14 +2,16 @@
 
 This practice was adopted from sertantai-legal on 2026-09-30. The good example is `2026-09-27-issue-166.md` in legal's `.claude/sessions/`.
 
-## Scope: one issue or one deliverable per session
+## Scope: a session is a stretch of work, not an issue
 
-- **Name:** `<topic>/YYYY-MM-DD-issue-NNN.md` or `<topic>/YYYY-MM-DD-<deliverable>.md`. Older docs use `MM-DD-YY-<name>.md` and stay as they are.
-- **The split rule:** when something that comes up mid-session gets its own GitHub issue, or would need its own Todo list, it gets its own session.
-  - Open a stub with frontmatter, Problem and Todo.
-  - Add a one-line pointer in the parent's Todo: `⬜ → benchmarks/2026-09-30-gold-v2.md`.
-  - Never append a second project to a running doc.
-- **Size:** ~50–150 lines is healthy. Past ~200 lines, or with more than a handful of dated sections on different topics, split.
+- **Name:** `<topic>/YYYY-MM-DD-<what>.md`, with `issue: N` in the frontmatter when an issue drives it. Older docs use `MM-DD-YY-<name>.md` and stay as they are.
+- **Sessions aren't mirrors of GitHub issues** (Jason, 2026-10-01). One issue can span several sessions, and one session can touch several issues.
+- **Flow, not ping-pong:**
+  - Work in one active session.
+  - To move on, **close it**: hand every open item to the pending or suspended session where it'll actually be done (or drop it with a reason), then open the next.
+  - Don't bounce between sessions mid-task.
+- **Split rule:** when unrelated work comes up mid-session and would need its own Todo list, open a **pending** stub for it and add a one-line pointer. Don't absorb a second project into the running doc.
+- **Size:** ~50–150 lines is healthy. Past ~200 lines, or with more than a handful of dated sections on different topics, close and move on.
 
 ## Structure
 
@@ -47,7 +49,8 @@ A finding goes in `lessons` or in `bugs`, never both.
 
 **At close** (session-close skill):
 - Fill `summary`, `decisions` and `lessons` (and `bugs`).
-- Every leftover ⬜ either moves to a named follow-up session or issue (linked), or is explicitly dropped with a reason.
+- Every leftover ⬜ moves to the pending/suspended session where it'll be done (mark it `⏸️ (deferred — moved to …)`), or is dropped with a reason.
+- Only one session is active at a time.
 
 ## Commits
 
