@@ -91,6 +91,24 @@ Reviewed by sertantai-legal and Gemini 2.5 Pro (raw: `data/code-review/drrp-temp
 - **`revoked`** is distinct from `no_obligations` (both reviews): "no duties now" isn't "never had any".
 - Both fields follow the #68 never-NULL rule.
 
+### R1a. Verdict-split field names (PROPOSED to legal, 2026-10-01)
+
+**Principle: the smallest migration.** The existing law-payload DRRP fields **keep their meaning, as made**, so legal's `is_making` path is untouched. The current view is added as new `current_*` fields.
+
+| Field | View | Status | Meaning |
+|---|---|---|---|
+| `duty_holder`, `rights_holder`, `responsibility_holder`, `power_holder`, `duty_type`, `role`, `role_gvt`, `duties`, `rights`, `responsibilities`, `powers` | as made | existing, **unchanged** | What the law imposed. Legal derives `making_enrichment_verdict` → `is_making` from these. Never changed by repeal |
+| `current_verdict` | as amended | **new** | `making` \| `empowering` \| `no_obligations` \| `revoked` \| `holder_unknown`. Sent explicitly, so legal doesn't re-derive it |
+| `current_duty_type` | as amended | **new** | DRRP types over live provisions (raw `Obligation` kept when the holder is unknown, as today) |
+| `current_duty_holder`, `current_rights_holder`, `current_responsibility_holder`, `current_power_holder` | as amended | **new** | Holders over live provisions. Holder lists only, no entry lists (as for correlatives) |
+
+**Rules:**
+- **Live provisions:** `status` not in (repealed, prospective), and not `unapplied_repealed()` (L10). `in_force_partial` and `repealed_saved` count.
+- **`revoked`:** the law is wholly revoked. Either legal's live status says so (revoked, or revoked_unapplied with the effect in force), or every substantive provision is repealed. Its `current_*` holder lists are `[]`.
+- **Never NULL in a DRRP-carrying payload:** `current_*` lists are `[]` when empty. All-NULL keeps meaning "no DRRP in this payload".
+- **#72 correlatives** (`claim_holder`, `liability_holder`, `protected_holder`) are current-view by nature, rolled up over live provisions. They ship in the same legal release.
+- **The as-made fields** keep today's roll-up for now. Once the made text is classified (R5, priority 3), they're computed from it. The names don't change.
+
 ### R2. Provision status comes from legal's LAT, not from dots (both reviews)
 - Each LAT row carries `status: in_force | repealed | prospective`, set by legal's CLML parse:
   - repealed from the "[Repealed]"/"[Revoked]" markers, dotted text and repeal commentary;
