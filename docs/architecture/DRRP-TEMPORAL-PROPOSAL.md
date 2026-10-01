@@ -278,11 +278,12 @@ Renumbering is one `renamed` entry (also in lat-renames, match `renumbered`). `i
    - plus the entry's `change`, `cause`, `change_ids`, `op_key`, `source_hash` and `created_at`.
    - Current state stays in `legislation_text` / `provision_actors`.
    - History of a provision = its versions (oldest first) + the current row.
-3. **Idempotent:** unique on (law_name, section_id, op_key, change). A re-delivered log is a no-op.
+3. **Idempotent:** keyed on the change log's stable entry `id`. Legal offers to add it to the payload (additive; needs Jason's go-ahead). The fallback is a unique key on (law_name, coalesce(section_id, old_section_id), op_key, change): `removed` entries have a null `section_id`, and Postgres treats nulls as distinct. Legal confirms one entry per row per op (merge renames need equal text; a renumbering pair is one `renamed` entry; `status_changed` only where the row isn't already text_changed or inserted). A re-delivered log is a no-op.
    **Atomic (Gemini):** the snapshot and the apply for a law run in **one transaction** with `apply_lat_diff` / `apply_lat_status`, so history can't be lost to a half-applied change. On any failure the whole law rolls back and the watermark doesn't advance, so a retry resumes cleanly.
 4. **Renamed:** the snapshot is keyed on `old_section_id`, plus a `renamed_to` pointer, so history follows the provision across ids. Tier data is already carried by the rename pass.
 5. **inserted:** no snapshot (nothing was superseded). **removed:** a snapshot of the last state.
 6. parser / scope / correction / unattributed entries: **no version**. They're applied as today (L3).
+   **Status changes arriving only through `status_hash`** (legal recomputing status outside a parse, e.g. `mix lat.status` after a rule fix) are parser-like and **never versioned**. Status changes inside a parse are in the log with their cause (legal).
 7. **Re-parse after apply:** unchanged from today. Text-changed and inserted rows are re-parsed (and stems with changed children); status-only changes are not.
 
 **Not in step 2:**
@@ -301,16 +302,22 @@ L8.4 gives `effects_unapplied` per law: effects legislation.gov.uk lists as "Not
 The effect items carry **no commencement date**, so flipping a provision to none on an unapplied omission could hide an obligation that still applies.
 
 **Recommended rule:**
-1. **Flag, don't flip.** A provision with an exactly-mapped unapplied effect keeps its as_amended classification. The provision payload carries `unapplied_effects: [{by, affect}]` so users and legal can show "amendment pending / not yet applied".
+1. **Flag, don't flip.** A provision with an exactly-mapped unapplied effect keeps its as_amended classification. Legal shows "amendment pending (prospective / in force since …)" in its own UI from its own feed data, so fractalaw needn't send `unapplied_effects` back (legal).
 2. **Word-level effects** (words substituted / inserted / omitted) never change the classification: there's no new text to classify, and the provision still exists.
-3. **Whole-provision omission or repeal** (`omitted`, `repealed`, `revoked`, exactly mapped): flip to none **only** if legal can supply the effect's in-force date and it has passed (status runs ahead of the text, L2). Until then, flag only.
+3. **Whole-provision omission or repeal** (`omitted`, `repealed`, `revoked`, exactly mapped): decided by the effect's in-force data, which legislation.gov.uk's feed carries (`<ukm:InForceDates><ukm:InForce Date=… | Prospective="true">`):
+   - **Prospective:** never flip. It isn't law yet, and the text isn't stale. Legal's sample: all 7 unapplied effects in anaw/2016/3 were prospective.
+   - **A past `Date`:** in force, text stale → flip to none (status runs ahead of the text, L2).
+   - **No in-force data:** flag only.
 4. **Law-level** whole-law revocation (legal LiveStatus `revoked_unapplied`) feeds `current_verdict = revoked` when the verdict split is built (R1). The revocation is in force; only its application to the text lags.
 5. **Unmapped effects** (null `section_id`): law-level flag only.
 6. **The flag clears itself (Gemini):** `unapplied_effects` is recomputed from legal's manifest on every refresh, so once legislation.gov.uk applies the effect it drops out, and the new text arrives through the normal change log (L9).
 
-**Reviews:** Gemini agrees with L9 (with the atomicity changes above) and with L10 as proposed (`data/code-review/drrp-temporal-L9-L10-gemini.md`). Legal: pending.
+**Reviews:** Gemini agrees with L9 (with the atomicity changes above) and with L10 as proposed (`data/code-review/drrp-temporal-L9-L10-gemini.md`). Legal agrees with both, with the changes folded in above: the entry-id key, status-hash-only changes never versioned, in-force data from the feed, and no `unapplied_effects` sent back.
 
-**Ask of legal:** the in-force date (or `in_force: bool`) per unapplied effect, if the changes feed exposes it.
+**Legal's proposal (needs Jason's go-ahead):**
+1. Parse `InForce` (date | prospective), `<ukm:Savings>` and the feed's **structured affected refs** (`<ukm:Section Ref=…>`) in ChangesFeed. The structured refs map to section_ids far better than the ~63% text-target parser.
+2. Re-fetch the feeds for the ~357 laws with unapplied effects.
+3. Add `in_force_date`, `prospective` and `saved` per item in `effects_unapplied`, with `section_id` taken from the structured refs.
 
 ### Decisions for Jason: D1–D4 APPROVED (Jason, 2026-10-01), as recommended
 - **D1, prospective provisions:** classify and flag them ("coming into force" is visible, but excluded from current obligations), or `none` until commenced? Legal recommends: none until commenced; partly commenced → `in_force_partial`, classified and counted (flagged).
