@@ -67,6 +67,7 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
   - Otherwise there is one pair per active holder, so a counterparty to a government Power and a governed Right gets both `liability` and `no_right`.
   - An actor with no correlative sends `[]`, never NULL.
 - **Never feeds layers 4–5.** DRRP types, the holder lists, the verdict and `is_making` stay based only on held types.
+- **`claim_right` is the duty's direct correlative, in a broad public-law sense** (Gemini, #72): it doesn't by itself imply a private right of civil action. Many regulatory duties aren't actionable (e.g. HSWA s.47 for ss.2–8). User-facing text should present it as "owed to you", not "you can sue".
 - **`protected` is a compliance category, not Hohfeldian.** A beneficiary isn't the direct correlative party. Many "owed to" duties give no enforceable claim either: HSWA s.47 excludes civil action for breach of ss.2–8. `protected` answers "what protects me".
 - **Implied rights (#67) stay.** "Available for inspection by the public" gives the Public an inferred **Liberty** (active → Right: it may inspect) *and* a `claim_right` (the authority owes it an available register). These are two relations. Only the Liberty counts in DRRP (Jason, 2026-09-30).
 - **Query semantics.**
@@ -103,6 +104,8 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
 - **Bodies with no role in the relation** (e.g. a regulator merely named in a landlord's duty) are `mentioned`, not counterparty.
 
 **Why:** the SLM split HSWA s.2(1) (Employee = counterparty) and s.3(1) (Person = beneficiary), the same kind of duty. On Obligation provisions, protective-wording duties were split 177 counterparty vs 244 beneficiary, and 683 beneficiaries carried recipient wording.
+
+**Reviews:** Gemini agrees with changes (`data/code-review/drrp-counterparty-beneficiary-gemini.md`): it checked duties to the public, to an authority, consultation, duties of care, access, courts, prohibitions ("must not disclose to anyone other than the worker": the worker is a beneficiary) and payment, and agrees the recipient wins the tie-break. Legal: pending.
 
 **Fix path:** the definitions go into the SLM/LLM position prompts now. Positions are corrected when the re-enrichment backlog re-runs those tiers. Correlatives are derived from positions, so they follow.
 
