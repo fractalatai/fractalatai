@@ -1,10 +1,16 @@
 ---
 session: Benchmark Refresh
-status: pending
+status: closed
 opened: 2026-09-28
+closed: 2026-10-01
+outcome: abandoned
+issue: 65
+summary: >
+  Superseded by gold v2 (#74, benchmarks/2026-09-30-gold-v2.md). The benchmark LAT sync, the gold
+  snapshot and the new benchmark design were done there; the SLM-retraining question moved there too.
 ---
 
-# Session: Benchmark Refresh (PENDING)
+# Session: Benchmark Refresh (CLOSED — superseded by #74)
 
 ## Problem
 

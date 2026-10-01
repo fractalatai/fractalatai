@@ -30,6 +30,7 @@ The first #62 hub sync (2026-09-27) flagged 422 laws `reparse_needed`: their tex
 - ⬜ **Batch 1** (EPA 1990 + 24 new Making Acts): local steps done 2026-09-29 (17,137 actors reconciled, 7,845 pending_slm; 1,447 fitness mentions). Pod workload: position ~16,342 actors, significance ~2,351+ obligation provisions (after re-reconcile), fitness 1,447 mentions. DuckDB snapshot `fractalaw_pre_batch1_20260929.duckdb`
 - ⬜ Audit the earlier corpus LLM labels (~2,449 `llm` actors) for the penalty-clause error fixed in `e7bc2ab`: find Obligation labels on offence/penalty text, clear, re-run with the fixed prompt
 - ⬜ After legal #166 scopes large Acts: re-enrich the 6 Tier 0 big Acts on scoped LAT (Companies Act 2006, PH(S)A 2008, IPA 2016, PCA 2017, CTBSA 2019, EU(W)A 2018)
+- ⬜ Stale law-level verdicts on ~40 zero-actor laws (old regex roll-ups; e.g. UK_uksi_2000_3184, UK_uksi_2012_3018): parse them, or give them a holder-unknown verdict; dry run + Jason review first (from #73, 2026-10-01)
 - ⬜ Keep DuckDB snapshots before each batch's parse (parse rewrites law-level DRRP); restore held/zero-actor laws afterwards
 
 ## Dependencies
