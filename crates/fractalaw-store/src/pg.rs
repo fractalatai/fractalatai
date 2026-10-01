@@ -107,8 +107,8 @@ impl PgStore {
                   ELSE COALESCE(drrp_types, '{}'::text[]) END AS drrp_types, \
              duty_family, duty_sub_type, popimar, purposes, \
              clause_refined, taxa_confidence, taxa_classified_at, \
-             CASE WHEN scope = 'out' THEN NULL \
-                  WHEN status IN ('repealed', 'prospective') THEN COALESCE(extraction_method, 'status') \
+             CASE WHEN status IN ('repealed', 'prospective') THEN COALESCE(extraction_method, 'status') \
+                  WHEN scope = 'out' THEN NULL \
                   ELSE extraction_method END AS extraction_method, \
              holder_inferred_from, ancestor_distance, \
              CASE WHEN extraction_method IS NULL OR scope IN ('amendment', 'out') \
