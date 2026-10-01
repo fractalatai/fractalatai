@@ -139,12 +139,21 @@ fn in_sync(state: Option<&LatSyncState>, m: &ManifestEntry) -> bool {
 ///   intermediate states were never observed (never invented). Change ids and op
 ///   keys are merged; the key is the first entry's (its id when legal serves one).
 /// - The watermark is the latest `created_at` seen, legislative or not.
-pub(crate) fn version_batch(law: &str, entries: &[LatChangeEntry]) -> VersionBatch {
+///
+/// Entries at or before `since` are dropped here, whatever the server filtered:
+/// merging an already-versioned entry with a new one would key the new version
+/// on the old entry and lose it to ON CONFLICT (found 2026-10-01, when legal's
+/// queryable ignored `;`-separated `since`).
+pub(crate) fn version_batch(law: &str, entries: &[LatChangeEntry], since: Option<DateTime<Utc>>) -> VersionBatch {
     let mut specs: Vec<VersionSpec> = Vec::new();
     let mut by_row: HashMap<String, usize> = HashMap::new();
     let mut through: Option<DateTime<Utc>> = None;
     for e in entries {
-        if let Some(t) = parse_legal_timestamp(&e.created_at) {
+        let at = parse_legal_timestamp(&e.created_at);
+        if since.is_some_and(|s| at.is_none_or(|t| t <= s)) {
+            continue;
+        }
+        if let Some(t) = at {
             through = Some(through.map_or(t, |x| x.max(t)));
         }
         if e.cause != "legislative" || e.change == "inserted" {
@@ -195,12 +204,12 @@ pub(crate) fn version_batch(law: &str, entries: &[LatChangeEntry]) -> VersionBat
 
 /// New change-log entries for a law since its watermark.
 async fn law_changes(sync: &ZenohSync, law: &str, state: Option<&LatSyncState>, timeout: Duration) -> anyhow::Result<VersionBatch> {
-    let since = state.and_then(|s| s.changes_through).map(|t| t.to_rfc3339());
+    let since = state.and_then(|s| s.changes_through);
     let entries = sync
-        .query_lat_changes(law, since.as_deref(), timeout)
+        .query_lat_changes(law, since.map(|t| t.to_rfc3339()).as_deref(), timeout)
         .await
         .with_context(|| format!("query lat-changes {law}"))?;
-    Ok(version_batch(law, &entries))
+    Ok(version_batch(law, &entries, since))
 }
 
 /// Legal serves a status hash (#167) that differs from the one last applied.
@@ -896,7 +905,7 @@ mod tests {
             // A second legislative change to s.1 since the last sync: merged, not a second version
             entry(None, "status_changed", "legislative", Some("L:s.1"), None, "op3", &["c5"], "2026-10-01T12:00:00Z"),
         ];
-        let b = version_batch("L", &e);
+        let b = version_batch("L", &e, None);
         let rows: Vec<&str> = b.specs.iter().map(|s| s.section_id.as_str()).collect();
         assert_eq!(rows, vec!["L:s.1", "L:s.3", "L:s.23"]);
         assert_eq!(b.specs[0].change_ids, vec!["c1", "c5"]);
@@ -906,8 +915,15 @@ mod tests {
         assert_eq!(b.specs[2].renamed_to.as_deref(), Some("L:s.24"));
         assert_eq!(b.changes_through.unwrap().to_rfc3339(), "2026-10-01T12:00:00+00:00");
         // Legal's entry id takes over the key when served
-        let b = version_batch("L", &[entry(Some("42"), "text_changed", "legislative", Some("L:s.1"), None, "op1", &[], "2026-10-01T10:00:00Z")]);
+        let b = version_batch("L", &[entry(Some("42"), "text_changed", "legislative", Some("L:s.1"), None, "op1", &[], "2026-10-01T10:00:00Z")], None);
         assert_eq!(b.specs[0].version_key, "L|entry|42");
+        // The server re-sends the full log: entries at or before the watermark are
+        // dropped client-side, so the new change gets its own version, not the old key
+        let since = parse_legal_timestamp("2026-10-01T11:00:00Z");
+        let b = version_batch("L", &e, since);
+        assert_eq!(b.specs.len(), 1);
+        assert_eq!(b.specs[0].version_key, "L|L:s.1|op3|status_changed");
+        assert_eq!(b.specs[0].change_ids, vec!["c5"]);
     }
 
     use super::*;
