@@ -83,6 +83,13 @@ pub struct LatManifestEntry {
     /// Per-row status hash (sertantai-legal #167); null while any row lacks status
     #[serde(default)]
     pub status_hash: Option<String>,
+    /// Cause of the law's latest caused parse (#167 L8.3): initial | parser | scope |
+    /// correction | legislative | unattributed; null until re-parsed since L8.3
+    #[serde(default)]
+    pub cause: Option<String>,
+    /// SHA-256 of the fetched CLML for that parse (#167 L8.3)
+    #[serde(default)]
+    pub source_hash: Option<String>,
     #[serde(default)]
     pub updated_at: Option<String>,
     /// `full` | `partial` (legal #166 scoped LAT)
@@ -195,6 +202,11 @@ pub mod keys {
     /// Example: `fractalaw/@acme/data/legislation/lat-renames/UK_ukpga_1974_37`
     pub fn lat_renames(tenant: &str, law_name: &str) -> String {
         format!("{PREFIX}/@{tenant}/data/legislation/lat-renames/{law_name}")
+    }
+
+    /// Legal's per-note amendment annotations for a law (sertantai-legal #167 L8.2).
+    pub fn amendments(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/data/legislation/amendments/{law_name}")
     }
 
     /// Key expression for a specific law's provision-level taxa data.
@@ -922,6 +934,27 @@ impl ZenohSync {
     /// Returns decoded Arrow RecordBatches containing all provisions.
     ///
     /// Returns an empty Vec if no peer responds within the timeout.
+    /// Query legal's amendment annotations for a law (Arrow; #167 L8.2):
+    /// effect, effective_dates, effective_from, changed_by, change_id per note.
+    pub async fn query_amendments(
+        &self,
+        law_name: &str,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<RecordBatch>, ZenohError> {
+        let key = keys::amendments(&self.tenant, law_name);
+        let replies = self.session.get(&key).timeout(timeout).await.map_err(ZenohError::Session)?;
+        let mut all = Vec::new();
+        while let Ok(reply) = replies.recv_async().await {
+            if let Ok(sample) = reply.result() {
+                let bytes = sample.payload().to_bytes();
+                if !bytes.is_empty() {
+                    all.extend(decode_arrow_ipc(&bytes)?);
+                }
+            }
+        }
+        Ok(all)
+    }
+
     pub async fn query_lat(
         &self,
         law_name: &str,

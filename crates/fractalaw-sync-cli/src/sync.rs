@@ -1514,7 +1514,7 @@ pub(crate) async fn cmd_sync_watch(
                 let pg = lat_pg.as_ref().expect("guarded");
                 println!("\n[manifest] comparing hub against legal's LAT manifest...");
                 let opts = crate::lat_sync::PullLatOpts {
-                    laws: None, stale: true, apply: true, allow_benchmark: false, limit: None, timeout,
+                    laws: None, stale: true, apply: true, allow_benchmark: false, limit: None, timeout, refresh_fields: false,
                 };
                 match crate::lat_sync::stale_scope(pg, &sync, timeout).await {
                     Ok((laws, manifest)) => {

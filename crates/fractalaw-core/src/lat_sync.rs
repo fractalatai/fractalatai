@@ -169,6 +169,10 @@ pub struct ManifestEntry {
     pub struct_hash: Option<String>,
     /// Per-row status hash (legal #167); None until legal computes status for every row
     pub status_hash: Option<String>,
+    /// Cause of legal's latest caused parse (#167 L8.3); None until re-parsed since L8.3
+    pub cause: Option<String>,
+    /// SHA-256 of the CLML fetched for that parse (#167 L8.3)
+    pub source_hash: Option<String>,
     /// `full` | `partial` (legal #166 scoped LAT); None = full
     pub coverage: Option<String>,
     /// Scope purposes, e.g. [`ENABLING_EXTENT`], [`RELEVANCE`]
@@ -752,7 +756,7 @@ mod tests {
         let purposes = scope_purposes(Some(&v));
         assert_eq!(purposes, vec!["enabling_extent"]);
         let m = ManifestEntry {
-            law_name: "L".into(), row_count: 2, lat_hash: "h".into(), struct_hash: None, status_hash: None,
+            law_name: "L".into(), row_count: 2, lat_hash: "h".into(), struct_hash: None, status_hash: None, cause: None, source_hash: None,
             coverage: Some("partial".into()), scope_purposes: purposes, scope: Some(v.to_string()),
         };
         assert!(m.is_partial() && m.is_enabling_extent());

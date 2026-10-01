@@ -92,6 +92,10 @@ enum Command {
         /// Apply at most N laws this run (pilot / batches)
         #[arg(long)]
         limit: Option<usize>,
+        /// Refresh only legal's unhashed fields (sertantai-legal #167): status,
+        /// effective_from, changed_by, amendment notes, parse cause. No text or tier data
+        #[arg(long)]
+        refresh_fields: bool,
         /// Archive these approved laws that legal no longer holds (comma-separated or file)
         #[arg(long, conflicts_with_all = ["laws", "stale", "restore_laws"])]
         archive_laws: Option<String>,
@@ -506,6 +510,7 @@ async fn main() -> anyhow::Result<()> {
             apply,
             allow_benchmark,
             limit,
+            refresh_fields,
             archive_laws,
             restore_laws,
             archive_reason,
@@ -529,7 +534,7 @@ async fn main() -> anyhow::Result<()> {
                 let laws = laws.context("specify --laws")?;
                 return sync::cmd_sync_pull_lat(&data_dir, &zenoh, &laws, timeout, None).await;
             }
-            let opts = lat_sync::PullLatOpts { laws, stale, apply, allow_benchmark, limit, timeout: timeout_d };
+            let opts = lat_sync::PullLatOpts { laws, stale, apply, allow_benchmark, limit, timeout: timeout_d, refresh_fields };
             lat_sync::cmd_pull_lat(&data_dir, &zenoh, &opts, pg_url.as_deref()).await
         }
         Command::PullLrt {

@@ -54,6 +54,24 @@ pub struct TierCounts {
     pub fitness_mentions: i64,
 }
 
+/// One of legal's amendment notes (#167 L8.2).
+#[derive(Debug, Clone, Default)]
+pub struct LegalAmendment {
+    pub id: String,
+    pub code: Option<String>,
+    pub code_type: Option<String>,
+    pub effect: Option<String>,
+    pub change_id: Option<String>,
+    pub changed_by: Option<String>,
+    pub effective_from: Option<chrono::NaiveDate>,
+    pub effective_dates: Vec<chrono::NaiveDate>,
+    pub text: Option<String>,
+    pub updated_at: Option<DateTime<Utc>>,
+}
+
+/// One LAT row's unhashed fields (#167): status, effective_from, changed_by.
+pub type LatFieldRow = (String, Option<String>, Option<chrono::NaiveDate>, Option<String>);
+
 #[derive(Debug, Clone)]
 pub struct LatApplyReport {
     pub law_name: String,
@@ -88,6 +106,29 @@ ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS scope JSONB;
 ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS status_hash TEXT;
 -- Per-row provision status from legal (sertantai-legal #167, fractalatai #73)
 ALTER TABLE legislation_text ADD COLUMN IF NOT EXISTS status TEXT;
+-- When the row's current text/status took effect, and by which instrument (#167 L8.2)
+ALTER TABLE legislation_text ADD COLUMN IF NOT EXISTS effective_from DATE;
+ALTER TABLE legislation_text ADD COLUMN IF NOT EXISTS changed_by TEXT;
+-- Cause and source hash of legal's latest caused parse (#167 L8.3)
+ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS cause TEXT;
+ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS source_hash TEXT;
+-- Legal's amendment notes, structured (#167 L8.2): a mirror, replaced per law
+CREATE TABLE IF NOT EXISTS legal_amendments (
+    law_name         TEXT NOT NULL,
+    id               TEXT NOT NULL,
+    code             TEXT,
+    code_type        TEXT,
+    effect           TEXT,
+    change_id        TEXT,
+    changed_by       TEXT,
+    effective_from   DATE,
+    effective_dates  DATE[] NOT NULL DEFAULT '{}',
+    note_text        TEXT,
+    updated_at       TIMESTAMPTZ,
+    pulled_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (law_name, id)
+);
+CREATE INDEX IF NOT EXISTS idx_legal_amendments_change ON legal_amendments (change_id);
 CREATE TABLE IF NOT EXISTS lat_archive (
     id                BIGSERIAL PRIMARY KEY,
     law_name          TEXT NOT NULL,
@@ -218,6 +259,80 @@ impl PgStore {
             .map_err(db("status_hash"))?;
         tx.commit().await.map_err(db("status commit"))?;
         Ok(changed)
+    }
+
+    /// Refresh legal's unhashed per-row fields (#167: status, effective_from,
+    /// changed_by) and the law's latest parse cause/source_hash. Touches no
+    /// text or tier data. Returns rows changed.
+    pub async fn apply_lat_fields(
+        &self,
+        law_name: &str,
+        rows: &[LatFieldRow],
+        cause: Option<&str>,
+        source_hash: Option<&str>,
+    ) -> Result<u64, StoreError> {
+        let ids: Vec<&str> = rows.iter().map(|r| r.0.as_str()).collect();
+        let st: Vec<Option<&str>> = rows.iter().map(|r| r.1.as_deref()).collect();
+        let ef: Vec<Option<chrono::NaiveDate>> = rows.iter().map(|r| r.2).collect();
+        let cb: Vec<Option<&str>> = rows.iter().map(|r| r.3.as_deref()).collect();
+        let mut tx = self.pool().begin().await.map_err(db("fields tx"))?;
+        let changed = sqlx::query(
+            "UPDATE legislation_text lt SET status = v.status, effective_from = v.effective_from, changed_by = v.changed_by
+             FROM unnest($2::text[], $3::text[], $4::date[], $5::text[]) AS v(section_id, status, effective_from, changed_by)
+             WHERE lt.law_name = $1 AND lt.section_id = v.section_id
+               AND (lt.status, lt.effective_from, lt.changed_by) IS DISTINCT FROM (v.status, v.effective_from, v.changed_by)",
+        )
+        .bind(law_name)
+        .bind(&ids)
+        .bind(&st)
+        .bind(&ef)
+        .bind(&cb)
+        .execute(&mut *tx)
+        .await
+        .map_err(db("apply fields"))?
+        .rows_affected();
+        sqlx::query("UPDATE lat_sync_state SET cause = $2, source_hash = $3 WHERE law_name = $1")
+            .bind(law_name)
+            .bind(cause)
+            .bind(source_hash)
+            .execute(&mut *tx)
+            .await
+            .map_err(db("cause"))?;
+        tx.commit().await.map_err(db("fields commit"))?;
+        Ok(changed)
+    }
+
+    /// Replace a law's mirror of legal's amendment notes (#167 L8.2).
+    pub async fn replace_legal_amendments(&self, law_name: &str, notes: &[LegalAmendment]) -> Result<usize, StoreError> {
+        let mut tx = self.pool().begin().await.map_err(db("amendments tx"))?;
+        sqlx::query("DELETE FROM legal_amendments WHERE law_name = $1")
+            .bind(law_name)
+            .execute(&mut *tx)
+            .await
+            .map_err(db("amendments delete"))?;
+        for n in notes {
+            sqlx::query(
+                "INSERT INTO legal_amendments (law_name, id, code, code_type, effect, change_id, changed_by,
+                     effective_from, effective_dates, note_text, updated_at)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (law_name, id) DO NOTHING",
+            )
+            .bind(law_name)
+            .bind(&n.id)
+            .bind(&n.code)
+            .bind(&n.code_type)
+            .bind(&n.effect)
+            .bind(&n.change_id)
+            .bind(&n.changed_by)
+            .bind(n.effective_from)
+            .bind(&n.effective_dates)
+            .bind(&n.text)
+            .bind(n.updated_at)
+            .execute(&mut *tx)
+            .await
+            .map_err(db("amendments insert"))?;
+        }
+        tx.commit().await.map_err(db("amendments commit"))?;
+        Ok(notes.len())
     }
 
     /// Laws whose LAT is `enabling_extent` extent evidence only (legal #166):
@@ -577,7 +692,7 @@ mod tests {
     fn manifest(law: &str, legal: &[RecordBatch]) -> ManifestEntry {
         let rows = fractalaw_core::lat_sync::lat_rows_from_batches(legal).unwrap();
         ManifestEntry {
-            law_name: law.into(), row_count: rows.len() as u64, lat_hash: lat_hash(&rows), struct_hash: None, status_hash: None,
+            law_name: law.into(), row_count: rows.len() as u64, lat_hash: lat_hash(&rows), struct_hash: None, status_hash: None, cause: None, source_hash: None,
             coverage: None, scope_purposes: vec![], scope: None,
         }
     }

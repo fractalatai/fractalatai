@@ -37,6 +37,9 @@ pub(crate) struct PullLatOpts {
     pub allow_benchmark: bool,
     pub limit: Option<usize>,
     pub timeout: Duration,
+    /// Refresh only legal's unhashed fields (#167): status, effective_from,
+    /// changed_by, amendment notes, parse cause. No text or tier data.
+    pub refresh_fields: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -106,6 +109,8 @@ pub(crate) fn manifest_entry(m: &LatManifestEntry) -> ManifestEntry {
         lat_hash: m.lat_hash.clone(),
         struct_hash: m.struct_hash.clone(),
         status_hash: m.status_hash.clone(),
+        cause: m.cause.clone(),
+        source_hash: m.source_hash.clone(),
         coverage: m.coverage.clone(),
         scope_purposes: lat_sync::scope_purposes(scope.as_ref()),
         scope: scope.map(|s| s.to_string()),
@@ -544,6 +549,9 @@ pub(crate) async fn cmd_pull_lat(
         anyhow::bail!("specify --laws or --stale");
     };
 
+    if opts.refresh_fields {
+        return refresh_fields(&pg, &sync, &laws, &manifest, opts).await;
+    }
     println!(
         "LAT sync ({}): {} laws, tenant {}{}",
         if opts.apply { "apply" } else { "dry run" },
@@ -553,6 +561,126 @@ pub(crate) async fn cmd_pull_lat(
     );
     let outcomes = run_pass(&pg, &sync, &benchmarks, &laws, &manifest, opts).await?;
     report_pass(data_dir, &sync, &duck, &outcomes, opts.timeout).await
+}
+
+// ── #167 unhashed fields: status, effective_from, changed_by, notes, cause ──
+
+fn str_at(b: &arrow::record_batch::RecordBatch, name: &str, i: usize) -> Option<String> {
+    use arrow::array::{Array, AsArray};
+    use arrow::datatypes::DataType;
+    let c = b.column_by_name(name)?;
+    if c.is_null(i) {
+        return None;
+    }
+    match c.data_type() {
+        DataType::Utf8 => Some(c.as_string::<i32>().value(i).to_string()),
+        DataType::LargeUtf8 => Some(c.as_string::<i64>().value(i).to_string()),
+        _ => None,
+    }
+}
+
+fn date_at(b: &arrow::record_batch::RecordBatch, name: &str, i: usize) -> Option<chrono::NaiveDate> {
+    use arrow::array::{Array, AsArray};
+    use arrow::datatypes::Date32Type;
+    let c = b.column_by_name(name)?;
+    if c.is_null(i) {
+        return None;
+    }
+    c.as_primitive_opt::<Date32Type>().and_then(|a| a.value_as_date(i))
+}
+
+fn dates_at(b: &arrow::record_batch::RecordBatch, name: &str, i: usize) -> Vec<chrono::NaiveDate> {
+    use arrow::array::{Array, AsArray};
+    use arrow::datatypes::Date32Type;
+    let Some(c) = b.column_by_name(name) else { return vec![] };
+    if c.is_null(i) {
+        return vec![];
+    }
+    let inner = if let Some(l) = c.as_list_opt::<i64>() {
+        l.value(i)
+    } else if let Some(l) = c.as_list_opt::<i32>() {
+        l.value(i)
+    } else {
+        return vec![];
+    };
+    inner.as_primitive_opt::<Date32Type>().map_or(vec![], |a| (0..a.len()).filter_map(|j| a.value_as_date(j)).collect())
+}
+
+fn ts_at(b: &arrow::record_batch::RecordBatch, name: &str, i: usize) -> Option<DateTime<Utc>> {
+    use arrow::array::{Array, AsArray};
+    use arrow::datatypes::TimestampMicrosecondType;
+    let c = b.column_by_name(name)?;
+    if c.is_null(i) {
+        return None;
+    }
+    c.as_primitive_opt::<TimestampMicrosecondType>().and_then(|a| DateTime::from_timestamp_micros(a.value(i)))
+}
+
+/// Pull each law's LAT and amendment notes and refresh only the unhashed #167
+/// fields. Dry run unless --apply. Benchmark laws included: nothing they hold
+/// as classification is touched.
+async fn refresh_fields(
+    pg: &PgStore,
+    sync: &ZenohSync,
+    laws: &[String],
+    manifest: &HashMap<String, ManifestEntry>,
+    opts: &PullLatOpts,
+) -> anyhow::Result<()> {
+    let hub = pg.hub_law_row_counts().await?;
+    let targets: Vec<&String> =
+        laws.iter().filter(|l| hub.get(*l).copied().unwrap_or(0) > 0 && manifest.contains_key(*l)).collect();
+    println!("Refresh #167 fields ({}): {} laws", if opts.apply { "apply" } else { "dry run" }, targets.len());
+    let (mut rows, mut notes, mut failed) = (0u64, 0usize, 0usize);
+    for law in targets {
+        let m = &manifest[law];
+        let res: anyhow::Result<(u64, usize)> = async {
+            let lat = sync.query_lat(law, opts.timeout).await.with_context(|| format!("query LAT {law}"))?;
+            let mut fields = Vec::new();
+            for b in &lat {
+                for i in 0..b.num_rows() {
+                    let sid = str_at(b, "section_id", i).context("LAT row with null section_id")?;
+                    fields.push((sid, str_at(b, "status", i), date_at(b, "effective_from", i), str_at(b, "changed_by", i)));
+                }
+            }
+            let mut amend = Vec::new();
+            for b in sync.query_amendments(law, opts.timeout).await.with_context(|| format!("query amendments {law}"))? {
+                for i in 0..b.num_rows() {
+                    let Some(id) = str_at(&b, "id", i) else { continue };
+                    amend.push(fractalaw_store::LegalAmendment {
+                        id,
+                        code: str_at(&b, "code", i),
+                        code_type: str_at(&b, "code_type", i),
+                        effect: str_at(&b, "effect", i),
+                        change_id: str_at(&b, "change_id", i),
+                        changed_by: str_at(&b, "changed_by", i),
+                        effective_from: date_at(&b, "effective_from", i),
+                        effective_dates: dates_at(&b, "effective_dates", i),
+                        text: str_at(&b, "text", i),
+                        updated_at: ts_at(&b, "updated_at", i),
+                    });
+                }
+            }
+            if !opts.apply {
+                return Ok((fields.len() as u64, amend.len()));
+            }
+            let changed = pg.apply_lat_fields(law, &fields, m.cause.as_deref(), m.source_hash.as_deref()).await?;
+            let n = pg.replace_legal_amendments(law, &amend).await?;
+            Ok((changed, n))
+        }
+        .await;
+        match res {
+            Ok((c, n)) => {
+                rows += c;
+                notes += n;
+            }
+            Err(e) => {
+                failed += 1;
+                eprintln!("  {law}: error: {e:#}");
+            }
+        }
+    }
+    println!("{} {rows}, amendment notes {notes}, failed laws {failed}", if opts.apply { "rows changed" } else { "rows seen" });
+    Ok(())
 }
 
 /// Drop `enabling_extent` laws (legal #166 extent evidence) from a publish:
