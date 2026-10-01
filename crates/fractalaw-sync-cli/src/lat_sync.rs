@@ -606,6 +606,28 @@ fn dates_at(b: &arrow::record_batch::RecordBatch, name: &str, i: usize) -> Vec<c
     inner.as_primitive_opt::<Date32Type>().map_or(vec![], |a| (0..a.len()).filter_map(|j| a.value_as_date(j)).collect())
 }
 
+fn strs_at(b: &arrow::record_batch::RecordBatch, name: &str, i: usize) -> Vec<String> {
+    use arrow::array::{Array, AsArray};
+    let Some(c) = b.column_by_name(name) else { return vec![] };
+    if c.is_null(i) {
+        return vec![];
+    }
+    let inner = if let Some(l) = c.as_list_opt::<i64>() {
+        l.value(i)
+    } else if let Some(l) = c.as_list_opt::<i32>() {
+        l.value(i)
+    } else {
+        return vec![];
+    };
+    if let Some(a) = inner.as_string_opt::<i64>() {
+        (0..a.len()).filter(|&j| !a.is_null(j)).map(|j| a.value(j).to_string()).collect()
+    } else if let Some(a) = inner.as_string_opt::<i32>() {
+        (0..a.len()).filter(|&j| !a.is_null(j)).map(|j| a.value(j).to_string()).collect()
+    } else {
+        vec![]
+    }
+}
+
 fn ts_at(b: &arrow::record_batch::RecordBatch, name: &str, i: usize) -> Option<DateTime<Utc>> {
     use arrow::array::{Array, AsArray};
     use arrow::datatypes::TimestampMicrosecondType;
@@ -657,6 +679,7 @@ async fn refresh_fields(
                         effective_dates: dates_at(&b, "effective_dates", i),
                         text: str_at(&b, "text", i),
                         updated_at: ts_at(&b, "updated_at", i),
+                        affected_sections: strs_at(&b, "affected_sections", i),
                     });
                 }
             }

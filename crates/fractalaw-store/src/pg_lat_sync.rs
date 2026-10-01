@@ -67,6 +67,8 @@ pub struct LegalAmendment {
     pub effective_dates: Vec<chrono::NaiveDate>,
     pub text: Option<String>,
     pub updated_at: Option<DateTime<Utc>>,
+    /// Section ids the note affects (legal's Arrow payload from c95599aa)
+    pub affected_sections: Vec<String>,
 }
 
 /// One LAT row's unhashed fields (#167): status, effective_from, changed_by.
@@ -129,6 +131,7 @@ CREATE TABLE IF NOT EXISTS legal_amendments (
     PRIMARY KEY (law_name, id)
 );
 CREATE INDEX IF NOT EXISTS idx_legal_amendments_change ON legal_amendments (change_id);
+ALTER TABLE legal_amendments ADD COLUMN IF NOT EXISTS affected_sections TEXT[] NOT NULL DEFAULT '{}';
 CREATE TABLE IF NOT EXISTS lat_archive (
     id                BIGSERIAL PRIMARY KEY,
     law_name          TEXT NOT NULL,
@@ -313,8 +316,8 @@ impl PgStore {
         for n in notes {
             sqlx::query(
                 "INSERT INTO legal_amendments (law_name, id, code, code_type, effect, change_id, changed_by,
-                     effective_from, effective_dates, note_text, updated_at)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT (law_name, id) DO NOTHING",
+                     effective_from, effective_dates, note_text, updated_at, affected_sections)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT (law_name, id) DO NOTHING",
             )
             .bind(law_name)
             .bind(&n.id)
@@ -327,6 +330,7 @@ impl PgStore {
             .bind(&n.effective_dates)
             .bind(&n.text)
             .bind(n.updated_at)
+            .bind(&n.affected_sections)
             .execute(&mut *tx)
             .await
             .map_err(db("amendments insert"))?;
