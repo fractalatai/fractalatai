@@ -26,6 +26,13 @@ pub struct LawDrrpInputs {
     pub duty_text_provisions: i64,
     /// Substantive (non-amendment) provisions
     pub substantive_provisions: i64,
+    /// Provisions that impose nothing now (#73): status repealed/prospective, or
+    /// an in-force unapplied whole-provision repeal (L10). The current
+    /// (as-amended) roll-up excludes them; the as-made one doesn't.
+    pub non_live: Vec<String>,
+    /// All substantive provisions, live or not: with `substantive_provisions`
+    /// (live only) it tells a wholly repealed law apart
+    pub substantive_total: i64,
 }
 
 /// Provision data store — implemented by LanceStore and PgStore.

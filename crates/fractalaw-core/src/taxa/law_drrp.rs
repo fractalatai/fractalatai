@@ -150,7 +150,35 @@ pub fn aggregate(
     law
 }
 
+/// The current (as-amended) verdict label sent as `current_verdict` (#73 R1a):
+/// `revoked` when the whole law is revoked (legal's LRT `live`) or every
+/// substantive provision is repealed; otherwise the live-provision roll-up's
+/// verdict, or `holder_unknown`.
+pub fn current_verdict(revoked: bool, law: &LawDrrp) -> &'static str {
+    if revoked {
+        "revoked"
+    } else {
+        law.verdict().map_or("holder_unknown", |v| v.as_str())
+    }
+}
+
+/// Legal's LRT `live` label for a wholly revoked law (sertantai-legal LiveStatus;
+/// includes revoked_unapplied, excludes prospective revocations).
+pub fn live_is_revoked(live: Option<&str>) -> bool {
+    live.is_some_and(|l| l.contains("Revoked / Repealed / Abolished"))
+}
+
 impl LawDrrp {
+    /// The `current_*` payload for a label (#73 R1a): `revoked` sends empty
+    /// lists, `holder_unknown` the holder-unknown shape, otherwise the roll-up.
+    pub fn current_payload(&self, label: &str) -> LawDrrp {
+        match label {
+            "revoked" => LawDrrp::default(),
+            "holder_unknown" => self.holder_unknown_payload(),
+            _ => self.clone(),
+        }
+    }
+
     /// The payload for a law with no verdict because a holder is unknown:
     /// `duty_type` keeps the raw `Obligation` beside any known Right/Power
     /// types; Duty/Responsibility lists are empty (never NULL); known Rights
@@ -281,5 +309,20 @@ mod tests {
         let law = aggregate(&rights, &["L:s.2(1)".to_string()], |s| texts.get(s).map(|t| t.to_string()));
         assert_eq!(law.holder_unknown, 0);
         assert_eq!(law.verdict(), Some(Verdict::Empowering));
+    }
+
+    #[test]
+    fn current_verdict_labels() {
+        let duty = aggregate(&[sig("L:s.1", "Org: Employer", "Obligation")], &[], |_| Some("t".into()));
+        assert_eq!(current_verdict(false, &duty), "making");
+        assert_eq!(current_verdict(true, &duty), "revoked", "revocation wins over any live roll-up");
+        let unknown = aggregate(&[], &["L:s.2".to_string()], |_| Some("records shall be kept".into()));
+        assert_eq!(current_verdict(false, &unknown), "holder_unknown");
+        assert_eq!(current_verdict(false, &LawDrrp::default()), "no_obligations");
+        assert!(duty.current_payload("revoked").duty_holders.is_empty());
+        assert!(unknown.current_payload("holder_unknown").duty_types.contains("Obligation"));
+        assert!(live_is_revoked(Some("❌ Revoked / Repealed / Abolished")));
+        assert!(!live_is_revoked(Some("⭕ Part Revocation / Repeal")));
+        assert!(!live_is_revoked(None));
     }
 }

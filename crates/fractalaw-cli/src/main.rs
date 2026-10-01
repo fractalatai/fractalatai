@@ -432,7 +432,7 @@ async fn open_provision_store(
 fn law_drrp_for(
     inputs: &fractalaw_store::LawDrrpInputs,
 ) -> (&'static str, Option<fractalaw_core::taxa::law_drrp::LawDrrp>) {
-    use fractalaw_core::taxa::law_drrp::{ActorSignal, LawDrrp, aggregate};
+    use fractalaw_core::taxa::law_drrp::LawDrrp;
     if inputs.signals.iter().any(|(_, _, _, method, _)| method.is_none()) {
         return ("unreconciled", None);
     }
@@ -458,10 +458,22 @@ fn law_drrp_for(
         .filter(|(_, _, scope)| scope.as_deref() == Some("amendment"))
         .map(|(sid, _, _)| sid.as_str())
         .collect();
+    let law = rollup(inputs, &amendment, &std::collections::HashSet::new(), &texts);
+    (law.verdict().map_or("holder_unknown", |v| v.as_str()), Some(law))
+}
+
+/// Roll up a law's signals, skipping amendment-scope and `exclude`d sections.
+fn rollup(
+    inputs: &fractalaw_store::LawDrrpInputs,
+    amendment: &std::collections::HashSet<&str>,
+    exclude: &std::collections::HashSet<&str>,
+    texts: &std::collections::HashMap<&str, &str>,
+) -> fractalaw_core::taxa::law_drrp::LawDrrp {
+    use fractalaw_core::taxa::law_drrp::{ActorSignal, aggregate};
     let signals: Vec<ActorSignal> = inputs
         .signals
         .iter()
-        .filter(|(sid, ..)| !amendment.contains(sid.as_str()))
+        .filter(|(sid, ..)| !amendment.contains(sid.as_str()) && !exclude.contains(sid.as_str()))
         .map(|(sid, label, drrp, _, position)| ActorSignal {
             section_id: sid.clone(),
             actor_label: label.clone(),
@@ -469,8 +481,44 @@ fn law_drrp_for(
             position: position.clone().unwrap_or_default(),
         })
         .collect();
-    let law = aggregate(&signals, &inputs.holder_unknown, |sid| texts.get(sid).map(|t| t.to_string()));
-    (law.verdict().map_or("holder_unknown", |v| v.as_str()), Some(law))
+    let unknown: Vec<String> =
+        inputs.holder_unknown.iter().filter(|s| !exclude.contains(s.as_str())).cloned().collect();
+    aggregate(&signals, &unknown, |sid| texts.get(sid).map(|t| t.to_string()))
+}
+
+/// The current (as-amended) view for a law whose as-made DRRP is written
+/// (#73 R1a): the roll-up over live provisions only, and its verdict label.
+/// `revoked` when legal's `live` says so or no substantive provision is live.
+/// None where the as-made view isn't written either (unreconciled, no actors).
+fn current_for(
+    inputs: &fractalaw_store::LawDrrpInputs,
+    outcome: &str,
+    live: Option<&str>,
+) -> Option<(&'static str, fractalaw_core::taxa::law_drrp::LawDrrp)> {
+    use fractalaw_core::taxa::law_drrp::{LawDrrp, current_verdict, live_is_revoked};
+    if matches!(outcome, "unreconciled" | "no_actors" | "not_run") {
+        return None;
+    }
+    let revoked = live_is_revoked(live) || (inputs.substantive_total > 0 && inputs.substantive_provisions == 0);
+    if outcome == "no_obligations_no_duty_text" {
+        let law = LawDrrp::default();
+        return Some((current_verdict(revoked, &law), law));
+    }
+    let texts: std::collections::HashMap<&str, &str> = inputs
+        .provisions
+        .iter()
+        .filter_map(|(sid, text, _)| text.as_deref().map(|t| (sid.as_str(), t)))
+        .collect();
+    let amendment: std::collections::HashSet<&str> = inputs
+        .provisions
+        .iter()
+        .filter(|(_, _, scope)| scope.as_deref() == Some("amendment"))
+        .map(|(sid, _, _)| sid.as_str())
+        .collect();
+    let exclude: std::collections::HashSet<&str> = inputs.non_live.iter().map(String::as_str).collect();
+    let law = rollup(inputs, &amendment, &exclude, &texts);
+    let label = current_verdict(revoked, &law);
+    Some((label, law.current_payload(label)))
 }
 
 #[tokio::main]
@@ -667,8 +715,11 @@ async fn main() -> anyhow::Result<()> {
                 let mut drrp_rolled_up: Vec<String> = Vec::new();
                 let mut no_duty_text: Vec<String> = Vec::new();
                 let mut transitions: std::collections::BTreeMap<(String, String), usize> = std::collections::BTreeMap::new();
+                // (as-made verdict, current verdict) counts (#73 R1a)
+                let mut current_views: std::collections::BTreeMap<(String, String), usize> = std::collections::BTreeMap::new();
+                store.ensure_current_view_columns()?;
                 if dry_run {
-                    println!("law\tcurrent\tnew\tduties\tresponsibilities\trights\tpowers\tholder_unknown\tnon_active_excluded");
+                    println!("law\tcurrent\tnew\tduties\tresponsibilities\trights\tpowers\tholder_unknown\tnon_active_excluded\tcurrent_view");
                 }
                 for law_name in &law_names {
                     if dry_run {
@@ -676,6 +727,9 @@ async fn main() -> anyhow::Result<()> {
                         let current = commands::pipeline::read_law_verdict(&store, law_name)?.unwrap_or("-");
                         let inputs = lance.query_law_drrp_inputs(law_name).await?;
                         let (new, law) = law_drrp_for(&inputs);
+                        let live = commands::pipeline::read_law_live(&store, law_name)?;
+                        let cur = current_for(&inputs, new, live.as_deref()).map_or("-", |(v, _)| v);
+                        *current_views.entry((new.to_string(), cur.to_string())).or_default() += 1;
                         let row = law.map(|l| {
                             format!(
                                 "{}\t{}\t{}\t{}\t{}\t{}",
@@ -683,7 +737,7 @@ async fn main() -> anyhow::Result<()> {
                                 l.holder_unknown, l.excluded_non_active
                             )
                         });
-                        println!("{law_name}\t{current}\t{new}\t{}", row.unwrap_or_else(|| "\t\t\t\t\t".into()));
+                        println!("{law_name}\t{current}\t{new}\t{}\t{cur}", row.unwrap_or_else(|| "\t\t\t\t\t".into()));
                         *transitions.entry((current.to_string(), new.to_string())).or_default() += 1;
                         continue;
                     }
@@ -753,6 +807,12 @@ async fn main() -> anyhow::Result<()> {
                         _ => {}
                     }
                     *verdicts.entry(outcome).or_default() += 1;
+                    // Current (as-amended) view beside the as-made one (#73 R1a)
+                    let live = commands::pipeline::read_law_live(&store, law_name)?;
+                    if let Some((label, cur)) = current_for(&inputs, outcome, live.as_deref()) {
+                        commands::pipeline::write_law_current(&store, law_name, label, &cur)?;
+                        *current_views.entry((outcome.to_string(), label.to_string())).or_default() += 1;
+                    }
 
                     // Part-level significance breakdown for large Acts
                     if let Some(parts_json) = lance.query_significance_parts(law_name).await? {
@@ -775,6 +835,10 @@ async fn main() -> anyhow::Result<()> {
                     for ((from, to), n) in &transitions {
                         eprintln!("  {from} → {to}: {n}");
                     }
+                    eprintln!("As made → current view (#73 R1a):");
+                    for ((made, cur), n) in &current_views {
+                        eprintln!("  {made} → {cur}: {n}");
+                    }
                     return Ok(());
                 }
                 println!(
@@ -782,6 +846,7 @@ async fn main() -> anyhow::Result<()> {
                     law_names.len()
                 );
                 println!("Law-level DRRP verdicts: {verdicts:?}");
+                println!("As made → current view (#73 R1a): {current_views:?}");
                 // Provenance (#63): DRRP roll-up only where it wrote a verdict; significance for all
                 let [drrp_stage, sig_stage]: [_; 2] = provenance::taxa_backfill().try_into().expect("two stages");
                 // The verdict's basis stays auditable: no-duty-text verdicts are recorded as such

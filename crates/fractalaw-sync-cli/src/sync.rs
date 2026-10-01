@@ -73,6 +73,7 @@ pub(crate) async fn cmd_sync_publish(
 ) -> anyhow::Result<()> {
     let store = open_duck(data_dir)?;
     store.ensure_taxa_hash_columns()?;
+    store.ensure_current_view_columns()?;
     // Enrichment provenance (#63) comes from the hub; without it the payload is verdict-only
     let prov_pg = match pg_url {
         Some(url) => {
@@ -202,7 +203,9 @@ pub(crate) async fn cmd_sync_publish(
     } else {
         "duty_holder, rights_holder, responsibility_holder, power_holder, \
          duty_type, role, role_gvt, \
-         duties, rights, responsibilities, powers, "
+         duties, rights, responsibilities, powers, \
+         current_verdict, current_duty_type, current_duty_holder, current_rights_holder, \
+         current_responsibility_holder, current_power_holder, "
     };
 
     let mut published = 0usize;

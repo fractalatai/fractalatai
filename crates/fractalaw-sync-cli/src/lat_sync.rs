@@ -646,7 +646,7 @@ pub(crate) async fn cmd_pull_lat(
     };
 
     if opts.refresh_fields {
-        return refresh_fields(&pg, &sync, &laws, &manifest, opts).await;
+        return refresh_fields(&pg, &sync, &duck, &laws, &manifest, opts).await;
     }
     println!(
         "LAT sync ({}): {} laws, tenant {}{}",
@@ -740,6 +740,7 @@ fn ts_at(b: &arrow::record_batch::RecordBatch, name: &str, i: usize) -> Option<D
 async fn refresh_fields(
     pg: &PgStore,
     sync: &ZenohSync,
+    duck: &DuckStore,
     laws: &[String],
     manifest: &HashMap<String, ManifestEntry>,
     opts: &PullLatOpts,
@@ -799,6 +800,28 @@ async fn refresh_fields(
         }
     }
     println!("{} {rows}, amendment notes {notes}, failed laws {failed}", if opts.apply { "rows changed" } else { "rows seen" });
+
+    // Legal's LRT `live` per law (#73 R1a: current_verdict = revoked). One
+    // wildcard query; a targeted column update, never upsert_legislation, which
+    // would replace the whole row (and our DRRP columns).
+    // Per law (Arrow): legal's lrt/* wildcard doesn't decode, and LRT has no JSON form
+    let mut live: Vec<(String, Option<String>)> = Vec::new();
+    for law in laws.iter().filter(|l| hub.get(*l).copied().unwrap_or(0) > 0) {
+        live.push((law.clone(), legal_live(sync, law, opts.timeout).await));
+    }
+    if opts.apply {
+        duck.ensure_current_view_columns()?;
+        let held: HashSet<&String> = laws.iter().collect();
+        let mut n = 0usize;
+        for (name, l) in live.iter().filter(|(n, _)| held.contains(n)) {
+            let v = l.as_ref().map_or("NULL".to_string(), |s| format!("'{}'", s.replace('\'', "''")));
+            duck.execute(&format!("UPDATE legislation SET live = {v} WHERE name = '{}'", name.replace('\'', "''")))?;
+            n += 1;
+        }
+        println!("live status stored for {n} laws ({} with a label)", live.iter().filter(|(_, l)| l.is_some()).count());
+    } else {
+        println!("live status read for {} laws", live.len());
+    }
     Ok(())
 }
 

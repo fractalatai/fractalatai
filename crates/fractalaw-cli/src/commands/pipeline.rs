@@ -1504,6 +1504,52 @@ pub(crate) fn read_law_verdict(store: &DuckStore, law_name: &str) -> anyhow::Res
     Ok(out)
 }
 
+/// Legal's LRT `live` label for a law, as stored by `pull-lat --refresh-fields`.
+pub(crate) fn read_law_live(store: &DuckStore, law_name: &str) -> anyhow::Result<Option<String>> {
+    for batch in store.query_arrow(&format!(
+        "SELECT live FROM legislation WHERE name = '{}'",
+        law_name.replace('\'', "''")
+    ))? {
+        if let Some(col) = batch.column(0).as_any().downcast_ref::<arrow::array::StringArray>()
+            && batch.num_rows() > 0
+            && !col.is_null(0)
+        {
+            return Ok(Some(col.value(0).to_string()));
+        }
+    }
+    Ok(None)
+}
+
+/// Write the current (as-amended) view (#73 R1a). Lists are typed empty, never
+/// NULL, so legal overwrites stale values; the as-made columns are untouched.
+pub(crate) fn write_law_current(
+    store: &DuckStore,
+    law_name: &str,
+    verdict: &str,
+    law: &fractalaw_core::taxa::law_drrp::LawDrrp,
+) -> anyhow::Result<()> {
+    let list = |set: &std::collections::BTreeSet<String>| {
+        if set.is_empty() {
+            "CAST([] AS VARCHAR[])".to_string()
+        } else {
+            format_sql_list(set.iter().map(|s| s.as_str()))
+        }
+    };
+    store.execute(&format!(
+        "UPDATE legislation SET current_verdict = '{verdict}', current_duty_type = {}, \
+            current_duty_holder = {}, current_rights_holder = {}, \
+            current_responsibility_holder = {}, current_power_holder = {} \
+         WHERE name = '{}'",
+        list(&law.duty_types),
+        list(&law.duty_holders),
+        list(&law.rights_holders),
+        list(&law.responsibility_holders),
+        list(&law.power_holders),
+        law_name.replace('\'', "''"),
+    ))?;
+    Ok(())
+}
+
 /// Write the law-level DRRP rolled up from reconciled provision_actors (#55).
 /// Empty sets are written as typed empty lists, not NULL: sertantai-legal reads
 /// NULL DRRP as "no verdict" and empty lists as "no obligations".

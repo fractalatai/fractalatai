@@ -585,7 +585,24 @@ impl PgStore {
         .fetch_one(&self.pool)
         .await
         .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?;
-        Ok(crate::provision_store::LawDrrpInputs { provisions, signals, holder_unknown, duty_text_provisions, substantive_provisions })
+        let non_live = sqlx::query_scalar::<_, String>(
+            "SELECT section_id FROM legislation_text WHERE law_name = $1 \
+               AND (status IN ('repealed', 'prospective') OR unapplied_repealed(law_name, section_id))",
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?;
+        let substantive_total: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM legislation_text WHERE law_name = $1 AND scope = 'substantive'",
+        )
+        .bind(law_name)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?;
+        Ok(crate::provision_store::LawDrrpInputs {
+            provisions, signals, holder_unknown, duty_text_provisions, substantive_provisions, non_live, substantive_total,
+        })
     }
 
     /// Query Part-level significance breakdown for large Acts.

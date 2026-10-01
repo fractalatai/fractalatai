@@ -671,6 +671,25 @@ impl DuckStore {
         Ok(())
     }
 
+    /// Ensure the current-view (as-amended) columns exist (#73 R1a): legal's LRT
+    /// `live`, `current_verdict`, `current_duty_type` and the four
+    /// `current_*_holder` lists. Idempotent.
+    pub fn ensure_current_view_columns(&self) -> Result<(), StoreError> {
+        for (col, ty) in [
+            ("live", "VARCHAR"),
+            ("current_verdict", "VARCHAR"),
+            ("current_duty_type", "VARCHAR[]"),
+            ("current_duty_holder", "VARCHAR[]"),
+            ("current_rights_holder", "VARCHAR[]"),
+            ("current_responsibility_holder", "VARCHAR[]"),
+            ("current_power_holder", "VARCHAR[]"),
+        ] {
+            self.conn
+                .execute_batch(&format!("ALTER TABLE legislation ADD COLUMN IF NOT EXISTS {col} {ty}"))?;
+        }
+        Ok(())
+    }
+
     /// Ensure `inherited_count` column exists on `legislation`.
     ///
     /// Tracks how many provisions were resolved by Tier 1 deterministic
