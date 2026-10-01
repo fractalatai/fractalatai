@@ -1382,7 +1382,7 @@ pub(crate) async fn cmd_sync_watch(
                     let hub_rows = pg.hub_law_row_counts().await.ok()
                         .and_then(|c| c.get(law_name).copied()).unwrap_or(0);
                     let apply = !benchmarks.contains(law_name);
-                    match crate::lat_sync::sync_law(pg, &sync, law_name, manifest.as_ref(), states.get(law_name), hub_rows, apply, timeout).await {
+                    match crate::lat_sync::sync_law(pg, &sync, law_name, manifest.as_ref(), states.get(law_name), hub_rows, apply, true, timeout).await {
                         Ok(o) => match o.action {
                             crate::lat_sync::Action::Applied | crate::lat_sync::Action::InSync => {
                                 eprint!(" → {} ({} provisions)", if o.action == crate::lat_sync::Action::Applied { "applied" } else { "in sync" }, o.legal_rows);

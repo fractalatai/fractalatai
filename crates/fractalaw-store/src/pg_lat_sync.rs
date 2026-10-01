@@ -38,6 +38,8 @@ pub struct LatSyncState {
     /// Legal #166 scoped LAT: `full` | `partial` (None = full)
     pub coverage: Option<String>,
     pub scope_purposes: Vec<String>,
+    /// Legal's per-row status hash last applied (#167)
+    pub status_hash: Option<String>,
 }
 
 /// Tier data on a set of provisions. Diff-apply requires the carried rows'
@@ -83,6 +85,9 @@ CREATE TABLE IF NOT EXISTS lat_sync_state (
 ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS coverage TEXT;
 ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS scope_purposes TEXT[] NOT NULL DEFAULT '{}';
 ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS scope JSONB;
+ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS status_hash TEXT;
+-- Per-row provision status from legal (sertantai-legal #167, fractalatai #73)
+ALTER TABLE legislation_text ADD COLUMN IF NOT EXISTS status TEXT;
 CREATE TABLE IF NOT EXISTS lat_archive (
     id                BIGSERIAL PRIMARY KEY,
     law_name          TEXT NOT NULL,
@@ -139,7 +144,7 @@ impl PgStore {
     pub async fn lat_sync_states(&self) -> Result<HashMap<String, LatSyncState>, StoreError> {
         let rows = sqlx::query(
             "SELECT law_name, lat_hash, struct_hash, row_count, renames_through,
-                    held_section_ids, reparse_needed, applied_at, coverage, scope_purposes
+                    held_section_ids, reparse_needed, applied_at, coverage, scope_purposes, status_hash
              FROM lat_sync_state",
         )
         .fetch_all(self.pool())
@@ -159,6 +164,7 @@ impl PgStore {
                     applied_at: r.get(7),
                     coverage: r.get(8),
                     scope_purposes: r.get(9),
+                    status_hash: r.get(10),
                 };
                 (s.law_name.clone(), s)
             })
@@ -179,6 +185,39 @@ impl PgStore {
         .await
         .map_err(db("update coverage"))?;
         Ok(())
+    }
+
+    /// Apply legal's per-row provision status (#167) and record its hash. Touches
+    /// only `legislation_text.status`: no text, tier data or archive changes, so a
+    /// status-only change (e.g. a repeal) needs no re-parse. Returns rows changed.
+    pub async fn apply_lat_status(
+        &self,
+        law_name: &str,
+        statuses: &[(String, Option<String>)],
+        status_hash: Option<&str>,
+    ) -> Result<u64, StoreError> {
+        let (ids, sts): (Vec<String>, Vec<Option<String>>) = statuses.iter().cloned().unzip();
+        let mut tx = self.pool().begin().await.map_err(db("status tx"))?;
+        let changed = sqlx::query(
+            "UPDATE legislation_text lt SET status = v.status
+             FROM unnest($2::text[], $3::text[]) AS v(section_id, status)
+             WHERE lt.law_name = $1 AND lt.section_id = v.section_id AND lt.status IS DISTINCT FROM v.status",
+        )
+        .bind(law_name)
+        .bind(&ids)
+        .bind(&sts)
+        .execute(&mut *tx)
+        .await
+        .map_err(db("apply status"))?
+        .rows_affected();
+        sqlx::query("UPDATE lat_sync_state SET status_hash = $2 WHERE law_name = $1")
+            .bind(law_name)
+            .bind(status_hash)
+            .execute(&mut *tx)
+            .await
+            .map_err(db("status_hash"))?;
+        tx.commit().await.map_err(db("status commit"))?;
+        Ok(changed)
     }
 
     /// Laws whose LAT is `enabling_extent` extent evidence only (legal #166):
@@ -538,7 +577,7 @@ mod tests {
     fn manifest(law: &str, legal: &[RecordBatch]) -> ManifestEntry {
         let rows = fractalaw_core::lat_sync::lat_rows_from_batches(legal).unwrap();
         ManifestEntry {
-            law_name: law.into(), row_count: rows.len() as u64, lat_hash: lat_hash(&rows), struct_hash: None,
+            law_name: law.into(), row_count: rows.len() as u64, lat_hash: lat_hash(&rows), struct_hash: None, status_hash: None,
             coverage: None, scope_purposes: vec![], scope: None,
         }
     }

@@ -80,6 +80,9 @@ pub struct LatManifestEntry {
     pub lat_hash: String,
     #[serde(default)]
     pub struct_hash: Option<String>,
+    /// Per-row status hash (sertantai-legal #167); null while any row lacks status
+    #[serde(default)]
+    pub status_hash: Option<String>,
     #[serde(default)]
     pub updated_at: Option<String>,
     /// `full` | `partial` (legal #166 scoped LAT)

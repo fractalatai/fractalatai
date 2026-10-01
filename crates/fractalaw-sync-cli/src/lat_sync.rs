@@ -54,6 +54,10 @@ pub(crate) enum Action {
     Applied,
     /// Tier data would have been lost: rolled back
     GateFailed,
+    /// LAT text/structure unchanged, only per-row status moved (legal #167):
+    /// planned (dry run) or applied as a status-only update
+    StatusPlanned,
+    StatusApplied,
 }
 
 impl Action {
@@ -66,6 +70,8 @@ impl Action {
             Self::Planned => "planned",
             Self::Applied => "applied",
             Self::GateFailed => "gate_failed",
+            Self::StatusPlanned => "status_planned",
+            Self::StatusApplied => "status_applied",
         }
     }
 }
@@ -99,6 +105,7 @@ pub(crate) fn manifest_entry(m: &LatManifestEntry) -> ManifestEntry {
         row_count: m.row_count,
         lat_hash: m.lat_hash.clone(),
         struct_hash: m.struct_hash.clone(),
+        status_hash: m.status_hash.clone(),
         coverage: m.coverage.clone(),
         scope_purposes: lat_sync::scope_purposes(scope.as_ref()),
         scope: scope.map(|s| s.to_string()),
@@ -107,6 +114,41 @@ pub(crate) fn manifest_entry(m: &LatManifestEntry) -> ManifestEntry {
 
 fn in_sync(state: Option<&LatSyncState>, m: &ManifestEntry) -> bool {
     state.is_some_and(|s| s.lat_hash == m.lat_hash && s.struct_hash == m.struct_hash)
+}
+
+/// Legal serves a status hash (#167) that differs from the one last applied.
+fn status_moved(state: Option<&LatSyncState>, m: &ManifestEntry) -> bool {
+    m.status_hash.is_some() && state.is_none_or(|s| s.status_hash != m.status_hash)
+}
+
+/// Pull the law's LAT, verify per-row status against the manifest's
+/// `status_hash`, and apply it when asked. Status only: no text or tier data.
+async fn sync_status(
+    pg: &PgStore,
+    sync: &ZenohSync,
+    law: &str,
+    m: &ManifestEntry,
+    batches: Option<&[arrow::record_batch::RecordBatch]>,
+    apply: bool,
+    timeout: Duration,
+) -> anyhow::Result<(bool, String)> {
+    let owned;
+    let batches = match batches {
+        Some(b) => b,
+        None => {
+            owned = sync.query_lat(law, timeout).await.with_context(|| format!("query LAT {law}"))?;
+            &owned[..]
+        }
+    };
+    let statuses = lat_sync::status_rows_from_batches(batches).map_err(anyhow::Error::msg)?;
+    if m.status_hash.as_deref() != Some(lat_sync::status_hash(&statuses).as_str()) {
+        return Ok((false, "status_hash differs from manifest".into()));
+    }
+    if !apply {
+        return Ok((true, String::new()));
+    }
+    let changed = pg.apply_lat_status(law, &statuses, m.status_hash.as_deref()).await?;
+    Ok((true, format!("{changed} rows' status changed")))
 }
 
 pub(crate) fn benchmark_laws(duck: &DuckStore) -> anyhow::Result<HashSet<String>> {
@@ -141,6 +183,7 @@ pub(crate) async fn sync_law(
     state: Option<&LatSyncState>,
     hub_rows: i64,
     apply: bool,
+    apply_status: bool,
     timeout: Duration,
 ) -> anyhow::Result<LawOutcome> {
     let Some(m) = manifest.filter(|m| m.row_count > 0) else {
@@ -150,6 +193,18 @@ pub(crate) async fn sync_law(
     if in_sync(state, m) {
         // Scope can change without the LAT changing (legal #166)
         pg.update_lat_coverage(m).await?;
+        if status_moved(state, m) {
+            // Status-only change (e.g. a repeal): no re-parse, no tier data touched
+            let (ok, note) = sync_status(pg, sync, law, m, None, apply_status, timeout).await?;
+            let action = match (ok, apply_status) {
+                (false, _) => Action::ManifestMoved,
+                (true, true) => Action::StatusApplied,
+                (true, false) => Action::StatusPlanned,
+            };
+            let mut out = LawOutcome::new(law, action, hub_rows, m.row_count);
+            out.note = note;
+            return Ok(out);
+        }
         return Ok(LawOutcome::new(law, Action::InSync, hub_rows, m.row_count));
     }
 
@@ -190,6 +245,11 @@ pub(crate) async fn sync_law(
     if apply {
         let report = pg.apply_lat_diff(law, &batches, &plan, m, renames_through).await?;
         out.action = if report.committed { Action::Applied } else { Action::GateFailed };
+        if report.committed && m.status_hash.is_some() {
+            // Rows are in place: now their status (legal #167)
+            let (_, note) = sync_status(pg, sync, law, m, Some(&batches), true, timeout).await?;
+            out.note = note;
+        }
         if !report.committed {
             out.note = format!("tier data before {:?} after {:?}", report.before, report.after);
         }
@@ -345,7 +405,9 @@ pub(crate) async fn run_pass(
         let benchmark = benchmarks.contains(law) && !opts.allow_benchmark;
         let under_limit = opts.limit.is_none_or(|l| applied < l);
         let apply = opts.apply && !benchmark && under_limit;
-        let mut o = match sync_law(pg, sync, law, manifest.get(law), states.get(law), hub_rows, apply, opts.timeout).await {
+        // Status-only updates touch no tier data, so benchmark laws take them too (#167)
+        let apply_status = opts.apply && under_limit;
+        let mut o = match sync_law(pg, sync, law, manifest.get(law), states.get(law), hub_rows, apply, apply_status, opts.timeout).await {
             Ok(o) => o,
             Err(e) => {
                 let mut o = LawOutcome::new(law, Action::ManifestMoved, hub_rows, 0);

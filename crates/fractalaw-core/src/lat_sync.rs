@@ -100,6 +100,36 @@ pub fn lat_hash(rows: &[LatRow]) -> String {
     )
 }
 
+/// Provision statuses legal serves per LAT row (sertantai-legal #167, fractalatai #73).
+/// `repealed` and `prospective` impose nothing now (DRRP-TEMPORAL-PROPOSAL L8 step 1).
+pub const STATUS_NOT_LIVE: &[&str] = &["repealed", "prospective"];
+
+/// `status_hash` for one law (legal #167): SHA-256 over `section_id TAB status LF`
+/// lines ordered bytewise by section_id. Status is not in `lat_hash`/`struct_hash`.
+pub fn status_hash(rows: &[(String, Option<String>)]) -> String {
+    hash_lines(
+        rows.iter()
+            .map(|(sid, st)| (sid.as_str(), format!("{sid}\t{}\n", st.as_deref().unwrap_or(""))))
+            .collect(),
+    )
+}
+
+/// (section_id, status) from LAT batches; a missing column or NULL counts as None.
+pub fn status_rows_from_batches(
+    batches: &[arrow::record_batch::RecordBatch],
+) -> Result<Vec<(String, Option<String>)>, String> {
+    let mut rows = Vec::new();
+    for b in batches {
+        let sid = b.column_by_name("section_id").ok_or("LAT batch has no section_id column")?;
+        let status = b.column_by_name("status");
+        for i in 0..b.num_rows() {
+            let section_id = cell(sid, i).ok_or("LAT row with null section_id")?;
+            rows.push((section_id, status.and_then(|c| cell(c, i))));
+        }
+    }
+    Ok(rows)
+}
+
 /// One row for [`struct_hash`]: section_id and the rendered [`STRUCT_COLUMNS`] values.
 pub type StructRow = (String, Vec<Option<String>>);
 
@@ -137,6 +167,8 @@ pub struct ManifestEntry {
     pub lat_hash: String,
     /// Absent until legal serves it
     pub struct_hash: Option<String>,
+    /// Per-row status hash (legal #167); None until legal computes status for every row
+    pub status_hash: Option<String>,
     /// `full` | `partial` (legal #166 scoped LAT); None = full
     pub coverage: Option<String>,
     /// Scope purposes, e.g. [`ENABLING_EXTENT`], [`RELEVANCE`]
@@ -674,6 +706,15 @@ mod tests {
     }
 
     #[test]
+    fn status_hash_shape() {
+        // legal #167: sorted bytewise by section_id, `section_id TAB status LF`
+        let rows = vec![("L:b".to_string(), Some("repealed".to_string())), ("L:a".to_string(), Some("in_force".to_string()))];
+        let expected = format!("{:x}", Sha256::digest(b"L:a\tin_force\nL:b\trepealed\n"));
+        assert_eq!(status_hash(&rows), expected);
+        assert_eq!(status_hash(&[]), format!("{:x}", Sha256::digest(b"")));
+    }
+
+    #[test]
     fn rows_from_large_utf8_and_null_columns() {
         use arrow::array::{ArrayRef, Int32Array, LargeStringArray, NullArray};
         use arrow::datatypes::{DataType, Field, Schema};
@@ -711,7 +752,7 @@ mod tests {
         let purposes = scope_purposes(Some(&v));
         assert_eq!(purposes, vec!["enabling_extent"]);
         let m = ManifestEntry {
-            law_name: "L".into(), row_count: 2, lat_hash: "h".into(), struct_hash: None,
+            law_name: "L".into(), row_count: 2, lat_hash: "h".into(), struct_hash: None, status_hash: None,
             coverage: Some("partial".into()), scope_purposes: purposes, scope: Some(v.to_string()),
         };
         assert!(m.is_partial() && m.is_enabling_extent());

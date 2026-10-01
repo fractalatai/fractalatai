@@ -88,7 +88,10 @@ impl PgStore {
     /// Every row of an enriched law, never NULL `drrp_types`/`actors`:
     /// sertantai-legal reads NULL as "not in this payload" and keeps stale
     /// values (#68). A row with no actors sends `actors = []`. Amendment text
-    /// (#57) sends `drrp_types = []` and `actors = []`. Rows not classified
+    /// (#57) sends `drrp_types = []` and `actors = []`.
+    /// A repealed or prospective provision (legal's per-row `status`, #73) imposes
+    /// nothing now: `drrp_types = []`, `actors = []`, method kept (or `status`),
+    /// i.e. classified none. Rows not classified
     /// (scope `out`, whatever method an older pipeline left, or not yet
     /// parsed) send `drrp_types = []`, `actors = []` and `extraction_method`
     /// NULL, marking them unclassified. A law with no enriched row publishes
@@ -99,14 +102,19 @@ impl PgStore {
     ) -> Result<Vec<RecordBatch>, StoreError> {
         let rows = sqlx::query(
             "SELECT section_id, \
-             CASE WHEN extraction_method IS NULL OR scope IN ('amendment', 'out') THEN '{}'::text[] \
+             CASE WHEN extraction_method IS NULL OR scope IN ('amendment', 'out') \
+                       OR status IN ('repealed', 'prospective') THEN '{}'::text[] \
                   ELSE COALESCE(drrp_types, '{}'::text[]) END AS drrp_types, \
              duty_family, duty_sub_type, popimar, purposes, \
              clause_refined, taxa_confidence, taxa_classified_at, \
-             CASE WHEN scope = 'out' THEN NULL ELSE extraction_method END AS extraction_method, \
+             CASE WHEN scope = 'out' THEN NULL \
+                  WHEN status IN ('repealed', 'prospective') THEN COALESCE(extraction_method, 'status') \
+                  ELSE extraction_method END AS extraction_method, \
              holder_inferred_from, ancestor_distance, \
-             CASE WHEN extraction_method IS NULL OR scope IN ('amendment', 'out') THEN '[]'::jsonb \
+             CASE WHEN extraction_method IS NULL OR scope IN ('amendment', 'out') \
+                       OR status IN ('repealed', 'prospective') THEN '[]'::jsonb \
                   ELSE COALESCE(actors, '[]'::jsonb) END AS actors, \
+             status, \
              significance_scope_duty_bearer, significance_scope_protected_class, \
              significance_gravity, significance_strength, significance_hierarchy, \
              significance_confidence, significance_overall \
@@ -561,8 +569,12 @@ impl PgStore {
         .await
         .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?;
         let (substantive_provisions, duty_text_provisions): (i64, i64) = sqlx::query_as(
+            // Only live provisions count (#73): never let repealed, prospective or
+            // dotted (stripped) text evidence `no_obligations`
             "SELECT count(*), count(*) FILTER (WHERE drrp_types && ARRAY['Obligation', 'Liberty']) \
-             FROM legislation_text WHERE law_name = $1 AND scope = 'substantive'",
+             FROM legislation_text WHERE law_name = $1 AND scope = 'substantive' \
+               AND CASE WHEN status IS NULL THEN coalesce(text, '') !~ '^[[:space:].]*$' \
+                        ELSE status NOT IN ('repealed', 'prospective') END",
         )
         .bind(law_name)
         .fetch_one(&self.pool)
