@@ -71,8 +71,13 @@ pub struct TaxaRecord {
     /// POPIMAR management categories.
     pub popimar: Vec<&'static str>,
 
-    /// Purpose categories (function-based classification).
+    /// Purpose signals (the original multi-match patterns): internal, for
+    /// DRRP gating and scope. Not published.
     pub purposes: Vec<&'static str>,
+
+    /// The published purpose: one value in the agreed vocabulary
+    /// (PURPOSE-CLASSIFICATION.md), before the stem rule.
+    pub purpose: &'static str,
 
     /// Pattern classification detail (if any).
     pub classification: Option<duty_patterns::DutyClassification>,
@@ -167,8 +172,10 @@ pub fn parse_v2_with_trail(
             purpose_gated,
         );
         let (_, trail) = decision::decide(&signal_set);
+        let purpose = purpose::primary(&cleaned, &[]);
         return (
             TaxaRecord {
+                purpose,
                 cleaned_text: cleaned,
                 governed_actors: extracted.governed_labels(),
                 government_actors: extracted.government_labels(),
@@ -216,9 +223,11 @@ pub fn parse_v2_with_trail(
     };
 
     let actor_positions = derive_actor_positions(&extracted, cr.classification.as_ref());
+    let purpose = purpose::primary(&cleaned, &cr.duty_types);
 
     (
         TaxaRecord {
+            purpose,
             cleaned_text: cleaned,
             governed_actors: extracted.governed_labels(),
             government_actors: extracted.government_labels(),

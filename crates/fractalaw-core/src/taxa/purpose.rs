@@ -3,9 +3,13 @@
 //! Purpose identifies WHAT the law does (function-based), as opposed to
 //! `duty_type` which identifies WHO has obligations (role-based).
 //!
-//! 15 purpose categories, using `+` as separator (avoids CSV issues).
-//!
-//! Ported from `Taxa.PurposeClassifier`.
+//! Two layers (docs/architecture/PURPOSE-CLASSIFICATION.md, agreed 2026-10-01):
+//! - [`classify`]: the original multi-match patterns (ported from
+//!   `Taxa.PurposeClassifier`). **Internal signals only**: DRRP gating
+//!   (`should_skip_drrp`), scope and miss-heat were tuned on them, so they're
+//!   kept unchanged until moving gating is measured against gold v2.
+//! - [`primary`]: the **published** purpose, one per provision, in the agreed
+//!   vocabulary. It's what `legislation_text.purposes` carries (an array of one).
 
 use std::sync::LazyLock;
 
@@ -213,6 +217,166 @@ pub fn classify_title(title: &str) -> Vec<&'static str> {
 /// Sort purposes by priority order.
 pub fn sort_purposes(purposes: &mut Vec<&str>) {
     purposes.sort_by_key(|p| ALL_PURPOSES.iter().position(|&k| k == *p).unwrap_or(99));
+}
+
+// ── Published purpose (agreed 2026-10-01) ────────────────────────────
+
+pub const REQUIREMENT: &str = "Requirement";
+pub const PROCEDURE_DETAIL: &str = "Procedure+Detail";
+pub const ESTABLISHMENT: &str = "Establishment+Constitution";
+
+/// The published vocabulary in table order: machinery, operative, sanctions.
+/// `Process+Rule+Constraint+Condition` is retired from it.
+pub const PUBLISHED_PURPOSES: &[&str] = &[
+    ENACTMENT,
+    INTERPRETATION,
+    APPLICATION_SCOPE,
+    EXEMPTION,
+    EXTENT,
+    ESTABLISHMENT,
+    AMENDMENT,
+    REPEAL_REVOCATION,
+    TRANSITIONAL,
+    REQUIREMENT,
+    POWER_CONFERRED,
+    PROCEDURE_DETAIL,
+    CHARGE_FEE,
+    ENFORCEMENT,
+    OFFENCE,
+    DEFENCE_APPEAL,
+    LIABILITY,
+    UNCLASSIFIED,
+];
+
+/// Published purposes that are law-about-law (structural in the spec).
+pub const MACHINERY_PURPOSES: &[&str] = &[
+    ENACTMENT,
+    INTERPRETATION,
+    APPLICATION_SCOPE,
+    EXEMPTION,
+    EXTENT,
+    ESTABLISHMENT,
+    AMENDMENT,
+    REPEAL_REVOCATION,
+    TRANSITIONAL,
+];
+
+/// Checked in this order: the first match wins (precedence: machinery >
+/// sanctions > Charge+Fee > Procedure+Detail test > Requirement / Power).
+/// Exemption is checked before Application+Scope so a negative application
+/// ("shall not apply to …") is an exemption, not scope.
+static PRIMARY_PATTERNS: LazyLock<Vec<(&'static str, Regex)>> = LazyLock::new(|| {
+    let raw: &[(&str, &str)] = &[
+        (ENACTMENT, RAW_PATTERNS[0].1),
+        (
+            INTERPRETATION,
+            // Definitions, deeming, evidential effect, status by operation of law.
+            // Not bare "for the purposes of" / "reference to": duties start that way too.
+            r#"(?i)(?:^\s*Interpretation\b|["“'‘][^"”'’]{1,80}["”'’]\s*(?:\([^)]{0,40}\)\s*)?(?:means|includes|does not include|has the (?:same )?meaning|is to be (?:read|construed))|\bha(?:s|ve) the (?:same |respective )?meanings? (?:given|as|assigned)|\bIn th(?:is|ese) (?:Act|Regulations?|Order|Part|Chapter|section|regulation|article|Schedule)\s*(?:,|—|–|-)\s*$|\breferences? (?:in [^.;]{0,80})?to [^.;]{0,80}\b(?:are|is) (?:to be )?(?:read|construed|references?)\b|\b(?:shall|is to|are to|must) be (?:treated|deemed|regarded|taken) (?:as|to)\b|\bis (?:treated|deemed|regarded) (?:as|to)\b|\bconclusive evidence\b|\bshall be (?:admissible )?(?:in )?evidence\b|\bremains? in force\b|\bceases? to have effect\b)"#,
+        ),
+        (
+            EXEMPTION,
+            r"(?i)(?:shall not apply in any case where|by a certificate in writing exempt|\bexempt(?:ion|ed)?\b|\b(?:shall|does|do) not apply (?:to|in|where|unless)\b|\bnothing in [^.;]{0,80}\b(?:requires?|shall require|is to be taken to require|makes? [^.;]{0,40}\bliable)\b)",
+        ),
+        (
+            APPLICATION_SCOPE,
+            r"(?i)(?:^\s*Application\b|(?:^|[.;,]\s+|\d\s+)(?:these|this) (?:Regulations?|Act|Order|Part|Rules?|section|provisions?|Directive).{0,60}(?:shall |do(?:es)? )?appl(?:y|ies) (?:to|in |where|until|unless)|shall apply to .{0,60} as they apply to|be under a like duty|(?:any )?(?:requirement|prohibition|duty).{0,150}(?:shall (?:also )?extend|shall extend only)|shall extend only to|provisions of .{0,40}(?:shall )?apply (?:to|in)|\bbinds? the Crown\b|\bnothing in [^.;]{0,80}\b(?:shall )?(?:prejudice|affects?|derogate)\b)",
+        ),
+        (EXTENT, RAW_PATTERNS[3].1),
+        (
+            ESTABLISHMENT,
+            r"(?i)(?:\bThere (?:shall be|is (?:hereby )?established|are established|continues? to be) (?:a|an|the) [^.;]{0,60}\b(?:body|Executive|Agency|Authority|Commission|Council|Board|Committee|Office)|\bshall (?:be|continue to be) a body corporate\b|\bis (?:hereby )?established\b|\b(?:principal|general) (?:objective|aim)s? of\b|\bThe (?:principal )?objectives? of the\b|\bconstitution of the\b)",
+        ),
+        (AMENDMENT, RAW_PATTERNS[13].1),
+        (REPEAL_REVOCATION, RAW_PATTERNS[12].1),
+        (TRANSITIONAL, r"(?i)(?:transitional (?:provision|arrangement)s?|\bsavings? (?:and transitional|provisions?)\b|transitional and saving)"),
+        (
+            ENFORCEMENT,
+            r"(?i)(?:(?:criminal|enforcement|prosecut\w+) proceedings|proceedings for (?:an )?offence|\benforcing authority\b|\b(?:improvement|prohibition|enforcement|stop|compliance) notice\b|\binspector (?:may|shall)\b|\bpowers? of entry\b|\bmay (?:enter|inspect|seize|take samples)\b)",
+        ),
+        (
+            OFFENCE,
+            r"(?i)(?:\bcommits? an offence\b|\bguilty of an offence\b|\bit is an offence\b|\bliable,? on (?:summary )?conviction\b|\bon conviction on indictment\b|\b(?:fixed|civil|monetary|variable) (?:monetary )?penalt(?:y|ies)\b|\bpenalty notice\b|\bliable to (?:a fine|imprisonment)\b)",
+        ),
+        (
+            DEFENCE_APPEAL,
+            r"(?i)(?:\b[Aa]ppeal\b|[Ii]t (?:is|shall (?:also )?be) a defence|may not rely on a defence|shall not be guilty|\breview of (?:the|a|any) decision\b)",
+        ),
+        (
+            LIABILITY,
+            r"(?i)(?:\bcivil liability\b|\bshall not be liable\b|\bliable (?:in damages|to pay|for (?:any |the )?(?:loss|damage|injury|costs?))|\bcompensation\b|\bbreach of (?:a )?statutory duty\b|\bactionable\b)",
+        ),
+        (
+            CHARGE_FEE,
+            // As the signal pattern, without "by the fee/charge" (an incidental
+            // mention: "accompanied by the fee" is a detail of an application)
+            r"(?i)(?:fees and charges|(?:fees?|charges?).*?(?:paid|payable)|failed to pay a (?:fee|charge)|fee.*?may not exceed|may charge.*?a fee|[Aa] fee charged)",
+        ),
+        (
+            PROCEDURE_DETAIL,
+            // Qualifies a relation created elsewhere (refers to it), notice
+            // service, parliamentary procedure (detail ruling, 2026-10-01)
+            r"(?i)(?:\b(?:the|any|such|that|an?|each) (?:application|notice|record|report|assessment|plan|statement|information|register|certificate|request|return|notification|copy|copies|document|scheme|licence|permit|approval|consent|direction|order|regulations)s? (?:referred to in|mentioned in|required (?:by|under)|made under|given under|served under|kept under|prepared under|issued under|specified in|under) (?:this |that )?(?:section|regulation|paragraph|sub-?section|article|sub-?paragraph|Part|Schedule|provision)?\s*[\d(]|\b(?:laid before|approved by a resolution of|resolution of either House|subject to annulment|statutory instrument containing)\b|\bmay be (?:served|given|sent) (?:on|to) [^.;]{0,60}\bby (?:delivering|leaving|sending|post)\b|\bmust be (?:made|given|served|sent) (?:in writing|in the (?:prescribed|approved) form)\b)",
+        ),
+    ];
+    raw.iter().map(|(p, r)| (*p, Regex::new(r).unwrap())).collect()
+});
+
+static OBLIGATION_MODAL_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b(?:shall|must|is required to|are required to|it (?:shall|is) be the duty|no person shall)\b").unwrap()
+});
+static LIBERTY_MODAL_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\b(?:may|is entitled to|are entitled to|power to)\b").unwrap());
+/// A government deadline to act stays a Requirement (detail ruling exception)
+static GOV_DEADLINE_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"(?i)\bmust come into force (?:no later than|before|by)\b").unwrap());
+
+/// The published purpose of a provision: one value in the agreed vocabulary.
+/// `duty_types` is the regex DRRP result for the same text (Requirement /
+/// Power Conferred follow the provision's main relation). Returns
+/// `Unclassified` when nothing fits; [`inherit_from_stem`] then gives list
+/// items and fragments their stem's purpose.
+pub fn primary(text: &str, duty_types: &[super::duty_type::DutyType]) -> &'static str {
+    use super::duty_type::DutyType;
+    if !text.chars().any(|c| c.is_alphabetic()) {
+        return UNCLASSIFIED;
+    }
+    if GOV_DEADLINE_RE.is_match(text) {
+        return REQUIREMENT;
+    }
+    if let Some((p, _)) = PRIMARY_PATTERNS.iter().find(|(_, re)| re.is_match(text)) {
+        return p;
+    }
+    let ob = duty_types.contains(&DutyType::Obligation);
+    let li = duty_types.contains(&DutyType::Liberty);
+    match (ob, li) {
+        (true, false) => REQUIREMENT,
+        (false, true) => POWER_CONFERRED,
+        // Both: the main relation, taken as the first modal in the text
+        (true, true) => match (OBLIGATION_MODAL_RE.find(text), LIBERTY_MODAL_RE.find(text)) {
+            (Some(o), Some(l)) if l.start() < o.start() => POWER_CONFERRED,
+            _ => REQUIREMENT,
+        },
+        (false, false) => {
+            if OBLIGATION_MODAL_RE.is_match(text) {
+                REQUIREMENT
+            } else if LIBERTY_MODAL_RE.is_match(text) {
+                POWER_CONFERRED
+            } else {
+                UNCLASSIFIED
+            }
+        }
+    }
+}
+
+/// The stem rule: a provision with no purpose of its own (a list item or
+/// fragment) takes its nearest classified ancestor's purpose. `ancestor_purposes`
+/// is nearest first. A provision that does something itself keeps its own.
+pub fn inherit_from_stem<'a>(own: &'a str, ancestor_purposes: impl IntoIterator<Item = &'a str>) -> &'a str {
+    if own != UNCLASSIFIED {
+        return own;
+    }
+    ancestor_purposes.into_iter().find(|p| *p != UNCLASSIFIED).unwrap_or(own)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────
@@ -642,5 +806,68 @@ mod tests {
             "'Paragraph 2 shall not apply' should match; got: {:?}",
             result
         );
+    }
+
+    // ── Published purpose (agreed 2026-10-01) ───────────────────────
+
+    use crate::taxa::duty_type::DutyType;
+
+    fn p(text: &str) -> &'static str {
+        primary(text, &[])
+    }
+
+    #[test]
+    fn primary_machinery() {
+        assert_eq!(p("These Regulations may be cited as the X Regulations 2024 and come into force on 1st April 2024 and extend to Great Britain."), ENACTMENT);
+        assert_eq!(p(r#""premises" includes any place"#), INTERPRETATION);
+        assert_eq!(p("A notice shall be treated as served if it is sent by post."), INTERPRETATION);
+        assert_eq!(p("A certificate issued under this regulation shall be conclusive evidence of the matters stated in it."), INTERPRETATION);
+        assert_eq!(p("An approval under paragraph (1) remains in force for the period specified in the approval."), INTERPRETATION);
+        assert_eq!(p("These Regulations shall not apply to the master or crew of a ship."), EXEMPTION);
+        assert_eq!(p("Nothing in this section requires an employer to keep a record."), EXEMPTION);
+        assert_eq!(p("Nothing in this section makes the Crown criminally liable."), EXEMPTION);
+        assert_eq!(p("This Act binds the Crown."), APPLICATION_SCOPE);
+        assert_eq!(p("Nothing in these Regulations shall prejudice any other enactment."), APPLICATION_SCOPE);
+        assert_eq!(p("These Regulations apply to every employer and self-employed person."), APPLICATION_SCOPE);
+        assert_eq!(p("There shall be a body corporate to be known as the Health and Safety Executive."), ESTABLISHMENT);
+        assert_eq!(p("The principal objective of the Regulator in carrying out its functions is to secure safety."), ESTABLISHMENT);
+        assert_eq!(p("In section 3, for subsection (2) substitute the following."), AMENDMENT);
+    }
+
+    #[test]
+    fn primary_sanctions() {
+        assert_eq!(p("A person guilty of an offence under this section is liable on summary conviction to a fine."), OFFENCE);
+        assert_eq!(p("It is an offence for a person to fail to discharge a duty to which he is subject."), OFFENCE);
+        assert_eq!(p("It is a defence for an accused to prove that he took all reasonable precautions."), DEFENCE_APPEAL);
+        assert_eq!(p("The operator shall not be liable for any loss arising from the closure."), LIABILITY);
+        assert_eq!(p("An inspector may enter any premises at any reasonable time."), ENFORCEMENT);
+    }
+
+    #[test]
+    fn primary_requirement_vs_procedure_detail() {
+        // Creates its own duty, even a procedural one
+        assert_eq!(primary("The Executive must consult the Secretary of State before issuing an approved code of practice.", &[DutyType::Obligation]), REQUIREMENT);
+        assert_eq!(primary("Every employer shall make a suitable and sufficient assessment of the risks.", &[DutyType::Obligation]), REQUIREMENT);
+        // Qualifies a duty created elsewhere
+        assert_eq!(primary("An application under section 10 must be made in the prescribed form and be accompanied by the fee.", &[DutyType::Obligation]), PROCEDURE_DETAIL);
+        assert_eq!(primary("The information referred to in paragraph (1) must be given in writing.", &[DutyType::Obligation]), PROCEDURE_DETAIL);
+        assert_eq!(p("A statutory instrument containing regulations under this section is subject to annulment in pursuance of a resolution of either House of Parliament."), PROCEDURE_DETAIL);
+        // Government deadline exception
+        assert_eq!(p("The first domestic energy efficiency regulations must come into force no later than 1 April 2018."), REQUIREMENT);
+        // Review clauses are a government Requirement
+        assert_eq!(primary("The Secretary of State must review these Regulations and publish a report.", &[DutyType::Obligation]), REQUIREMENT);
+    }
+
+    #[test]
+    fn primary_power_and_stems() {
+        assert_eq!(primary("In carrying out that function the CMA may carry out, commission or support research.", &[DutyType::Liberty]), POWER_CONFERRED);
+        assert_eq!(primary("The employee may request a copy of the record and the employer shall provide it.", &[DutyType::Obligation, DutyType::Liberty]), POWER_CONFERRED);
+        // A list item with no purpose of its own takes its stem's
+        let item = p("to secure that the registers maintained by them are available at all reasonable times;");
+        assert_eq!(item, UNCLASSIFIED);
+        assert_eq!(inherit_from_stem(item, [UNCLASSIFIED, REQUIREMENT]), REQUIREMENT);
+        // An item that does something itself keeps it
+        assert_eq!(inherit_from_stem(EXEMPTION, [REQUIREMENT]), EXEMPTION);
+        assert_eq!(p("...."), UNCLASSIFIED);
     }
 }

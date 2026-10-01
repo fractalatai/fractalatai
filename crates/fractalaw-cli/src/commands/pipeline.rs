@@ -88,7 +88,11 @@ pub(crate) struct ProvisionTaxa {
     pub(crate) duty_family: Option<String>,
     pub(crate) duty_sub_type: Option<String>,
     pub(crate) popimar: Vec<String>,
+    /// Purpose signals (internal: gating, Gap C inheritance); not written
     pub(crate) purposes: Vec<String>,
+    /// The published purpose (PURPOSE-CLASSIFICATION.md), after the stem rule;
+    /// written to `legislation_text.purposes` as a one-value array, `[]` when empty
+    pub(crate) purpose: String,
     pub(crate) clause_refined: String,
     pub(crate) taxa_confidence: Option<f32>,
     // Legacy fitness_polarity/person/process/place/plant/property/sector removed.
@@ -114,6 +118,7 @@ impl ProvisionTaxa {
             duty_sub_type: None,
             popimar: Vec::new(),
             purposes: Vec::new(),
+            purpose: String::new(),
             clause_refined: String::new(),
             taxa_confidence: None,
             section_type: String::new(),
@@ -330,9 +335,17 @@ fn parse_provisions(
             if !section_id.is_empty()
                 && fractalaw_core::taxa::amendment::is_amendment_text(&section_id, |sid| texts.get(sid).cloned())
             {
+                // The instruction is the amending law's own content (purpose
+                // Amendment); inserted text belongs to the amended law (none)
+                let purpose = if fractalaw_core::taxa::amendment::is_amendment_instruction(&text) {
+                    fractalaw_core::taxa::purpose::AMENDMENT.to_string()
+                } else {
+                    String::new()
+                };
                 provision_taxa.push(ProvisionTaxa {
                     section_id,
                     scope: fractalaw_core::taxa::ProvisionScope::Amendment.as_str().to_string(),
+                    purpose,
                     ..ProvisionTaxa::empty()
                 });
                 continue;
@@ -349,6 +362,7 @@ fn parse_provisions(
                     provision_taxa.push(ProvisionTaxa {
                         section_id,
                         scope: "substantive".to_string(),
+                        purpose: record.purpose.to_string(),
                         ..ProvisionTaxa::empty()
                     });
                 }
@@ -419,6 +433,7 @@ fn parse_provisions(
                     duty_sub_type,
                     popimar: record.popimar.iter().map(|s| s.to_string()).collect(),
                     purposes: record.purposes.iter().map(|s| s.to_string()).collect(),
+                    purpose: record.purpose.to_string(),
                     clause_refined: record
                         .clause_refined
                         .clone()
@@ -539,7 +554,25 @@ fn parse_provisions(
         }
     }
 
+    apply_stem_purposes(&mut provision_taxa);
     provision_taxa
+}
+
+/// The stem rule for the published purpose: a list item or fragment with no
+/// purpose of its own takes its nearest classified ancestor's
+/// (PURPOSE-CLASSIFICATION.md). Rows without a purpose (out, inserted text) stay empty.
+fn apply_stem_purposes(provision_taxa: &mut [ProvisionTaxa]) {
+    use fractalaw_core::taxa::{amendment::ancestors, purpose};
+    let by_sid: std::collections::HashMap<String, String> = provision_taxa
+        .iter()
+        .filter(|p| !p.purpose.is_empty())
+        .map(|p| (p.section_id.clone(), p.purpose.clone()))
+        .collect();
+    for p in provision_taxa.iter_mut().filter(|p| p.purpose == purpose::UNCLASSIFIED) {
+        let anc = ancestors(&p.section_id);
+        let stems = anc.iter().filter_map(|a| by_sid.get(a).map(|s| s.as_str()));
+        p.purpose = purpose::inherit_from_stem(purpose::UNCLASSIFIED, stems).to_string();
+    }
 }
 
 /// Infer holders for Rule provisions by finding the most frequent governed actor.
@@ -1279,8 +1312,9 @@ async fn write_provision_taxa(
         }
         popimar_b.append(true);
 
-        for v in &pt.purposes {
-            purposes_b.values().append_value(v);
+        // Published purpose only (one value); the multi-match signals stay internal
+        if !pt.purpose.is_empty() {
+            purposes_b.values().append_value(&pt.purpose);
         }
         purposes_b.append(true);
 
