@@ -137,87 +137,124 @@ Reviewed by sertantai-legal and Gemini 2.5 Pro (raw: `data/code-review/drrp-temp
 4. **Q7 sample:** legal fetches made text for a sample of amended laws. We measure how many provisions differ, including definition changes (R6), and the cost, before committing to all ~800.
 5. Made-text classification for amended laws, then the as_made roll-up.
 
-## L. Change over a law's life: the LAT change contract (2026-10-01)
+## L. Change over a law's life: the LAT change contract (2026-10-01, revised after review)
 
-The views (R1–R8) say *what* we hold. This section says *how changes arrive*, which the earlier draft left loose. Today the LAT sync (#62) compares legal's previous and current LAT text and sorts each row into a bucket: unchanged, renamed, grown, text_changed, inserted, archived or held. It can't see:
-- **why** a row changed: an amendment, legal improving its parser, or a change of scope (#166);
-- **when** the change took legal effect, as opposed to when we noticed it;
-- **whether our first copy was the law as made**, or already amended;
-- **effects that legislation.gov.uk hasn't applied yet** (revoked_unapplied).
+The views (R1–R8) say *what* we hold. This section says *how changes arrive*. Today the LAT sync (#62) sees only text differences between legal's previous and current LAT. It can't tell why a row changed, when the change took legal effect, whether our first copy was the law as made, or which effects legislation.gov.uk hasn't applied yet.
 
-### L1. Worked lifecycle (Jason's scenario)
+Reviewed by sertantai-legal (with figures from its dev DB) and Gemini 2.5 Pro (`data/code-review/drrp-temporal-section-L-gemini.md`). Legal can supply most of the contract from data it already holds.
+
+### L1. Worked lifecycle
 
 | # | Event in the law | What legal's LAT shows | What fractalaw does | as_amended | as_made |
 |---|---|---|---|---|---|
-| 0 | **Made** and first loaded. Current text = made text only if the law hasn't been amended yet | Rows, `status: in_force` (or `prospective`); manifest `amended: false` | Classify all rows; version 1 per provision | Live roll-up | = as_amended while `amended: false` |
-| 0′ | **First loaded already amended** (the usual case for older laws) | Rows of the current text; manifest `amended: true` | Classify the current rows (version 1 = "first observed", not made). Queue a made-text job (R5) | Live roll-up | From the made text (R5), not from version 1 |
-| 1 | **An amendment inserts provisions** (s.4A, reg.5ZA) | New section_ids, `status: in_force` or `prospective`; change `cause: legislative`, `effective_from`, `changed_by` | New versions; classify the new rows (plus any stem whose children changed) | Gains their DRRP | Unchanged (they didn't exist when made) |
-| 2 | **DRRP-laden provisions are repealed** | Same ids; `status: repealed`; text dotted or "[Repealed]"; `cause: legislative` | New version with status repealed. **No re-parse; no model calls.** The previous version keeps its classification in the version history | Those provisions → none; verdict re-rolled (may move making → no_obligations) | Unchanged |
-| 3 | **An existing provision is amended and an actor drops out** | Same id, new text; `cause: legislative`, `effective_from`, `changed_by` | New version; re-parse that provision only (+ dependents, L4). The previous version's actors stay in history | New classification; holder lists and correlatives re-rolled | Unchanged |
-| 4 | **The whole law is repealed** | Every row `status: repealed` (or the law's status revoked); text often fully dotted | One version per provision (status only); no model calls | All none; `current_verdict = revoked` | Unchanged; `is_making` keeps its value |
+| 0 | **Made** and first loaded, unamended | Rows `in_force`/`prospective`; manifest `amended: false` | Classify all rows; version 1 per provision | Live roll-up | = as_amended while unamended |
+| 0′ | **First loaded already amended** (usual for older laws) | Current rows; manifest `amended: true` | Classify the current rows (version 1 = first observed, not made). Queue the made-text job (R5) | Live roll-up | From the made text (R5) |
+| 1 | **Amendment inserts provisions** | New section_ids; `cause: legislative`, `effective_from`, `changed_by`, `change_id` | New versions; classify the new rows + their stems | Gains their DRRP | Unchanged |
+| 2 | **DRRP-laden provisions repealed** | Same ids, `status: repealed`; `cause: legislative` | New version, status only. **No re-parse.** The previous version keeps its classification in history | Those provisions → none; verdict re-rolled | Unchanged |
+| 3 | **A provision amended; an actor drops out** | Same id, new text; `cause: legislative` | New version; re-parse it + dependents (L4) | Re-classified; holder lists and correlatives re-rolled | Unchanged |
+| 4 | **Whole law repealed** | All rows `repealed` (or law status revoked; possibly `effects_unapplied` while the text is still live) | Status-only versions; no model calls | All none; `current_verdict = revoked` | Unchanged; `is_making` keeps its value |
+| 5 | **Renumbered by amendment** (legal: 238 notes) | Legal emits a rename with `cause: legislative` + the note | History carries across ids (rename, not repeal + insert) | Unchanged DRRP under the new id | Unchanged |
+| 6 | **Whole Part/Schedule substituted** (51 notes) | Many rows share one `change_id` | One change event, many versions; classify the substituted rows | Re-rolled | Unchanged |
+| 7 | **Commenced piecemeal** ("for specified purposes", 2,644 notes) | `status: in_force_partial`, a list of dates, `partial` flag | Classify, flagged partial | Counts, flagged partial (D1) | — |
+| 8 | **Extent-specific amendment** | Separate rows per extent (`s.23(3)[S]`; 2,753 rows in 49 laws) | Each row has its own history; **never merged** | Per row | Per row |
+| 9 | **Revival** (no notes today) or **sunset/expiry** (rare) | Just another status change (repealed → in_force, or → repealed) | Status-only version | Follows status | Unchanged |
 
-The opposite order is just as possible (repeal first, amendment later). Each event is applied independently to the current versions.
+Status is a free state, not one-way.
 
-### L2. What legal adds (the contract)
+### L2. The contract: what legal adds
 
 **Per LAT row:**
-- `status: in_force | repealed | prospective` (R2). It is **authoritative over the text**: a row can say `repealed` while legislation.gov.uk still shows live text (an unapplied effect).
-- `effective_from`: the date this row's current text or status took legal effect, where legal's amendment annotations know it. Otherwise null.
-- `changed_by`: the instrument that made the last change (from the F-note commentary), or null.
+- `status: in_force | in_force_partial | repealed | repealed_saved | prospective`. `repealed_saved` only where a savings note exists (D2).
+- `effective_from`: the latest dated note affecting the row.
+  - Legal holds 58,751 amendment notes, plus 17,177 commencement and 24,591 modification notes, all with `affected_sections`.
+  - 82% carry a date and 95% cite the instrument, so expect ~18% null.
+  - Partial commencement keeps the list of dates.
+- `changed_by`: the citing instrument (e.g. S.I. 2006/984).
+- `effect`: substituted | inserted | repealed | …
+- `change_id`: a hash of (law, normalised note text). Never the F-number, which renumbers when notes are added.
 - `extent_code` (exists already).
+- These come from a pure, test-driven parser module over the notes legal already stores.
 
 **Per law (manifest):**
-- `amended: bool`: made ≠ current, from legal's amendment data.
-- `as_of`: the date legislation.gov.uk's revised text is up to date to.
-- `effects_unapplied`: legislation.gov.uk effects not yet in the text (e.g. revoked_unapplied), so status can run ahead of the text.
+- `amended`: made ≠ current.
+- `as_of`: legislation.gov.uk's `md_dct_valid_date`, held today for 904 of 1,069 LAT laws.
+- `effects_unapplied`: from the changes feed's `applied` flag (legal's LiveStatus already uses it; 669 laws are `revoked_unapplied`).
+  - Mapping a cited target to a section_id is best effort.
+  - Where it maps, the row's `status` is authoritative over the text; otherwise the effect is reported at law level only.
 
-**Per change**, in the rename log, or a change log beside it: every changed, inserted or removed row carries a `cause`:
-- **`legislative`**: a real amendment, repeal, insertion, substitution or commencement;
-- **`parser`**: legal changed how it parses (ids, sort keys, text cleaning, structure). The law didn't change;
-- **`scope`**: a scoped LAT widened or narrowed (#166);
-- **`correction`**: legal fixed bad data.
+**Per change** (a change log beside the rename log):
+- `cause`, decided **per parse operation, not guessed**, using a new `source_hash` (hash of the fetched CLML) on legal's parse events:
+  - **`parser`**: the source CLML is unchanged, so only legal's code changed. This is exact.
+  - **`scope`**: a LatScope change (explicit, with its own history).
+  - **`correction`**: an admin or fix task (explicit source).
+  - **`legislative`**: the source changed **and** there's evidence on the row or its ancestor: a new amendment note, or a status change.
+  - **`unattributed`**: the source changed but there's no evidence.
+- Legal never sends "unknown".
+- Renumbering renames carry `cause: legislative` + the note.
 
 ### L3. What fractalaw does with each cause
 
-| cause | Version history | Re-parse | Notes |
-|---|---|---|---|
-| `legislative`, text change | **New version** (old one kept with its actors and DRRP) | That provision + dependents | `effective_from` / `changed_by` stored on the version |
-| `legislative`, status only (repealed, commenced) | New version | No (repealed → none). Prospective → in_force: classify only if never classified | |
-| `parser` | **No new version**: the current version is overwritten | Only if the normalised text changed (`match_key`); otherwise carry tier data (today's behaviour) | Not a legal event, so no history |
-| `scope` | Rows added or removed without versions | New rows only | Partial coverage is flagged (#66) |
-| `correction` | Overwrite the current version | If the text changed | |
-| unknown (legal didn't say) | Treated as `legislative` | As legislative | Safe default: keeps history rather than losing it |
+| cause | Version history | Re-parse |
+|---|---|---|
+| `legislative`, text change | **New version**; the old one kept with its actors and DRRP | That provision + dependents (L4) |
+| `legislative`, status only | New version | No (repealed → none). Prospective → in_force: classify if never classified |
+| `parser` | **No version**: the current version is overwritten | Only if the normalised text changed; otherwise carry tier data |
+| `scope` | Rows added or removed, no versions | New rows only |
+| `correction` | Overwrite the current version | If the text changed |
+| `unattributed` | **No version**: overwrite the current version and **flag for review** | If the text changed |
+
+**The default flipped after review:** unattributed changes never create versions. Legal's rename log shows today's churn is mostly parser-driven (19,309 dropped + 1,879 extent_tag + 363 unique_text renames). Treating unknown as legislative would have created ~20,000 false versions.
 
 ### L4. Dependents: what else to re-parse when a provision changes
 
-- **Stems and children.** If a stem changes, its list items are re-parsed (they're labelled with their stem). If a child is inserted, its stem's content list changed too.
-- **Definitions.** If an interpretation provision's definition of a term changes, re-parse the provisions that use the term. The same rule is used for reuse in R6.
-- **Referenced provisions.** If a provision that others cite as the holder's source changes ("regulations under subsection (2)"), re-parse the citing provisions.
+- **Stems and children:** if a stem changes, re-parse its list items. An inserted child changes its stem's content list too.
+- **Definitions:** legal already maps terms to provisions: 66K `legislative_definitions` plus `definition_link`. Legal publishes "provisions using term X" per law, and when a definition changes, those provisions are re-parsed.
+- **Referenced holders:** provisions citing a changed provision as their holder's source ("regulations under subsection (2)").
+- **Cap:** same-law uses plus explicit cross-references only. **Never fan out across the corpus** (e.g. for Interpretation Act terms). Dry-run the count before a large cascade.
 
-### L5. Fractalaw storage
+### L5. Fractalaw storage and ordering
 
-- **`provision_versions`** (new, append-only): `section_id, version, text_md5, status, extent_code, effective_from, observed_at, cause, changed_by, drrp (types), actors (jsonb snapshot), superseded_at`.
-  - `legislation_text` + `provision_actors` remain the **current version**.
-  - This replaces `lat_archive`'s ad-hoc role for legislative history. `lat_archive` stays for parser/scope churn and undo.
-- **Law verdicts** are re-rolled after every applied change:
-  - `current_verdict` (as_amended) changes over time;
-  - `making_enrichment_verdict` (as_made) is computed once, from the made text or from version 1 when `amended: false`, and never re-rolled by later changes.
-- **Ordering.** Versions are ordered by `effective_from`, falling back to `observed_at`. A version with an earlier `effective_from` than the current one (a late-applied effect) is inserted in order. The current view still follows the latest by `observed_at`, so it reflects legal's latest text and status.
+- **`provision_versions`** (new, append-only): `section_id, version, text_md5, status, extent_code, effective_from, effective_dates[], partial, changed_by, effect, change_id, cause, observed_at, drrp, actors (jsonb snapshot)`.
+  - `legislation_text` + `provision_actors` remain the current version.
+  - `lat_archive` stays for parser/scope churn and undo.
+- **Sequence = observation order.** Fractalaw never composes text: legislation.gov.uk serves the consolidated result, so a late-applied effect simply arrives as the next text. There's nothing to replay (Gemini's objection doesn't apply).
+  - `effective_from` is an attribute for date queries. Versions are **never re-slotted** by it (the earlier insert-in-order rule is dropped).
+  - We record what we saw and when, and never invent intermediate states.
+- **Idempotency:** a change is keyed on (law, section_id, source_hash) + `change_id`. A re-delivered change is a no-op.
+- **Verdicts:**
+  - `current_verdict` (as_amended) is re-rolled after every applied change;
+  - `making_enrichment_verdict` (as_made) is computed once (made text, or version 1 when unamended) and never re-rolled.
 
 ### L6. Publishing
 
-Only changed provisions and the law level are republished, after each applied change. A status-only repeal publishes the provision as classified none (R3) plus the re-rolled `current_verdict`.
+Changed provisions + the law level, after each applied change. A status-only repeal publishes the provision as classified none, plus the re-rolled `current_verdict`.
 
-### L7. What this deliberately doesn't do
+### L7. Deliberately not done
 
-- **Reconstruct intermediate history** (versions before we first observed a law). Only made (R5) and from-first-observation onward are kept. Point-in-time stays deferred (R8).
-- **Classify repealed text.** A repealed provision's last classification survives in its version history, and nothing new is spent on it.
+- No reconstruction of history from before first observation (only made + observed onward).
+- No classification of repealed text: the last classification survives in history.
+- No corpus-wide definition cascades.
+
+### L8. Build order
+
+- **Legal**, after D3/D4:
+  1. per-row `status` (including `in_force_partial`, `repealed_saved`);
+  2. the structured note parser → `effective_from` / `changed_by` / `effect` / `change_id`;
+  3. `source_hash` + `md_dct_valid_date` on parse events → `cause` per operation;
+  4. manifest `amended`, `as_of`, `effects_unapplied`;
+  5. the change log beside the rename log.
+- **Fractalaw**, as each part lands:
+  1. read `status` (repealed → none; replaces the dotted-text inference);
+  2. apply changes by cause (L3);
+  3. the `provision_versions` table;
+  4. dependents (L4);
+  5. the verdict split + payload (R1/R4).
 
 ### Decisions for Jason
 - **D1, prospective provisions:** classify and flag them ("coming into force" is visible, but excluded from current obligations), or `none` until commenced (legal's default; simpler)?
 - **D2, savings:** add a `repealed_saved` status (it needs legal's commentary detection), or rely on the savings clause itself being classified?
 - **D3:** approve the sequencing, starting with legal's `status` column and our switch to it.
-- **D4:** approve the change contract (L2: legal's `cause`, `effective_from`, `changed_by`, `amended`, `as_of`, `effects_unapplied`) and fractalaw's version history (L5).
+- **D4:** approve the change contract (L2), the cause handling with `unattributed` never versioned (L3), observation-order versions (L5) and the build order (L8).
 
 ## Original open questions (answered in the reviews above)
 
