@@ -432,6 +432,34 @@ async fn open_provision_store(
 fn law_drrp_for(
     inputs: &fractalaw_store::LawDrrpInputs,
 ) -> (&'static str, Option<fractalaw_core::taxa::law_drrp::LawDrrp>) {
+    let (outcome, law) = law_drrp_rollup(inputs);
+    // A found duty is evidence even from a partial parse; "none found" is not.
+    // Live rows with text that parse never reached (LAT-synced, reparse
+    // pending) block a negative verdict: leave the stored one unchanged.
+    if matches!(outcome, "no_obligations" | "no_obligations_no_duty_text" | "empowering") && unparsed_live_rows(inputs) > 0 {
+        return ("partially_parsed", None);
+    }
+    (outcome, law)
+}
+
+/// Live provisions with text but no parse scope: rows parse hasn't reached.
+/// Empty container rows (text in their children) don't count.
+fn unparsed_live_rows(inputs: &fractalaw_store::LawDrrpInputs) -> usize {
+    let non_live: std::collections::HashSet<&str> = inputs.non_live.iter().map(|s| s.as_str()).collect();
+    inputs
+        .provisions
+        .iter()
+        .filter(|(sid, text, scope)| {
+            scope.is_none()
+                && !non_live.contains(sid.as_str())
+                && text.as_deref().is_some_and(|t| t.chars().any(|c| c.is_alphabetic()))
+        })
+        .count()
+}
+
+fn law_drrp_rollup(
+    inputs: &fractalaw_store::LawDrrpInputs,
+) -> (&'static str, Option<fractalaw_core::taxa::law_drrp::LawDrrp>) {
     use fractalaw_core::taxa::law_drrp::LawDrrp;
     if inputs.signals.iter().any(|(_, _, _, method, _)| method.is_none()) {
         return ("unreconciled", None);
@@ -485,8 +513,12 @@ fn provision_correlatives(inputs: &fractalaw_store::LawDrrpInputs) -> Vec<(Strin
 /// The smell list (Jason, 2026-10-01): a live, amended law whose whole-law
 /// verdict isn't making may have been making, or its effects repeal its own
 /// provisions. Flagged for Jason; made text is fetched per law only on approval.
+/// Laws that mostly amend others (more amendment rows than substantive ones)
+/// are expected not to be making and stay off the list (legal, 2026-10-01).
 fn verdict_smell(inputs: &fractalaw_store::LawDrrpInputs, outcome: &str, live: Option<&str>) -> bool {
+    let count = |want: &str| inputs.provisions.iter().filter(|(_, _, sc)| sc.as_deref() == Some(want)).count();
     inputs.amended == Some(true)
+        && count("amendment") <= count("substantive")
         && !fractalaw_core::taxa::law_drrp::live_is_revoked(live)
         && matches!(outcome, "no_obligations" | "no_obligations_no_duty_text" | "empowering")
 }
@@ -526,7 +558,7 @@ fn current_for(
     live: Option<&str>,
 ) -> Option<(&'static str, fractalaw_core::taxa::law_drrp::LawDrrp)> {
     use fractalaw_core::taxa::law_drrp::{LawDrrp, current_verdict, live_is_revoked};
-    if matches!(outcome, "unreconciled" | "no_actors" | "not_run") {
+    if matches!(outcome, "unreconciled" | "no_actors" | "not_run" | "partially_parsed") {
         return None;
     }
     let revoked = live_is_revoked(live) || (inputs.substantive_total > 0 && inputs.substantive_provisions == 0);
@@ -828,6 +860,13 @@ async fn main() -> anyhow::Result<()> {
                                 inputs.substantive_provisions
                             );
                             no_duty_text.push(law_name.clone());
+                        }
+                        ("partially_parsed", _) => {
+                            // Live rows parse hasn't reached: "none found" isn't evidence yet
+                            eprintln!(
+                                "  {law_name}: {} live rows unparsed, negative verdict withheld; law-level DRRP left unchanged (re-parse first)",
+                                unparsed_live_rows(&inputs)
+                            );
                         }
                         ("no_actors", _) => {
                             // No actor rows but duty text present (or nothing parsed): parse found no
@@ -1149,9 +1188,35 @@ mod tests {
     use super::*;
     use std::collections::BTreeSet;
 
+    fn prov(sid: &str, text: &str, scope: Option<&str>) -> (String, Option<String>, Option<String>) {
+        (sid.into(), Some(text.into()), scope.map(String::from))
+    }
+
+    #[test]
+    fn negative_verdict_needs_a_full_parse() {
+        // One parsed row with no duty text, the rest never parsed (LAT-synced)
+        let mut inputs = fractalaw_store::LawDrrpInputs {
+            provisions: vec![
+                prov("L:reg.1", "These Regulations may be cited as", Some("substantive")),
+                prov("L:reg.2", "The operator shall keep a record", None),
+                prov("L:reg.3", "", None), // empty container row: not counted
+            ],
+            substantive_provisions: 1,
+            ..Default::default()
+        };
+        assert_eq!(law_drrp_for(&inputs).0, "partially_parsed");
+        // A repealed unparsed row doesn't block
+        inputs.non_live = vec!["L:reg.2".into()];
+        assert_eq!(law_drrp_for(&inputs).0, "no_obligations_no_duty_text");
+    }
+
     #[test]
     fn smell_is_live_amended_not_making() {
-        let mut inputs = fractalaw_store::LawDrrpInputs { amended: Some(true), ..Default::default() };
+        let mut inputs = fractalaw_store::LawDrrpInputs {
+            amended: Some(true),
+            provisions: vec![prov("L:s.1", "x", Some("substantive"))],
+            ..Default::default()
+        };
         assert!(verdict_smell(&inputs, "no_obligations", Some("✔ In force")));
         assert!(verdict_smell(&inputs, "empowering", None));
         assert!(!verdict_smell(&inputs, "making", None));
@@ -1159,6 +1224,11 @@ mod tests {
         // revoked laws keep their verdict and aren't re-examined
         assert!(!verdict_smell(&inputs, "no_obligations", Some("❌ Revoked / Repealed / Abolished")));
         inputs.amended = Some(false);
+        assert!(!verdict_smell(&inputs, "no_obligations", None));
+        // Mostly amending others: expected not making
+        inputs.amended = Some(true);
+        inputs.provisions.push(prov("L:s.2", "In section 3 substitute", Some("amendment")));
+        inputs.provisions.push(prov("L:s.3", "In section 4 omit", Some("amendment")));
         assert!(!verdict_smell(&inputs, "no_obligations", None));
     }
 
