@@ -13,10 +13,12 @@ Position correction (#72): re-label counterparty/beneficiary actors on live
 provisions with an active Obligation holder at the agreed rule (the SLM was
 trained on the old split). Sample first, nothing written:
     /usr/bin/python3 scripts/gemini_llm_batch.py --position-correction \
-        --exclude-law-file revoked.txt --limit 50 --sample-out data/audit/poscorr_sample.tsv
+        --model gemini-3.8-flash --workers 8 --exclude-law-file revoked.txt \
+        --limit 50 --sample-out data/audit/poscorr_sample.tsv
 """
 
 import argparse
+import concurrent.futures
 import csv
 import hashlib
 import json
@@ -51,7 +53,9 @@ SYSTEM_PROMPT = (
     "- counterparty: the recipient of the duty's act: the party the act is done to or withheld from (notified, informed, sent or supplied something, consulted, paid, given access, served, charged, or whose request the duty answers). 'Ensure that X is provided with ...' makes X a counterparty. For a power or right: the party subject to it.\n"
     "- beneficiary: the party whose interest the duty protects without receiving its act, e.g. 'ensure the health, safety and welfare of his employees', 'persons not in his employment are not exposed to risks'.\n"
     "- mentioned: referenced with no role in the relation, e.g. a regulator merely named in another party's duty.\n"
-    "If an actor is both the recipient and the protected party, it is counterparty.\n\n"
+    "If an actor is both the recipient and the protected party, it is counterparty.\n"
+    "The actor is given as a canonical label (e.g. 'Gvt: Authority', 'Ind: Person'): classify "
+    "the party in the text that the label denotes (e.g. 'Gvt: Authority' may be 'the Regulator').\n\n"
     "Offences and penalties are not obligations: a provision that makes something an "
     "offence, or says a person guilty of an offence is liable to a fine or imprisonment, "
     "is none (the person is mentioned). A provision that only references, conditions, "
@@ -74,16 +78,24 @@ def read_law_file(path):
 
 def query_pending_llm(conn, limit=None, significance=None, max_confidence=None, law_file=None,
                       position_correction=False, exclude_law_file=None):
-    """Rows of (section_id, actor_label, actor_category, regex_drrp, text, position)."""
+    """Rows of (section_id, actor_label, actor_category, regex_drrp, text, position,
+    parent_text, list_items); the context columns are filled for position correction."""
     cur = conn.cursor()
     params = []
 
     if position_correction:
         # #72: non-active actors that would carry a correlative (claim_right /
-        # protected) against an active Obligation holder, on live substantive
+        # protected / liability / no_right) against an active holder, on live substantive
         # provisions; benchmark laws out; skip rows already at this prompt
         sql = """
-            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text, pa.position
+            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text, pa.position,
+                   (SELECT p.text FROM legislation_text p
+                    WHERE p.section_id = regexp_replace(lt.section_id, '\\([^()]*\\)$', '')
+                      AND p.section_id <> lt.section_id) AS parent_text,
+                   CASE WHEN rtrim(lt.text) ~ '[—–-]$' THEN
+                     (SELECT string_agg(c.text, ' | ' ORDER BY c.section_id) FROM legislation_text c
+                      WHERE c.law_name = lt.law_name AND c.section_id LIKE lt.section_id || '(%%'
+                        AND c.section_id NOT LIKE lt.section_id || '(%%(%%') END AS list_items
             FROM provision_actors pa
             JOIN legislation_text lt ON pa.section_id = lt.section_id
             WHERE pa.position IN ('counterparty', 'beneficiary')
@@ -91,7 +103,7 @@ def query_pending_llm(conn, limit=None, significance=None, max_confidence=None, 
             AND coalesce(lt.status, '') NOT IN ('repealed', 'prospective')
             AND NOT unapplied_repealed(lt.law_name, lt.section_id)
             AND EXISTS (SELECT 1 FROM provision_actors h WHERE h.section_id = pa.section_id
-                        AND h.position = 'active' AND h.drrp = 'Obligation')
+                        AND h.position = 'active' AND h.drrp IN ('Obligation', 'Liberty'))
             AND pa.llm_prompt_version IS DISTINCT FROM %s
             AND lt.law_name NOT IN (SELECT DISTINCT split_part(section_id, ':', 1) FROM gold_benchmarks)
         """
@@ -107,7 +119,8 @@ def query_pending_llm(conn, limit=None, significance=None, max_confidence=None, 
     elif significance and max_confidence:
         # Target: SLM-classified actors on provisions with specific significance and low confidence
         sql = """
-            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text, pa.position
+            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text, pa.position,
+                   NULL, NULL
             FROM provision_actors pa
             JOIN legislation_text lt ON pa.section_id = lt.section_id
             WHERE lt.significance_overall = %s
@@ -124,7 +137,8 @@ def query_pending_llm(conn, limit=None, significance=None, max_confidence=None, 
     else:
         # Default: pending_llm actors
         sql = """
-            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text, pa.position
+            SELECT pa.section_id, pa.actor_label, pa.actor_category, pa.regex_drrp, lt.text, pa.position,
+                   NULL, NULL
             FROM provision_actors pa
             JOIN legislation_text lt ON pa.section_id = lt.section_id
             WHERE pa.extraction_method = 'pending_llm'
@@ -144,22 +158,27 @@ def query_pending_llm(conn, limit=None, significance=None, max_confidence=None, 
     return rows
 
 
-def classify_actor(api_key, text, actor_label):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={api_key}"
+def classify_actor(api_key, text, actor_label, parent_text=None, list_items=None, model=GEMINI_MODEL):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+    context = ""
+    if parent_text:
+        context += f"Parent provision (context only): {parent_text[:800]}\n\n"
+    if list_items:
+        context += f"Its list items (context only): {list_items[:1200]}\n\n"
     user_msg = (
-        f"Provision: {text}\n\n"
+        f"{context}Provision: {text}\n\n"
         f"Actor: {actor_label}\n\n"
-        f"Classify this actor's DRRP type and Hohfeldian position."
+        f"Classify this actor's DRRP type and Hohfeldian position in this provision."
     )
+    # 2.5 Flash: no thinking (cheap bulk tier); newer models: default thinking, as gold v2
+    gen = ({"temperature": 0.1, "maxOutputTokens": 100, "thinkingConfig": {"thinkingBudget": 0}}
+           if model == "gemini-2.5-flash" else
+           {"temperature": 0, "maxOutputTokens": 4096, "responseMimeType": "application/json"})
     body = {
         "contents": [
             {"role": "user", "parts": [{"text": SYSTEM_PROMPT + "\n\n" + user_msg}]}
         ],
-        "generationConfig": {
-            "temperature": 0.1,
-            "maxOutputTokens": 100,
-            "thinkingConfig": {"thinkingBudget": 0}
-        }
+        "generationConfig": gen
     }
     try:
         resp = requests.post(url, json=body, timeout=30)
@@ -230,6 +249,9 @@ def main():
     parser.add_argument("--position-correction", action="store_true",
                         help="#72: re-label counterparty/beneficiary actors under active Obligations at the agreed rule")
     parser.add_argument("--exclude-law-file", help="Law names to leave out (e.g. revoked laws), position correction only")
+    parser.add_argument("--model", default=GEMINI_MODEL,
+                        help=f"Gemini model (default {GEMINI_MODEL}; position correction uses gemini-3.8-flash)")
+    parser.add_argument("--workers", type=int, default=1, help="Parallel requests (default 1)")
     parser.add_argument("--sample-out", help="Classify and write old → new to this TSV; nothing written to the DB")
     args = parser.parse_args()
 
@@ -260,7 +282,7 @@ def main():
     print(f"Loaded {len(actors):,} actors ({mode})")
 
     if args.dry_run:
-        for sid, label, cat, drrp, text, _ in actors[:5]:
+        for sid, label, cat, drrp, text, *_ in actors[:5]:
             print(f"  {sid} | {label} | {text[:100]}...")
         if len(actors) > 5:
             print(f"  ... and {len(actors) - 5} more")
@@ -275,8 +297,16 @@ def main():
     t0 = time.time()
     sample = []
 
-    for i, (sid, label, category, regex_drrp, text, old_position) in enumerate(actors):
-        result = classify_actor(api_key, text, label)
+    def run(row):
+        sid, label, category, regex_drrp, text, old_position, parent_text, list_items = row
+        if args.workers == 1:
+            # Rate limit: ~10 requests/s for Flash
+            time.sleep(0.1)
+        return row, classify_actor(api_key, text, label, parent_text, list_items, model=args.model)
+
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=args.workers)
+    for i, ((sid, label, category, regex_drrp, text, old_position, parent_text, list_items), result) in enumerate(
+            pool.map(run, actors)):
 
         if result:
             drrp, position = result
@@ -301,9 +331,6 @@ def main():
             eta = (len(actors) - i - 1) / rate if rate > 0 else 0
             print(f"  [{i+1:,}/{len(actors):,}] {classified:,} classified, "
                   f"{errors} errors, {rate:.1f}/s, ETA {eta/60:.0f}m")
-
-        # Rate limit: ~10 requests/s for Flash
-        time.sleep(0.1)
 
     if updates:
         write_batch(conn, updates)
@@ -334,7 +361,7 @@ def main():
         print(f"  {d:15s}: {drrp_counts.get(d, 0):,}")
 
     if provenance and not args.sample_out:
-        provenance.record(conn, TOUCHED_LAWS, "taxa", "llm", "llm", GEMINI_MODEL,
+        provenance.record(conn, TOUCHED_LAWS, "taxa", "llm", "llm", args.model,
                           prompt_version=provenance.prompt_version(SYSTEM_PROMPT))
     conn.close()
 
