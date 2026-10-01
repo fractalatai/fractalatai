@@ -649,9 +649,15 @@ impl PgStore {
         .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?
         .into_iter()
         .collect();
+        let amended: Option<bool> = sqlx::query_scalar("SELECT amended FROM lat_sync_state WHERE law_name = $1")
+            .bind(law_name)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?
+            .flatten();
         Ok(crate::provision_store::LawDrrpInputs {
             provisions, signals, holder_unknown, duty_text_provisions, substantive_provisions, non_live, substantive_total,
-            access_inferred,
+            access_inferred, amended,
         })
     }
 

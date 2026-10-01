@@ -482,6 +482,15 @@ fn provision_correlatives(inputs: &fractalaw_store::LawDrrpInputs) -> Vec<(Strin
         .collect()
 }
 
+/// The smell list (Jason, 2026-10-01): a live, amended law whose whole-law
+/// verdict isn't making may have been making, or its effects repeal its own
+/// provisions. Flagged for Jason; made text is fetched per law only on approval.
+fn verdict_smell(inputs: &fractalaw_store::LawDrrpInputs, outcome: &str, live: Option<&str>) -> bool {
+    inputs.amended == Some(true)
+        && !fractalaw_core::taxa::law_drrp::live_is_revoked(live)
+        && matches!(outcome, "no_obligations" | "no_obligations_no_duty_text" | "empowering")
+}
+
 /// Roll up a law's signals, skipping amendment-scope and `exclude`d sections.
 fn rollup(
     inputs: &fractalaw_store::LawDrrpInputs,
@@ -738,10 +747,12 @@ async fn main() -> anyhow::Result<()> {
                 let mut transitions: std::collections::BTreeMap<(String, String), usize> = std::collections::BTreeMap::new();
                 // (as-made verdict, current verdict) counts (#73 R1a)
                 let mut current_views: std::collections::BTreeMap<(String, String), usize> = std::collections::BTreeMap::new();
+                // Live, amended, verdict not making: listed for Jason
+                let mut smells: Vec<String> = Vec::new();
                 store.ensure_current_view_columns()?;
                 store.ensure_correlative_columns()?;
                 if dry_run {
-                    println!("law\tcurrent\tnew\tduties\tresponsibilities\trights\tpowers\tholder_unknown\tnon_active_excluded\tcurrent_view\tclaim_holders\tliability_holders\tprotected_holders");
+                    println!("law\tcurrent\tnew\tduties\tresponsibilities\trights\tpowers\tholder_unknown\tnon_active_excluded\tcurrent_view\tclaim_holders\tliability_holders\tprotected_holders\tsmell");
                 }
                 for law_name in &law_names {
                     if dry_run {
@@ -763,7 +774,11 @@ async fn main() -> anyhow::Result<()> {
                                 l.holder_unknown, l.excluded_non_active
                             )
                         });
-                        println!("{law_name}\t{current}\t{new}\t{}\t{cur}\t{corr}", row.unwrap_or_else(|| "\t\t\t\t\t".into()));
+                        let smell = verdict_smell(&inputs, new, live.as_deref());
+                        if smell {
+                            smells.push(format!("{law_name} ({new})"));
+                        }
+                        println!("{law_name}\t{current}\t{new}\t{}\t{cur}\t{corr}\t{}", row.unwrap_or_else(|| "\t\t\t\t\t".into()), if smell { "smell" } else { "" });
                         *transitions.entry((current.to_string(), new.to_string())).or_default() += 1;
                         continue;
                     }
@@ -837,6 +852,9 @@ async fn main() -> anyhow::Result<()> {
                     *verdicts.entry(outcome).or_default() += 1;
                     // Current (as-amended) view beside the as-made one (#73 R1a)
                     let live = commands::pipeline::read_law_live(&store, law_name)?;
+                    if verdict_smell(&inputs, outcome, live.as_deref()) {
+                        smells.push(format!("{law_name} ({outcome})"));
+                    }
                     if let Some((label, cur)) = current_for(&inputs, outcome, live.as_deref()) {
                         commands::pipeline::write_law_current(&store, law_name, label, &cur)?;
                         *current_views.entry((outcome.to_string(), label.to_string())).or_default() += 1;
@@ -867,6 +885,10 @@ async fn main() -> anyhow::Result<()> {
                     for ((made, cur), n) in &current_views {
                         eprintln!("  {made} → {cur}: {n}");
                     }
+                    eprintln!("Smell list (live, amended, not making): {}", smells.len());
+                    for s in &smells {
+                        eprintln!("  {s}");
+                    }
                     return Ok(());
                 }
                 println!(
@@ -875,6 +897,9 @@ async fn main() -> anyhow::Result<()> {
                 );
                 println!("Law-level DRRP verdicts: {verdicts:?}");
                 println!("As made → current view (#73 R1a): {current_views:?}");
+                if !smells.is_empty() {
+                    println!("Smell list (live, amended, not making): {}", smells.join(", "));
+                }
                 // Provenance (#63): DRRP roll-up only where it wrote a verdict; significance for all
                 let [drrp_stage, sig_stage]: [_; 2] = provenance::taxa_backfill().try_into().expect("two stages");
                 // The verdict's basis stays auditable: no-duty-text verdicts are recorded as such
@@ -1123,6 +1148,19 @@ pub(crate) fn open_duck(data_dir: &std::path::Path) -> anyhow::Result<DuckStore>
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
+
+    #[test]
+    fn smell_is_live_amended_not_making() {
+        let mut inputs = fractalaw_store::LawDrrpInputs { amended: Some(true), ..Default::default() };
+        assert!(verdict_smell(&inputs, "no_obligations", Some("✔ In force")));
+        assert!(verdict_smell(&inputs, "empowering", None));
+        assert!(!verdict_smell(&inputs, "making", None));
+        assert!(!verdict_smell(&inputs, "holder_unknown", None));
+        // revoked laws keep their verdict and aren't re-examined
+        assert!(!verdict_smell(&inputs, "no_obligations", Some("❌ Revoked / Repealed / Abolished")));
+        inputs.amended = Some(false);
+        assert!(!verdict_smell(&inputs, "no_obligations", None));
+    }
 
     #[test]
     fn taxa_hash_deterministic() {

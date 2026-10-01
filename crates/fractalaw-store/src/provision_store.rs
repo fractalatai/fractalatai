@@ -35,6 +35,8 @@ pub struct LawDrrpInputs {
     pub substantive_total: i64,    /// (section_id, actor_label) of active Liberties inferred by the #67 access
     /// rule: each also holds a `claim_right` (layer 1b, #72)
     pub access_inferred: std::collections::HashSet<(String, String)>,
+    /// Legal's manifest `amended` (#73 L8.4); None when not synced
+    pub amended: Option<bool>,
 }
 
 /// Provision data store — implemented by LanceStore and PgStore.
