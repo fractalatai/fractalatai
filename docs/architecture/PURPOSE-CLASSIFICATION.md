@@ -86,7 +86,11 @@ Purpose isn't cosmetic. `provision_scope` uses it to decide **structural vs subs
 - **sertantai-legal, provision level** (`legal_articles.purposes`): stored as received. Nothing in legal or compliance reads it (legal, 2026-10-01), so the value changes and single values are safe, and legal needs no code change.
   - Laws not republished in the single run keep the old values, so the store mixes the two vocabularies until every law is re-enriched. The final dry run counts how many laws still carry old labels.
   - Secondary sources (`secondary_source_provisions.purposes`, from the JSP pipeline) aren't in the single run. They keep the old labels until they're next enriched.
-- **Law level** (`legal_register.purpose`, multi-label, 8,060 laws): **legal's own field**, set by legal's regex PurposeClassifier at scrape time. Legal's admin UI and compliance's Baserow "Purpose" multi-select read it. This proposal doesn't touch it, so after the run the law level speaks the old vocabulary. Legal has put a decision to Jason: roll it up from the provision purposes (one classifier), or leave it for now. Either way the law level stays a set, and the existing names are kept because Baserow and the UI show them.
+- **Law level: a purpose profile, published by fractalaw** (Jason, 2026-10-01; sertantai-legal#172).
+  - What kind of law it is (making, amending, commencing…) is legal's **Function**; purpose doesn't repeat it.
+  - Legal's `legal_register.purpose` today runs the regex over the whole law's text, so most laws get nearly every label.
+  - Instead, fractalaw publishes `purpose_profile`: each purpose's count and share of the law's own provisions, e.g. `[{purpose: "Requirement", count: 132, share: 0.55}, …]`. Amendment instructions count; inserted text is excluded.
+  - Legal stores it, derives its multi-select from it, and retires its law-level classifier. Shape, base (live or whole law) and fallback are agreed on #172.
 - **Compliance controls** (`scripts/compliance/generate_controls.py`, fractalaw's, so legal and compliance need no change): select `Requirement` positively instead of excluding purposes, and **attach the `Procedure+Detail` provisions that qualify it** (same law, referring to it) as prompt context. "The record required by regulation 5 must contain…" and a table of limits are what a control needs, so they mustn't be dropped (legal).
 - **Fractalaw:** `purpose.rs` labels, `STRUCTURAL_PURPOSES`, `making.rs` counts, and the `classify_title` mapping.
 - **Data:** purposes are re-derived in the single run. No separate pass.
