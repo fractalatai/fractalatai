@@ -103,18 +103,22 @@ impl PgStore {
         let rows = sqlx::query(
             "SELECT section_id, \
              CASE WHEN extraction_method IS NULL OR scope IN ('amendment', 'out') \
-                       OR status IN ('repealed', 'prospective') THEN '{}'::text[] \
+                       OR status IN ('repealed', 'prospective') \
+                       OR unapplied_repealed(law_name, section_id) THEN '{}'::text[] \
                   ELSE COALESCE(drrp_types, '{}'::text[]) END AS drrp_types, \
              duty_family, duty_sub_type, popimar, purposes, \
              clause_refined, taxa_confidence, taxa_classified_at, \
-             CASE WHEN status IN ('repealed', 'prospective') THEN COALESCE(extraction_method, 'status') \
+             CASE WHEN status IN ('repealed', 'prospective') OR unapplied_repealed(law_name, section_id) \
+                  THEN COALESCE(extraction_method, 'status') \
                   WHEN scope = 'out' THEN NULL \
                   ELSE extraction_method END AS extraction_method, \
              holder_inferred_from, ancestor_distance, \
              CASE WHEN extraction_method IS NULL OR scope IN ('amendment', 'out') \
-                       OR status IN ('repealed', 'prospective') THEN '[]'::jsonb \
+                       OR status IN ('repealed', 'prospective') \
+                       OR unapplied_repealed(law_name, section_id) THEN '[]'::jsonb \
                   ELSE COALESCE(actors, '[]'::jsonb) END AS actors, \
-             status, \
+             CASE WHEN unapplied_repealed(law_name, section_id) AND coalesce(status, '') NOT IN ('repealed', 'prospective') \
+                  THEN 'repealed' ELSE status END AS status, \
              significance_scope_duty_bearer, significance_scope_protected_class, \
              significance_gravity, significance_strength, significance_hierarchy, \
              significance_confidence, significance_overall \
@@ -574,7 +578,8 @@ impl PgStore {
             "SELECT count(*), count(*) FILTER (WHERE drrp_types && ARRAY['Obligation', 'Liberty']) \
              FROM legislation_text WHERE law_name = $1 AND scope = 'substantive' \
                AND CASE WHEN status IS NULL THEN coalesce(text, '') !~ '^[[:space:].]*$' \
-                        ELSE status NOT IN ('repealed', 'prospective') END",
+                        ELSE status NOT IN ('repealed', 'prospective') END \
+               AND NOT unapplied_repealed(law_name, section_id)",
         )
         .bind(law_name)
         .fetch_one(&self.pool)

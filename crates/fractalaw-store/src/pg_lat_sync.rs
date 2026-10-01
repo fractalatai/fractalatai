@@ -232,6 +232,24 @@ CREATE TABLE IF NOT EXISTS provision_versions (
 );
 CREATE INDEX IF NOT EXISTS idx_provision_versions_section ON provision_versions (law_name, section_id);
 ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS changes_through TIMESTAMPTZ;
+-- #73 L10 rule 3: a provision (or a descendant of one) whose whole-provision
+-- omission/repeal/revocation is unapplied by legislation.gov.uk but IN FORCE by a
+-- past date (legal #168), exactly mapped and not saved. It is dead in as_amended
+-- although its text lags. Prospective or undated effects never count.
+CREATE OR REPLACE FUNCTION unapplied_repealed(p_law TEXT, p_section TEXT) RETURNS BOOLEAN
+LANGUAGE sql STABLE AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM lat_sync_state l, jsonb_array_elements(coalesce(l.effects_unapplied, '[]'::jsonb)) x
+    WHERE l.law_name = p_law
+      AND lower(x->>'affect') IN ('omitted', 'repealed', 'revoked')
+      AND (x->>'exact')::boolean
+      AND x->>'section_id' IS NOT NULL
+      AND (x->>'prospective')::boolean IS FALSE
+      AND (x->>'in_force_date')::date <= current_date
+      AND coalesce((x->>'saved')::boolean, false) = false
+      AND (p_section = x->>'section_id' OR p_section LIKE (x->>'section_id') || '(%')
+  )
+$$;
 CREATE TABLE IF NOT EXISTS lat_archive (
     id                BIGSERIAL PRIMARY KEY,
     law_name          TEXT NOT NULL,
