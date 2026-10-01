@@ -37,6 +37,16 @@ The first #62 hub sync (2026-09-27) flagged 422 laws `reparse_needed`: their tex
 - ⬜ Stale law-level verdicts on ~40 zero-actor laws (old regex roll-ups; e.g. UK_uksi_2000_3184, UK_uksi_2012_3018): parse them, or give them a holder-unknown verdict; dry run + Jason review first (from #73, 2026-10-01)
 - ⬜ Keep DuckDB snapshots before each batch's parse (parse rewrites law-level DRRP); restore held/zero-actor laws afterwards
 
+## Single-run checklist (from `parsing/2026-09-30-issue-72.md`, 2026-10-01)
+
+This session runs the **single run**: one enrichment pass and **one** publish, after the data model is finished (Jason: build first, run once). Before publishing, the final dry run must show:
+- ⬜ **0 `partially_parsed` laws.** That's the check that the backlog parse covered every live row (397 laws had unparsed live rows; all are `reparse_needed`)
+- ⬜ The **21 stored negative verdicts** set before a LAT sync (no_obligations/empowering on now-partial parses) are re-decided
+- ⬜ **Smell list** (live, amended, not making) sent to legal for Jason's per-law made-text approval (preview: 4 laws)
+- ⬜ **Purpose vocabulary:** count of laws still carrying old purpose labels (not republished). Legal's store mixes the two vocabularies until they're re-enriched
+- ⬜ Correlatives (claim/liability/protected holders), current_* and as-made verdicts reviewed together (Jason)
+- ⬜ **(Jason)** Compliance screening: `current_verdict` or `is_making`. Decided before the publish
+
 ## Dependencies
 
 - ✅ #62 hub sync + diff-apply; #63 provenance; refined zero-actor guard (`e7bc2ab`)
