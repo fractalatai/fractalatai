@@ -114,6 +114,10 @@ ALTER TABLE legislation_text ADD COLUMN IF NOT EXISTS changed_by TEXT;
 -- Cause and source hash of legal's latest caused parse (#167 L8.3)
 ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS cause TEXT;
 ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS source_hash TEXT;
+-- Manifest L8.4: made ≠ current, revised-text date, unapplied effects
+ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS amended BOOLEAN;
+ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS as_of DATE;
+ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS effects_unapplied JSONB;
 -- Legal's amendment notes, structured (#167 L8.2): a mirror, replaced per law
 CREATE TABLE IF NOT EXISTS legal_amendments (
     law_name         TEXT NOT NULL,
@@ -265,14 +269,14 @@ impl PgStore {
     }
 
     /// Refresh legal's unhashed per-row fields (#167: status, effective_from,
-    /// changed_by) and the law's latest parse cause/source_hash. Touches no
+    /// changed_by) and the law's manifest fields: parse cause/source_hash (L8.3),
+    /// amended / as_of / effects_unapplied (L8.4). Touches no
     /// text or tier data. Returns rows changed.
     pub async fn apply_lat_fields(
         &self,
         law_name: &str,
         rows: &[LatFieldRow],
-        cause: Option<&str>,
-        source_hash: Option<&str>,
+        manifest: &ManifestEntry,
     ) -> Result<u64, StoreError> {
         let ids: Vec<&str> = rows.iter().map(|r| r.0.as_str()).collect();
         let st: Vec<Option<&str>> = rows.iter().map(|r| r.1.as_deref()).collect();
@@ -294,10 +298,16 @@ impl PgStore {
         .await
         .map_err(db("apply fields"))?
         .rows_affected();
-        sqlx::query("UPDATE lat_sync_state SET cause = $2, source_hash = $3 WHERE law_name = $1")
+        sqlx::query(
+            "UPDATE lat_sync_state SET cause = $2, source_hash = $3, amended = $4, as_of = $5::date,
+                    effects_unapplied = $6::jsonb WHERE law_name = $1",
+        )
             .bind(law_name)
-            .bind(cause)
-            .bind(source_hash)
+            .bind(manifest.cause.as_deref())
+            .bind(manifest.source_hash.as_deref())
+            .bind(manifest.amended)
+            .bind(manifest.as_of.as_deref())
+            .bind(manifest.effects_unapplied.as_deref())
             .execute(&mut *tx)
             .await
             .map_err(db("cause"))?;
@@ -696,7 +706,7 @@ mod tests {
     fn manifest(law: &str, legal: &[RecordBatch]) -> ManifestEntry {
         let rows = fractalaw_core::lat_sync::lat_rows_from_batches(legal).unwrap();
         ManifestEntry {
-            law_name: law.into(), row_count: rows.len() as u64, lat_hash: lat_hash(&rows), struct_hash: None, status_hash: None, cause: None, source_hash: None,
+            law_name: law.into(), row_count: rows.len() as u64, lat_hash: lat_hash(&rows), struct_hash: None, status_hash: None, cause: None, source_hash: None, amended: None, as_of: None, effects_unapplied: None,
             coverage: None, scope_purposes: vec![], scope: None,
         }
     }

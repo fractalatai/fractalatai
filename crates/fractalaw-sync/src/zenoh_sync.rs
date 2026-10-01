@@ -90,6 +90,16 @@ pub struct LatManifestEntry {
     /// SHA-256 of the fetched CLML for that parse (#167 L8.3)
     #[serde(default)]
     pub source_hash: Option<String>,
+    /// The law has amendment notes: made ≠ current (#167 L8.4)
+    #[serde(default)]
+    pub amended: Option<bool>,
+    /// Date legislation.gov.uk's revised text is valid as of (#167 L8.4)
+    #[serde(default)]
+    pub as_of: Option<String>,
+    /// Effects not yet applied to the text: a JSON string, or a list (#167 L8.4).
+    /// Items `{by, affect, target, section_id, exact}`
+    #[serde(default)]
+    pub effects_unapplied: Option<serde_json::Value>,
     #[serde(default)]
     pub updated_at: Option<String>,
     /// `full` | `partial` (legal #166 scoped LAT)

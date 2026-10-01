@@ -173,6 +173,12 @@ pub struct ManifestEntry {
     pub cause: Option<String>,
     /// SHA-256 of the CLML fetched for that parse (#167 L8.3)
     pub source_hash: Option<String>,
+    /// Made ≠ current (#167 L8.4)
+    pub amended: Option<bool>,
+    /// Revised text valid as of, ISO date (#167 L8.4)
+    pub as_of: Option<String>,
+    /// Unapplied effects as a JSON array string (#167 L8.4)
+    pub effects_unapplied: Option<String>,
     /// `full` | `partial` (legal #166 scoped LAT); None = full
     pub coverage: Option<String>,
     /// Scope purposes, e.g. [`ENABLING_EXTENT`], [`RELEVANCE`]
@@ -756,7 +762,7 @@ mod tests {
         let purposes = scope_purposes(Some(&v));
         assert_eq!(purposes, vec!["enabling_extent"]);
         let m = ManifestEntry {
-            law_name: "L".into(), row_count: 2, lat_hash: "h".into(), struct_hash: None, status_hash: None, cause: None, source_hash: None,
+            law_name: "L".into(), row_count: 2, lat_hash: "h".into(), struct_hash: None, status_hash: None, cause: None, source_hash: None, amended: None, as_of: None, effects_unapplied: None,
             coverage: Some("partial".into()), scope_purposes: purposes, scope: Some(v.to_string()),
         };
         assert!(m.is_partial() && m.is_enabling_extent());

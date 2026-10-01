@@ -111,6 +111,13 @@ pub(crate) fn manifest_entry(m: &LatManifestEntry) -> ManifestEntry {
         status_hash: m.status_hash.clone(),
         cause: m.cause.clone(),
         source_hash: m.source_hash.clone(),
+        amended: m.amended,
+        as_of: m.as_of.clone(),
+        // Legal sends a JSON string ("[]" when none); accept a list too
+        effects_unapplied: m.effects_unapplied.as_ref().map(|v| match v {
+            serde_json::Value::String(s) => s.clone(),
+            other => other.to_string(),
+        }),
         coverage: m.coverage.clone(),
         scope_purposes: lat_sync::scope_purposes(scope.as_ref()),
         scope: scope.map(|s| s.to_string()),
@@ -686,7 +693,7 @@ async fn refresh_fields(
             if !opts.apply {
                 return Ok((fields.len() as u64, amend.len()));
             }
-            let changed = pg.apply_lat_fields(law, &fields, m.cause.as_deref(), m.source_hash.as_deref()).await?;
+            let changed = pg.apply_lat_fields(law, &fields, m).await?;
             let n = pg.replace_legal_amendments(law, &amend).await?;
             Ok((changed, n))
         }
