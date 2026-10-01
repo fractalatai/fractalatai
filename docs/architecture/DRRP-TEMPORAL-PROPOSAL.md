@@ -141,7 +141,7 @@ Reviewed by sertantai-legal and Gemini 2.5 Pro (raw: `data/code-review/drrp-temp
 
 The views (R1–R8) say *what* we hold. This section says *how changes arrive*. Today the LAT sync (#62) sees only text differences between legal's previous and current LAT. It can't tell why a row changed, when the change took legal effect, whether our first copy was the law as made, or which effects legislation.gov.uk hasn't applied yet.
 
-Reviewed by sertantai-legal (with figures from its dev DB) and Gemini 2.5 Pro (`data/code-review/drrp-temporal-section-L-gemini.md`). Legal can supply most of the contract from data it already holds.
+Reviewed by sertantai-legal (with figures from its dev DB) and Gemini 2.5 Pro in two rounds (`data/code-review/drrp-temporal-section-L-gemini.md`, `…-round2.md`). In round 2, Gemini agreed that all four refutations hold and agreed D1–D4 as recommended. Its two remaining gaps (behaviour per status in step 1; interim handling before `cause` exists) are closed in L8. Legal can supply most of the contract from data it already holds.
 
 ### L1. Worked lifecycle
 
@@ -244,8 +244,18 @@ Changed provisions + the law level, after each applied change. A status-only rep
   4. manifest `amended`, `as_of`, `effects_unapplied`;
   5. the change log beside the rename log.
 - **Fractalaw**, as each part lands:
-  1. read `status` (repealed → none; replaces the dotted-text inference);
-  2. apply changes by cause (L3);
+  1. read `status` (replaces the dotted-text inference), with defined behaviour for **every** status from day one (Gemini, round 2):
+
+     | status | Provision DRRP | Counted in `current_verdict` / "my obligations" |
+     |---|---|---|
+     | `in_force` | classified | yes |
+     | `in_force_partial` | classified, flagged `partial` | yes (flagged) |
+     | `repealed_saved` | classified (last classification kept), flagged `saved` | yes (flagged): it still applies to the saved cases |
+     | `prospective` | none until commenced (D1) | no |
+     | `repealed` | none, no model calls | no |
+     | missing (legal not yet live) | today's behaviour (dotted text still excluded) | as today |
+
+  2. apply changes by cause (L3). **Interim, until legal's L8.3 delivers `cause`:** every change is handled as `unattributed`. That means today's diff-apply (carry tier data; re-parse changed text), and **no versions** are written. History starts only once `cause` arrives, so false history is never created (Gemini, round 2);
   3. the `provision_versions` table;
   4. dependents (L4);
   5. the verdict split + payload (R1/R4).
