@@ -45,6 +45,7 @@ This session runs the **single run**: one enrichment pass and **one** publish, a
 - ⬜ **Smell list** (live, amended, not making) sent to legal for Jason's per-law made-text approval (preview: 4 laws)
 - ⬜ **Purpose vocabulary:** count of laws still carrying old purpose labels (not republished). Legal's store mixes the two vocabularies until they're re-enriched
 - ⬜ Correlatives (claim/liability/protected holders), current_* and as-made verdicts reviewed together (Jason)
+- ⬜ **Purpose change list for compliance (legal#172):** per law, old `purpose` values → new (from `purpose_profile`, share ≥ 0.05), sent to legal after the dry run. Process+Rule has no 1:1 mapping
 - ⬜ **(Jason)** Compliance screening: `current_verdict` or `is_making`. Decided before the publish
 
 ## Dependencies
