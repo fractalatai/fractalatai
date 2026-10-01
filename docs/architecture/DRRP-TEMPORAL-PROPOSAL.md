@@ -260,6 +260,54 @@ Changed provisions + the law level, after each applied change. A status-only rep
   4. dependents (L4);
   5. the verdict split + payload (R1/R4).
 
+## L9. Fractalaw step 2: versioning from legal's change log (PROPOSED, 2026-10-01)
+
+Legal's #167 is complete. **L8.5** serves `lat-changes/{law}?since=`, a per-row change log:
+- `op_key`, `section_id` / `old_section_id`;
+- `change`: text_changed | inserted | removed | renamed | status_changed;
+- `cause` **per row**: legislative only with the row's own evidence (a note new in this parse that targets the row or an ancestor, or a status change); otherwise unattributed, or the operation's parser / scope / correction;
+- `change_ids`, `op_cause`, `source_hash`.
+
+Renumbering is one `renamed` entry (also in lat-renames, match `renumbered`). `initial` parses log nothing. The log starts empty, with no backfill.
+
+**Plan:**
+1. The LAT sync (pull-lat / sync watch) pulls `lat-changes` for each law it applies, since a per-law watermark `changes_through` (like `renames_through`).
+2. **Before** `apply_lat_diff` / `apply_lat_status` changes a row, each `legislative` entry snapshots the row's superseded state into `provision_versions`:
+   - text, text_md5, status, effective_from, changed_by;
+   - drrp_types, actors (jsonb, from provision_actors);
+   - plus the entry's `change`, `cause`, `change_ids`, `op_key`, `source_hash` and `created_at`.
+   - Current state stays in `legislation_text` / `provision_actors`.
+   - History of a provision = its versions (oldest first) + the current row.
+3. **Idempotent:** unique on (law_name, section_id, op_key, change). A re-delivered log is a no-op.
+4. **Renamed:** the snapshot is keyed on `old_section_id`, plus a `renamed_to` pointer, so history follows the provision across ids. Tier data is already carried by the rename pass.
+5. **inserted:** no snapshot (nothing was superseded). **removed:** a snapshot of the last state.
+6. parser / scope / correction / unattributed entries: **no version**. They're applied as today (L3).
+7. **Re-parse after apply:** unchanged from today. Text-changed and inserted rows are re-parsed (and stems with changed children); status-only changes are not.
+
+**Not in step 2:**
+- dependent re-parse through definitions (L4); the definition graph isn't served yet;
+- the verdict split (R1/R4);
+- unapplied effects (L10).
+
+## L10. Unapplied effects in as_amended (PROPOSED RULE, 2026-10-01)
+
+L8.4 gives `effects_unapplied` per law: effects legislation.gov.uk lists as "Not yet" applied to the text. In the hub there are 5,760 effects in 251 laws. Mapped exactly to a row: words substituted 1,352 (922 exact), words inserted 984 (733), inserted 892 (247), words omitted 412 (284), substituted 406 (214), omitted 365 (245), coming into force 114, others.
+
+**The problem:** "not yet applied" mixes two different things:
+- effects **in force** that legislation.gov.uk hasn't caught up with yet (the text is stale);
+- effects **not yet in force** (prospective).
+
+The effect items carry **no commencement date**, so flipping a provision to none on an unapplied omission could hide an obligation that still applies.
+
+**Recommended rule:**
+1. **Flag, don't flip.** A provision with an exactly-mapped unapplied effect keeps its as_amended classification. The provision payload carries `unapplied_effects: [{by, affect}]` so users and legal can show "amendment pending / not yet applied".
+2. **Word-level effects** (words substituted / inserted / omitted) never change the classification: there's no new text to classify, and the provision still exists.
+3. **Whole-provision omission or repeal** (`omitted`, `repealed`, `revoked`, exactly mapped): flip to none **only** if legal can supply the effect's in-force date and it has passed (status runs ahead of the text, L2). Until then, flag only.
+4. **Law-level** whole-law revocation (legal LiveStatus `revoked_unapplied`) feeds `current_verdict = revoked` when the verdict split is built (R1). The revocation is in force; only its application to the text lags.
+5. **Unmapped effects** (null `section_id`): law-level flag only.
+
+**Ask of legal:** the in-force date (or `in_force: bool`) per unapplied effect, if the changes feed exposes it.
+
 ### Decisions for Jason: D1–D4 APPROVED (Jason, 2026-10-01), as recommended
 - **D1, prospective provisions:** classify and flag them ("coming into force" is visible, but excluded from current obligations), or `none` until commenced? Legal recommends: none until commenced; partly commenced → `in_force_partial`, classified and counted (flagged).
 - **D2, savings:** `repealed_saved` status, or rely on the savings clause itself being classified? Legal recommends: `repealed_saved` only where a savings note exists (detectable from the notes); never inferred.
