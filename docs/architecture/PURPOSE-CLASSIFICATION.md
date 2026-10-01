@@ -1,6 +1,6 @@
 # Purpose Classification (PROPOSED, 2026-10-01)
 
-**Status:** proposed by fractalaw. Gemini reviewed it (2026-10-01, `data/code-review/purpose-classification-gemini.md`; changes adopted below). sertantai-legal's review is pending, then Jason.
+**Status:** proposed by fractalaw. Gemini and sertantai-legal reviewed it (2026-10-01; adopted changes below). Waiting for Jason's sign-off, and his decision on the law-level `purpose` (raised by legal).
 **Fixes:** #40 (Process+Rule too broad), #47 (Offence/Enforcement coverage). **Supersedes:** #69 (provision function).
 
 ## What purpose is
@@ -37,7 +37,7 @@ Purpose isn't cosmetic. `provision_scope` uses it to decide **structural vs subs
 | 6 | `Establishment+Constitution` | machinery | Bodies: creation ("There shall be a body corporate…"), constitution, membership, proceedings, staffing, and **statements of their objectives or general functions** ("the principal objective of the Regulator is…") | **new** (#40, Gemini) |
 | 7 | `Amendment` | machinery | Amends another instrument | keep |
 | 8 | `Repeal+Revocation` | machinery | Repeals or revokes | keep |
-| 9 | `Transitional Arrangement` | machinery | Transitional and saving provisions | keep; savings added |
+| 9 | `Transitional Arrangement` | machinery | Transitional and time-based saving provisions | keep; time-based savings added |
 | 10 | `Requirement` | operative | Creates a duty or prohibition, for anyone (governed or government) | **new**: the real half of the catch-all |
 | 11 | `Power Conferred` | operative | Creates a power, permission or entitlement (any "may" relation, including governed rights) | keep; **widened** to every Liberty |
 | 12 | `Procedure+Detail` | operative | Form, manner, timing, conditions or procedure of a relation **created in another provision**; notice service; parliamentary procedure (the 2026-10-01 detail-provisions ruling) | **new**: the other half of the catch-all |
@@ -54,8 +54,14 @@ Purpose isn't cosmetic. `provision_scope` uses it to decide **structural vs subs
 - **Creates its own duty**, even a procedural one → `Requirement`. Example: "The Executive must consult the Secretary of State before issuing an approved code of practice" (no other provision imposes the consultation).
 - A duty with a qualifier stays `Requirement`. HSWA s.2(3), "Except in such cases as may be prescribed, it shall be the duty of every employer to prepare … a written statement", is a duty, not an `Exemption`.
 
+**Boundary cases** (legal, 2026-10-01):
+- **Technical schedules, tables of values, forms and standards** referenced by a duty (exposure limits such as COSHH WELs, specified limits, prescribed forms) are `Procedure+Detail`: they set the content of a duty created elsewhere. For compliance they're the substance, so controls attach them to the duty they qualify (see Contract). Schedules aren't in fractalaw's parse scope today.
+- **General non-prejudice savings** ("Nothing in these Regulations shall prejudice any other enactment", "nothing in this section affects any liability…") → `Application+Scope`. They're neither time-based (`Transitional Arrangement`) nor an `Exemption`.
+- **Crown application:** "This Act binds the Crown" → `Application+Scope`; "nothing in this section makes the Crown criminally liable" → `Exemption`.
+- **Review clauses:** "The Secretary of State must review these Regulations and publish a report" → `Requirement` (a government duty, so a Responsibility). This is intended. It raises Responsibility counts on many post-2012 SIs.
+
 **Choosing one purpose.** Ask what the provision *does* in its own text, read with its stem:
-- **Precedence** when two fit: machinery (1–9) > sanctions (14–17) > `Charge+Fee` > `Power Conferred` / `Requirement` > `Procedure+Detail`. A definition containing "shall" is a definition; an offence provision is an offence even though it implies a duty elsewhere. Between `Requirement` and `Power Conferred`, the provision's main relation decides.
+- **Precedence** when two fit: machinery (1–9) > sanctions (14–17) > `Charge+Fee` > `Power Conferred` / `Requirement` > `Procedure+Detail`. **Within each family, table order decides**, so "may be cited as … comes into force … extends to" is `Enactment+Citation+Commencement`. A definition containing "shall" is a definition; an offence provision is an offence even though it implies a duty elsewhere. Between `Requirement` and `Power Conferred`, the provision's main relation decides.
 - **List items and fragments take their stem's purpose** ("A scheme must— (a) …" items are `Requirement`), unless the item does something else itself, e.g. an exemption or definition inside a list. This is the same stem rule as DRRP, and it should clear most of today's Unclassified rows.
 - **Government deadline exception** (detail ruling): "The first regulations must come into force no later than…" is `Requirement`.
 
@@ -77,8 +83,11 @@ Purpose isn't cosmetic. `provision_scope` uses it to decide **structural vs subs
 
 ## Contract and migration
 
-- **sertantai-legal:** the value set in the provision payload `purposes` changes. `Process+Rule+Constraint+Condition` disappears, three values are added, and arrays hold one value. Legal confirms how it stores, displays or filters purposes before anything ships.
-- **Compliance controls** (`scripts/compliance/generate_controls.py`) excludes Offence, Exemption, Enactment and Defence+Appeal. It should select `Requirement` positively instead of excluding. Legal to relay to sertantai-compliance.
+- **sertantai-legal, provision level** (`legal_articles.purposes`): stored as received. Nothing in legal or compliance reads it (legal, 2026-10-01), so the value changes and single values are safe, and legal needs no code change.
+  - Laws not republished in the single run keep the old values, so the store mixes the two vocabularies until every law is re-enriched. The final dry run counts how many laws still carry old labels.
+  - Secondary sources (`secondary_source_provisions.purposes`, from the JSP pipeline) aren't in the single run. They keep the old labels until they're next enriched.
+- **Law level** (`legal_register.purpose`, multi-label, 8,060 laws): **legal's own field**, set by legal's regex PurposeClassifier at scrape time. Legal's admin UI and compliance's Baserow "Purpose" multi-select read it. This proposal doesn't touch it, so after the run the law level speaks the old vocabulary. Legal has put a decision to Jason: roll it up from the provision purposes (one classifier), or leave it for now. Either way the law level stays a set, and the existing names are kept because Baserow and the UI show them.
+- **Compliance controls** (`scripts/compliance/generate_controls.py`, fractalaw's, so legal and compliance need no change): select `Requirement` positively instead of excluding purposes, and **attach the `Procedure+Detail` provisions that qualify it** (same law, referring to it) as prompt context. "The record required by regulation 5 must contain…" and a table of limits are what a control needs, so they mustn't be dropped (legal).
 - **Fractalaw:** `purpose.rs` labels, `STRUCTURAL_PURPOSES`, `making.rs` counts, and the `classify_title` mapping.
 - **Data:** purposes are re-derived in the single run. No separate pass.
 
@@ -94,7 +103,14 @@ Not adopted:
 - **"The DRRP consistency check is fundamentally flawed."** That critique reads `Procedure+Detail` as any procedural "must". Under the detail ruling it covers only provisions qualifying a relation created elsewhere, which are relation `none` by definition. A procedural duty created in its own text is `Requirement`. With the test above the check holds.
 - **Primary + secondary purpose.** Its counter-examples resolve with a single label: HSWA s.2(3) is a qualified duty, and a body "which shall exercise the functions conferred" is `Establishment` (the functions are created elsewhere). A secondary label brings back the ambiguity this proposal removes, and the operative detail is already in DRRP. **For Jason to confirm.**
 
-## Open questions for reviewers
+**sertantai-legal.** Agrees with the value changes and with one value per provision. Keep Liability and Defence+Appeal separate ("shall not be liable" protects; a defence answers a charge); keep Establishment. Adopted:
+- technical schedules and tables → `Procedure+Detail`, attached to their duty in controls;
+- non-prejudice savings → `Application+Scope`;
+- ties within machinery decided by table order;
+- Crown and review-clause examples;
+- the mixed-vocabulary count in the final dry run.
+
+## Open questions for reviewers (answered)
 
 1. Is single-label right, or do some provisions need two purposes (e.g. "cited as … and comes into force")?
 2. Should `Liability` and `Defence+Appeal` merge, now that "shall not be liable" sits with civil liability?
