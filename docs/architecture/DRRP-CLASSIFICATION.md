@@ -73,6 +73,19 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
   - When `relates_to` names the holder, there is one pair.
   - Otherwise there is one pair per active holder, so a counterparty to a government Power and a governed Right gets both `liability` and `no_right`.
   - An actor with no correlative sends `[]`, never NULL.
+- **The act (#75, Jason 2026-10-01).** Each counterparty's correlative can carry what it's owed, from a fixed list:
+  - `notify`: told of an event or decision (RIDDOR reg.4, the enforcing authority);
+  - `supply`: given information, a copy or a thing (MHSWR reg.10, employees);
+  - `consult`: consulted (safety representatives);
+  - `pay`: paid;
+  - `give_access`: given access or inspection (EPA s.20(7), the public);
+  - `serve`: served with a notice;
+  - `charge`: a charge levied on, or withheld from, the party (HSWA s.9);
+  - `answer_request`: the duty answers its request;
+  - `other`.
+  - Item shape: `{type, to, act}`; `act` absent means unknown.
+  - **Labelled now:** the definitive prompt labels `act` on each counterparty. Regex derives it for new laws from the clause verb, measured against those labels. It isn't an SLM target.
+  - **Published later:** once compliance and legal agree it on #75. It never feeds DRRP or the verdict.
 - **Never feeds layers 4–5.** DRRP types, the holder lists, the verdict and `is_making` stay based only on held types.
 - **`claim_right` is the duty's direct correlative, in a broad public-law sense** (Gemini, #72): it doesn't by itself imply a private right of civil action. Many regulatory duties aren't actionable (e.g. HSWA s.47 for ss.2–8). User-facing text should present it as "owed to you", not "you can sue".
 - **`protected` is a compliance category, not Hohfeldian.** A beneficiary isn't the direct correlative party. Many "owed to" duties give no enforceable claim either: HSWA s.47 excludes civil action for breach of ss.2–8. `protected` answers "what protects me".
