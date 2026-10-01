@@ -260,7 +260,7 @@ Changed provisions + the law level, after each applied change. A status-only rep
   4. dependents (L4);
   5. the verdict split + payload (R1/R4).
 
-## L9. Fractalaw step 2: versioning from legal's change log (PROPOSED, 2026-10-01)
+## L9. Fractalaw step 2: versioning from legal's change log (APPROVED, Jason 2026-10-01, D5)
 
 Legal's #167 is complete. **L8.5** serves `lat-changes/{law}?since=`, a per-row change log:
 - `op_key`, `section_id` / `old_section_id`;
@@ -291,7 +291,7 @@ Renumbering is one `renamed` entry (also in lat-renames, match `renumbered`). `i
 - the verdict split (R1/R4);
 - unapplied effects (L10).
 
-## L10. Unapplied effects in as_amended (PROPOSED RULE, 2026-10-01)
+## L10. Unapplied effects in as_amended (APPROVED, Jason 2026-10-01, D6)
 
 L8.4 gives `effects_unapplied` per law: effects legislation.gov.uk lists as "Not yet" applied to the text. In the hub there are 5,760 effects in 251 laws. Mapped exactly to a row: words substituted 1,352 (922 exact), words inserted 984 (733), inserted 892 (247), words omitted 412 (284), substituted 406 (214), omitted 365 (245), coming into force 114, others.
 
