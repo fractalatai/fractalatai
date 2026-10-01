@@ -177,6 +177,13 @@ Law-level holder fields (`duty_holder`, `rights_holder`, `responsibility_holder`
 
 Never send NULL to clear a verdict: legal can't tell it apart from "not in this payload".
 
+**Current view (fractalatai #73, R1a, agreed 2026-10-01).** The law payload also carries the as-amended view. The existing fields above stay **as made** and feed `is_making`.
+- `current_verdict`: `making | empowering | no_obligations | revoked | holder_unknown`. `revoked` means legal's LRT `live` says the whole law is revoked.
+- `current_duty_type`.
+- `current_duty_holder`, `current_rights_holder`, `current_responsibility_holder`, `current_power_holder`: over live provisions only (status not repealed/prospective, and not an in-force unapplied repeal).
+- Same shapes as above: `[]` when empty in a DRRP-carrying payload; never NULL to clear.
+- Legal's resolver never reads `current_verdict` for `is_making`.
+
 **Correlative holder lists (layer 1b).** The law payload's DRRP section also carries `claim_holder`, `liability_holder` and `protected_holder`, in the same format as `duty_holder` (a list of labels).
 - They are `[]` in any payload that carries the DRRP section.
 - They are NULL only in the "no DRRP in this payload" shape.

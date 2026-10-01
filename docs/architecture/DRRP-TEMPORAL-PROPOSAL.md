@@ -91,7 +91,7 @@ Reviewed by sertantai-legal and Gemini 2.5 Pro (raw: `data/code-review/drrp-temp
 - **`revoked`** is distinct from `no_obligations` (both reviews): "no duties now" isn't "never had any".
 - Both fields follow the #68 never-NULL rule.
 
-### R1a. Verdict-split field names (PROPOSED to legal, 2026-10-01)
+### R1a. Verdict-split field names (AGREED with legal, 2026-10-01)
 
 **Principle: the smallest migration.** The existing law-payload DRRP fields **keep their meaning, as made**, so legal's `is_making` path is untouched. The current view is added as new `current_*` fields.
 
@@ -108,6 +108,12 @@ Reviewed by sertantai-legal and Gemini 2.5 Pro (raw: `data/code-review/drrp-temp
 - **Never NULL in a DRRP-carrying payload:** `current_*` lists are `[]` when empty. All-NULL keeps meaning "no DRRP in this payload".
 - **#72 correlatives** (`claim_holder`, `liability_holder`, `protected_holder`) are current-view by nature, rolled up over live provisions. They ship in the same legal release.
 - **The as-made fields** keep today's roll-up for now. Once the made text is classified (R5, priority 3), they're computed from it. The names don't change.
+
+**Legal's review (agreed):**
+- **Flat columns.** One legal migration carries all 9: the six current_* plus #72's three correlative lists. Legal recreates its uk_lrt view and triggers once.
+- **Ingest:** the current_* holder lists get the never-cross-assign filter; the correlative lists don't; `[]` clears; `current_verdict` is stored as sent, never re-derived.
+- **`revoked`:** read `live` from the LRT payload. `live = "❌ Revoked / Repealed / Abolished"` means the whole law is revoked, as decided by LiveStatus (it includes revoked_unapplied and excludes prospective revocations). Optional additive `live_kind` (revoked vs revoked_unapplied) for UI text.
+- **is_making's resolver ignores `current_verdict`.** Legal stores it for the register UI and for sertantai-compliance. Whether customer screening should key on `current_verdict` rather than `is_making` is a separate decision for Jason (compliance).
 
 ### R2. Provision status comes from legal's LAT, not from dots (both reviews)
 - Each LAT row carries `status: in_force | repealed | prospective`, set by legal's CLML parse:
