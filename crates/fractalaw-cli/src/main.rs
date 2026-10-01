@@ -462,6 +462,26 @@ fn law_drrp_for(
     (law.verdict().map_or("holder_unknown", |v| v.as_str()), Some(law))
 }
 
+/// Layer-1b correlatives per provision actor (#72), as (section_id, label,
+/// JSON array) rows for `write_actor_correlatives`. Every reconciled actor
+/// gets a row, `[]` when it holds none.
+fn provision_correlatives(inputs: &fractalaw_store::LawDrrpInputs) -> Vec<(String, String, String)> {
+    use fractalaw_core::taxa::correlatives::{PositionedActor, derive_correlatives};
+    let mut sections: std::collections::HashMap<String, Vec<PositionedActor>> = std::collections::HashMap::new();
+    for (sid, label, drrp, _, position) in &inputs.signals {
+        sections.entry(sid.clone()).or_default().push(PositionedActor {
+            label: label.clone(),
+            drrp: drrp.clone().unwrap_or_default(),
+            position: position.clone().unwrap_or_default(),
+            access_inferred: inputs.access_inferred.contains(&(sid.clone(), label.clone())),
+        });
+    }
+    derive_correlatives(&sections)
+        .into_iter()
+        .map(|((sid, label), cs)| (sid, label, serde_json::to_string(&cs).expect("correlatives serialise")))
+        .collect()
+}
+
 /// Roll up a law's signals, skipping amendment-scope and `exclude`d sections.
 fn rollup(
     inputs: &fractalaw_store::LawDrrpInputs,
@@ -479,6 +499,7 @@ fn rollup(
             actor_label: label.clone(),
             drrp: drrp.clone().unwrap_or_default(),
             position: position.clone().unwrap_or_default(),
+            access_inferred: inputs.access_inferred.contains(&(sid.clone(), label.clone())),
         })
         .collect();
     let unknown: Vec<String> =
@@ -718,8 +739,9 @@ async fn main() -> anyhow::Result<()> {
                 // (as-made verdict, current verdict) counts (#73 R1a)
                 let mut current_views: std::collections::BTreeMap<(String, String), usize> = std::collections::BTreeMap::new();
                 store.ensure_current_view_columns()?;
+                store.ensure_correlative_columns()?;
                 if dry_run {
-                    println!("law\tcurrent\tnew\tduties\tresponsibilities\trights\tpowers\tholder_unknown\tnon_active_excluded\tcurrent_view");
+                    println!("law\tcurrent\tnew\tduties\tresponsibilities\trights\tpowers\tholder_unknown\tnon_active_excluded\tcurrent_view\tclaim_holders\tliability_holders\tprotected_holders");
                 }
                 for law_name in &law_names {
                     if dry_run {
@@ -730,6 +752,10 @@ async fn main() -> anyhow::Result<()> {
                         let live = commands::pipeline::read_law_live(&store, law_name)?;
                         let cur = current_for(&inputs, new, live.as_deref()).map_or("-", |(v, _)| v);
                         *current_views.entry((new.to_string(), cur.to_string())).or_default() += 1;
+                        let corr = law.as_ref().map_or_else(|| "\t\t".to_string(), |l| {
+                            let j = |s: &std::collections::BTreeSet<String>| s.iter().cloned().collect::<Vec<_>>().join("; ");
+                            format!("{}\t{}\t{}", j(&l.claim_holders), j(&l.liability_holders), j(&l.protected_holders))
+                        });
                         let row = law.map(|l| {
                             format!(
                                 "{}\t{}\t{}\t{}\t{}\t{}",
@@ -737,11 +763,14 @@ async fn main() -> anyhow::Result<()> {
                                 l.holder_unknown, l.excluded_non_active
                             )
                         });
-                        println!("{law_name}\t{current}\t{new}\t{}\t{cur}", row.unwrap_or_else(|| "\t\t\t\t\t".into()));
+                        println!("{law_name}\t{current}\t{new}\t{}\t{cur}\t{corr}", row.unwrap_or_else(|| "\t\t\t\t\t".into()));
                         *transitions.entry((current.to_string(), new.to_string())).or_default() += 1;
                         continue;
                     }
                     let updated = lance.backfill_from_actors(law_name).await?;
+                    let inputs = lance.query_law_drrp_inputs(law_name).await?;
+                    // Layer-1b correlatives into the provision actors JSON (#72)
+                    lance.write_actor_correlatives(law_name, &provision_correlatives(&inputs)).await?;
                     let sig = lance.backfill_significance(law_name).await?;
 
                     // Law-level significance (Approach L + K profile) → DuckDB (#55)
@@ -769,7 +798,6 @@ async fn main() -> anyhow::Result<()> {
 
                     // Law-level DRRP from reconciled provision_actors → DuckDB (#55).
                     // Only where DRRP ran (parsed provisions); otherwise leave it as is.
-                    let inputs = lance.query_law_drrp_inputs(law_name).await?;
                     let (outcome, law) = law_drrp_for(&inputs);
                     match (outcome, law) {
                         ("unreconciled", _) => {

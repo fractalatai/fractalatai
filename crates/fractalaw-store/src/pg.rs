@@ -483,6 +483,42 @@ impl PgStore {
         Ok(result.rows_affected() as usize)
     }
 
+    /// Merge layer-1b correlatives into each actor of the law's
+    /// `legislation_text.actors` (#72). Run after `backfill_from_actors`, which
+    /// rebuilds the JSON. Every actor gets `correlatives`, `[]` when none.
+    pub async fn write_actor_correlatives(
+        &self,
+        law_name: &str,
+        rows: &[(String, String, String)],
+    ) -> Result<usize, StoreError> {
+        let (sids, labels, corrs): (Vec<&str>, Vec<&str>, Vec<&str>) = rows
+            .iter()
+            .map(|(s, l, c)| (s.as_str(), l.as_str(), c.as_str()))
+            .fold((vec![], vec![], vec![]), |(mut a, mut b, mut c), (x, y, z)| {
+                a.push(x);
+                b.push(y);
+                c.push(z);
+                (a, b, c)
+            });
+        let result = sqlx::query(
+            "WITH c AS (SELECT section_id, label, corr::jsonb AS corr FROM unnest($2::text[], $3::text[], $4::text[]) AS u(section_id, label, corr)) \
+             UPDATE legislation_text lt SET actors = ( \
+               SELECT jsonb_agg(e || jsonb_build_object('correlatives', COALESCE( \
+                        (SELECT c.corr FROM c WHERE c.section_id = lt.section_id AND c.label = e->>'label'), \
+                        '[]'::jsonb)) ORDER BY ord) \
+               FROM jsonb_array_elements(lt.actors) WITH ORDINALITY AS t(e, ord)) \
+             WHERE lt.law_name = $1 AND jsonb_typeof(lt.actors) = 'array' AND jsonb_array_length(lt.actors) > 0",
+        )
+        .bind(law_name)
+        .bind(&sids)
+        .bind(&labels)
+        .bind(&corrs)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("write_actor_correlatives: {e}")))?;
+        Ok(result.rows_affected() as usize)
+    }
+
     /// Compute significance_overall from the 5 dimension columns (Approach B formula).
     /// Idempotent — safe to re-run after SLM retrain or formula change.
     pub async fn backfill_significance(&self, law_name: &str) -> Result<usize, StoreError> {
@@ -600,8 +636,22 @@ impl PgStore {
         .fetch_one(&self.pool)
         .await
         .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?;
+        // #67 access rule: inferred active Liberty that reconcile kept (layer 1b claim_right)
+        let access_inferred = sqlx::query_as::<_, (String, String)>(
+            "SELECT pa.section_id, pa.actor_label FROM provision_actors pa \
+             JOIN legislation_text lt ON lt.section_id = pa.section_id WHERE lt.law_name = $1 \
+               AND pa.inferred_drrp = 'Liberty' AND pa.inferred_position = 'active' \
+               AND pa.drrp = 'Liberty' AND pa.position = 'active'",
+        )
+        .bind(law_name)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| StoreError::Other(format!("query_law_drrp_inputs: {e}")))?
+        .into_iter()
+        .collect();
         Ok(crate::provision_store::LawDrrpInputs {
             provisions, signals, holder_unknown, duty_text_provisions, substantive_provisions, non_live, substantive_total,
+            access_inferred,
         })
     }
 
@@ -1140,6 +1190,14 @@ impl crate::ProvisionStore for PgStore {
 
     async fn backfill_significance(&self, law_name: &str) -> Result<usize, StoreError> {
         self.backfill_significance(law_name).await
+    }
+
+    async fn write_actor_correlatives(
+        &self,
+        law_name: &str,
+        rows: &[(String, String, String)],
+    ) -> Result<usize, StoreError> {
+        self.write_actor_correlatives(law_name, rows).await
     }
 
     async fn query_significance_profile(

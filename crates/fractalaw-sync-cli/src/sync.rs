@@ -74,6 +74,7 @@ pub(crate) async fn cmd_sync_publish(
     let store = open_duck(data_dir)?;
     store.ensure_taxa_hash_columns()?;
     store.ensure_current_view_columns()?;
+    store.ensure_correlative_columns()?;
     // Enrichment provenance (#63) comes from the hub; without it the payload is verdict-only
     let prov_pg = match pg_url {
         Some(url) => {
@@ -205,7 +206,8 @@ pub(crate) async fn cmd_sync_publish(
          duty_type, role, role_gvt, \
          duties, rights, responsibilities, powers, \
          current_verdict, current_duty_type, current_duty_holder, current_rights_holder, \
-         current_responsibility_holder, current_power_holder, "
+         current_responsibility_holder, current_power_holder, \
+         claim_holder, liability_holder, protected_holder, "
     };
 
     let mut published = 0usize;

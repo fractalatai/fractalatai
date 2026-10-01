@@ -165,6 +165,115 @@ pub fn infer_access_rights(
     out
 }
 
+/// Layer-1b correlative types (DRRP-CLASSIFICATION.md, #72).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CorrelativeType {
+    /// The duty is owed to this actor (counterparty of an Obligation, or #67)
+    ClaimRight,
+    /// Exposed to a government actor's Power
+    Liability,
+    /// Can't prevent a governed actor's Right
+    NoRight,
+    /// The duty protects this actor (beneficiary of an Obligation)
+    Protected,
+}
+
+/// One `actors[].correlatives` item: `{type, to}`, where `to` is the active holder's label.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+pub struct Correlative {
+    #[serde(rename = "type")]
+    pub kind: CorrelativeType,
+    pub to: String,
+}
+
+/// A reconciled actor on one provision, as layer 1b reads it.
+#[derive(Debug, Clone)]
+pub struct PositionedActor {
+    pub label: String,
+    /// Reconciled type: `Obligation`, `Liberty`, `none`
+    pub drrp: String,
+    /// Reconciled position: `active`, `counterparty`, `beneficiary`, `mentioned`
+    pub position: String,
+    /// Active Liberty inferred by the #67 access rule
+    pub access_inferred: bool,
+}
+
+impl PositionedActor {
+    fn holds(&self, drrp: &str) -> bool {
+        self.position == "active" && self.drrp == drrp
+    }
+}
+
+/// Derive layer-1b correlatives for every actor in a law
+/// (DRRP-CLASSIFICATION.md layer 1b, #72). Keyed by (section_id, label);
+/// every actor gets an entry, `[]` when it holds none.
+///
+/// - Non-active actors pair with each active holder in the same provision:
+///   counterparty → `claim_right` (Obligation), `liability` (government
+///   Liberty = Power) or `no_right` (governed Liberty = Right); beneficiary of
+///   an Obligation → `protected`; mentioned → nothing. No active holder
+///   (holder unknown) → nothing.
+/// - An active actor gets one only in the #67 case: an inferred access Liberty
+///   holds a `claim_right` against the government actors whose access
+///   Obligation it is, in the provision or else the nearest ancestor stem.
+///
+/// Derived from positions only: never feeds DRRP or the verdict.
+pub fn derive_correlatives(
+    sections: &HashMap<String, Vec<PositionedActor>>,
+) -> HashMap<(String, String), Vec<Correlative>> {
+    let gov_obligors = |sid: &str| -> Vec<String> {
+        sections
+            .get(sid)
+            .map(|actors| {
+                actors
+                    .iter()
+                    .filter(|a| a.holds("Obligation") && is_government(&a.label))
+                    .map(|a| a.label.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let mut out = HashMap::new();
+    for (sid, actors) in sections {
+        let holders: Vec<&PositionedActor> =
+            actors.iter().filter(|a| a.holds("Obligation") || a.holds("Liberty")).collect();
+        for a in actors {
+            let mut cs: Vec<Correlative> = Vec::new();
+            match a.position.as_str() {
+                "counterparty" | "beneficiary" => {
+                    for h in holders.iter().filter(|h| h.label != a.label) {
+                        let kind = match (a.position.as_str(), h.drrp.as_str()) {
+                            ("counterparty", "Obligation") => CorrelativeType::ClaimRight,
+                            ("counterparty", _) if is_government(&h.label) => CorrelativeType::Liability,
+                            ("counterparty", _) => CorrelativeType::NoRight,
+                            ("beneficiary", "Obligation") => CorrelativeType::Protected,
+                            _ => continue,
+                        };
+                        cs.push(Correlative { kind, to: h.label.clone() });
+                    }
+                }
+                "active" if a.access_inferred && a.holds("Liberty") => {
+                    let mut obligors = gov_obligors(sid);
+                    if obligors.is_empty() {
+                        obligors = super::amendment::ancestors(sid)
+                            .iter()
+                            .map(|anc| gov_obligors(anc))
+                            .find(|o| !o.is_empty())
+                            .unwrap_or_default();
+                    }
+                    cs.extend(obligors.into_iter().map(|to| Correlative { kind: CorrelativeType::ClaimRight, to }));
+                }
+                _ => {}
+            }
+            cs.sort();
+            cs.dedup();
+            out.insert((sid.clone(), a.label.clone()), cs);
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -226,6 +335,109 @@ mod tests {
             act("Org: Operator", Some("Obligation"), "counterparty"),
         ]);
         assert!(infer_access_rights(&texts, &actors).is_empty());
+    }
+
+    fn pa(label: &str, drrp: &str, pos: &str) -> PositionedActor {
+        PositionedActor { label: label.into(), drrp: drrp.into(), position: pos.into(), access_inferred: false }
+    }
+
+    fn corr(got: &HashMap<(String, String), Vec<Correlative>>, sid: &str, label: &str) -> Vec<(CorrelativeType, String)> {
+        got[&(sid.to_string(), label.to_string())].iter().map(|c| (c.kind, c.to.clone())).collect()
+    }
+
+    #[test]
+    fn worked_examples_layer_1b() {
+        use CorrelativeType::*;
+        let mut s = HashMap::new();
+        // HSWA s.2(1): protected-interest duty → beneficiary → protected
+        s.insert("H:s.2(1)".to_string(), vec![pa("Org: Employer", "Obligation", "active"), pa("Ind: Employee", "Obligation", "beneficiary")]);
+        // HSWA s.2(2)(c): employees receive the training → counterparty → claim_right
+        s.insert("H:s.2(2)(c)".to_string(), vec![pa("Org: Employer", "Obligation", "active"), pa("Ind: Employee", "Obligation", "counterparty")]);
+        // HSWA s.3(1): persons not employed, protected
+        s.insert("H:s.3(1)".to_string(), vec![pa("Org: Employer", "Obligation", "active"), pa("Ind: Person", "Obligation", "beneficiary")]);
+        // HSWA s.9: no charge levied on employees → counterparty → claim_right
+        s.insert("H:s.9".to_string(), vec![pa("Org: Employer", "Obligation", "active"), pa("Ind: Employee", "none", "counterparty")]);
+        // PPE Regs reg.4: "ensure PPE is provided to employees" → counterparty
+        s.insert("P:reg.4(1)".to_string(), vec![pa("Org: Employer", "Obligation", "active"), pa("Ind: Employee", "Obligation", "counterparty")]);
+        // Water Act s.82(2)(c)-style Power: a counterparty is liable
+        s.insert("W:s.82(2)(c)".to_string(), vec![pa("Gvt: Minister", "Liberty", "active"), pa("Org: Undertaker", "Liberty", "counterparty")]);
+        // A governed Right: the counterparty can't prevent it
+        s.insert("R:s.5".to_string(), vec![pa("Ind: Owner", "Liberty", "active"), pa("Org: Occupier", "none", "counterparty")]);
+        // Notice service: the operator notifies the authority (a regulator holds a claim_right)
+        s.insert("N:reg.7".to_string(), vec![pa("Org: Operator", "Obligation", "active"), pa("Gvt: Authority: Enforcement", "Obligation", "counterparty"), pa("Gvt: Minister", "none", "mentioned")]);
+        // Holder unknown: no active holder → nothing
+        s.insert("U:s.1".to_string(), vec![pa("Ind: Person", "Obligation", "counterparty")]);
+        let got = derive_correlatives(&s);
+        assert_eq!(corr(&got, "H:s.2(1)", "Ind: Employee"), vec![(Protected, "Org: Employer".into())]);
+        assert_eq!(corr(&got, "H:s.2(1)", "Org: Employer"), vec![]);
+        assert_eq!(corr(&got, "H:s.2(2)(c)", "Ind: Employee"), vec![(ClaimRight, "Org: Employer".into())]);
+        assert_eq!(corr(&got, "H:s.3(1)", "Ind: Person"), vec![(Protected, "Org: Employer".into())]);
+        assert_eq!(corr(&got, "H:s.9", "Ind: Employee"), vec![(ClaimRight, "Org: Employer".into())]);
+        assert_eq!(corr(&got, "P:reg.4(1)", "Ind: Employee"), vec![(ClaimRight, "Org: Employer".into())]);
+        assert_eq!(corr(&got, "W:s.82(2)(c)", "Org: Undertaker"), vec![(Liability, "Gvt: Minister".into())]);
+        assert_eq!(corr(&got, "R:s.5", "Org: Occupier"), vec![(NoRight, "Ind: Owner".into())]);
+        assert_eq!(corr(&got, "N:reg.7", "Gvt: Authority: Enforcement"), vec![(ClaimRight, "Org: Operator".into())]);
+        assert_eq!(corr(&got, "N:reg.7", "Gvt: Minister"), vec![]);
+        assert_eq!(corr(&got, "U:s.1", "Ind: Person"), vec![]);
+    }
+
+    #[test]
+    fn one_pair_per_active_holder_and_no_co_holder_pairs() {
+        use CorrelativeType::*;
+        let mut s = HashMap::new();
+        // A counterparty to a government Power and a governed Right gets both
+        s.insert("X:s.1".to_string(), vec![
+            pa("Gvt: Agency", "Liberty", "active"),
+            pa("Ind: Owner", "Liberty", "active"),
+            pa("Org: Operator", "none", "counterparty"),
+        ]);
+        // Co-holders of one Obligation get nothing against each other; a beneficiary of a Liberty gets nothing
+        s.insert("X:s.2".to_string(), vec![
+            pa("Org: Employer", "Obligation", "active"),
+            pa("Org: Operator", "Obligation", "active"),
+        ]);
+        s.insert("X:s.3".to_string(), vec![pa("Gvt: Agency", "Liberty", "active"), pa("Public", "none", "beneficiary")]);
+        let got = derive_correlatives(&s);
+        assert_eq!(corr(&got, "X:s.1", "Org: Operator"), vec![(Liability, "Gvt: Agency".into()), (NoRight, "Ind: Owner".into())]);
+        assert_eq!(corr(&got, "X:s.2", "Org: Employer"), vec![]);
+        assert_eq!(corr(&got, "X:s.3", "Public"), vec![]);
+    }
+
+    #[test]
+    fn access_inferred_liberty_claims_against_stem_obligor() {
+        use CorrelativeType::*;
+        let mut s = HashMap::new();
+        // EPA 1990 s.20(7): the authority's duty in the stem, the public's access in (a)
+        s.insert("E:s.20(7)".to_string(), vec![pa("Gvt: Authority: Enforcement", "Obligation", "active")]);
+        let mut public = pa("Public", "Liberty", "active");
+        public.access_inferred = true;
+        s.insert("E:s.20(7)(a)".to_string(), vec![public.clone()]);
+        // Same-provision case; an LLM-active Liberty (not inferred) gets nothing
+        s.insert("L:reg.35(1)".to_string(), vec![pa("Gvt: Authority: Local", "Obligation", "active"), public, pa("Ind: Person", "Liberty", "active")]);
+        let got = derive_correlatives(&s);
+        assert_eq!(corr(&got, "E:s.20(7)(a)", "Public"), vec![(ClaimRight, "Gvt: Authority: Enforcement".into())]);
+        assert_eq!(corr(&got, "L:reg.35(1)", "Public"), vec![(ClaimRight, "Gvt: Authority: Local".into())]);
+        assert_eq!(corr(&got, "L:reg.35(1)", "Ind: Person"), vec![]);
+    }
+
+    #[test]
+    fn pair_type_matches_holder_class() {
+        // legal's check: liability only against government, no_right only against governed
+        let mut s = HashMap::new();
+        s.insert("X:s.1".to_string(), vec![
+            pa("Gvt: Agency", "Liberty", "active"),
+            pa("Ind: Owner", "Liberty", "active"),
+            pa("Org: Operator", "none", "counterparty"),
+        ]);
+        for c in derive_correlatives(&s).values().flatten() {
+            match c.kind {
+                CorrelativeType::Liability => assert!(is_government(&c.to)),
+                CorrelativeType::NoRight => assert!(!is_government(&c.to)),
+                _ => {}
+            }
+        }
+        let json = serde_json::to_string(&Correlative { kind: CorrelativeType::ClaimRight, to: "Org: Employer".into() }).unwrap();
+        assert_eq!(json, r#"{"type":"claim_right","to":"Org: Employer"}"#);
     }
 
     #[test]

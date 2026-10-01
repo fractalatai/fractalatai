@@ -32,7 +32,9 @@ pub struct LawDrrpInputs {
     pub non_live: Vec<String>,
     /// All substantive provisions, live or not: with `substantive_provisions`
     /// (live only) it tells a wholly repealed law apart
-    pub substantive_total: i64,
+    pub substantive_total: i64,    /// (section_id, actor_label) of active Liberties inferred by the #67 access
+    /// rule: each also holds a `claim_right` (layer 1b, #72)
+    pub access_inferred: std::collections::HashSet<(String, String)>,
 }
 
 /// Provision data store — implemented by LanceStore and PgStore.
@@ -80,6 +82,17 @@ pub trait ProvisionStore: Send + Sync {
 
     /// Backfill legislation_text from reconciled provision_actors.
     async fn backfill_from_actors(&self, _law_name: &str) -> Result<usize, StoreError> {
+        Ok(0)
+    }
+
+    /// Write layer-1b correlatives into each actor of `legislation_text.actors`
+    /// (#72): `rows` = (section_id, actor_label, correlatives JSON array).
+    /// Every actor gets a `correlatives` key, `[]` when it has none.
+    async fn write_actor_correlatives(
+        &self,
+        _law_name: &str,
+        _rows: &[(String, String, String)],
+    ) -> Result<usize, StoreError> {
         Ok(0)
     }
 

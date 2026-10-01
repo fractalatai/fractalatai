@@ -17,6 +17,8 @@
 
 use std::collections::BTreeSet;
 
+use super::correlatives::{CorrelativeType, PositionedActor, derive_correlatives};
+
 /// One reconciled actor signal on one provision.
 #[derive(Debug, Clone)]
 pub struct ActorSignal {
@@ -28,6 +30,8 @@ pub struct ActorSignal {
     pub drrp: String,
     /// Reconciled position: `active`, `counterparty`, `beneficiary`, `mentioned`
     pub position: String,
+    /// Active Liberty inferred by the #67 access rule (a `claim_right` source, layer 1b)
+    pub access_inferred: bool,
 }
 
 /// (holder, duty_type, clause, article), the DuckDB `duties`/`rights`/... struct.
@@ -52,6 +56,11 @@ pub struct LawDrrp {
     pub excluded_non_active: usize,
     /// In-scope provisions with an Obligation and no known holder
     pub holder_unknown: usize,
+    /// Layer-1b correlative holders (#72): who is owed a duty, exposed to a
+    /// Power, or protected by a duty. Never counted in the verdict.
+    pub claim_holders: BTreeSet<String>,
+    pub liability_holders: BTreeSet<String>,
+    pub protected_holders: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -147,6 +156,27 @@ pub fn aggregate(
         entries.push((s.actor_label.clone(), dt.to_uppercase(), clause, article));
     }
     law.holder_unknown = holder_unknown.iter().filter(|sid| !in_amendment(sid)).count();
+
+    // Layer 1b (#72): correlatives over the same in-scope provisions
+    let mut sections: std::collections::HashMap<String, Vec<PositionedActor>> = std::collections::HashMap::new();
+    for s in signals.iter().filter(|s| !in_amendment(&s.section_id)) {
+        sections.entry(s.section_id.clone()).or_default().push(PositionedActor {
+            label: s.actor_label.clone(),
+            drrp: s.drrp.clone(),
+            position: s.position.clone(),
+            access_inferred: s.access_inferred,
+        });
+    }
+    for ((_, label), cs) in derive_correlatives(&sections) {
+        for c in cs {
+            match c.kind {
+                CorrelativeType::ClaimRight => law.claim_holders.insert(label.clone()),
+                CorrelativeType::Liability => law.liability_holders.insert(label.clone()),
+                CorrelativeType::Protected => law.protected_holders.insert(label.clone()),
+                CorrelativeType::NoRight => false,
+            };
+        }
+    }
     law
 }
 
@@ -209,7 +239,7 @@ mod tests {
     }
 
     fn sig_at(sid: &str, label: &str, drrp: &str, position: &str) -> ActorSignal {
-        ActorSignal { section_id: sid.into(), actor_label: label.into(), drrp: drrp.into(), position: position.into() }
+        ActorSignal { section_id: sid.into(), actor_label: label.into(), drrp: drrp.into(), position: position.into(), access_inferred: false }
     }
 
     #[test]
@@ -324,5 +354,29 @@ mod tests {
         assert!(live_is_revoked(Some("❌ Revoked / Repealed / Abolished")));
         assert!(!live_is_revoked(Some("⭕ Part Revocation / Repeal")));
         assert!(!live_is_revoked(None));
+    }
+
+    #[test]
+    fn correlative_holders_rolled_up_not_in_verdict() {
+        let law = aggregate(
+            &[
+                sig_at("L:s.2(1)", "Org: Employer", "Obligation", "active"),
+                sig_at("L:s.2(1)", "Ind: Employee", "Obligation", "beneficiary"),
+                sig_at("L:s.4", "Org: Employer", "Obligation", "active"),
+                sig_at("L:s.4", "Gvt: Authority: Enforcement", "Obligation", "counterparty"),
+                sig_at("L:s.9", "Gvt: Minister", "Liberty", "active"),
+                sig_at("L:s.9", "Org: Operator", "Liberty", "counterparty"),
+                // amendment text is excluded, as for DRRP
+                sig_at("L:s.20", "Org: Employer", "Obligation", "active"),
+                sig_at("L:s.20", "Ind: Person", "Obligation", "counterparty"),
+            ],
+            &[],
+            |sid| Some(if sid == "L:s.20" { "In section 3, for \"x\" substitute \"y\"".into() } else { "text".into() }),
+        );
+        assert_eq!(law.protected_holders.iter().collect::<Vec<_>>(), vec!["Ind: Employee"]);
+        assert_eq!(law.claim_holders.iter().collect::<Vec<_>>(), vec!["Gvt: Authority: Enforcement"]);
+        assert_eq!(law.liability_holders.iter().collect::<Vec<_>>(), vec!["Org: Operator"]);
+        assert_eq!(law.verdict(), Some(Verdict::Making));
+        assert!(law.duty_holders.contains("Org: Employer") && !law.duty_holders.contains("Ind: Employee"));
     }
 }

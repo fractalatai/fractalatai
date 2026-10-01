@@ -690,6 +690,16 @@ impl DuckStore {
         Ok(())
     }
 
+    /// Ensure the layer-1b correlative holder columns exist (#72):
+    /// `claim_holder`, `liability_holder`, `protected_holder`. Idempotent.
+    pub fn ensure_correlative_columns(&self) -> Result<(), StoreError> {
+        for col in ["claim_holder", "liability_holder", "protected_holder"] {
+            self.conn
+                .execute_batch(&format!("ALTER TABLE legislation ADD COLUMN IF NOT EXISTS {col} VARCHAR[]"))?;
+        }
+        Ok(())
+    }
+
     /// Ensure `inherited_count` column exists on `legislation`.
     ///
     /// Tracks how many provisions were resolved by Tier 1 deterministic

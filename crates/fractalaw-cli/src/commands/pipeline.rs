@@ -1587,11 +1587,22 @@ pub(crate) fn write_law_drrp(
         &law.responsibilities,
         &law.powers,
     );
+    // Layer-1b correlative holders (#72) change the payload too; laws without
+    // any keep their existing hash
+    let hash = if law.claim_holders.is_empty() && law.liability_holders.is_empty() && law.protected_holders.is_empty() {
+        hash
+    } else {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::hash::DefaultHasher::new();
+        (&hash, &law.claim_holders, &law.liability_holders, &law.protected_holders).hash(&mut h);
+        format!("{:016x}", h.finish())
+    };
     store.execute(&format!(
         "UPDATE legislation SET \
             duty_holder = {}, rights_holder = {}, responsibility_holder = {}, power_holder = {}, \
             duty_type = {}, role = {}, role_gvt = {}, \
             duties = {}, rights = {}, responsibilities = {}, powers = {}, \
+            claim_holder = {}, liability_holder = {}, protected_holder = {}, \
             taxa_hash = '{hash}' \
          WHERE name = '{}'",
         list(&law.duty_holders),
@@ -1605,6 +1616,9 @@ pub(crate) fn write_law_drrp(
         entries(&law.rights),
         entries(&law.responsibilities),
         entries(&law.powers),
+        list(&law.claim_holders),
+        list(&law.liability_holders),
+        list(&law.protected_holders),
         law_name.replace('\'', "''"),
     ))?;
     Ok(())
