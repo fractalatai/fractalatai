@@ -93,6 +93,19 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
 | `beneficiary` | benefits, but is neither the holder nor the direct correlative | no |
 | `mentioned` | referred to, with no legal role | no |
 
+**Counterparty vs beneficiary for a duty (PROPOSED, #72, 2026-10-01; Jason agrees, pending reviews).** The test is the duty's **act**, not who gains from it:
+- **`counterparty`** = the **recipient** of the duty's act: the party notified, informed, sent or supplied something, consulted, paid, given access, served, or whose request the duty answers. The duty runs *to* them → layer 1b `claim_right`.
+  - "The operator must notify **the authority**"; "OFCOM must send a copy to **the applicant**"; "the employer shall provide information to **the employee**".
+- **`beneficiary`** = the party whose **interest the duty protects**, without being the recipient of its act → layer 1b `protected`.
+  - "It shall be the duty of every employer to ensure … the health, safety and welfare at work of all his **employees**" (HSWA s.2(1)); "… that **persons not in his employment** … are not exposed to risks" (s.3(1)).
+  - Both are beneficiaries: the same kind of duty gets the same position.
+- **Both at once:** an actor that is both the recipient and the protected party is a `counterparty`. The recipient test wins: "provide **employees** with information, instruction and training" (HSWA s.2(2)(c)).
+- **Bodies with no role in the relation** (e.g. a regulator merely named in a landlord's duty) are `mentioned`, not counterparty.
+
+**Why:** the SLM split HSWA s.2(1) (Employee = counterparty) and s.3(1) (Person = beneficiary), the same kind of duty. On Obligation provisions, protective-wording duties were split 177 counterparty vs 244 beneficiary, and 683 beneficiaries carried recipient wording.
+
+**Fix path:** the definitions go into the SLM/LLM position prompts now. Positions are corrected when the re-enrichment backlog re-runs those tiers. Correlatives are derived from positions, so they follow.
+
 ### Layer 3: Holder class
 
 Defined by the **actor dictionary** (`crates/fractalaw-core/data/actor-dictionary.yaml`, field `type`), never by label prefix.
