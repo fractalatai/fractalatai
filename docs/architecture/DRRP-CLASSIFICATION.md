@@ -94,8 +94,10 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
 | `beneficiary` | benefits, but is neither the holder nor the direct correlative | no |
 | `mentioned` | referred to, with no legal role | no |
 
-**Counterparty vs beneficiary for a duty (PROPOSED, #72, 2026-10-01; Jason agrees, pending reviews).** The test is the duty's **act**, not who gains from it:
-- **`counterparty`** = the **recipient** of the duty's act: the party notified, informed, sent or supplied something, consulted, paid, given access, served, or whose request the duty answers. The duty runs *to* them → layer 1b `claim_right`.
+**Counterparty vs beneficiary for a duty (#72, agreed 2026-10-01: Jason, Gemini, sertantai-legal).** The test is the duty's **act**, not who gains from it:
+- **`counterparty`** = the **recipient** of the duty's act: the party the act is **done to or withheld from**. That covers notified, informed, sent or supplied something, consulted, paid, given access, served, charged, or whose request the duty answers. The duty runs *to* them → layer 1b `claim_right`.
+  - **Prohibited acts aimed at a party** count: "No employer shall levy … any charge on **any employee**" (HSWA s.9) → the employee is the counterparty (legal).
+  - **"Ensure that X is provided with …"** is still a recipient duty: "every employer shall ensure that suitable PPE is provided to **his employees**" (PPE Regs reg.4) → counterparty. The word "ensure" doesn't make it a protected-interest duty (legal).
   - "The operator must notify **the authority**"; "OFCOM must send a copy to **the applicant**"; "the employer shall provide information to **the employee**".
 - **`beneficiary`** = the party whose **interest the duty protects**, without being the recipient of its act → layer 1b `protected`.
   - "It shall be the duty of every employer to ensure … the health, safety and welfare at work of all his **employees**" (HSWA s.2(1)); "… that **persons not in his employment** … are not exposed to risks" (s.3(1)).
@@ -105,7 +107,7 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
 
 **Why:** the SLM split HSWA s.2(1) (Employee = counterparty) and s.3(1) (Person = beneficiary), the same kind of duty. On Obligation provisions, protective-wording duties were split 177 counterparty vs 244 beneficiary, and 683 beneficiaries carried recipient wording.
 
-**Reviews:** Gemini agrees with changes (`data/code-review/drrp-counterparty-beneficiary-gemini.md`): it checked duties to the public, to an authority, consultation, duties of care, access, courts, prohibitions ("must not disclose to anyone other than the worker": the worker is a beneficiary) and payment, and agrees the recipient wins the tie-break. Legal: pending.
+**Reviews:** Gemini agrees with changes (`data/code-review/drrp-counterparty-beneficiary-gemini.md`): it checked duties to the public, to an authority, consultation, duties of care, access, courts, prohibitions ("must not disclose to anyone other than the worker": the worker is a beneficiary) and payment, and agrees the recipient wins the tie-break. Legal agrees (no change to its code; its consistency check maps position → correlative type, so it isn't affected) and added the two edge cases above. Legal also offered an optional extra check: each pair against its `to` holder's type.
 
 **Fix path:** the definitions go into the SLM/LLM position prompts now. Positions are corrected when the re-enrichment backlog re-runs those tiers. Correlatives are derived from positions, so they follow.
 
