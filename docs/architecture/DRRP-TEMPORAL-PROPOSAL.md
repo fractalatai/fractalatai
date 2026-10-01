@@ -251,8 +251,8 @@ Changed provisions + the law level, after each applied change. A status-only rep
   5. the verdict split + payload (R1/R4).
 
 ### Decisions for Jason
-- **D1, prospective provisions:** classify and flag them ("coming into force" is visible, but excluded from current obligations), or `none` until commenced (legal's default; simpler)?
-- **D2, savings:** add a `repealed_saved` status (it needs legal's commentary detection), or rely on the savings clause itself being classified?
+- **D1, prospective provisions:** classify and flag them ("coming into force" is visible, but excluded from current obligations), or `none` until commenced? Legal recommends: none until commenced; partly commenced → `in_force_partial`, classified and counted (flagged).
+- **D2, savings:** `repealed_saved` status, or rely on the savings clause itself being classified? Legal recommends: `repealed_saved` only where a savings note exists (detectable from the notes); never inferred.
 - **D3:** approve the sequencing, starting with legal's `status` column and our switch to it.
 - **D4:** approve the change contract (L2), the cause handling with `unattributed` never versioned (L3), observation-order versions (L5) and the build order (L8).
 
