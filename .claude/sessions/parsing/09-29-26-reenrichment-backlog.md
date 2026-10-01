@@ -1,10 +1,10 @@
 ---
 session: Re-enrichment Backlog
-status: pending
+status: suspended
 opened: 2026-09-29
 ---
 
-# Session: Re-enrichment Backlog (PENDING)
+# Session: Re-enrichment Backlog (SUSPENDED)
 
 **Blocked (Jason, 2026-10-01): waits until the data models are finished** (#73 verdict split + as made, #72 correlatives), so the re-run populates the final model in one pass.
 

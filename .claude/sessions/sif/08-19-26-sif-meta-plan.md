@@ -1,10 +1,12 @@
 ---
 session: SIF v0.1 Meta-Plan
-status: active
+status: suspended
 opened: 2026-08-19
 ---
 
-# Session: SIF v0.1 Meta-Plan (ACTIVE)
+# Session: SIF v0.1 Meta-Plan (SUSPENDED)
+
+**Suspended (Jason, 2026-10-01):** paused: outside the current priority (the DRRP data model: #73, then #72). Resume via session-start.
 
 ## Problem
 

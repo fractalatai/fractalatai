@@ -1,6 +1,6 @@
 ---
 session: PgStore Hardening & Remaining Wiring
-status: active
+status: suspended
 opened: 2026-06-25
 closed:
 outcome:
@@ -31,7 +31,9 @@ depends_on:
   - 06-24-26-pgstore-implementation.md
 ---
 
-# Session: PgStore Hardening & Remaining Wiring (ACTIVE)
+# Session: PgStore Hardening & Remaining Wiring (SUSPENDED)
+
+**Suspended (Jason, 2026-10-01):** paused: outside the current priority (the DRRP data model: #73, then #72). Resume via session-start.
 
 ## Context
 

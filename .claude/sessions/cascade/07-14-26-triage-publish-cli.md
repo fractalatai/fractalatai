@@ -1,10 +1,12 @@
 ---
 session: Triage Publish CLI
-status: active
+status: suspended
 opened: 2026-07-14
 ---
 
-# Session: Triage Publish CLI (ACTIVE)
+# Session: Triage Publish CLI (SUSPENDED)
+
+**Suspended (Jason, 2026-10-01):** paused: outside the current priority (the DRRP data model: #73, then #72). Resume via session-start.
 
 ## Problem
 
