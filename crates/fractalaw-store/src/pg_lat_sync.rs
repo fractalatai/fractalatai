@@ -40,6 +40,8 @@ pub struct LatSyncState {
     pub scope_purposes: Vec<String>,
     /// Legal's per-row status hash last applied (#167)
     pub status_hash: Option<String>,
+    /// Latest lat-changes entry consumed (#73 L9)
+    pub changes_through: Option<DateTime<Utc>>,
 }
 
 /// Tier data on a set of provisions. Diff-apply requires the carried rows'
@@ -69,6 +71,74 @@ pub struct LegalAmendment {
     pub updated_at: Option<DateTime<Utc>>,
     /// Section ids the note affects (legal's Arrow payload from c95599aa)
     pub affected_sections: Vec<String>,
+}
+
+/// A provision version to snapshot before a legislative change is applied (#73 L9).
+/// One per superseded row per apply; entries since the last sync are merged.
+#[derive(Debug, Clone, Default)]
+pub struct VersionSpec {
+    /// Legal's change-log entry id when served; else law|row|op_key|change
+    pub version_key: String,
+    /// The hub row superseded (old id for renamed/removed)
+    pub section_id: String,
+    pub renamed_to: Option<String>,
+    pub change: String,
+    pub cause: String,
+    pub change_ids: Vec<String>,
+    pub op_keys: Vec<String>,
+    pub source_hash: Option<String>,
+    pub legal_created_at: Option<DateTime<Utc>>,
+}
+
+/// History to write with an apply: the snapshots plus the change-log watermark.
+#[derive(Debug, Clone, Default)]
+pub struct VersionBatch {
+    pub specs: Vec<VersionSpec>,
+    /// Latest lat-changes `created_at` consumed
+    pub changes_through: Option<DateTime<Utc>>,
+}
+
+/// Snapshot the superseded rows and advance the watermark, inside the caller's
+/// transaction, so history and the change commit (or roll back) together.
+async fn write_versions(conn: &mut sqlx::PgConnection, law_name: &str, batch: &VersionBatch) -> Result<u64, StoreError> {
+    let mut n = 0;
+    for v in &batch.specs {
+        n += sqlx::query(
+            "INSERT INTO provision_versions (version_key, law_name, section_id, renamed_to, change, cause,
+                 change_ids, op_keys, source_hash, legal_created_at,
+                 text, text_md5, status, effective_from, changed_by, drrp_types, actors)
+             SELECT $1, $2, lt.section_id, $4, $5, $6, $7, $8, $9, $10,
+                    lt.text, md5(lt.text), lt.status, lt.effective_from, lt.changed_by, lt.drrp_types,
+                    (SELECT jsonb_agg(to_jsonb(pa)) FROM provision_actors pa WHERE pa.section_id = lt.section_id)
+             FROM legislation_text lt WHERE lt.law_name = $2 AND lt.section_id = $3
+             ON CONFLICT (version_key) DO NOTHING",
+        )
+        .bind(&v.version_key)
+        .bind(law_name)
+        .bind(&v.section_id)
+        .bind(&v.renamed_to)
+        .bind(&v.change)
+        .bind(&v.cause)
+        .bind(&v.change_ids)
+        .bind(&v.op_keys)
+        .bind(&v.source_hash)
+        .bind(v.legal_created_at)
+        .execute(&mut *conn)
+        .await
+        .map_err(db("write version"))?
+        .rows_affected();
+    }
+    if batch.changes_through.is_some() {
+        sqlx::query(
+            "UPDATE lat_sync_state SET changes_through = GREATEST(changes_through, $2) WHERE law_name = $1",
+        )
+        .bind(law_name)
+        .bind(batch.changes_through)
+        .execute(&mut *conn)
+        .await
+        .map_err(db("changes_through"))?;
+    }
+    Ok(n)
 }
 
 /// One LAT row's unhashed fields (#167): status, effective_from, changed_by.
@@ -136,6 +206,32 @@ CREATE TABLE IF NOT EXISTS legal_amendments (
 );
 CREATE INDEX IF NOT EXISTS idx_legal_amendments_change ON legal_amendments (change_id);
 ALTER TABLE legal_amendments ADD COLUMN IF NOT EXISTS affected_sections TEXT[] NOT NULL DEFAULT '{}';
+-- Legislative history (#73 L9): the superseded state of a provision, snapshotted
+-- from the hub before a legislative change (legal's lat-changes) is applied.
+-- Current state stays in legislation_text / provision_actors.
+CREATE TABLE IF NOT EXISTS provision_versions (
+    id                BIGSERIAL PRIMARY KEY,
+    version_key       TEXT NOT NULL UNIQUE,
+    law_name          TEXT NOT NULL,
+    section_id        TEXT NOT NULL,
+    renamed_to        TEXT,
+    change            TEXT NOT NULL,
+    cause             TEXT NOT NULL,
+    change_ids        TEXT[] NOT NULL DEFAULT '{}',
+    op_keys           TEXT[] NOT NULL DEFAULT '{}',
+    source_hash       TEXT,
+    legal_created_at  TIMESTAMPTZ,
+    text              TEXT,
+    text_md5          TEXT,
+    status            TEXT,
+    effective_from    DATE,
+    changed_by        TEXT,
+    drrp_types        TEXT[],
+    actors            JSONB,
+    observed_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_provision_versions_section ON provision_versions (law_name, section_id);
+ALTER TABLE lat_sync_state ADD COLUMN IF NOT EXISTS changes_through TIMESTAMPTZ;
 CREATE TABLE IF NOT EXISTS lat_archive (
     id                BIGSERIAL PRIMARY KEY,
     law_name          TEXT NOT NULL,
@@ -192,7 +288,8 @@ impl PgStore {
     pub async fn lat_sync_states(&self) -> Result<HashMap<String, LatSyncState>, StoreError> {
         let rows = sqlx::query(
             "SELECT law_name, lat_hash, struct_hash, row_count, renames_through,
-                    held_section_ids, reparse_needed, applied_at, coverage, scope_purposes, status_hash
+                    held_section_ids, reparse_needed, applied_at, coverage, scope_purposes, status_hash,
+                    changes_through
              FROM lat_sync_state",
         )
         .fetch_all(self.pool())
@@ -213,6 +310,7 @@ impl PgStore {
                     coverage: r.get(8),
                     scope_purposes: r.get(9),
                     status_hash: r.get(10),
+                    changes_through: r.get(11),
                 };
                 (s.law_name.clone(), s)
             })
@@ -243,9 +341,12 @@ impl PgStore {
         law_name: &str,
         statuses: &[(String, Option<String>)],
         status_hash: Option<&str>,
+        versions: &VersionBatch,
     ) -> Result<u64, StoreError> {
         let (ids, sts): (Vec<String>, Vec<Option<String>>) = statuses.iter().cloned().unzip();
         let mut tx = self.pool().begin().await.map_err(db("status tx"))?;
+        // Legislative status changes in legal's log: history before the change (#73 L9)
+        write_versions(&mut tx, law_name, versions).await?;
         let changed = sqlx::query(
             "UPDATE legislation_text lt SET status = v.status
              FROM unnest($2::text[], $3::text[]) AS v(section_id, status)
@@ -398,8 +499,12 @@ impl PgStore {
         plan: &DiffPlan,
         manifest: &ManifestEntry,
         renames_through: Option<DateTime<Utc>>,
+        versions: &VersionBatch,
     ) -> Result<LatApplyReport, StoreError> {
         let mut tx = self.pool().begin().await.map_err(db("begin"))?;
+        // Legislative changes in legal's log: snapshot the superseded rows first,
+        // in this transaction, so history and the change commit together (#73 L9)
+        write_versions(&mut tx, law_name, versions).await?;
         let carried = plan.carried();
         let old_ids: Vec<String> = carried.iter().map(|(o, _)| o.clone()).collect();
         let new_ids: Vec<String> = carried.iter().map(|(_, n)| n.clone()).collect();
@@ -712,6 +817,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn legislative_change_snapshots_the_superseded_row_once() {
+        // #73 L9: history is written in the apply transaction, before the change
+        let Some(s) = store().await else { eprintln!("test DB unavailable, skipping"); return };
+        s.ensure_lat_sync_tables().await.unwrap();
+        let law = "TEST_lat_versions";
+        sqlx::query("DELETE FROM provision_versions WHERE law_name = $1").bind(law).execute(s.pool()).await.unwrap();
+        seed(&s, law, &[
+            ("reg.4(4)", "3", "The operator must keep records"),
+            ("reg.5", "4", "The operator must report incidents"),
+        ]).await;
+        let legal = vec![batch(law, &[
+            ("reg.4(4)", "3", "The operator must keep records for five years"),
+            ("reg.5", "4", "The operator must report incidents"),
+        ])];
+        let hub = s.hub_lat_rows(law).await.unwrap();
+        let plan = plan_diff(&hub, &fractalaw_core::lat_sync::lat_rows_from_batches(&legal).unwrap(), &[]);
+        let versions = VersionBatch {
+            specs: vec![VersionSpec {
+                version_key: format!("{law}|{law}:reg.4(4)|op1|text_changed"),
+                section_id: format!("{law}:reg.4(4)"),
+                change: "text_changed".into(),
+                cause: "legislative".into(),
+                change_ids: vec!["c1".into()],
+                op_keys: vec!["op1".into()],
+                ..Default::default()
+            }],
+            changes_through: None,
+        };
+        let r = s.apply_lat_diff(law, &legal, &plan, &manifest(law, &legal), None, &versions).await.unwrap();
+        assert!(r.committed, "{r:?}");
+        let (text, actors, cids): (String, Option<serde_json::Value>, Vec<String>) = sqlx::query_as(
+            "SELECT text, actors, change_ids FROM provision_versions WHERE law_name = $1")
+            .bind(law).fetch_one(s.pool()).await.unwrap();
+        assert_eq!(text, "The operator must keep records", "the superseded text, not the new one");
+        assert!(actors.is_some_and(|a| a.as_array().is_some_and(|x| !x.is_empty())), "actors snapshotted before they were cleared");
+        assert_eq!(cids, vec!["c1"]);
+        // Re-delivery of the same entry writes nothing new
+        let mut c = s.pool().acquire().await.unwrap();
+        assert_eq!(write_versions(&mut c, law, &versions).await.unwrap(), 0);
+        let n: i64 = sqlx::query_scalar("SELECT count(*) FROM provision_versions WHERE law_name = $1")
+            .bind(law).fetch_one(s.pool()).await.unwrap();
+        assert_eq!(n, 1);
+    }
+
+    #[tokio::test]
     async fn diff_apply_carries_renames_archives_and_clears_changed() {
         let Some(s) = store().await else { eprintln!("test DB unavailable, skipping"); return };
         let law = "TEST_lat_apply";
@@ -732,7 +882,7 @@ mod tests {
         let hub = s.hub_lat_rows(law).await.unwrap();
         let plan = plan_diff(&hub, &fractalaw_core::lat_sync::lat_rows_from_batches(&legal).unwrap(), &[]);
         assert_eq!(plan.renamed.len(), 1);
-        let r = s.apply_lat_diff(law, &legal, &plan, &manifest(law, &legal), None).await.unwrap();
+        let r = s.apply_lat_diff(law, &legal, &plan, &manifest(law, &legal), None, &Default::default()).await.unwrap();
         assert!(r.committed && r.gate_passed(), "{r:?}");
         assert_eq!(plan.grown, vec![format!("{law}:reg.6")]);
         assert_eq!(r.before.provision_actors, 3);
@@ -774,7 +924,7 @@ mod tests {
         let mut plan = plan_diff(&s.hub_lat_rows(law).await.unwrap(),
             &fractalaw_core::lat_sync::lat_rows_from_batches(&legal).unwrap(), &[]);
         plan.archived.push(format!("{law}:reg.2"));
-        let r = s.apply_lat_diff(law, &legal, &plan, &manifest(law, &legal), None).await.unwrap();
+        let r = s.apply_lat_diff(law, &legal, &plan, &manifest(law, &legal), None, &Default::default()).await.unwrap();
         assert!(!r.committed);
         assert_eq!(actors_of(&s, &format!("{law}:reg.2")).await, 1, "rolled back");
         assert!(!s.lat_sync_states().await.unwrap().contains_key(law));
@@ -804,7 +954,7 @@ mod tests {
         let plan = plan_diff(&s.hub_lat_rows(law).await.unwrap(),
             &fractalaw_core::lat_sync::lat_rows_from_batches(&legal).unwrap(), &[]);
         assert_eq!(plan.held.len(), 2);
-        assert!(s.apply_lat_diff(law, &legal, &plan, &manifest(law, &legal), None).await.unwrap().committed);
+        assert!(s.apply_lat_diff(law, &legal, &plan, &manifest(law, &legal), None, &Default::default()).await.unwrap().committed);
         assert_eq!(s.archive_held_rows(law).await.unwrap(), 2);
         assert_eq!(actors_of(&s, &format!("{law}:reg.8")).await, 0);
         assert!(s.lat_sync_states().await.unwrap()[law].held_section_ids.is_empty());
@@ -825,7 +975,7 @@ mod tests {
         m.scope = Some(r#"{"fragments":["section/2"],"purposes":["enabling_extent"]}"#.into());
         let plan = plan_diff(&s.hub_lat_rows(law).await.unwrap(),
             &fractalaw_core::lat_sync::lat_rows_from_batches(&legal).unwrap(), &[]);
-        assert!(s.apply_lat_diff(law, &legal, &plan, &m, None).await.unwrap().committed);
+        assert!(s.apply_lat_diff(law, &legal, &plan, &m, None, &Default::default()).await.unwrap().committed);
         let st = &s.lat_sync_states().await.unwrap()[law];
         assert_eq!(st.coverage.as_deref(), Some("partial"));
         assert!(s.enabling_extent_laws().await.unwrap().contains(law));
@@ -862,7 +1012,7 @@ mod tests {
         ]).unwrap()];
         let plan = plan_diff(&hub, &hub, &[]);
         assert!(plan.is_noop());
-        let r = s.apply_lat_diff(law, &legal, &plan, &manifest(law, &legal), None).await.unwrap();
+        let r = s.apply_lat_diff(law, &legal, &plan, &manifest(law, &legal), None, &Default::default()).await.unwrap();
         assert!(r.committed);
         assert_eq!(r.before.provision_actors, before);
         assert_eq!(r.after, r.before);

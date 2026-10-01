@@ -19,8 +19,8 @@ use std::time::Duration;
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use fractalaw_core::lat_sync::{self, DiffPlan, ManifestEntry, Rename, RenameSource, RenameStatus};
-use fractalaw_store::{DuckStore, LatApplyReport, LatSyncState, PgStore};
-use fractalaw_sync::{LatManifestEntry, ZenohSync};
+use fractalaw_store::{DuckStore, LatApplyReport, LatSyncState, PgStore, VersionBatch, VersionSpec};
+use fractalaw_sync::{LatChangeEntry, LatManifestEntry, ZenohSync};
 
 use crate::{get_string_value, open_duck, ZenohArgs};
 
@@ -128,6 +128,81 @@ fn in_sync(state: Option<&LatSyncState>, m: &ManifestEntry) -> bool {
     state.is_some_and(|s| s.lat_hash == m.lat_hash && s.struct_hash == m.struct_hash)
 }
 
+/// Versions to snapshot for a law's new change-log entries (#73 L9).
+///
+/// - Only `legislative` entries make history (parser / scope / correction /
+///   unattributed never do; status changes outside a parse never reach the log).
+/// - `inserted` supersedes nothing.
+/// - The superseded row is `old_section_id` for removed/renamed, else `section_id`.
+/// - Several legislative entries for one row since the last sync become **one**
+///   version: the hub only ever held the state before the first, and the
+///   intermediate states were never observed (never invented). Change ids and op
+///   keys are merged; the key is the first entry's (its id when legal serves one).
+/// - The watermark is the latest `created_at` seen, legislative or not.
+pub(crate) fn version_batch(law: &str, entries: &[LatChangeEntry]) -> VersionBatch {
+    let mut specs: Vec<VersionSpec> = Vec::new();
+    let mut by_row: HashMap<String, usize> = HashMap::new();
+    let mut through: Option<DateTime<Utc>> = None;
+    for e in entries {
+        if let Some(t) = parse_legal_timestamp(&e.created_at) {
+            through = Some(through.map_or(t, |x| x.max(t)));
+        }
+        if e.cause != "legislative" || e.change == "inserted" {
+            continue;
+        }
+        let row = match e.change.as_str() {
+            "removed" | "renamed" => e.old_section_id.clone(),
+            _ => e.section_id.clone(),
+        };
+        let Some(row) = row else { continue };
+        if let Some(&i) = by_row.get(&row) {
+            let s = &mut specs[i];
+            for c in &e.change_ids {
+                if !s.change_ids.contains(c) {
+                    s.change_ids.push(c.clone());
+                }
+            }
+            if let Some(op) = &e.op_key {
+                if !s.op_keys.contains(op) {
+                    s.op_keys.push(op.clone());
+                }
+            }
+            if e.change == "renamed" || e.change == "removed" {
+                s.change = e.change.clone();
+                s.renamed_to = if e.change == "renamed" { e.section_id.clone() } else { None };
+            }
+            continue;
+        }
+        let version_key = match &e.id {
+            Some(v) => format!("{law}|entry|{}", v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string())),
+            None => format!("{law}|{row}|{}|{}", e.op_key.as_deref().unwrap_or(""), e.change),
+        };
+        by_row.insert(row.clone(), specs.len());
+        specs.push(VersionSpec {
+            version_key,
+            section_id: row,
+            renamed_to: if e.change == "renamed" { e.section_id.clone() } else { None },
+            change: e.change.clone(),
+            cause: e.cause.clone(),
+            change_ids: e.change_ids.clone(),
+            op_keys: e.op_key.iter().cloned().collect(),
+            source_hash: e.source_hash.clone(),
+            legal_created_at: parse_legal_timestamp(&e.created_at),
+        });
+    }
+    VersionBatch { specs, changes_through: through }
+}
+
+/// New change-log entries for a law since its watermark.
+async fn law_changes(sync: &ZenohSync, law: &str, state: Option<&LatSyncState>, timeout: Duration) -> anyhow::Result<VersionBatch> {
+    let since = state.and_then(|s| s.changes_through).map(|t| t.to_rfc3339());
+    let entries = sync
+        .query_lat_changes(law, since.as_deref(), timeout)
+        .await
+        .with_context(|| format!("query lat-changes {law}"))?;
+    Ok(version_batch(law, &entries))
+}
+
 /// Legal serves a status hash (#167) that differs from the one last applied.
 fn status_moved(state: Option<&LatSyncState>, m: &ManifestEntry) -> bool {
     m.status_hash.is_some() && state.is_none_or(|s| s.status_hash != m.status_hash)
@@ -142,6 +217,7 @@ async fn sync_status(
     m: &ManifestEntry,
     batches: Option<&[arrow::record_batch::RecordBatch]>,
     apply: bool,
+    versions: &VersionBatch,
     timeout: Duration,
 ) -> anyhow::Result<(bool, String)> {
     let owned;
@@ -159,8 +235,9 @@ async fn sync_status(
     if !apply {
         return Ok((true, String::new()));
     }
-    let changed = pg.apply_lat_status(law, &statuses, m.status_hash.as_deref()).await?;
-    Ok((true, format!("{changed} rows' status changed")))
+    let changed = pg.apply_lat_status(law, &statuses, m.status_hash.as_deref(), versions).await?;
+    let hist = if versions.specs.is_empty() { String::new() } else { format!(", {} versions", versions.specs.len()) };
+    Ok((true, format!("{changed} rows' status changed{hist}")))
 }
 
 pub(crate) fn benchmark_laws(duck: &DuckStore) -> anyhow::Result<HashSet<String>> {
@@ -206,8 +283,10 @@ pub(crate) async fn sync_law(
         // Scope can change without the LAT changing (legal #166)
         pg.update_lat_coverage(m).await?;
         if status_moved(state, m) {
-            // Status-only change (e.g. a repeal): no re-parse, no tier data touched
-            let (ok, note) = sync_status(pg, sync, law, m, None, apply_status, timeout).await?;
+            // Status-only change (e.g. a repeal): no re-parse, no tier data touched.
+            // Legislative status changes in legal's log are versioned first (#73 L9)
+            let versions = if apply_status { law_changes(sync, law, state, timeout).await? } else { VersionBatch::default() };
+            let (ok, note) = sync_status(pg, sync, law, m, None, apply_status, &versions, timeout).await?;
             let action = match (ok, apply_status) {
                 (false, _) => Action::ManifestMoved,
                 (true, true) => Action::StatusApplied,
@@ -255,12 +334,13 @@ pub(crate) async fn sync_law(
     let plan = lat_sync::plan_diff(&hub, &legal, &renames);
     out.action = Action::Planned;
     if apply {
-        let report = pg.apply_lat_diff(law, &batches, &plan, m, renames_through).await?;
+        let versions = law_changes(sync, law, state, timeout).await?;
+        let report = pg.apply_lat_diff(law, &batches, &plan, m, renames_through, &versions).await?;
         out.action = if report.committed { Action::Applied } else { Action::GateFailed };
         if report.committed && m.status_hash.is_some() {
             // Rows are in place: now their status (legal #167)
-            let (_, note) = sync_status(pg, sync, law, m, Some(&batches), true, timeout).await?;
-            out.note = note;
+            let (_, note) = sync_status(pg, sync, law, m, Some(&batches), true, &VersionBatch::default(), timeout).await?;
+            out.note = if versions.specs.is_empty() { note } else { format!("{note}; {} versions", versions.specs.len()) };
         }
         if !report.committed {
             out.note = format!("tier data before {:?} after {:?}", report.before, report.after);
@@ -788,6 +868,48 @@ pub(crate) async fn cmd_restore_laws(laws: &[String], reason: &str, pg_url: Opti
 
 #[cfg(test)]
 mod tests {
+    fn entry(id: Option<&str>, change: &str, cause: &str, sid: Option<&str>, old: Option<&str>, op: &str, ids: &[&str], at: &str) -> LatChangeEntry {
+        LatChangeEntry {
+            id: id.map(|s| serde_json::Value::String(s.into())),
+            law_name: "L".into(),
+            op_key: Some(op.into()),
+            section_id: sid.map(Into::into),
+            old_section_id: old.map(Into::into),
+            change: change.into(),
+            cause: cause.into(),
+            change_ids: ids.iter().map(|s| s.to_string()).collect(),
+            op_cause: None,
+            source_hash: Some("h".into()),
+            created_at: at.into(),
+        }
+    }
+
+    #[test]
+    fn version_batch_rules() {
+        let e = vec![
+            entry(None, "text_changed", "legislative", Some("L:s.1"), None, "op1", &["c1"], "2026-10-01T10:00:00Z"),
+            entry(None, "text_changed", "unattributed", Some("L:s.2"), None, "op1", &[], "2026-10-01T10:00:00Z"),
+            entry(None, "inserted", "legislative", Some("L:s.1A"), None, "op1", &["c2"], "2026-10-01T10:00:00Z"),
+            entry(None, "removed", "legislative", None, Some("L:s.3"), "op1", &["c3"], "2026-10-01T10:00:00Z"),
+            entry(None, "renamed", "legislative", Some("L:s.24"), Some("L:s.23"), "op1", &["c4"], "2026-10-01T10:00:00Z"),
+            entry(None, "parser", "parser", Some("L:s.5"), None, "op2", &[], "2026-10-01T11:00:00Z"),
+            // A second legislative change to s.1 since the last sync: merged, not a second version
+            entry(None, "status_changed", "legislative", Some("L:s.1"), None, "op3", &["c5"], "2026-10-01T12:00:00Z"),
+        ];
+        let b = version_batch("L", &e);
+        let rows: Vec<&str> = b.specs.iter().map(|s| s.section_id.as_str()).collect();
+        assert_eq!(rows, vec!["L:s.1", "L:s.3", "L:s.23"]);
+        assert_eq!(b.specs[0].change_ids, vec!["c1", "c5"]);
+        assert_eq!(b.specs[0].op_keys, vec!["op1", "op3"]);
+        assert_eq!(b.specs[0].version_key, "L|L:s.1|op1|text_changed");
+        assert_eq!(b.specs[1].version_key, "L|L:s.3|op1|removed"); // removed: keyed on the old id, never NULL
+        assert_eq!(b.specs[2].renamed_to.as_deref(), Some("L:s.24"));
+        assert_eq!(b.changes_through.unwrap().to_rfc3339(), "2026-10-01T12:00:00+00:00");
+        // Legal's entry id takes over the key when served
+        let b = version_batch("L", &[entry(Some("42"), "text_changed", "legislative", Some("L:s.1"), None, "op1", &[], "2026-10-01T10:00:00Z")]);
+        assert_eq!(b.specs[0].version_key, "L|entry|42");
+    }
+
     use super::*;
 
     fn d(status: &str, conflict: bool, by: i64, date: Option<&str>) -> DuckLrt {

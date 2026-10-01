@@ -28,7 +28,7 @@ mod pg_lat_sync;
 #[cfg(feature = "pg")]
 mod pg_provenance;
 #[cfg(feature = "pg")]
-pub use pg_lat_sync::{LatApplyReport, LatFieldRow, LatSyncState, LegalAmendment, TierCounts};
+pub use pg_lat_sync::{LatApplyReport, LatFieldRow, LatSyncState, LegalAmendment, TierCounts, VersionBatch, VersionSpec};
 #[cfg(feature = "pg")]
 pub use sqlx::PgPool;
 

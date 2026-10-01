@@ -138,6 +138,34 @@ pub struct LatRenameEntry {
     pub created_at: String,
 }
 
+/// One entry of legal's per-row change log (`lat-changes/{law}`, #167 L8.5).
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct LatChangeEntry {
+    /// Stable entry id (#167 follow-up; absent until legal serves it)
+    #[serde(default)]
+    pub id: Option<serde_json::Value>,
+    pub law_name: String,
+    #[serde(default)]
+    pub op_key: Option<String>,
+    /// New id; null for `removed`
+    #[serde(default)]
+    pub section_id: Option<String>,
+    /// For `removed` / `renamed`
+    #[serde(default)]
+    pub old_section_id: Option<String>,
+    /// text_changed | inserted | removed | renamed | status_changed
+    pub change: String,
+    /// Per row: legislative | parser | scope | correction | unattributed
+    pub cause: String,
+    #[serde(default)]
+    pub change_ids: Vec<String>,
+    #[serde(default)]
+    pub op_cause: Option<String>,
+    #[serde(default)]
+    pub source_hash: Option<String>,
+    pub created_at: String,
+}
+
 impl SyncEvent {
     /// Deserialize a SyncEvent from a zenoh sample payload.
     pub fn from_payload(bytes: &[u8]) -> Result<Self, ZenohError> {
@@ -215,6 +243,11 @@ pub mod keys {
     }
 
     /// Legal's per-note amendment annotations for a law (sertantai-legal #167 L8.2).
+    /// Legal's per-row change log for a law (#167 L8.5).
+    pub fn lat_changes(tenant: &str, law_name: &str) -> String {
+        format!("{PREFIX}/@{tenant}/data/legislation/lat-changes/{law_name}")
+    }
+
     pub fn amendments(tenant: &str, law_name: &str) -> String {
         format!("{PREFIX}/@{tenant}/data/legislation/amendments/{law_name}")
     }
@@ -1065,6 +1098,40 @@ impl ZenohSync {
             .into_iter()
             .map(|v| serde_json::from_value(v).map_err(ZenohError::Json))
             .collect()
+    }
+
+    /// Query legal's per-row change log for a law, oldest first (#167 L8.5),
+    /// entries created strictly after `since` (ISO-8601) when given.
+    pub async fn query_lat_changes(
+        &self,
+        law_name: &str,
+        since: Option<&str>,
+        timeout: std::time::Duration,
+    ) -> Result<Vec<LatChangeEntry>, ZenohError> {
+        let key = keys::lat_changes(&self.tenant, law_name);
+        let selector = match since {
+            Some(s) => format!("{key}?since={s};format=json"),
+            None => format!("{key}?format=json"),
+        };
+        let replies = self.session.get(selector).timeout(timeout).await.map_err(ZenohError::Session)?;
+        let mut out = Vec::new();
+        while let Ok(reply) = replies.recv_async().await {
+            if let Ok(sample) = reply.result() {
+                let bytes = sample.payload().to_bytes();
+                if bytes.is_empty() {
+                    continue;
+                }
+                match serde_json::from_slice::<serde_json::Value>(&bytes)? {
+                    serde_json::Value::Array(items) => {
+                        for v in items {
+                            out.push(serde_json::from_value(v).map_err(ZenohError::Json)?);
+                        }
+                    }
+                    v => out.push(serde_json::from_value(v).map_err(ZenohError::Json)?),
+                }
+            }
+        }
+        Ok(out)
     }
 
     /// Query sertantai for a single law's legislation record (LRT) via zenoh.
