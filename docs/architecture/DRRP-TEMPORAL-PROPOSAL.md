@@ -130,16 +130,22 @@ Reviewed by sertantai-legal and Gemini 2.5 Pro (raw: `data/code-review/drrp-temp
 | `repealed` | `none` (no types, actors or correlatives); no model calls | no |
 | `prospective` | **decision needed (D1):** classified on its text and flagged, *or* `none` | no (not in force yet) |
 
+### Decision (Jason, 2026-10-01): R5 and R6 dropped; whole-law view plus an exception path
+- **No bulk made-text fetch.** The existing law-level fields mean "everything the law imposed as far as our text shows, including later-repealed provisions" (the roll-up over all held provisions); `current_*` covers live provisions only. R4's field meaning stands; R5 and R6 below are **not built**.
+- `is_making` is the law's character, not its status: repeal or revocation never removes it, and amendment should rarely remove it.
+- **Exception path:** a live, amended law whose verdict is `no_obligations` or `empowering` is a smell. It goes on a list for Jason. Fetching made text for one of those laws is approved manually, per law (legal's process).
+- **New laws:** their history accrues from enactment through LAT's per-row change log (L, #167). Old versions aren't back-filled.
+
 ### R4. as_made is law-level only, for now (legal; Gemini wanted provision-level)
 - Law payload: `making_enrichment_verdict` plus as_made holder lists (names to agree in the spec, e.g. `made_duty_holder` or a `made` sub-object).
 - Provision-level as_made is deferred. Every stated use (is_making, "did this law ever impose…", successor tracing) is law-level, and the versioned data model keeps the door open.
 
-### R5. Made text: legal fetches it, for amended laws only
+### R5. Made text: legal fetches it, for amended laws only (DROPPED, see the decision above)
 - `/body/made/data.xml`, the same CLML, stored in a separate `legal_articles_made` table with its own lat-made manifest key. The current LAT is never touched.
 - Only for **amended laws** (about 800 of 1,069 LAT laws) plus laws first loaded after revocation. For never-amended laws, made = current.
 - **No `last_live` approximation** (Gemini): as_made comes only from made text, or from current text when the law was never amended.
 
-### R6. Reuse rule for as_made (Gemini)
+### R6. Reuse rule for as_made (Gemini) (DROPPED with R5)
 - Copy a current classification to as_made only if the provision's text is unchanged (normalised) **and** no definition it depends on has changed.
 - In practice: if an interpretation or definition provision of the law changed between made and current, re-classify the provisions that use the defined terms.
 - The Q7 sample below measures how often that happens.

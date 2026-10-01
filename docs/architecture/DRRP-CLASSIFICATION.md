@@ -195,7 +195,10 @@ Law-level holder fields (`duty_holder`, `rights_holder`, `responsibility_holder`
 
 Never send NULL to clear a verdict: legal can't tell it apart from "not in this payload".
 
-**Current view (fractalatai #73, R1a, agreed 2026-10-01).** The law payload also carries the as-amended view. The existing fields above stay **as made** and feed `is_making`.
+**Current view (fractalatai #73, R1a, agreed 2026-10-01).** The law payload also carries the as-amended view. The existing fields above stay the **whole-law** view and feed `is_making`.
+- **Whole-law view (Jason, 2026-10-01):** the existing fields mean "everything the law imposed as far as our text shows, including later-repealed provisions": the roll-up over all held provisions. They aren't computed from made text (#73 R5/R6 dropped).
+- `is_making` is the law's **character** (it imposes substantive requirements, as against only commencing, amending or revoking). Repeal or revocation never removes it, and amendment should rarely remove it.
+- **Smell list:** a live, amended law whose whole-law verdict is `no_obligations` or `empowering` is suspect: it may have been making, or its effects repeal its own provisions. The backfill dry run flags these, and legal puts them to Jason. Made text is fetched only per law, with Jason's approval (legal's exception path).
 - `current_verdict`: `making | empowering | no_obligations | revoked | holder_unknown`. `revoked` means legal's LRT `live` says the whole law is revoked.
 - `current_duty_type`.
 - `current_duty_holder`, `current_rights_holder`, `current_responsibility_holder`, `current_power_holder`: over live provisions only (status not repealed/prospective, and not an in-force unapplied repeal).
