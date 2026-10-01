@@ -468,10 +468,10 @@ pub(crate) async fn cmd_taxa_slm(
         and an actor mentioned in it, classify the actor's Hohfeldian legal position.\n\n\
         Positions:\n\
         - active: The actor bears the duty, obligation, or exercises the power/liberty.\n\
-        - counterparty: The actor to whom the duty is owed, or against whom the right is held.\n\
-        - beneficiary: The actor who benefits from the provision but is neither the duty-bearer \
-        nor the direct correlative.\n\
-        - mentioned: The actor is referenced but has no active legal role in this provision.\n\n\
+        - counterparty: the recipient of the duty's act: the party the act is done to or withheld from (notified, informed, sent or supplied something, consulted, paid, given access, served, charged, or whose request the duty answers). 'Ensure that X is provided with ...' makes X a counterparty. For a power or right: the party subject to it.\n\
+        - beneficiary: the party whose interest the duty protects without receiving its act, e.g. 'ensure the health, safety and welfare of his employees', 'persons not in his employment are not exposed to risks'.\n\
+        - mentioned: referenced with no role in the relation, e.g. a regulator merely named in another party's duty.\n\
+        If an actor is both the recipient and the protected party, it is counterparty.\n\n\
         Respond with ONLY a JSON object: {\"position\": \"active\"|\"counterparty\"|\"beneficiary\"|\"mentioned\"}";
 
     let mut total = 0usize;

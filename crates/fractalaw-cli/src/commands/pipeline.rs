@@ -1085,9 +1085,10 @@ Text: {target_text}
 Name each actor mentioned in or implied by this provision using natural language (e.g. "employer", "HSE", "inspector", "local authority"). For each, classify their POSITION:
 
 - ACTIVE — this actor bears the duty, exercises the power, or holds the right (the doer)
-- COUNTERPARTY — this actor is on the receiving end (holds a claim against a duty, is subject to a power)
-- BENEFICIARY — this actor benefits from the provision without a direct legal relation
-- MENTIONED — this actor is referenced but has no active legal role
+- COUNTERPARTY — the recipient of the duty's act: the party the act is done to or withheld from (notified, informed, sent or supplied something, consulted, paid, given access, served, charged, or whose request the duty answers). 'Ensure that X is provided with ...' makes X a counterparty. For a power or right: the party subject to it.
+- BENEFICIARY — the party whose interest the duty protects without receiving its act, e.g. 'ensure the health, safety and welfare of his employees', 'persons not in his employment are not exposed to risks'.
+- MENTIONED — referenced with no role in the relation, e.g. a regulator merely named in another party's duty.
+If an actor is both the recipient and the protected party, it is counterparty.
 
 If an active actor's obligation relates specifically to one counterparty (not all), include "relates_to" with that counterparty's natural language name.
 

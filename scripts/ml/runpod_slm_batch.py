@@ -62,9 +62,10 @@ SYSTEM_PROMPT = (
     "- none: The provision does not create an obligation or liberty for this actor.\n\n"
     "2. The actor's Hohfeldian legal position in this provision:\n"
     "- active: The actor bears the duty or exercises the power/liberty.\n"
-    "- counterparty: The actor to whom the duty is owed or who is subject to the power.\n"
-    "- beneficiary: The actor benefits but is neither duty-bearer nor direct correlative.\n"
-    "- mentioned: The actor is referenced but has no active legal role.\n\n"
+    "- counterparty: the recipient of the duty's act: the party the act is done to or withheld from (notified, informed, sent or supplied something, consulted, paid, given access, served, charged, or whose request the duty answers). 'Ensure that X is provided with ...' makes X a counterparty. For a power or right: the party subject to it.\n"
+    "- beneficiary: the party whose interest the duty protects without receiving its act, e.g. 'ensure the health, safety and welfare of his employees', 'persons not in his employment are not exposed to risks'.\n"
+    "- mentioned: referenced with no role in the relation, e.g. a regulator merely named in another party's duty.\n"
+    "If an actor is both the recipient and the protected party, it is counterparty.\n\n"
     "Note: An actor can be 'active' with drrp 'none' — e.g. in an offence provision "
     "('A person who contravenes... is guilty') the actor is active but no new duty is created.\n\n"
     'Respond with ONLY a JSON object: {"drrp": "Obligation"|"Liberty"|"none", '
