@@ -27,7 +27,12 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - ⬜ Cost check before running. Per call (smoke test, Gemini 3.8 Flash): ~6.35K tokens in, of which 6.1K is the system prompt (cacheable), and ~170 out + 200–600 thinking. **(Jason)** prices it in the console and approves. **Proposed:** a 200-provision pilot first (measure beneficiary/counterparty yield and real tokens), then the full run
 - ⬜ **Before labelling (Jason 2026-10-05):**
   - ✅ LAT at legal's latest. The `pull-lat --stale` dry run (2026-10-05, after legal restarted :7447) gives 741 in_sync and 0 text changes; 154 not_held; the 4 known delete candidates were never applied
-  - ⬜ **(Jason)** Reconcile the actor dictionary against legal's regex library (`actor_definitions.ex`): 75 shared, 54 legal-only, 57 ours-only. Proposal in `docs/dictionaries/ACTOR-RECONCILIATION-2026-10-05.md`: adopt ~40, rename conflicts (B), skip the broad ones, add EU Council/Parliament, Tenant and Safety Committee; YAML canonical; trigger-only first
+  - ✅ Actor dictionary reconciled with legal (`050e829`):
+    - Jason's decisions: YAML canonical; group prefixes for cross-domain roles, domain prefixes (Data:, Offshore:, Maritime:, Env:) for domain-specific ones; trigger-only additions; Spc: Authorised Person governed.
+    - 175 labels: 45 added, 9 renamed via `renamed_from`.
+    - Legal has the final list and rename map.
+  - ⬜ **(Jason)** Apply the label rename migration (`scripts/migrations/rename_actor_labels_20261005.py`). Dry run: 2,599 provision_actors rows (SC: Applicant 2,378), 53 gold rows, 16 collisions (Spc: Appellant duplicates; new label's values kept, gaps filled from the old row)
+- ⬜ Label versions now include the dictionary hash (`label_version()`, currently `drrp-v1.1-2026-10-05+dict.85e950d2`), so the 245 pilot/probe labels made with the old dictionary will be relabelled in the family pilots
 - ⬜ **Label by family, in order of actor-dictionary confidence** (memory `feedback_actor_dictionary_gap`). Per family group: a pilot of ~50 → add the OTHER actors to the dictionary (and tell legal) → bulk. High-confidence families first (OH&S sub-families, Fire, Nuclear, Consumer/Product Safety…). The LLM work improves the dictionary
 - ⬜ Label with the definitive prompt, one model, per provision. Resumable and versioned; nothing written to provision_actors
 - ⬜ Retrain the SLM (RunPod) on position + type, and purpose per provision. Not `act`
