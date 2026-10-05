@@ -1496,9 +1496,10 @@
   category: Gvt
   triggers: [intelligence service, intelligence services, Security Service, Secret Intelligence Service, GCHQ, head of an intelligence service]
 
-- label: "Gvt: Authority: School Governing Body"
-  type: government
-  category: Gvt  # statutory public body; Jason to confirm government vs governed (2026-10-05)
+- label: "Org: School Governing Body"
+  type: governed
+  category: Org  # governed (Jason, 2026-10-05): an organisation role, like an employer
+  renamed_from: ["Gvt: Authority: School Governing Body"]
   triggers: [governing body of a maintained school, school governing body]
 
 - label: "Gvt: Authority: Safeguarding Children Board"
