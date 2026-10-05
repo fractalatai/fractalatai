@@ -1406,3 +1406,9 @@
   category: Ind
   triggers: [designated person, designated persons]
 
+# ── Gaps from family group 4 pilot (2026-10-05): trigger-only ──
+- label: "Org: Farm Business"
+  type: governed
+  category: Org
+  triggers: [farmer, farmers, farm business, eligible farm business]
+
