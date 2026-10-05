@@ -338,7 +338,7 @@ mod tests {
         assert!(is_government("Gvt: Authority: Enforcement"));
         assert!(is_government("EU: Commission"));
         assert!(!is_government("Spc: Administrator"));
-        assert!(is_government("Spc: Authorised Person"));
+        assert!(!is_government("Spc: Authorised Person")); // governed specialist (2026-10-05)
         assert!(!is_government("Org: Employer"));
         assert!(!is_government("Public"));
         // Not in the dictionary: family prefix
@@ -562,7 +562,7 @@ mod tests {
         let cases = [
             ("In each year a water undertaker must publish a report.", "Svc: Water Undertaker"),
             ("The incumbent undertaker must give notice to the licensee.", "Svc: Water Undertaker"),
-            ("The licence holder shall keep records of all waste received.", "Spc: Licence Holder"),
+            ("The licence holder shall keep records of all waste received.", "Ind: Licensee"),
             ("An employer shall not employ a young person for work which is beyond his capacity.", "Ind: Young Person"),
             ("Before making the regulations the Secretary of State must consult the mayor and the CCA.", "Gvt: Authority: Combined County"),
             ("Before making the regulations the Secretary of State must consult the mayor and the CCA.", "Gvt: Mayor"),
@@ -630,7 +630,7 @@ mod tests {
             "A provider of a Part 3 service must carry out the first children's access assessment.";
         let actors = extract_actors_for_family(text, Some("PUBLIC"));
         assert!(
-            has_label(&actors.governed, "Public: Provider"),
+            has_label(&actors.governed, "Svc: Provider"),
             "provider should be extracted for PUBLIC family, got: {:?}",
             actors.governed
         );
@@ -641,7 +641,7 @@ mod tests {
         let text = "A provider of a Part 3 service must carry out the assessment.";
         let actors = extract_actors(text);
         assert!(
-            !has_label(&actors.governed, "Public: Provider"),
+            !has_label(&actors.governed, "Svc: Provider"),
             "provider should not be extracted without family, got: {:?}",
             actors.governed
         );
@@ -652,7 +652,7 @@ mod tests {
         let text = "The keeper of a dog shall ensure it is under control.";
         let actors = extract_actors_for_family(text, Some("PUBLIC"));
         assert!(
-            has_label(&actors.governed, "Public: Keeper"),
+            has_label(&actors.governed, "SC: Keeper"),
             "keeper should be extracted for PUBLIC family, got: {:?}",
             actors.governed
         );
@@ -663,7 +663,7 @@ mod tests {
         let text = "A registered firearms dealer shall comply with this requirement.";
         let actors = extract_actors_for_family(text, Some("PUBLIC"));
         assert!(
-            has_label(&actors.governed, "Public: Dealer"),
+            has_label(&actors.governed, "SC: Dealer"),
             "dealer should be extracted for PUBLIC family, got: {:?}",
             actors.governed
         );
@@ -711,7 +711,7 @@ mod tests {
     #[test]
     fn extract_applicant() {
         let actors = extract_actors(" The applicant shall provide sufficient information. ");
-        assert!(has_label(&actors.governed, "SC: Applicant"));
+        assert!(has_label(&actors.governed, "Ind: Applicant"));
     }
 
     #[test]
@@ -737,12 +737,12 @@ mod tests {
         // DPA 2018 s.48(1), s.91 (#60 follow-up: the controller was OTHER:)
         let text = "Where a data subject requests the rectification of personal data, the controller must inform the data subject and any processor in writing, and notify the Information Commissioner.";
         let actors = extract_actors_for_family(text, Some("💙 PUBLIC: Data"));
-        for label in ["Public: Data Controller", "Public: Data Processor", "Ind: Data Subject"] {
+        for label in ["Data: Controller", "Data: Processor", "Data: Subject"] {
             assert!(has_label(&actors.governed, label), "{label} missing: {:?}", actors.governed);
         }
         assert!(has_label(&actors.government, "Gvt: Agency: Information Commissioner"), "{:?}", actors.government);
         assert!(super::is_government("Gvt: Agency: Information Commissioner"));
-        assert!(!super::is_government("Public: Data Controller"));
+        assert!(!super::is_government("Data: Controller"));
     }
 
     #[test]
@@ -750,8 +750,8 @@ mod tests {
         // Landfill tax "controller of a landfill site", air traffic controller: not data controllers
         for fam in [Some("💚 ENVIRONMENTAL PROTECTION"), Some("PUBLIC"), None] {
             let actors = extract_actors_for_family("A controller of a landfill site must pay the tax to the end processor.", fam);
-            assert!(!has_label(&actors.governed, "Public: Data Controller"), "{fam:?}: {:?}", actors.governed);
-            assert!(!has_label(&actors.governed, "Public: Data Processor"), "{fam:?}: {:?}", actors.governed);
+            assert!(!has_label(&actors.governed, "Data: Controller"), "{fam:?}: {:?}", actors.governed);
+            assert!(!has_label(&actors.governed, "Data: Processor"), "{fam:?}: {:?}", actors.governed);
         }
     }
 
@@ -760,12 +760,12 @@ mod tests {
         let text = "The provider shall ensure the keeper is informed.";
         let actors = extract_actors_for_family(text, Some("OH&S: Occupational / Personal Safety"));
         assert!(
-            !has_label(&actors.governed, "Public: Provider"),
+            !has_label(&actors.governed, "Svc: Provider"),
             "provider should not be extracted for OH&S, got: {:?}",
             actors.governed
         );
         assert!(
-            !has_label(&actors.governed, "Public: Keeper"),
+            !has_label(&actors.governed, "SC: Keeper"),
             "keeper should not be extracted for OH&S, got: {:?}",
             actors.governed
         );
@@ -782,7 +782,10 @@ mod tests {
         assert!(labels.contains("Ind: Responsible Person"));
         // Specialist patterns
         assert!(labels.contains("Offshore: Licensee"));
-        assert!(labels.contains("Public: Keeper"));
+        assert!(labels.contains("SC: Keeper"));
+        // Trigger-only (2026-10-05 reconciliation with legal)
+        assert!(labels.contains("SC: T&L: Consignor"));
+        assert!(labels.contains("Maritime: Master"));
         // Should have a reasonable count (50+)
         assert!(
             labels.len() > 50,

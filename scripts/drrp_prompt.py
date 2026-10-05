@@ -172,6 +172,13 @@ def system_prompt() -> str:
     return SYSTEM_PROMPT.format(dictionary=dictionary_block())
 
 
+def label_version() -> str:
+    """PROMPT_VERSION plus a hash of the actor dictionary block: the dictionary is part of the prompt,
+    so labels made with a different dictionary are a different version (e.g. drrp-v1.1-2026-10-05+dict.1a2b3c4d)."""
+    import hashlib
+    return f"{PROMPT_VERSION}+dict.{hashlib.sha256(dictionary_block().encode()).hexdigest()[:8]}"
+
+
 def gemini_schema() -> dict:
     """RESPONSE_SCHEMA in Gemini's OpenAPI subset: nullable instead of type unions."""
     import json

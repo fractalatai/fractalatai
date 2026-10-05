@@ -66,7 +66,7 @@ LABEL_ALIASES = {
     "hirer": "SC: Hirer",
 
     # Specialist
-    "appellant": "Spc: Appellant",
+    "appellant": "Ind: Appellant",
     "applicant": "Spc: Applicant",
     "authorised person": "Spc: Authorised Person",
     "compliance body": "Spc: Compliance Body",

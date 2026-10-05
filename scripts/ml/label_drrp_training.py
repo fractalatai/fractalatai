@@ -28,9 +28,12 @@ import psycopg
 
 ROOT = "/var/home/jason/fractalaw"
 sys.path.insert(0, os.path.join(ROOT, "scripts/benchmarks/gold_v2"))
-from common import MODELS, PG, PROMPT_VERSION, _post, ancestors, applying, applying_index, gemini_schema, references, system_prompt, user_prompt  # noqa: E402
+from common import MODELS, PG, _post, ancestors, applying, applying_index, gemini_schema, references, system_prompt, user_prompt  # noqa: E402
+
+from drrp_prompt import label_version  # noqa: E402
 
 SAMPLE = os.path.join(ROOT, "data/training/drrp-v1.1/sample.csv")
+PROMPT_VERSION = label_version()  # prompt rules + dictionary hash
 API = "https://generativelanguage.googleapis.com/v1beta"
 # Gemini 3.8 Flash standard rates through 2026-12-31, USD per M tokens (thinking billed as output)
 PRICE = {"input": 0.75, "cached": 0.075, "output": 3.75}

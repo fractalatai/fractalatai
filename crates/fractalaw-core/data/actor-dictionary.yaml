@@ -574,8 +574,7 @@
 # uses was licence-authorised. Like Spc: Notifying Authority, the label keeps its
 # prefix; the dictionary type decides the class (DRRP-CLASSIFICATION.md layer 3).
 - label: "Spc: Authorised Person"
-  type: government
-  match_group: governed  # keep matching before "Ind: Person"; class is still government
+  type: governed  # a specialist authorised by the duty holder; government-authorised officers are Gvt: Officer (Jason 2026-10-05)
   category: Spc
   regex_patterns:
     - "[Aa]uthoris?ed [Pp]ersons?"
@@ -663,13 +662,17 @@
 - label: "Ind: Licensee"
   type: governed
   category: Ind
+  renamed_from: ["Spc: Licence Holder"]
   regex_patterns:
     - "[Ll]icen[cs]ees?"
-  triggers: [licensee, licensees, the licensee]
+    - "(?:[Ll]icen[cs]e|[Pp]ermit) [Hh]olders?"
+    - "holders? of (?:a|the) (?:licen[cs]e|permit)"
+  triggers: [licensee, licensees, the licensee, licence holder, permit holder]
 
 - label: "Ind: Appellant"
   type: governed
   category: Ind
+  renamed_from: ["Spc: Appellant"]
   regex_patterns:
     - "[Aa]ppellants?"
   triggers: [appellant, appellants, the appellant]
@@ -681,9 +684,10 @@
     - "[Hh]irers?"
   triggers: [hirer, hirers, the hirer]
 
-- label: "Ind: Data Subject"
+- label: "Data: Subject"
   type: governed
-  category: Ind
+  category: Data
+  renamed_from: ["Ind: Data Subject"]
   regex_patterns:
     - "[Dd]ata subjects?"
   triggers: [data subject, data subjects]
@@ -814,9 +818,10 @@
     - "[Rr]egistrants?"
   triggers: [registrant, registrants]
 
-- label: "SC: Applicant"
+- label: "Ind: Applicant"
   type: governed
-  category: SC
+  category: Ind
+  renamed_from: ["SC: Applicant"]
   regex_patterns:
     - "[Aa]pplicants?"
   triggers: [applicant, applicants]
@@ -889,43 +894,48 @@
 
 # ── Specialist: Public (family-gated) ───────────────────────────────
 
-- label: "Public: Provider"
+- label: "Svc: Provider"
   type: governed
-  category: Public
+  category: Svc
+  renamed_from: ["Public: Provider"]
   regex_patterns:
     - "[Pp]roviders?"
   triggers: [provider, providers, service provider]
   families: ["PUBLIC"]
 
-- label: "Public: Keeper"
+- label: "SC: Keeper"
   type: governed
-  category: Public
+  category: SC
+  renamed_from: ["Public: Keeper"]
   regex_patterns:
     - "[Kk]eepers?"
   triggers: [keeper, keepers]
   families: ["PUBLIC"]
 
-- label: "Public: Dealer"
+- label: "SC: Dealer"
   type: governed
-  category: Public
+  category: SC
+  renamed_from: ["Public: Dealer"]
   regex_patterns:
     - "(?:[Dd]ealers?|registered (?:firearms )?dealer)"
   triggers: [dealer, dealers]
   families: ["PUBLIC"]
 
-# Data protection (DPA 2018, PECR): "controller" and "processor" mean other things elsewhere
-# (landfill site controller, air traffic controller, end processor), so they're gated to PUBLIC: Data.
-- label: "Public: Data Controller"
+# Data protection (DPA 2018, PECR): a domain prefix (Data:), gated to PUBLIC: Data, because "controller" and
+# "processor" mean other things elsewhere (landfill site controller, air traffic controller, end processor).
+- label: "Data: Controller"
   type: governed
-  category: Public
+  category: Data
+  renamed_from: ["Public: Data Controller"]
   regex_patterns:
     - "(?:[Jj]oint |[Dd]ata )?[Cc]ontrollers?"
   triggers: [controller, data controller, joint controllers]
   families: ["PUBLIC: Data"]
 
-- label: "Public: Data Processor"
+- label: "Data: Processor"
   type: governed
-  category: Public
+  category: Data
+  renamed_from: ["Public: Data Processor"]
   regex_patterns:
     - "(?:[Dd]ata )?[Pp]rocessors?"
   triggers: [processor, data processor]
@@ -1004,20 +1014,6 @@
     - "[Ww]ater and [Ss]ewerage [Uu]ndertakers?"
   triggers: [water undertaker, water undertakers, sewerage undertaker]
 
-# Duplicate of "Ind: Appellant" (same pattern): kept for existing rows, matches nothing new.
-- label: "Spc: Appellant"
-  type: governed
-  category: Spc
-  triggers: [appellant, appellants]
-
-- label: "Spc: Licence Holder"
-  type: governed
-  category: Spc
-  regex_patterns:
-    - "(?:[Ll]icen[cs]e|[Pp]ermit) [Hh]olders?"
-    - "holders? of (?:a|the) (?:licen[cs]e|permit)"
-  triggers: [licence holder, license holder, the licence holder, the license holder]
-
 - label: "Gvt: Consultation Body"
   type: government
   category: Gvt
@@ -1025,3 +1021,231 @@
     - "[Cc]onsultation [Bb]od(?:y|ies)"
     - "[Cc]onsultees?"
   triggers: [consultation body, consultation bodies, consultee, consultees]
+
+# ── Reconciliation with sertantai-legal (2026-10-05, docs/dictionaries/ACTOR-RECONCILIATION-2026-10-05.md) ──
+# Trigger-only: LLM-visible, regex-inert until patterns are added with tests (Jason: YAML canonical, trigger-only first).
+
+- label: "SC: Producer"
+  type: governed
+  category: SC
+  triggers: [producer, producers, person who produces]
+
+- label: "SC: Exporter"
+  type: governed
+  category: SC
+  triggers: [exporter, exporters, person who exports]
+
+- label: "SC: Retailer"
+  type: governed
+  category: SC
+  triggers: [retailer, retailers]
+
+- label: "SC: Seller"
+  type: governed
+  category: SC
+  triggers: [seller, sellers]
+
+- label: "SC: Consumer"
+  type: governed
+  category: SC
+  triggers: [consumer, consumers]
+
+- label: "SC: Customer"
+  type: governed
+  category: SC
+  triggers: [customer, customers]
+
+- label: "SC: Marketer"
+  type: governed
+  category: SC
+  triggers: [marketer, advertiser]
+
+- label: "SC: Storer"
+  type: governed
+  category: SC
+  triggers: [storer, person who stores]
+
+- label: "SC: Generator"
+  type: governed
+  category: SC
+  triggers: [generator, generators]
+
+- label: "SC: Agent"
+  type: governed
+  category: SC
+  triggers: [agent, authorised agent, owner or agent, agent of the operator]
+
+- label: "SC: T&L: Consignor"
+  type: governed
+  category: SC
+  triggers: [consignor, consignors]
+
+- label: "SC: T&L: Consignee"
+  type: governed
+  category: SC
+  triggers: [consignee, consignees]
+
+- label: "SC: T&L: Handler"
+  type: governed
+  category: SC
+  triggers: [handler, handlers, person who loads or unloads]
+
+- label: "SC: C: Constructor"
+  type: governed
+  category: SC
+  triggers: [constructor]
+
+- label: "SC: C: Domestic Client"
+  type: governed
+  category: SC
+  triggers: [domestic client]
+
+- label: "Ind: Holder"
+  type: governed
+  category: Ind
+  triggers: [holder, holders, waste holder]
+
+- label: "Ind: Appointed Person"
+  type: governed
+  category: Ind
+  triggers: [appointed person, appointed body]
+
+- label: "Ind: Relevant Person"
+  type: governed
+  category: Ind
+  triggers: [relevant person]
+
+- label: "Ind: Suitable Person"
+  type: governed
+  category: Ind
+  triggers: [suitable person]
+
+- label: "Ind: Chair"
+  type: governed
+  category: Ind
+  triggers: [chair, chairman, chairperson]
+
+- label: "Ind: Diver"
+  type: governed
+  category: Ind
+  triggers: [diver, divers]
+
+- label: "Ind: Parent"
+  type: governed
+  category: Ind
+  triggers: [parent, parents]
+
+- label: "Org: Investor"
+  type: governed
+  category: Org
+  triggers: [investor, investors]
+
+- label: "Org: Lessee"
+  type: governed
+  category: Org
+  triggers: [lessee, lessees]
+
+- label: "Org: Partnership"
+  type: governed
+  category: Org
+  triggers: [partnership, unincorporated body]
+
+- label: "Org: Tenant"
+  type: governed
+  category: Org
+  triggers: [tenant, tenants]
+
+- label: "Spc: Advisor"
+  type: governed
+  category: Spc
+  triggers: [adviser, advisor, safety adviser]
+
+- label: "Spc: OH Advisor"
+  type: governed
+  category: Spc
+  triggers: [occupational health nurse, physician, doctor]
+
+- label: "Spc: Surveyor"
+  type: governed
+  category: Spc
+  triggers: [surveyor]
+
+- label: "Spc: Technician"
+  type: governed
+  category: Spc
+  triggers: [technician, geotechnical specialist]
+
+- label: "Spc: Safety Committee"
+  type: governed
+  category: Spc
+  triggers: [safety committee]
+
+- label: "Svc: Maintainer"
+  type: governed
+  category: Svc
+  triggers: [maintainer]
+
+- label: "Svc: Repairer"
+  type: governed
+  category: Svc
+  triggers: [repairer, person who repairs]
+
+- label: "Env: Disposer"
+  type: governed
+  category: Env
+  triggers: [disposer]
+
+- label: "Env: Polluter"
+  type: governed
+  category: Env
+  triggers: [polluter]
+
+- label: "Env: Recycler"
+  type: governed
+  category: Env
+  triggers: [recycler]
+
+- label: "Env: Reuser"
+  type: governed
+  category: Env
+  triggers: [reuser]
+
+- label: "Env: Treater"
+  type: governed
+  category: Env
+  triggers: [person who treats waste, treater]
+
+- label: "Maritime: Master"
+  type: governed
+  category: Maritime
+  triggers: [master of a ship, master of the vessel, ship's master]
+
+- label: "Maritime: Crew"
+  type: governed
+  category: Maritime
+  triggers: [crew, crew of a ship]
+
+- label: "Gvt: Authority: Energy"
+  type: government
+  category: Gvt
+  triggers: [Northern Ireland Authority for Energy Regulation, network emergency co-ordinator]
+
+- label: "Gvt: Ministry: Department of the Environment"
+  type: government
+  category: Gvt
+  triggers: [Department of the Environment]
+
+- label: "HM Forces: Navy"
+  type: government
+  category: HM Forces
+  triggers: [His Majesty's Navy, Royal Navy]
+
+- label: "EU: Council"
+  type: government
+  category: EU
+  triggers: [Council of the European Union, the Council]
+
+- label: "EU: Parliament"
+  type: government
+  category: EU
+  triggers: [European Parliament]
