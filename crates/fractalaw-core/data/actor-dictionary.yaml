@@ -1562,3 +1562,8 @@
   category: Ind
   triggers: [solicitor, advocate, barrister, advocate or solicitor, legal representative]
 
+- label: "Ind: Interested Party"
+  type: governed
+  category: Ind  # consultees / stakeholders (Jason, 2026-10-05; was accepted as too generic)
+  triggers: [interested party, interested parties, other interested parties, stakeholders]
+
