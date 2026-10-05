@@ -600,7 +600,7 @@
   category: Spc
   regex_patterns:
     - "[Cc]ertification [Bb]od(?:y|ies)"
-  triggers: [certification body, certification bodies]
+  triggers: [certification body, certification bodies, approved certifier, approved certifier of construction]
 
 - label: "Spc: Approval Body"
   type: governed
@@ -1140,7 +1140,7 @@
 - label: "Org: Investor"
   type: governed
   category: Org
-  triggers: [investor, investors]
+  triggers: [investor, investors, nominated registered investor, NRI]
 
 - label: "Org: Lessee"
   type: governed
@@ -1411,4 +1411,40 @@
   type: governed
   category: Org
   triggers: [farmer, farmers, farm business, eligible farm business]
+
+# ── Gaps from family group 4 bulk labels (2026-10-05): trigger-only ──
+- label: "Spc: Health Care Professional"
+  type: governed
+  category: Spc
+  triggers: [health care professional, healthcare professional, registered medical practitioner, registered nurse]
+
+- label: "Gvt: Consular Officer"
+  type: government
+  category: Gvt
+  triggers: [consular officer, consul, diplomatic representative, consular or diplomatic representative, maritime representative]
+
+- label: "Spc: Public Analyst"
+  type: governed
+  category: Spc
+  triggers: [public analyst, food examiner, agricultural analyst]
+
+- label: "Gvt: CfD Counterparty"
+  type: government
+  category: Gvt
+  triggers: [CFD counterparty, CfD counterparty, contract for difference counterparty]
+
+- label: "Spc: Insolvency Practitioner"
+  type: governed
+  category: Spc
+  triggers: [insolvency practitioner, insolvency practitioners]
+
+- label: "Spc: Inspection Body"
+  type: governed
+  category: Spc
+  triggers: [inspection body, implementing body, body responsible for implementing inspection systems]
+
+- label: "Ind: Pilot"
+  type: governed
+  category: Ind
+  triggers: [pilot, pilots, the pilot]
 
