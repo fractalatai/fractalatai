@@ -389,3 +389,21 @@ Legal's first checks missed bracket-cased patterns; the re-check found three ove
 Mini invents labels (18 on 327) but is better than GPT-5.5 here at an eighth of the cost.
 
 **Jason: GPT-5.4-mini is the second model for groups 2–5** (5,602 provisions, ~$12, gate off). It's a disagreement detector; the referee decides.
+
+## Batch 1 at v1.3: complete (2026-10-05)
+
+**v1.3 refresh:** Gemini 745 relabelled ($3.19), GPT-5.5 batch 1 168 ($3.27).
+
+**Batch 1 at v1.3:** 78.5% agree, 292 disputed.
+- 314 of the 327 referee decisions are still valid under v1.3; 13 were invalidated (money 4, commencement 3, disapplication 3, laying 2, enforcing 1).
+- 284 of the disputes are covered by a valid decision.
+- The referee decided the other 8 (`referee/batch1_v13.jsonl`): Gemini 4, GPT 4.
+
+**Batch 1 training labels** = model consensus (1,065) + valid referee decisions (314) + the v1.3 referee decisions (8).
+
+**Edge-case rule gaps, to rule on together after groups 2–5:**
+- a notification duty inside a commencement provision;
+- electronic-delivery deeming vs notice service;
+- designation powers inside definitions;
+- "means at their disposal" (counterparty/supply?);
+- definition of "time-limited" for evidential savings.
