@@ -835,6 +835,7 @@
   triggers: [authorised representative, authorized representative]
 
 - label: "SC: Notified Body"
+  renamed_from: ["Spc: Notified Body"]  # alias: GPT-5.5 used this name (2026-10-05)
   type: governed
   category: SC
   regex_patterns:
@@ -1533,4 +1534,20 @@
   type: governed
   category: Finance  # UK ETS auctioning (SI 2021/484)
   triggers: [auction platform, appointed auction platform, auctioneer]
+
+# ── Gaps from GPT-5.5 batch 1 (gate pause, 2026-10-05): trigger-only ──
+- label: "Spc: Conformity Assessment Personnel"
+  type: governed
+  category: Spc
+  triggers: [personnel responsible for conformity assessment tasks, personnel responsible for carrying out conformity assessment tasks, conformity assessment personnel]
+
+- label: "Org: Subsidiary"
+  type: governed
+  category: Org
+  triggers: [subsidiary, subsidiaries]
+
+- label: "Org: Subcontractor"
+  type: governed
+  category: Org  # non-construction (construction subcontractors are SC: C: Contractor)
+  triggers: [subcontractor, subcontractors]
 

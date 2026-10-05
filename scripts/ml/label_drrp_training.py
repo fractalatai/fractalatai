@@ -42,7 +42,7 @@ import psycopg
 
 ROOT = "/var/home/jason/fractalaw"
 sys.path.insert(0, os.path.join(ROOT, "scripts/benchmarks/gold_v2"))
-from common import MODELS, PG, PROMPT_VERSION, _post, ancestors, applying, applying_index, gemini_schema, references, system_prompt, user_prompt  # noqa: E402
+from common import MODELS, PG, PROMPT_VERSION, _post, ancestors, call_openai, applying, applying_index, gemini_schema, references, system_prompt, user_prompt  # noqa: E402
 
 from drrp_prompt import dictionary_entries, dictionary_version  # noqa: E402
 
@@ -50,8 +50,20 @@ SAMPLE = os.path.join(ROOT, "data/training/drrp-v1.1/sample.csv")
 ACCEPTED_OTHER = os.path.join(ROOT, "data/training/drrp-v1.1/accepted_other.txt")
 DUCK = os.path.join(ROOT, "data/fractalaw.duckdb")
 API = "https://generativelanguage.googleapis.com/v1beta"
-# Gemini 3.8 Flash standard rates through 2026-12-31, USD per M tokens (thinking billed as output)
-PRICE = {"input": 0.75, "cached": 0.075, "output": 3.75}
+# USD per M tokens (thinking/reasoning billed as output). Gemini 3.8 Flash standard rates through 2026-12-31;
+# GPT-5.5 standard (2026-10-05)
+PRICES = {"gemini": {"input": 0.75, "cached": 0.075, "output": 3.75},
+          "openai": {"input": 5.00, "cached": 0.50, "output": 30.00}}
+
+
+def usage_tokens(u: dict) -> tuple[int, int, int, int]:
+    """(prompt, cached, output incl. thinking, thinking) from a Gemini usageMetadata or an OpenAI usage."""
+    u = u or {}
+    if "input_tokens" in u:  # OpenAI Responses API
+        return (u.get("input_tokens", 0), (u.get("input_tokens_details") or {}).get("cached_tokens", 0),
+                u.get("output_tokens", 0), (u.get("output_tokens_details") or {}).get("reasoning_tokens", 0))
+    return (u.get("promptTokenCount", 0), u.get("cachedContentTokenCount", 0),
+            u.get("candidatesTokenCount", 0) + u.get("thoughtsTokenCount", 0), u.get("thoughtsTokenCount", 0))
 
 
 def create_cache(model: str, system: str) -> str:
@@ -140,7 +152,8 @@ def stale_reason(resp: dict, ctx: str, current: set[str], added: dict, changed: 
     return None
 
 
-def report(conn, model: str, ids: set[str] | None, entries: dict) -> None:
+def report(conn, model: str, ids: set[str] | None, entries: dict, price: dict | None = None) -> None:
+    price = price or PRICES["gemini"]
     rows = conn.execute(
         "SELECT DISTINCT ON (section_id) section_id, stratum, split, response, error, usage, dict_version "
         "FROM drrp_training_labels_raw WHERE model = %s AND prompt_version = %s "
@@ -150,13 +163,13 @@ def report(conn, model: str, ids: set[str] | None, entries: dict) -> None:
     ok = [r for r in rows if r[3] is not None]
     tok = collections.Counter()
     for r in ok:
-        u = r[5] or {}
-        tok["prompt"] += u.get("promptTokenCount", 0)
-        tok["cached"] += u.get("cachedContentTokenCount", 0)
-        tok["output"] += u.get("candidatesTokenCount", 0) + u.get("thoughtsTokenCount", 0)
-        tok["thoughts"] += u.get("thoughtsTokenCount", 0)
+        p, c, o, t = usage_tokens(r[5])
+        tok["prompt"] += p
+        tok["cached"] += c
+        tok["output"] += o
+        tok["thoughts"] += t
     n = max(len(ok), 1)
-    cost = ((tok["prompt"] - tok["cached"]) * PRICE["input"] + tok["cached"] * PRICE["cached"] + tok["output"] * PRICE["output"]) / 1e6
+    cost = ((tok["prompt"] - tok["cached"]) * price["input"] + tok["cached"] * price["cached"] + tok["output"] * price["output"]) / 1e6
     dicts = collections.Counter(r[6] for r in ok)
     print(f"\n{len(ok)} labelled, {len(rows) - len(ok)} errors ({model}, {PROMPT_VERSION}; dictionaries {dict(dicts)})")
     print(f"tokens per provision: in {tok['prompt'] / n:,.0f} (cached {tok['cached'] / n:,.0f}), "
@@ -207,11 +220,14 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=60)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--gate", type=int, default=3, help="bulk runs pause when one new OTHER actor appears N times (0: off)")
-    ap.add_argument("--no-cache", action="store_true", help="send the system prompt with every call")
+    ap.add_argument("--no-cache", action="store_true", help="send the system prompt with every call (Gemini)")
+    ap.add_argument("--model", choices=["gemini", "openai"], default="gemini",
+                    help="gemini (gemini-3.8-flash) or openai (gpt-5.5:low; prompt caching is automatic)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--report", action="store_true", help="report only")
     args = ap.parse_args()
-    model = MODELS["gemini"]
+    model = MODELS[args.model]
+    price = PRICES[args.model]
     entries = dictionary_entries()
     dict_version = dictionary_version()
 
@@ -229,7 +245,7 @@ def main() -> None:
     with psycopg.connect(PG) as conn:
         register_dictionary(conn, dict_version, entries)
         if args.report:
-            report(conn, model, ids, entries)
+            report(conn, model, ids, entries, price)
             return
         laws = sorted({r["law_name"] for r in rows})
         law_rows = conn.execute("SELECT section_id, text, part FROM legislation_text WHERE law_name = ANY(%s)", (laws,)).fetchall()
@@ -274,11 +290,11 @@ def main() -> None:
     if args.dry_run or not jobs:
         if not jobs:
             with psycopg.connect(PG) as conn:
-                report(conn, model, ids, entries)
+                report(conn, model, ids, entries, price)
         return
 
     system = system_prompt()
-    cache = None if args.no_cache else create_cache(model, system)
+    cache = None if (args.no_cache or args.model != "gemini") else create_cache(model, system)
     print(f"context cache: {cache or 'off'}")
     gate = args.gate if not args.pilot else 0
     acc = accepted_other()
@@ -290,6 +306,8 @@ def main() -> None:
             return job, None, "skipped"
         r, md5, prompt = job
         try:
+            if args.model == "openai":
+                return job, call_openai(system, prompt), None
             return job, call(model, cache, system, prompt), None
         except Exception as e:  # recorded, retried on the next run
             return job, None, str(e)[:500]
@@ -326,7 +344,7 @@ def main() -> None:
             delete_cache(cache)
     print(f"done: {ok} labelled, {err} errors, {skipped} skipped by the gate")
     with psycopg.connect(PG) as conn:
-        report(conn, model, ids, entries)
+        report(conn, model, ids, entries, price)
     if stop.is_set():
         sys.exit(3)
 

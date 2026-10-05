@@ -7,6 +7,7 @@ Two independent models label (Gemini, OpenAI); agreement is gold, and a Claude
 agent referees disagreements.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -91,6 +92,8 @@ def call_openai(system: str, user: str) -> dict:
         "instructions": system,
         "input": user,
         "text": {"format": {"type": "json_schema", "name": "provision_labels", "schema": RESPONSE_SCHEMA, "strict": True}},
+        # route requests sharing the (long) system prompt to the same cache
+        "prompt_cache_key": "drrp-" + hashlib.sha256(system.encode()).hexdigest()[:12],
     }
     if effort:  # minimal | low | medium | high
         body["reasoning"] = {"effort": effort}
