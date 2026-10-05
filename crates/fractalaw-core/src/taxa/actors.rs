@@ -68,6 +68,26 @@ static BLACKLIST: &[&str] = &[
 static BLACKLIST_COMPILED: LazyLock<Vec<Regex>> =
     LazyLock::new(|| BLACKLIST.iter().map(|p| Regex::new(p).unwrap()).collect());
 
+/// Phrases removed before the government pass only: they contain a government-looking word but name a
+/// governed actor, which the governed pass still sees. The regex crate has no lookaround, so `Gvt: Officer`
+/// can't exclude these itself. "director, manager, secretary or other similar officer of the body
+/// corporate" is `Ind: Company Officer`, not a government officer (2026-10-05).
+static GOVERNMENT_MASK: &[&str] = &[
+    r"(?:[Ss]imilar |[Ss]enior )?[Oo]fficers? of (?:the|a|an|any|that|such|another) (?:body corporate|company|limited liability partnership|partnership|Scottish partnership)",
+    r"[Ss]imilar [Oo]fficers?",
+];
+
+static GOVERNMENT_MASK_COMPILED: LazyLock<Vec<Regex>> =
+    LazyLock::new(|| GOVERNMENT_MASK.iter().map(|p| Regex::new(p).unwrap()).collect());
+
+fn mask_government(text: &str) -> String {
+    let mut result = text.to_string();
+    for re in GOVERNMENT_MASK_COMPILED.iter() {
+        result = re.replace_all(&result, "").to_string();
+    }
+    result
+}
+
 fn apply_blacklist(text: &str) -> String {
     let mut result = text.to_string();
     for re in BLACKLIST_COMPILED.iter() {
@@ -228,7 +248,7 @@ pub fn extract_actors(text: &str) -> ExtractedActors {
     let cleaned = apply_blacklist(text);
     ExtractedActors {
         governed: run_patterns(&cleaned, &DICTIONARY.governed),
-        government: run_patterns(&cleaned, &DICTIONARY.government),
+        government: run_patterns(&mask_government(&cleaned), &DICTIONARY.government),
     }
 }
 
@@ -256,7 +276,7 @@ pub fn extract_actors_for_family(text: &str, family: Option<&str>) -> ExtractedA
 
     ExtractedActors {
         governed,
-        government: run_patterns(&cleaned, &DICTIONARY.government),
+        government: run_patterns(&mask_government(&cleaned), &DICTIONARY.government),
     }
 }
 
@@ -753,6 +773,24 @@ mod tests {
             assert!(!has_label(&actors.governed, "Data: Controller"), "{fam:?}: {:?}", actors.governed);
             assert!(!has_label(&actors.governed, "Data: Processor"), "{fam:?}: {:?}", actors.governed);
         }
+    }
+
+    #[test]
+    fn company_officer_is_not_a_government_officer() {
+        // Corporate-offence clause: the pilot returned "OTHER: Officer of a body corporate"; Gvt: Officer
+        // was matching it (73 active Gvt: Officer rows on these provisions in the hub, 2026-10-05).
+        let text = "Where an offence committed by a body corporate is proved to have been committed with the consent of any director, manager, secretary or other similar officer of the body corporate, he as well as the body corporate shall be guilty of that offence.";
+        let actors = extract_actors(text);
+        assert!(has_label(&actors.governed, "Ind: Company Officer"), "{:?}", actors.governed);
+        assert!(!has_label(&actors.government, "Gvt: Officer"), "{:?}", actors.government);
+        assert!(!super::is_government("Ind: Company Officer"));
+        // Real government officers still match
+        for t in [" An authorised officer may enter any premises. ", " An officer of a local authority may inspect the register. ",
+                  " The officer may require the production of documents. "] {
+            assert!(has_label(&extract_actors(t).government, "Gvt: Officer"), "{t}");
+        }
+        assert!(has_label(&extract_actors_for_family(text, Some("OH&S: Occupational / Personal Safety")).governed, "Ind: Company Officer"));
+        assert!(!has_label(&extract_actors_for_family(text, Some("OH&S: Occupational / Personal Safety")).government, "Gvt: Officer"));
     }
 
     #[test]
