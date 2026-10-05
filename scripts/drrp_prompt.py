@@ -18,7 +18,7 @@ import re
 
 import yaml
 
-PROMPT_VERSION = "drrp-v1.0-2026-10-01"
+PROMPT_VERSION = "drrp-v1.1-2026-10-05"
 DICTIONARY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "crates/fractalaw-core/data/actor-dictionary.yaml")
 
 # Published purposes, table order (fractalaw_core::taxa::purpose::PUBLISHED_PURPOSES)
@@ -50,7 +50,7 @@ For each ACTOR (person, body or class of persons) the provision refers to:
    - `Liberty`: the actor holds a power, permission or entitlement ("may", "is entitled to", "power to").
    - `none`: everything else.
    HARD RULE: only `active` actors hold Obligation/Liberty. A counterparty, beneficiary or mentioned actor ALWAYS holds `none`. Never copy the provision's type onto the other party.
-3. `inferred`: true only for the implied-right case below.
+3. `inferred`: true only for the implied-right case and for a holder taken from an APPLYING PROVISION (both below).
 4. `act`: for a `counterparty` of an active actor's OBLIGATION only, what it is owed: one of `notify` (told of an event or decision), `supply` (given information, a copy or a thing), `consult`, `pay`, `give_access` (access or inspection), `serve` (served with a notice), `charge` (a charge levied on, or withheld from, it), `answer_request` (the duty answers its request), `other`. Otherwise `null`.
 
 ## Counterparty or beneficiary: the test is the duty's ACT, not who gains
@@ -66,10 +66,11 @@ For each ACTOR (person, body or class of persons) the provision refers to:
 - **Detail provisions.** A provision that only sets the FORM, MANNER, DISCHARGE, CONDITIONS or PROCEDURE of a relation created in ANOTHER provision → relation `no`. Ask: does this provision create its own duty, or qualify one created elsewhere (it refers to it: "the application under section 10", "the information referred to in paragraph (1)", "the record required by regulation 5")? Examples: "An application under section 10 must be made in the prescribed form and be accompanied by the fee"; "where the authority have not so informed the applicant, at any time after …"; "which are required to be kept under these Regulations, or". A procedural duty created in its own text IS a relation: "The Executive must consult the Secretary of State before issuing an approved code of practice".
 - **Parliamentary procedure** ("subject to annulment in pursuance of a resolution of either House", "may not be made unless a draft has been laid before and approved by …") → relation `no`.
 - **Exception: a deadline that compels a government actor to act** ("The first … regulations must come into force no later than 1 April 2018") → relation `yes`, Obligation of the regulation maker (active).
-- **Passive and thing-subject duties are Obligations with an unknown holder.** "records shall be kept", "equipment must be provided", "the register shall be available" with no named doer → relation `yes`, raw_type `Obligation`, and no actor is active unless the text names who must act.
+- **Passive and thing-subject duties are Obligations.** "records shall be kept", "equipment must be provided", "the register shall be available" with no named doer → relation `yes`, raw_type `Obligation`. Their holder comes only from the stem, a referenced provision or an applying provision (rules below); otherwise no actor is active. Never guess a holder.
 - **Stems and list items.** You are given the provision's ancestors (its stem) as CONTEXT. Label the actors of the provision read together with its stem. If the provision completes a duty or power sentence begun in the stem (e.g. stem "It shall be the duty of each enforcing authority—", item "(a) to secure that the registers are available…"), the stem's holder is `active` in this provision too. Don't label a legal relation that exists only in the stem and not in this provision's own text.
 - **Implied access rights.** Where a GOVERNMENT actor's Obligation is to make something available for inspection/copying by, or to supply copies on request/payment to, a governed party named in the provision (e.g. "the public", "any person"), that governed party is `active`, holds `Liberty`, `inferred: true`. Enforcement or notice-service provisions never qualify.
 - **Holder named in a referenced provision.** You are also given the text of provisions this one refers to (REFERENCED PROVISIONS). When a provision that CREATES a relation identifies its holder only there (e.g. "Regulations under subsection (2) may prescribe…", where subsection (2) says "The Scottish Ministers may by regulations…"; or "A power under this section may be exercised by force", where the section confers the power on an authorised officer), that holder is `active`. Only use a holder that the referenced text actually names. This never turns a detail provision into a relation.
+- **Holder named in an applying provision.** You are also given APPLYING PROVISIONS: provisions of the same law that put a named party under a duty to comply with, or to ensure compliance with, requirements that include this provision. Examples: "Every employer shall ensure that every workplace … complies with any requirement of these Regulations"; "A contractor carrying out construction work must comply with the requirements of this Part"; "a manufacturer must ensure that it has been designed and manufactured in accordance with the essential health and safety requirements"; "no person shall keep the material unless he complies with paragraphs (3) to (6)". When THIS provision creates an Obligation but names no one who must act (passive or thing-subject, e.g. "Every enclosed workplace shall be ventilated…"), each party that an applying provision puts under that duty is `active`, holds `Obligation`, `inferred: true`, and raw_type is `null`. Supervisory form: "the principal contractor must take all reasonable steps to ensure that contractors … comply with the duties under these Regulations" → BOTH the principal contractor and the contractors. Only use parties the applying text names; ignore an applying provision that names no party or whose scope doesn't truly include this provision. If this provision names its own holder (in its text or stem), use that and ignore the applying provisions. This never turns a detail provision or a no-relation provision into a relation.
 - **Content lists of schemes, regulations and notices.** "A scheme under this section must— (a) …", "Regulations may— (a) …": each item completes the stem's Obligation or Liberty, so relation `yes` with the same type. The holder is the scheme or regulation maker (resolved from the stem or referenced provisions), otherwise raw_type with no active actor.
 - **Details nested inside a content list.** Below a content-list item, a sub-item that only states an eligibility criterion or defines a class of persons (e.g. "(i) the person's residence is in Scotland") → relation `no`. The Obligation/Liberty stays on the item above it.
 - **Instruments are never actors.** A scheme, regulations, an order, a notice or a licence is not an actor. "The scheme may specify…" is a Liberty of the scheme maker when the stem or referenced provisions name it; otherwise raw_type with no active actor.
@@ -226,7 +227,8 @@ def references(section_id: str, text: str, texts: dict[str, str]) -> list[tuple[
 # that cover other provisions ("Every employer shall ensure that every workplace … complies with any
 # requirement of these Regulations"). They name the holder of passive/thing-subject duties they cover.
 _SCOPE = (r"(?:these\s+Regulations|this\s+(?:Order|Act|Part|Schedule)|Part\s+\d+[A-Z]*\b|Schedules?\s+\d+[A-Z]*\b"
-          r"|(?:regulations?|sections?|articles?)\s+\d+[A-Z]*\b(?:\(\w{1,4}\))*(?:\s*(?:,|to|and|or)\s*\d+[A-Z]*\b(?:\(\w{1,4}\))*)*)")
+          r"|(?:regulations?|sections?|articles?)\s+\d+[A-Z]*\b(?:\(\w{1,4}\))*(?:\s*(?:,|to|and|or)\s*\d+[A-Z]*\b(?:\(\w{1,4}\))*)*"
+          r"|(?:sub-?)?paragraphs?\s+\(\w{1,4}\)(?:\s*(?:,|to|and|or)\s*\(\w{1,4}\))*)")
 _REQ = r"(?:any|the|all|each\s+of\s+the|such)?\s*(?:requirements?|provisions?|duties)\s+(?:of|in|imposed\s+by|under|contained\s+in)\s+"
 _APPLY = re.compile(
     r"\b(?:shall|must)\b.{0,200}?(?:"
@@ -234,12 +236,18 @@ _APPLY = re.compile(
     rf"|\b(?:ensure|secure)\s+that\s+{_REQ}(?P<s2>{_SCOPE}).{{0,80}}?\b(?:are|is)\s+complied\s+with"  # … are complied with
     # the scope must be this law's: not "regulation 48 of the Construction and Use Regulations",
     # "Article 21 of RAMS" or "Part 1 of Schedule 1 to the 2011 Order"
-    r")(?!(?:\(\w{1,4}\))*(?:\s*\(.{0,200}?\))?\s+(?:of|to)\s+(?!these\s+Regulations\b|this\s+(?:Act|Order|Part)\b))", re.I | re.S)
+    r")(?!(?:\(\w{1,4}\))*(?:\s*\(.{0,200}?\))?\s+(?:of|to)\s+(?!these\s+Regulations\b|this\s+(?:Act|Order|Part|regulation|section|article)\b))", re.I | re.S)
+# Product regimes: "a manufacturer must ensure that it has been designed and manufactured in accordance with the
+# essential (health and safety) requirements" applies every provision that sets those requirements
+_ESR_TERM = r"essential\s+(?:health\s+and\s+safety\s+)?requirements"
+_ESR = re.compile(r"\b(?:shall|must)\b.{0,200}?\b(?:ensure|secure)\b.{0,200}?(?:in\s+accordance\s+with|satisf(?:y|ies)|meets?|compl(?:y|ies)\s+with)"
+                  rf"\s+(?:all\s+)?(?:the\s+)?(?:relevant\s+|applicable\s+)?{_ESR_TERM}", re.I | re.S)
+_ESR_MENTION = re.compile(_ESR_TERM, re.I)
 # Mentions of compliance that put no one under a duty to comply
 _NOT_APPLYING = re.compile(
     r"\boffence\b|\bguilty\b|\bfail(?:s|ed|ure)?\s+to\s+comply|\bcontravene|\bin\s+order\s+to\s+comply|\benabl"
     r"|\bpresumed\b|\btreated\s+as\b|\bdeemed\s+to\s+compl|\bopinion\b|\bsatisfied\b|\bneed\s+not\b|\bshall\s+not\s+apply\b"
-    r"|\bnot\s+compl|\bnon-?complian|\bregard\s+to\b|\bunless\b|\bas\s+if\b|\bwarn|\bstate\s+that\b|\bwhen\s+enforcing\b"
+    r"|\bnot\s+compl|\bnon-?complian|\bregard\s+to\b|\bas\s+if\b|\bwarn|\bstate\s+that\b|\bwhen\s+enforcing\b"
     r"|\bevidence\b|\bshowing\b|\bnotice\b|\bwhether\b|\bdoes\s+not\b|\bMember\s+States\b"
     r"|\b(?:taken|made|necessary|practicable|measures)\s+(?:\w+\s+){0,3}to\s+comply\b", re.I)
 _NUM = re.compile(r"(\d+)([A-Z]*)((?:\(\w{1,4}\))*)")
@@ -252,10 +260,19 @@ def _base(local: str) -> tuple[str, str]:
     return kind, (m.group(1) + m.group(2)) if m else ""
 
 
-def _covers(scope: str, applier_part: str | None):
+def _covers(scope: str, applier_local: str, applier_part: str | None):
     """Predicate over (local id, part) for one scope expression."""
     s = re.sub(r"\s+", " ", scope.strip())
     low = s.lower()
+    if re.match(r"(?:sub-?)?paragraph", low):
+        # paragraphs of the applier's own provision: "paragraphs (3) to (6)" of reg.6 → reg.6(3) … reg.6(6)
+        head = applier_local.split("(", 1)[0]
+        labels = re.findall(r"\((\w{1,4})\)", s)
+        names, nums = set(labels), set()
+        for a, b in re.findall(r"\((\d+)\)\s*to\s*\((\d+)\)", s):
+            nums.update(str(n) for n in range(int(a), int(b) + 1))
+        wanted = names | nums
+        return lambda local, part: local.startswith(head + "(") and local[len(head) + 1:].split(")", 1)[0] in wanted
     if low in ("these regulations", "this order", "this act"):
         return lambda local, part: not local.startswith("sch.")
     if low == "this part":
@@ -296,22 +313,35 @@ def _covers(scope: str, applier_part: str | None):
 
 def applying_index(texts: dict[str, str], parts: dict[str, str | None]) -> dict[str, list]:
     """Per law, the applying provisions: [(section_id, rendered text, covers(local, part))]."""
+    esr: dict[str, set[str]] = {}  # per law, provisions that set essential requirements
+    for sid, text in texts.items():
+        if text and _ESR_MENTION.search(text):
+            law, local = sid.split(":", 1)
+            esr.setdefault(law, set()).add(local)
+    keys = None
     index: dict[str, list] = {}
     for sid, text in texts.items():
-        if not text or "compl" not in text.lower():
+        if not text or not ("compl" in text.lower() or _ESR_MENTION.search(text)):
             continue
         law, local = sid.split(":", 1)
         stems = [texts[a] for a in reversed(ancestors(sid)) if texts.get(a)]
         full = " ".join(stems + [text])
         if _NOT_APPLYING.search(full):
             continue
-        for m in _APPLY.finditer(full):
-            scope = m.group("s1") or m.group("s2")
-            rendered = " … ".join([t[:400] for t in stems] + [text])
-            if "—" in text or "–" in text or text.rstrip().endswith(":"):
-                items = [texts[k] for k in sorted(texts) if k.startswith(sid + "(") and k.count("(") == sid.count("(") + 1 and texts[k]]
-                rendered += " " + " ".join(t[:200] for t in items[:6])
-            index.setdefault(law, []).append((sid, rendered, _covers(scope, parts.get(sid))))
+        own_from = len(full) - len(text)  # a match must end in this provision's own text, not its stem's
+        covers = [_covers(m.group("s1") or m.group("s2"), local, parts.get(sid))
+                  for m in _APPLY.finditer(full) if m.end() > own_from]
+        m = _ESR.search(full)
+        if m and m.end() > own_from:
+            covers.append(lambda loc, part, ls=esr.get(law, set()): loc in ls)
+        if not covers:
+            continue
+        rendered = " … ".join([t[:400] for t in stems] + [text])
+        if "—" in text or "–" in text or text.rstrip().endswith(":"):
+            keys = keys or sorted(texts)
+            items = [texts[k] for k in keys if k.startswith(sid + "(") and k.count("(") == sid.count("(") + 1 and texts[k]]
+            rendered += " " + " ".join(t[:200] for t in items[:6])
+        index.setdefault(law, []).append((sid, rendered, lambda loc, part, cs=covers: any(c(loc, part) for c in cs)))
     return index
 
 
@@ -328,8 +358,11 @@ def applying(section_id: str, parts: dict[str, str | None], index: dict[str, lis
     return out[:4]
 
 
-def user_prompt(section_id: str, text: str, stems: list[tuple[str, str]], refs: list[tuple[str, str]] = ()) -> str:
+def user_prompt(section_id: str, text: str, stems: list[tuple[str, str]], refs: list[tuple[str, str]] = (),
+                apps: list[tuple[str, str]] = ()) -> str:
     ctx = "\n".join(f"[{sid}] {t[:1500]}" for sid, t in reversed(stems)) or "(none)"
     ref = "\n".join(f"[{sid}] {t[:1500]}" for sid, t in refs) or "(none)"
+    app = "\n".join(f"[{sid}] {t[:1200]}" for sid, t in apps) or "(none)"
     return (f"STEM CONTEXT (ancestors, outermost first):\n{ctx}\n\nREFERENCED PROVISIONS (same law):\n{ref}\n\n"
+            f"APPLYING PROVISIONS (same law; a named party's duty to comply with requirements that include this provision):\n{app}\n\n"
             f"PROVISION TO LABEL [{section_id}]:\n{text[:6000]}")

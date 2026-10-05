@@ -14,7 +14,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from common import CALLERS, PROMPT_VERSION, MODELS, ancestors, connect, references, system_prompt, user_prompt  # noqa: E402
+from common import CALLERS, PROMPT_VERSION, MODELS, ancestors, applying, applying_index, connect, references, system_prompt, user_prompt  # noqa: E402
 
 
 def main() -> None:
@@ -40,19 +40,22 @@ def main() -> None:
             "AND section_id NOT LIKE '%%:sch.%%' ORDER BY law_name, sort_key",
             (laws,),
         ).fetchall()
-        texts = dict(conn.execute(
-            "SELECT section_id, text FROM legislation_text WHERE law_name = ANY(%s)", (laws,)).fetchall())
+        law_rows = conn.execute(
+            "SELECT section_id, text, part FROM legislation_text WHERE law_name = ANY(%s)", (laws,)).fetchall()
+        texts = {sid: text for sid, text, _ in law_rows}
+        parts = {sid: part for sid, _, part in law_rows}
         done = {r[0] for r in conn.execute(
             "SELECT section_id || '|' || text_md5 FROM gold_v2_raw WHERE model = %s AND prompt_version = %s AND error IS NULL",
             (model, PROMPT_VERSION)).fetchall()}
 
+    apps = applying_index(texts, parts)
     jobs = []
     for sid, law, text in rows:
         md5 = hashlib.md5(text.encode()).hexdigest()
         if f"{sid}|{md5}" in done:
             continue
         stems = [(a, texts[a]) for a in ancestors(sid) if texts.get(a)]
-        jobs.append((sid, law, md5, user_prompt(sid, text, stems, references(sid, text, texts))))
+        jobs.append((sid, law, md5, user_prompt(sid, text, stems, references(sid, text, texts), applying(sid, parts, apps))))
     if args.limit:
         jobs = jobs[: args.limit]
     print(f"{model}: {len(jobs)} provisions to label ({len(rows)} substantive, {len(rows) - len(jobs)} already done or skipped)")

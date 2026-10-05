@@ -48,7 +48,7 @@ import sys as _sys  # noqa: E402
 
 _sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 from drrp_prompt import (  # noqa: E402,F401
-    PROMPT_VERSION, RESPONSE_SCHEMA, ancestors, dictionary_block, gemini_schema, references,
+    PROMPT_VERSION, RESPONSE_SCHEMA, ancestors, applying, applying_index, dictionary_block, gemini_schema, references,
     system_prompt, user_prompt,
 )
 
