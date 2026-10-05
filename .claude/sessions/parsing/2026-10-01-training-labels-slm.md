@@ -253,7 +253,7 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 
 ## Overlaps from legal's case-insensitive re-check (2026-10-05)
 
-Legal's first checks missed bracket-cased patterns; the re-check found three overlaps that we have too. Fixed (`91b0f6c`):
+Legal's first checks missed bracket-cased patterns; the re-check found three overlaps that we have too. Fixed (`9b91854`):
 - **Verifier** was an alternative under `Spc: Inspector`; it is now its own pattern (182 hub rows).
 - **Gas transporter** was caught by `SC: T&L: Carrier`'s "transporter"; it's now excluded from Carrier and has its own pattern (64 hub rows).
 - **OH Advisor** keeps the occupational forms; plain doctor/physician/nurse move to `Spc: Health Care Professional`.
