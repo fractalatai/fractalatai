@@ -79,3 +79,23 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - The tier positions are the noisy ones being replaced; they only steer the sample. The protective-wording cue adds only 244 provisions corpus-wide and is mixed ("for the benefit of the community").
 - **Beneficiary yield is unknown until labelled.** If ~60% confirm, that's ~900 beneficiary actors, short of the 1,000+ target, so the pilot measures it before the full run.
 - **Token estimate from gold v2 batch 1** (Gemini 3.8 Flash, 1,218 provisions: 6.00M in, 1.43M out incl. thinking; explicit caching was off then): ~4.9K in and ~1.2K out per provision. For 6,121 provisions that's ~30M in and ~7.2M out; with the 6.1K system prompt cached, most input is cache reads.
+
+## Pilot (2026-10-05)
+
+**Run:** `scripts/ml/label_drrp_training.py --pilot 200`, i.e. 206 provisions proportional per stratum. Raw responses go to `drrp_training_labels_raw`, declared in `scripts/pg_schema.sql`.
+
+**Cost:**
+- **$0.78**, or $3.76 per 1,000 provisions, with no errors.
+- The explicit context cache works: 6,677 of 6,851 input tokens per call are cached.
+- Output averages 835 tokens per provision, 706 of them thinking.
+- Full sample (6,121) ≈ **$23** at standard rates.
+
+**Yields:**
+- Relation yes 123 / no 83.
+- Actors: active 125, mentioned 104, counterparty 37, beneficiary 4.
+- **Counterparty:** 0.18 per provision → ~1,100 in the full sample (on target).
+- **Beneficiary:** 0.02 per provision → ~120 in the full sample (target 1,000+). The `ben` stratum, drawn from old tier labels, yielded 4 beneficiaries from 49 provisions. Those old labels mostly sit on definitions, notices and procedure. The model's calls look right; genuine beneficiaries are rare under the act test.
+- **Holder unknown:** the `hu` stratum gave holders in 12 of 26 (actor gaps fixed). The `app` stratum gave 19 inferred active holders from 10 provisions.
+- **OTHER labels:** 15 in total, e.g. consignor, consignee, producer, tenant, master of a vessel, safety committee, EU Council/Parliament. All other labels are dictionary labels.
+
+**Protective-purpose probe:** 39 provisions where a duty word (in the provision or its stem) occurs with protective wording ("ensure … health/safety/risk", "health and safety of", "exposed to risks", "well-being"). They gave **0.36 beneficiaries per provision**, e.g. COSHH NI reg.7(1) employer → employee, quarry operator → workers. 1,654 such provisions are unsampled (241 laws), which projects to ~600 more beneficiaries for ~$6.
