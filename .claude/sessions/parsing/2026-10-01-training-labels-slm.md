@@ -304,3 +304,24 @@ Legal's first checks missed bracket-cased patterns; the re-check found three ove
 - The counterparty/beneficiary split the retrain is for is nearly settled; disputes concentrate on purpose and relation.
 
 **Referee:** brief in `scripts/ml/REFEREE_TRAINING_LABELS.md`; disputes in `data/training/drrp-v1.1/disputes_batch1.jsonl`; decisions go to `referee/batch1.jsonl`. Test batch of 10 running.
+
+## Rulings 1–5 and prompt v1.2 (2026-10-05)
+
+**Referee test batch** (10 v1.1 disputes, kept as `referee/batch1_v1.1_test.jsonl`): Gemini 6, GPT 3, mixed 1.
+
+**Jason agreed rulings 1–5 and option (b):** bump the prompt and refresh by targeted relabel.
+1. A passive duty's counterparty gets an `act`.
+2. A headless stem ("X shall—") is relation yes with X active.
+3. A transitional provision that itself confers a time-limited power or duty is relation yes, purpose `Transitional Arrangement`.
+4. A Member State or country that is only a place is not an actor.
+5. `Ind: Interested Party` added.
+
+**Commits:** spec `dd0b541`, prompt `drrp-v1.2-2026-10-05` `4e2c491`, carry-forward `25b0ab9`.
+
+**Refresh** (`--carry-from drrp-v1.1-2026-10-05`):
+- Gemini: 6,394 carried, 708 relabelled (565 v1.2-affected + dictionary-stale), $3.51.
+- GPT batch 1: 1,237 carried, 151 relabelled, $2.83.
+
+**Batch 1 at v1.2: 75.9% agree, 327 disputed.** Purpose 197, relation 114, active↔mentioned 79, GPT-only actor 53, counterparty↔mentioned 46, raw_type 35, beneficiary↔mentioned 33, label 26, counterparty↔beneficiary 8.
+
+**Referee:** running on all 327 in batches of 50 → `referee/batch1.jsonl`.
