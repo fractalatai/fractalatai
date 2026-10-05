@@ -50,7 +50,7 @@ This session runs the **single run**: one enrichment pass and **one** publish, a
 - ⬜ **Actor label renames and the Authorised Person class change (2026-10-05):**
   - ✅ hub rows migrated 2026-10-05 (`scripts/migrations/rename_actor_labels_20261005.py`);
   - ✅ legal's `government_label?/1` no longer lists Spc: Authorised Person: live 2026-10-05 (legal bb4bb624); legal's rename task is `mix actors.rename_labels` (6f9600e4), run at our pre-publish message;
-  - ⬜ **(Jason)** The 30 laws carrying Spc: Authorised Person that are outside the backlog. Recommended (c): add them to the single run's backfill + publish (no re-parse), so their law-level holders re-derive under the governed class. The alternatives are (b) legal strips the stale holders, or (a) leave them;
+  - ⬜ **30 laws carrying Spc: Authorised Person outside the backlog → added to the single run's backfill + publish** (Jason, 2026-10-05; option c). No re-parse; `taxa backfill` re-derives law-level holders under the governed class. Laws: UK_asp_2009_12, UK_asp_2026_6, UK_nisr_2011_240, UK_nisr_2026_14, UK_ssi_2009_266, UK_ukpga_1968_73, UK_ukpga_1982_16, UK_ukpga_1982_45, UK_ukpga_1989_40, UK_ukpga_1994_21, UK_ukpga_1996_6, UK_ukpga_2003_21, UK_ukpga_2004_20, UK_ukpga_2006_28, UK_ukpga_2006_49, UK_ukpga_2010_15, UK_ukpga_2020_7, UK_ukpga_2022_30, UK_uksi_1996_1527, UK_uksi_1997_2962, UK_uksi_2002_2786, UK_uksi_2007_3106, UK_uksi_2012_3032, UK_uksi_2016_765, UK_uksi_2019_156, UK_uksi_2020_206, UK_uksi_2021_1309, UK_uksi_2021_534, UK_wsi_2005_1806, UK_wsi_2009_995;
   - legal runs the same rename map on its stored legal_articles rows at the publish. 88 of the 235 affected laws are outside the backlog, so our payloads alone won't rename them.
 
 ## Dependencies
