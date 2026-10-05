@@ -47,6 +47,10 @@ This session runs the **single run**: one enrichment pass and **one** publish, a
 - ⬜ Correlatives (claim/liability/protected holders), current_* and as-made verdicts reviewed together (Jason)
 - ⬜ **Purpose change list for compliance (legal#172):** per law, old `purpose` values → new (from `purpose_profile`, share ≥ 0.05), sent to legal after the dry run. Process+Rule has no 1:1 mapping
 - ⬜ **(Jason)** Compliance screening: `current_verdict` or `is_making`. Decided before the publish
+- ⬜ **(Jason)** Company officer repair (2026-10-05, `0e7846d`):
+  - Gvt: Officer was matching "director … or other similar officer of the body corporate": 401 hub provisions in 144 laws, 166 active rows (false government Responsibility holders).
+  - The extractor is fixed. The 90 backlog laws are re-parsed in the run anyway.
+  - The 54 laws outside the backlog need adding to the run's re-parse (regex/LLM rows), not just backfill.
 - ⬜ **Actor label renames and the Authorised Person class change (2026-10-05):**
   - ✅ hub rows migrated 2026-10-05 (`scripts/migrations/rename_actor_labels_20261005.py`);
   - ✅ legal's `government_label?/1` no longer lists Spc: Authorised Person: live 2026-10-05 (legal bb4bb624); legal's rename task is `mix actors.rename_labels` (6f9600e4), run at our pre-publish message;
