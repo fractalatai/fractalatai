@@ -129,3 +129,24 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - "Taker of provisional measure": too specific, left as OTHER.
 
 **Yields unchanged:** beneficiary 6 (0.03 per provision), counterparty 36 (0.17).
+
+## Dictionary-gap loop built (2026-10-05, `ea2a0fd`)
+
+**Jason:** jump on any actor dictionary diff as soon as it surfaces. Built:
+1. **Labeller gap listing.** Every report lists the `OTHER:` and non-dictionary labels with example provisions.
+2. **`llm_gaps.py`** (actor-drift skill, LLM gaps mode). It checks the training labels, gold v2 at the current prompt, the hub's free-text labels, and legal's regex library (via `legal_label_map.json`). Output goes to `data/audit/dictionary_gaps/<date>.json`, and it exits 1 on gaps.
+3. **Relabel only what a dictionary change affects.**
+   - `prompt_version` is now the rules only; each row has a `dict_version`, and the versions are registered in `drrp_dictionary_versions`. The 451 existing rows were split into these columns.
+   - A provision relabels only if its response has OTHER labels or labels that no longer exist, or its text matches a label added since.
+   - Example: the Company Officer change relabelled 4 of 206 pilot provisions instead of all 206.
+4. **Bulk-run gate.** A bulk run pauses (exit 3) when a new OTHER actor appears 3 times. Tested offline: it paused after 6 of 30. `accepted_other.txt` holds actors accepted as unlabelled.
+
+**First gap check** (226 → 3). New trigger-only labels:
+- Building: Accountable Person and Principal Accountable Person (~160 uses in gold v2);
+- Ind: Resident, Complainant, Accused; Org: Licensor;
+- Gvt: Minister: Lord Advocate, Gvt: Parliament; SC: Buyer; Svc: Statutory Undertaker;
+- extra triggers on existing labels.
+
+**Open (Jason):**
+- **`Ind: Public` (1,148 hub rows).** A correlative rule (`correlative-rules.yaml` rule 3) infers it as beneficiary for every active enforcement authority. The label is wrong (the dictionary label is `Public`; `actor_aliases.py` is fixed). The rule also contradicts the spec, which needs an explicit protective purpose for a beneficiary. Decide: retire the rule, or fix its label. The rows are inference-only, so they regenerate at re-parse. Asked legal whether they hold it.
+- **116 adjudicated rows with legacy free-text labels.** Benchmark gold carried forward; resolved at the gold v2 cutover.
