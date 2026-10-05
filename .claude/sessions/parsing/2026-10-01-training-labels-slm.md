@@ -1,6 +1,6 @@
 ---
 session: "Training labels and SLM retrain at drrp-v1.0"
-status: pending
+status: suspended
 opened: 2026-10-01
 closed:
 outcome:
@@ -8,7 +8,9 @@ issue: 72
 related: [74, 75, 76, "parsing/2026-09-30-issue-72.md"]
 ---
 
-# Session: Training labels and SLM retrain at drrp-v1.0 (PENDING)
+# Session: Training labels and SLM retrain at drrp-v1.0 (SUSPENDED)
+
+**Suspended (2026-10-05): waits on #60 remote duty holders (`parsing/2026-10-05-issue-60.md`).** The prompt labels passive/thing-subject duties as holder unknown; labelling now would train that into the SLM. Resume at the #60 prompt version (`drrp-v1.1`).
 
 ## Problem
 
@@ -29,6 +31,7 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 
 ## Dependencies
 
+- ⬜ #60 remote duty holders resolved and prompt at drrp-v1.1 (`parsing/2026-10-05-issue-60.md`)
 - ✅ Model complete and the definitive prompt written (`parsing/2026-09-30-issue-72.md`, `501edc2`)
 - ⬜ RunPod (Jason launches)
 - Enables: the single run (`09-29-26-reenrichment-backlog.md`)
