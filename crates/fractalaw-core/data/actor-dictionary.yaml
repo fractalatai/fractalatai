@@ -875,9 +875,10 @@
     - "[Ll]andlord"
   triggers: [landlord, landlords]
 
-- label: Public
+- label: "Ind: Public"
   type: governed
-  category: other
+  category: Ind  # members of the public: "innocent" third parties with no defined role or organisation (Jason 2026-10-05)
+  renamed_from: ["Public"]
   regex_patterns:
     - "(?:[Pp]ublic|[Ee]veryone|[Cc]itizens?)"
   triggers: [public, the public, general public, members of the public]

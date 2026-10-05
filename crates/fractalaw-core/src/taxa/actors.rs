@@ -360,7 +360,7 @@ mod tests {
         assert!(!is_government("Spc: Administrator"));
         assert!(!is_government("Spc: Authorised Person")); // governed specialist (2026-10-05)
         assert!(!is_government("Org: Employer"));
-        assert!(!is_government("Public"));
+        assert!(!is_government("Ind: Public"));
         // Not in the dictionary: family prefix
         assert!(is_government("Gvt: Something New"));
         assert!(is_government("HM Forces: Army"));
@@ -434,7 +434,7 @@ mod tests {
     fn blacklist_removes_false_positives() {
         // "public interest" should be blacklisted
         let actors = extract_actors(" This is in the public interest. ");
-        assert!(!has_label(&actors.governed, "Public"));
+        assert!(!has_label(&actors.governed, "Ind: Public"));
     }
 
     #[test]

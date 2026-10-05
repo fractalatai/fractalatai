@@ -20,8 +20,6 @@
   inferred_category: Org
   inferred_position: counterparty
 
-- trigger_actor: "Gvt: Authority: Enforcement"
-  trigger_position: active
-  inferred_actor: "Ind: Public"
-  inferred_category: Ind
-  inferred_position: beneficiary
+# Retired 2026-10-05 (Jason): "Gvt: Authority: Enforcement" active → inferred "Ind: Public" beneficiary.
+# Not required: a beneficiary needs an explicit protective purpose in the text (DRRP-CLASSIFICATION.md),
+# not one added to every enforcement-authority duty.

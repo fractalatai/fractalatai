@@ -290,7 +290,7 @@ mod tests {
         texts.insert("L:reg.35(1)".into(), "A local authority shall make available for inspection by the public, in such places as it reasonably considers".into());
         actors.insert("L:reg.35(1)".into(), vec![
             act("Gvt: Authority: Local", Some("Obligation"), "active"),
-            act("Public", Some("Obligation"), "counterparty"),
+            act("Ind: Public", Some("Obligation"), "counterparty"),
         ]);
         // reg.35(2): copies for any person
         texts.insert("L:reg.35(2)".into(), "A local authority shall afford to any person, facilities for obtaining copies of entries, on payment of reasonable charges".into());
@@ -302,15 +302,15 @@ mod tests {
         texts.insert("E:s.20(7)".into(), "It shall be the duty of each enforcing authority—".into());
         actors.insert("E:s.20(7)".into(), vec![act("Gvt: Authority: Enforcement", Some("Obligation"), "active")]);
         texts.insert("E:s.20(7)(a)".into(), "to secure that the registers maintained by them under this section are available, at all reasonable times, for inspection by the public free of charge".into());
-        actors.insert("E:s.20(7)(a)".into(), vec![act("Public", None, "mentioned")]);
+        actors.insert("E:s.20(7)(a)".into(), vec![act("Ind: Public", None, "mentioned")]);
         let mut got: Vec<(String, String)> = infer_access_rights(&texts, &actors)
             .into_iter()
             .map(|a| { assert_eq!((a.drrp.as_deref(), a.position.as_str()), (Some("Liberty"), "active")); (a.section_id, a.actor_label) })
             .collect();
         got.sort();
         assert_eq!(got, vec![
-            ("E:s.20(7)(a)".into(), "Public".into()),
-            ("L:reg.35(1)".into(), "Public".into()),
+            ("E:s.20(7)(a)".into(), "Ind: Public".into()),
+            ("L:reg.35(1)".into(), "Ind: Public".into()),
             ("L:reg.35(2)".into(), "Ind: Person".into()),
         ]);
     }
@@ -327,7 +327,7 @@ mod tests {
         ]);
         // Access wording but no government duty anywhere up the tree
         texts.insert("L:reg.10".into(), "The register shall be available for inspection by the public".into());
-        actors.insert("L:reg.10".into(), vec![act("Public", None, "mentioned")]);
+        actors.insert("L:reg.10".into(), vec![act("Ind: Public", None, "mentioned")]);
         // Access clause, government duty, but the governed actor isn't the addressee
         texts.insert("L:reg.11".into(), "The Agency must make the plan available for inspection by the public and send a copy to the operator".into());
         actors.insert("L:reg.11".into(), vec![
@@ -396,11 +396,11 @@ mod tests {
             pa("Org: Employer", "Obligation", "active"),
             pa("Org: Operator", "Obligation", "active"),
         ]);
-        s.insert("X:s.3".to_string(), vec![pa("Gvt: Agency", "Liberty", "active"), pa("Public", "none", "beneficiary")]);
+        s.insert("X:s.3".to_string(), vec![pa("Gvt: Agency", "Liberty", "active"), pa("Ind: Public", "none", "beneficiary")]);
         let got = derive_correlatives(&s);
         assert_eq!(corr(&got, "X:s.1", "Org: Operator"), vec![(Liability, "Gvt: Agency".into()), (NoRight, "Ind: Owner".into())]);
         assert_eq!(corr(&got, "X:s.2", "Org: Employer"), vec![]);
-        assert_eq!(corr(&got, "X:s.3", "Public"), vec![]);
+        assert_eq!(corr(&got, "X:s.3", "Ind: Public"), vec![]);
     }
 
     #[test]
@@ -409,14 +409,14 @@ mod tests {
         let mut s = HashMap::new();
         // EPA 1990 s.20(7): the authority's duty in the stem, the public's access in (a)
         s.insert("E:s.20(7)".to_string(), vec![pa("Gvt: Authority: Enforcement", "Obligation", "active")]);
-        let mut public = pa("Public", "Liberty", "active");
+        let mut public = pa("Ind: Public", "Liberty", "active");
         public.access_inferred = true;
         s.insert("E:s.20(7)(a)".to_string(), vec![public.clone()]);
         // Same-provision case; an LLM-active Liberty (not inferred) gets nothing
         s.insert("L:reg.35(1)".to_string(), vec![pa("Gvt: Authority: Local", "Obligation", "active"), public, pa("Ind: Person", "Liberty", "active")]);
         let got = derive_correlatives(&s);
-        assert_eq!(corr(&got, "E:s.20(7)(a)", "Public"), vec![(ClaimRight, "Gvt: Authority: Enforcement".into())]);
-        assert_eq!(corr(&got, "L:reg.35(1)", "Public"), vec![(ClaimRight, "Gvt: Authority: Local".into())]);
+        assert_eq!(corr(&got, "E:s.20(7)(a)", "Ind: Public"), vec![(ClaimRight, "Gvt: Authority: Enforcement".into())]);
+        assert_eq!(corr(&got, "L:reg.35(1)", "Ind: Public"), vec![(ClaimRight, "Gvt: Authority: Local".into())]);
         assert_eq!(corr(&got, "L:reg.35(1)", "Ind: Person"), vec![]);
     }
 
@@ -443,7 +443,7 @@ mod tests {
     #[test]
     fn load_rules_parses() {
         let rules = load_rules();
-        assert!(rules.len() >= 3);
+        assert!(rules.len() >= 2);
         assert_eq!(rules[0].trigger_actor, "Ind: Employee");
         assert_eq!(rules[0].inferred_actor, "Org: Employer");
     }

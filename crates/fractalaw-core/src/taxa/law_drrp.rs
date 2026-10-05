@@ -319,7 +319,7 @@ mod tests {
 
     #[test]
     fn holder_unknown_blocks_empowering_and_no_obligations() {
-        let rights = [sig("L:s.1", "Public", "Liberty")];
+        let rights = [sig("L:s.1", "Ind: Public", "Liberty")];
         let unknown = ["L:s.2".to_string()];
         let law = aggregate(&rights, &unknown, |_| Some("records shall be kept".into()));
         assert_eq!(law.verdict(), None);
@@ -327,7 +327,7 @@ mod tests {
         assert_eq!(payload.duty_types, BTreeSet::from(["Liberty".to_string(), "Obligation".to_string()]));
         // Known Rights and their holders are kept; there are no Duties to blank
         assert_eq!(payload.rights.len(), 1);
-        assert!(payload.rights_holders.contains("Public"));
+        assert!(payload.rights_holders.contains("Ind: Public"));
         assert!(payload.duties.is_empty() && payload.responsibilities.is_empty());
         assert_eq!(aggregate(&[], &unknown, |_| Some("records shall be kept".into())).verdict(), None);
         // A Duty is still Making whatever else is unknown

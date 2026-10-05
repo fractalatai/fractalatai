@@ -85,7 +85,7 @@ LABEL_ALIASES = {
     "united kingdom": "_NOT_ACTOR",
     "parliament": "_NOT_ACTOR",
     "child": "_NOT_ACTOR",
-    "public": "Public",
+    "public": "Ind: Public",
 }
 
 
