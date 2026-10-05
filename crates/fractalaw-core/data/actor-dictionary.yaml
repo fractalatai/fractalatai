@@ -1166,7 +1166,7 @@
 - label: "Spc: OH Advisor"
   type: governed
   category: Spc
-  triggers: [occupational health nurse, occupational health adviser, employment medical adviser, appointed doctor]  # plain doctor/physician/nurse: Spc: Health Care Professional (2026-10-05)
+  triggers: [occupational health nurse, occupational health adviser, occupational health physician, employment medical adviser, appointed doctor, relevant doctor, medical examiner]  # plain doctor/physician/nurse: Spc: Health Care Professional (2026-10-05)
 
 - label: "Spc: Surveyor"
   type: governed
