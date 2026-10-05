@@ -1464,3 +1464,24 @@
   category: EU
   triggers: [Committee of the Regions]
 
+# ── Gaps from family group 5 (second gate pause, 2026-10-05): domain prefixes, trigger-only ──
+- label: "Finance: Recognised Body"
+  type: governed
+  category: Finance  # Companies Act 1989 Part VII: recognised investment exchange / clearing house
+  triggers: [recognised body, recognised investment exchange, recognised clearing house]
+
+- label: "Finance: Clearing Member"
+  type: governed
+  category: Finance
+  triggers: [clearing member, clearing members]
+
+- label: "Aviation: Commander"
+  type: governed
+  category: Aviation
+  triggers: [aircraft commander, commander of an aircraft, pilot in command]
+
+- label: "Aviation: Crew"
+  type: governed
+  category: Aviation
+  triggers: [crew member, crew of an aircraft, flight crew, cabin crew]
+
