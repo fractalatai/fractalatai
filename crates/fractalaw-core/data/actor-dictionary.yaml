@@ -1362,3 +1362,36 @@
   category: Org
   triggers: [social partners, management and labour, organisations of employers and workers]
 
+# ── Gaps from family group 2 bulk labels (2026-10-05) ──
+- label: "Org: Temporary Work Agency"
+  type: governed
+  category: Org
+  regex_patterns:  # masked from the government pass (actors.rs GOVERNMENT_MASK), so Gvt: Agency doesn't fire
+    - "[Tt]emporary work agenc(?:y|ies)"
+  triggers: [temporary work agency, temporary work agencies, employment business]
+
+- label: "Org: Developer"
+  type: governed
+  category: Org
+  triggers: [developer, developers, the developer]
+
+- label: "Org: Community Body"
+  type: governed
+  category: Org
+  triggers: [community body, crofting community body, community bodies]
+
+- label: "SC: Filler"
+  type: governed
+  category: SC
+  triggers: [filler, fillers]
+
+- label: "EU: Economic and Social Committee"
+  type: government
+  category: EU
+  triggers: [European Economic and Social Committee, Economic and Social Committee]
+
+- label: "EU: Advisory Committee on Safety and Health at Work"
+  type: government
+  category: EU
+  triggers: [Advisory Committee on Safety and Health at Work]
+

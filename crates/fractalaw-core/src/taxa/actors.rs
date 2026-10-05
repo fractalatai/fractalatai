@@ -61,8 +61,6 @@ static BLACKLIST: &[&str] = &[
     r"local authority collected municipal waste",
     r"[Pp]ublic (?:nature|sewer|importance|functions?|interest|[Ss]ervices)",
     r"[Rr]epresentatives? of",
-    r"(?i)agency workers?",
-    r"(?i)temporary work agency",
 ];
 
 static BLACKLIST_COMPILED: LazyLock<Vec<Regex>> =
@@ -75,6 +73,10 @@ static BLACKLIST_COMPILED: LazyLock<Vec<Regex>> =
 static GOVERNMENT_MASK: &[&str] = &[
     r"(?:[Ss]imilar |[Ss]enior )?[Oo]fficers? of (?:the|a|an|any|that|such|another) (?:body corporate|company|limited liability partnership|partnership|Scottish partnership)",
     r"[Ss]imilar [Oo]fficers?",
+    // Agency Workers Regulations: the temporary work agency is a governed actor (Org: Temporary Work Agency),
+    // not Gvt: Agency. Was on the blacklist, which hid it from the governed pass too (2026-10-05).
+    r"(?i)temporary work agenc(?:y|ies)",
+    r"(?i)agency workers?",
 ];
 
 static GOVERNMENT_MASK_COMPILED: LazyLock<Vec<Regex>> =
@@ -845,6 +847,14 @@ mod tests {
         let l = g(" The Lord Advocate may issue guidance. ");
         assert!(l.contains(&"Gvt: Minister: Lord Advocate".to_string()) && !l.contains(&"Gvt: Judiciary".to_string()), "{l:?}");
         assert!(g(" The court may order the forfeiture. ").contains(&"Gvt: Judiciary".to_string()));
+    }
+
+    #[test]
+    fn temporary_work_agency_is_governed_not_gvt_agency() {
+        let actors = extract_actors(" The temporary work agency shall provide the agency worker with information. ");
+        assert!(has_label(&actors.governed, "Org: Temporary Work Agency"), "{:?}", actors.governed);
+        assert!(!has_label(&actors.government, "Gvt: Agency"), "{:?}", actors.government);
+        assert!(has_label(&extract_actors(" The Agency must publish a report. ").government, "Gvt: Agency"));
     }
 
     #[test]
