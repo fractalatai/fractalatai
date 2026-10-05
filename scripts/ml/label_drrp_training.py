@@ -20,7 +20,7 @@ Dictionary gaps are reported, never silently absorbed (Jason, 2026-10-05: jump o
 
   label_drrp_training.py --pilot 200 --dry-run   # which provisions, no calls
   label_drrp_training.py --pilot 200             # pilot: proportional per stratum, then a report
-  label_drrp_training.py --family "FIRE,NUCLEAR" --pilot 50   # a family group's pilot (substring match)
+  label_drrp_training.py --family "FIRE,NUCLEAR" --pilot 50   # a family group's pilot (substring match; "(none)" = no family)
   label_drrp_training.py                         # the whole sample
   label_drrp_training.py --report                # report on what's labelled so far
 """
@@ -217,7 +217,9 @@ def main() -> None:
     if args.family:
         fam = dict(duckdb.connect(DUCK, read_only=True).execute("SELECT name, coalesce(family, '') FROM legislation").fetchall())
         wanted = [f.strip().lower() for f in args.family.split(",") if f.strip()]
-        rows = [r for r in rows if any(w in fam.get(r["law_name"], "").lower() for w in wanted)]
+        # "(none)" selects laws with no family in DuckDB (empty or missing)
+        rows = [r for r in rows if any((w == "(none)" and not fam.get(r["law_name"], "").strip())
+                                       or (w != "(none)" and w in fam.get(r["law_name"], "").lower()) for w in wanted)]
     if args.pilot:
         rows = pick_pilot(rows, args.pilot, args.seed)
     ids = {r["section_id"] for r in rows}
