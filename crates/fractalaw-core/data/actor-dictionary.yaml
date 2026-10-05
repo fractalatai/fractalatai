@@ -1249,3 +1249,8 @@
   type: government
   category: EU
   triggers: [European Parliament]
+- label: "Ind: Company Officer"
+  type: governed
+  category: Ind
+  triggers: [officer of a body corporate, director, manager, secretary or other similar officer, member of a body corporate]
+

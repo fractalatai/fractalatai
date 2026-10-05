@@ -49,7 +49,8 @@ This session runs the **single run**: one enrichment pass and **one** publish, a
 - ⬜ **(Jason)** Compliance screening: `current_verdict` or `is_making`. Decided before the publish
 - ⬜ **Actor label renames and the Authorised Person class change (2026-10-05):**
   - ✅ hub rows migrated 2026-10-05 (`scripts/migrations/rename_actor_labels_20261005.py`);
-  - legal's `government_label?/1` no longer lists Spc: Authorised Person (must be live in legal's server **before** the publish);
+  - ✅ legal's `government_label?/1` no longer lists Spc: Authorised Person: live 2026-10-05 (legal bb4bb624); legal's rename task is `mix actors.rename_labels` (6f9600e4), run at our pre-publish message;
+  - ⬜ **(Jason)** The 30 laws carrying Spc: Authorised Person that are outside the backlog. Recommended (c): add them to the single run's backfill + publish (no re-parse), so their law-level holders re-derive under the governed class. The alternatives are (b) legal strips the stale holders, or (a) leave them;
   - legal runs the same rename map on its stored legal_articles rows at the publish. 88 of the 235 affected laws are outside the backlog, so our payloads alone won't rename them.
 
 ## Dependencies

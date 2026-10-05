@@ -119,3 +119,13 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - **Highest:** Road Safety 55%, Rail 47%, Climate Change 43%, Data 42%, Air Safety 40%.
 
 **Caveat:** this proxy mixes dictionary gaps with passive/impersonal duties (#60). The per-family pilot's OTHER rate is the real confidence signal.
+
+## Pilot re-run with the reconciled dictionary (2026-10-05)
+
+**Run:** 206 provisions at `drrp-v1.1-2026-10-05+dict.85e950d2`, $0.85 ($4.13 per 1,000; the larger dictionary adds ~900 cached tokens), no errors.
+
+**OTHER labels: 15 → 2.** The new labels are used: consignor, consignee, producer, holder, tenant, Maritime: Master, safety committee, advisor, agent, EU Council and Parliament. Remaining:
+- "Officer of a body corporate": the corporate-offence officer, 134 provisions in 103 laws. Added as trigger-only `Ind: Company Officer`. **Regex risk:** `[Oo]fficer` (Gvt: Officer) catches it as a government officer; fix when patterns are added.
+- "Taker of provisional measure": too specific, left as OTHER.
+
+**Yields unchanged:** beneficiary 6 (0.03 per provision), counterparty 36 (0.17).
