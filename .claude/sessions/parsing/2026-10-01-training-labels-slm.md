@@ -20,7 +20,8 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 
 ## Todo
 
-- ⬜ Training set: non-benchmark, live, substantive provisions spread across ~560 laws, stratified so beneficiary and counterparty get 1,000+ actors each. Hold out a test split
+- ⬜ Training set: non-benchmark, live, substantive provisions spread across ~560 laws, stratified so beneficiary and counterparty get 1,000+ actors each, **and holder-unknown Obligations, including duties with an applying provision (701 in 51 laws, #60)**, are well represented. Hold out a test split
+- ⬜ Label at `drrp-v1.1-2026-10-05` (#60 applying provisions); build prompts as `scripts/benchmarks/gold_v2/label.py` does (stems + references + `applying()`). Evaluate also on `data/audit/holder60_cases_20261005.tsv`
 - ⬜ Cost check before running. Per call (smoke test, Gemini 3.8 Flash): ~6.35K tokens in, of which 6.1K is the system prompt (cacheable), and ~170 out + 200–600 thinking. **(Jason)** prices it in the console and approves
 - ⬜ Label with the definitive prompt, one model, per provision. Resumable and versioned; nothing written to provision_actors
 - ⬜ Retrain the SLM (RunPod) on position + type, and purpose per provision. Not `act`
@@ -31,7 +32,7 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 
 ## Dependencies
 
-- ⬜ #60 remote duty holders resolved and prompt at drrp-v1.1 (`parsing/2026-10-05-issue-60.md`)
+- ✅ #60 remote duty holders resolved and prompt at drrp-v1.1 (`parsing/2026-10-05-issue-60.md`)
 - ✅ Model complete and the definitive prompt written (`parsing/2026-09-30-issue-72.md`, `501edc2`)
 - ⬜ RunPod (Jason launches)
 - Enables: the single run (`09-29-26-reenrichment-backlog.md`)
