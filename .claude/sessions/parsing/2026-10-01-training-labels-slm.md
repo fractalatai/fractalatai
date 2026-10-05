@@ -213,3 +213,16 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - Beneficiary 0.00, as expected: environmental duties protect the environment, not a party, and `prot` is small here (105 in the group).
 - Counterparty 0.14; fewer actors per provision (49 / 50); 6 holder-unknown.
 - 1,172 remain for the bulk run (~$4).
+
+## Family group 3 bulk (2026-10-05)
+
+**Result:** 1,222 provisions labelled, no errors, $4.77 for the group ($3.91 per 1,000).
+- Actors: active 623, mentioned 665, counterparty 183, **beneficiary 3**, as expected for environmental law.
+- Holder unknown: 42 of 181 in `hu`; relation yes 682 / no 540.
+
+**Gaps:**
+- Added: SC: T&L: Notifier (waste shipments), Ind: Designated Person.
+- Accepted: (envisaged) country of destination, Secretariat of the Basel Convention.
+- Relabel: 7 of 1,222; 0 gaps after.
+
+**Running totals (groups 1–3):** 4,214 provisions; 508 beneficiaries, 758 counterparties; $16.22.
