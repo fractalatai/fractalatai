@@ -289,3 +289,18 @@ Legal's first checks missed bracket-cased patterns; the re-check found three ove
 - **Dictionary over the day:** 132 → ~230 labels, reconciled with legal. Regex clashes fixed: company officer, economic operator, verifier, gas transporter, temporary work agency, prosecutor / Lord Advocate.
 
 **Next:** export the labels into the SLM fine-tune format and retrain on RunPod (Jason launches), then evaluate against the held-out test laws, the 50 hand-checked rows, `holder60_cases` and gold v2.
+
+## Second model (GPT-5.5 low) + Claude referee: batch 1 (2026-10-05)
+
+**Jason:** add the second model and the Claude diff analysis (the gold v2 approach) to the training labels, starting with batch 1 (family group 1, 1,357 provisions).
+
+**Run:** `label_drrp_training.py --model openai` (gpt-5.5:low, `prompt_cache_key` for cache routing). 1,357 labelled, 0 errors, **$22.38** ($16.49 per 1,000; GPT-5.5 is $5 / $0.50 cached / $30 per M).
+- GPT is much looser with labels than Gemini (~30 kinds of OTHER, many with existing labels; some non-actors). The gate paused twice on GPT noise, so the rest of the GPT pass ran with `--gate 0`.
+- Real gaps added: Spc: Conformity Assessment Personnel, Org: Subsidiary, Org: Subcontractor, Spc: Shotfirer, Ind: Legal Representative; triggers for installation manager, proprietor and partner. `Spc: Notified Body` (a GPT slip) is an alias.
+
+**Diff** (`compare_training_labels.py`): **75.0% agree, 339 disputed (25%).**
+- By kind: purpose 200, relation 118, active↔mentioned 83, GPT-only actor 55, counterparty↔mentioned 44, raw_type 37, beneficiary↔mentioned 35, label 30, **counterparty↔beneficiary 6**.
+- Agreement by stratum: from 88% (none) down to 60% (app).
+- The counterparty/beneficiary split the retrain is for is nearly settled; disputes concentrate on purpose and relation.
+
+**Referee:** brief in `scripts/ml/REFEREE_TRAINING_LABELS.md`; disputes in `data/training/drrp-v1.1/disputes_batch1.jsonl`; decisions go to `referee/batch1.jsonl`. Test batch of 10 running.
