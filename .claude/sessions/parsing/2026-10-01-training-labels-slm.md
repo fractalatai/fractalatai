@@ -31,7 +31,7 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
     - Jason's decisions: YAML canonical; group prefixes for cross-domain roles, domain prefixes (Data:, Offshore:, Maritime:, Env:) for domain-specific ones; trigger-only additions; Spc: Authorised Person governed.
     - 175 labels: 45 added, 9 renamed via `renamed_from`.
     - Legal has the final list and rename map.
-  - ⬜ **(Jason)** Apply the label rename migration (`scripts/migrations/rename_actor_labels_20261005.py`). Dry run: 2,599 provision_actors rows (SC: Applicant 2,378), 53 gold rows, 16 collisions (Spc: Appellant duplicates; new label's values kept, gaps filled from the old row)
+  - ✅ Label rename migration applied 2026-10-05 (`scripts/migrations/rename_actor_labels_20261005.py`): 2,599 provision_actors rows and 53 gold rows renamed, 16 collisions merged; no old labels remain. Backup: `data/backups/pre_actor_rename_20261005.dump` (pg_dump -Fc of provision_actors, gold_benchmarks, gold_v2). Legal's side waits for the single run's publish (backlog checklist)
 - ⬜ Label versions now include the dictionary hash (`label_version()`, currently `drrp-v1.1-2026-10-05+dict.85e950d2`), so the 245 pilot/probe labels made with the old dictionary will be relabelled in the family pilots
 - ⬜ **Label by family, in order of actor-dictionary confidence** (memory `feedback_actor_dictionary_gap`). Per family group: a pilot of ~50 → add the OTHER actors to the dictionary (and tell legal) → bulk. High-confidence families first (OH&S sub-families, Fire, Nuclear, Consumer/Product Safety…). The LLM work improves the dictionary
 - ⬜ Label with the definitive prompt, one model, per provision. Resumable and versioned; nothing written to provision_actors

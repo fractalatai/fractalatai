@@ -48,7 +48,7 @@ This session runs the **single run**: one enrichment pass and **one** publish, a
 - ⬜ **Purpose change list for compliance (legal#172):** per law, old `purpose` values → new (from `purpose_profile`, share ≥ 0.05), sent to legal after the dry run. Process+Rule has no 1:1 mapping
 - ⬜ **(Jason)** Compliance screening: `current_verdict` or `is_making`. Decided before the publish
 - ⬜ **Actor label renames and the Authorised Person class change (2026-10-05):**
-  - hub rows migrated (`scripts/migrations/rename_actor_labels_20261005.py`);
+  - ✅ hub rows migrated 2026-10-05 (`scripts/migrations/rename_actor_labels_20261005.py`);
   - legal's `government_label?/1` no longer lists Spc: Authorised Person (must be live in legal's server **before** the publish);
   - legal runs the same rename map on its stored legal_articles rows at the publish. 88 of the 235 affected laws are outside the backlog, so our payloads alone won't rename them.
 
