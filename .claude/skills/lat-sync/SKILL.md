@@ -44,6 +44,7 @@ Set `PG=--pg postgres://fractalaw:fractalaw@localhost:5433/fractalaw` and `Z="--
 4. **Batches:** `pull-lat $Z --stale --apply --limit 30`, then repeat. Benchmark laws are report-only unless `--allow-benchmark`, which needs Jason's approval.
 5. **Re-parse:** the laws in `reparse_<ts>.txt` go through the existing pipeline: `taxa parse` → reconcile → backfill (and fitness). `taxa parse` rewrites law-level DuckDB DRRP, so restore held/zero-actor laws from a snapshot per the #57/#58 lessons.
 6. **Held rows:** look at them per law (`lat_sync_state.held_section_ids`) and decide manually.
+7. **Cross-instrument holders check (#77):** run `/usr/bin/python3 .claude/skills/cross-instrument-holders/scripts/check_due.py`. If it prints a reminder (last pass > 90 days ago), run the `cross-instrument-holders` skill after the re-parse, so new regulations whose duty holder sits in the parent Act get reviewed.
 
 ## Delete Verification
 

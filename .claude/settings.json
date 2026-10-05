@@ -16,5 +16,18 @@
       "Bash(*rm -rf*target*)",
       "Bash(*cargo clean*)"
     ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$CLAUDE_PROJECT_DIR\"/.claude/skills/cross-instrument-holders/scripts/check_due.py --hook 2>/dev/null || true",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }
