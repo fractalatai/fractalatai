@@ -204,3 +204,12 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - **Accepted:** visiting force, headquarters.
 
 **Relabel:** 19 of 1,635; 0 gaps.
+
+## Family group 3 pilot (2026-10-05)
+
+**Group 3:** Environmental Protection, Waste, Water & Wastewater, Pollution, Air Quality, Noise; 1,222 sample provisions.
+
+**Pilot:** 50 provisions, $0.17, no errors, **0 dictionary gaps**.
+- Beneficiary 0.00, as expected: environmental duties protect the environment, not a party, and `prot` is small here (105 in the group).
+- Counterparty 0.14; fewer actors per provision (49 / 50); 6 holder-unknown.
+- 1,172 remain for the bulk run (~$4).
