@@ -73,7 +73,7 @@
   category: Gvt
   regex_patterns:
     - "(?:(?:Local |Special )?Health Boards?|NHS (?:Foundation )?Trusts?|NHS [Bb]od(?:y|ies)|NHS England|Health and Social Care (?:Trusts?|Board))"
-  triggers: [health board, local health board, nhs trust, nhs body, nhs england, health and social care trust]
+  triggers: [health board, local health board, nhs trust, nhs body, nhs england, health and social care trust, national health service]
 
 - label: "Gvt: Minister"
   type: government
@@ -592,7 +592,7 @@
   category: Spc
   regex_patterns:
     - "[Cc]ompliance [Bb]od(?:y|ies)"
-  triggers: [compliance body, compliance bodies]
+  triggers: [compliance body, compliance bodies, scheme operator, operator of a compliance scheme]
 
 - label: "Spc: Certification Body"
   type: governed
@@ -1028,12 +1028,12 @@
 - label: "SC: Producer"
   type: governed
   category: SC
-  triggers: [producer, producers, person who produces]
+  triggers: [producer, producers, person who produces, small producer, producer of batteries, scheme member]
 
 - label: "SC: Exporter"
   type: governed
   category: SC
-  triggers: [exporter, exporters, person who exports]
+  triggers: [exporter, exporters, person who exports, approved battery exporter, battery exporter]
 
 - label: "SC: Retailer"
   type: governed
@@ -1103,7 +1103,7 @@
 - label: "Ind: Holder"
   type: governed
   category: Ind
-  triggers: [holder, holders, waste holder]
+  triggers: [holder, holders, waste holder, final holder]
 
 - label: "Ind: Appointed Person"
   type: governed
@@ -1148,7 +1148,7 @@
 - label: "Org: Partnership"
   type: governed
   category: Org
-  triggers: [partnership, unincorporated body]
+  triggers: [partnership, unincorporated body, Scottish partnership, unincorporated association, limited liability partnership]
 
 - label: "Org: Tenant"
   type: governed
@@ -1256,4 +1256,55 @@
     - "(?:[Ss]imilar |[Ss]enior )?[Oo]fficers? of (?:the|a|an|any|that|such|another) (?:body corporate|company|limited liability partnership|partnership|Scottish partnership)"
     - "[Ss]imilar [Oo]fficers?"
   triggers: [officer of a body corporate, director, manager, secretary or other similar officer, member of a body corporate]
+
+# ── Dictionary gaps from LLM output (llm_gaps.py, 2026-10-05): trigger-only ──
+- label: "Building: Accountable Person"
+  type: governed
+  category: Building  # domain prefix: Building Safety Act 2022 higher-risk buildings (occupation phase)
+  triggers: [accountable person, AP, accountable person for a higher-risk building]
+
+- label: "Building: Principal Accountable Person"
+  type: governed
+  category: Building
+  triggers: [principal accountable person, PAP]
+
+- label: "Ind: Resident"
+  type: governed
+  category: Ind
+  triggers: [resident, residents, relevant resident]
+
+- label: "Ind: Complainant"
+  type: governed
+  category: Ind
+  triggers: [complainant, complainants]
+
+- label: "Ind: Accused"
+  type: governed
+  category: Ind
+  triggers: [accused, the accused, agent of the accused]
+
+- label: "Org: Licensor"
+  type: governed
+  category: Org
+  triggers: [licensor, licensors]
+
+- label: "Gvt: Minister: Lord Advocate"
+  type: government
+  category: Gvt
+  triggers: [Lord Advocate]
+
+- label: "Gvt: Parliament"
+  type: government
+  category: Gvt
+  triggers: [Parliament, either House of Parliament, House of Commons, House of Lords]
+
+- label: "SC: Buyer"
+  type: governed
+  category: SC
+  triggers: [buyer, buyers, purchaser]
+
+- label: "Svc: Statutory Undertaker"
+  type: governed
+  category: Svc
+  triggers: [statutory undertaker, statutory undertakers]
 

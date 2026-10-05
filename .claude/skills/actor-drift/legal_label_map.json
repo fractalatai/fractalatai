@@ -1,0 +1,18 @@
+{
+  "_comment": "sertantai-legal regex-library labels → fractalaw canonical label (null = rejected, too broad). From docs/dictionaries/ACTOR-RECONCILIATION-2026-10-05.md; extend as legal's library changes.",
+  "Ind: Applicant": "Ind: Applicant",
+  "Ind: Licence Holder": "Ind: Licensee",
+  "Ind: Authorised Person": "Spc: Authorised Person",
+  "SC: Domestic Client": "SC: C: Domestic Client",
+  "Public: Parents": "Ind: Parent",
+  "Maritime: master": "Maritime: Master",
+  "Maritime: crew": "Maritime: Crew",
+  "Spc: Representative": "SC: Authorised Representative",
+  "Gvt: Ministry:": "Gvt: Ministry",
+  "Gvt: Agency:": "Gvt: Agency",
+  "Gvt: Devolved Admin:": "Gvt: Devolved Admin",
+  ": He": null,
+  "Organisation": null,
+  "Gvt: Official": null,
+  "Spc: Body": null
+}

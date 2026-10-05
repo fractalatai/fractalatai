@@ -48,6 +48,30 @@ After any benchmark run, QA cycle, or enrichment that shows provisions with gold
 - the matching entry has `regex_patterns` (entries with only `triggers` are LLM-only);
 - family-gated entries match the law's family (DuckDB families carry an emoji prefix; `normalize_family` strips it).
 
+## LLM gaps mode (`llm_gaps.py`): run after every LLM batch
+
+**Jason (2026-10-05):** the actor dictionary is a known gap, so jump on any dictionary diff as soon as it surfaces.
+
+```bash
+/usr/bin/python3 /var/home/jason/fractalaw/.claude/skills/actor-drift/scripts/llm_gaps.py      # exit 1 when gaps remain
+```
+
+It reports:
+- `OTHER:` actors from the training labels (`drrp_training_labels_raw`) and gold v2 at the current prompt version;
+- labels not in the dictionary, from those sources and from hub `provision_actors` (free-text labels summarised by tier);
+- labels in legal's regex library (`actor_definitions.ex`) that we lack, after `legal_label_map.json`.
+
+`OTHER:` actors whose words now contain a label's trigger, and labels renamed via `renamed_from`, count as covered. Accepted unlabelled actors (too specific) live in `data/training/drrp-v1.1/accepted_other.txt`. The output goes to `data/audit/dictionary_gaps/<date>.json`.
+
+The labeller (`scripts/ml/label_drrp_training.py`) lists the same gaps after every run. A bulk run **pauses** (exit 3) when one new `OTHER:` actor appears `--gate` times (default 3).
+
+**Same-day loop for each gap:**
+1. **Add the label**, trigger-only, with the prefix chosen by what the actor is: a group prefix (Ind/Org/SC/Spc/Svc, Gvt/EU) for cross-domain roles, a domain prefix (Data:, Building:, Offshore:, Maritime:, Env:) for domain-specific ones. Or accept it in `accepted_other.txt` if it's too specific.
+2. **Check for regex clashes.** Does an existing pattern already catch the words as something else, like `[Oo]fficer` catching "officer of the body corporate" as Gvt: Officer? Fix it with a pattern, a mask (`GOVERNMENT_MASK` in actors.rs) and a test.
+3. **Measure the hub rows** it affects and schedule the repair: a migration, or the single run's scope (backlog session checklist).
+4. **Tell legal** (the sertantai-legal session): the label, any pattern, any rename.
+5. **Re-run the labeller.** Only the provisions the change affects relabel: the dictionary version is tracked per row in `drrp_dictionary_versions`.
+
 ## Workflow: Fixing Actor Drift
 
 1. **Run the surfacing script** — get list of missing entities

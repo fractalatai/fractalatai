@@ -172,11 +172,26 @@ def system_prompt() -> str:
     return SYSTEM_PROMPT.format(dictionary=dictionary_block())
 
 
+def dictionary_entries(yaml_text: str | None = None) -> dict[str, dict]:
+    """label → {type, triggers, patterns} for the actor dictionary (or a given YAML text, e.g. an old commit)."""
+    out = {}
+    for e in yaml.safe_load(yaml_text if yaml_text is not None else open(DICTIONARY)):
+        d = out.setdefault(e["label"], {"type": e["type"], "triggers": [], "patterns": []})
+        d["triggers"] += e.get("triggers") or []
+        d["patterns"] += e.get("regex_patterns") or []
+    return out
+
+
+def dictionary_version() -> str:
+    """Short hash of the dictionary block the prompt carries."""
+    import hashlib
+    return hashlib.sha256(dictionary_block().encode()).hexdigest()[:8]
+
+
 def label_version() -> str:
     """PROMPT_VERSION plus a hash of the actor dictionary block: the dictionary is part of the prompt,
     so labels made with a different dictionary are a different version (e.g. drrp-v1.1-2026-10-05+dict.1a2b3c4d)."""
-    import hashlib
-    return f"{PROMPT_VERSION}+dict.{hashlib.sha256(dictionary_block().encode()).hexdigest()[:8]}"
+    return f"{PROMPT_VERSION}+dict.{dictionary_version()}"
 
 
 def gemini_schema() -> dict:

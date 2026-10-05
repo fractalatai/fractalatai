@@ -122,6 +122,15 @@ CREATE TABLE IF NOT EXISTS drrp_training_labels_raw (
     response       JSONB,
     error          TEXT,
     usage          JSONB,
+    dict_version   TEXT NOT NULL DEFAULT 'pre-reconcile',  -- actor dictionary the prompt carried (drrp_dictionary_versions)
     created_at     TIMESTAMPTZ DEFAULT now(),
-    PRIMARY KEY (section_id, text_md5, model, prompt_version)
+    PRIMARY KEY (section_id, text_md5, model, prompt_version, dict_version)
+);
+
+-- Actor dictionary versions the labelling prompts carried: label → triggers/patterns, so a run can tell
+-- which labels were added since a provision was labelled and relabel only the provisions they affect.
+CREATE TABLE IF NOT EXISTS drrp_dictionary_versions (
+    dict_version TEXT PRIMARY KEY,
+    labels       JSONB NOT NULL,
+    created_at   TIMESTAMPTZ DEFAULT now()
 );
