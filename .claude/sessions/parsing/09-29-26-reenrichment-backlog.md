@@ -47,10 +47,10 @@ This session runs the **single run**: one enrichment pass and **one** publish, a
 - ⬜ Correlatives (claim/liability/protected holders), current_* and as-made verdicts reviewed together (Jason)
 - ⬜ **Purpose change list for compliance (legal#172):** per law, old `purpose` values → new (from `purpose_profile`, share ≥ 0.05), sent to legal after the dry run. Process+Rule has no 1:1 mapping
 - ⬜ **(Jason)** Compliance screening: `current_verdict` or `is_making`. Decided before the publish
-- ⬜ **(Jason)** Company officer repair (2026-10-05, `0e7846d`):
+- ⬜ Company officer repair (2026-10-05, `0e7846d`):
   - Gvt: Officer was matching "director … or other similar officer of the body corporate": 401 hub provisions in 144 laws, 166 active rows (false government Responsibility holders).
   - The extractor is fixed. The 90 backlog laws are re-parsed in the run anyway.
-  - The 54 laws outside the backlog need adding to the run's re-parse (regex/LLM rows), not just backfill.
+  - **54 laws outside the backlog added to the run's re-parse** (Jason, 2026-10-05; regex/LLM rows, not just backfill): UK_asc_2026_5, UK_asp_2003_8, UK_asp_2005_13, UK_ssi_2009_266, UK_ssi_2014_161, UK_ssi_2014_258, UK_ukpga_1947_39, UK_ukpga_1961_34, UK_ukpga_1968_72, UK_ukpga_1971_60, UK_ukpga_1971_61, UK_ukpga_1974_37, UK_ukpga_1976_72, UK_ukpga_1982_16, UK_ukpga_1982_45, UK_ukpga_1984_26, UK_ukpga_1987_12, UK_ukpga_1989_15, UK_ukpga_1989_40, UK_ukpga_1990_8, UK_ukpga_1994_21, UK_ukpga_1996_6, UK_ukpga_1997_8, UK_ukpga_2000_23, UK_ukpga_2000_5, UK_ukpga_2003_21, UK_ukpga_2004_20, UK_ukpga_2005_16, UK_ukpga_2006_28, UK_ukpga_2006_36, UK_ukpga_2008_32, UK_ukpga_2010_15, UK_ukpga_2018_12, UK_ukpga_2022_30, UK_uksi_1997_2962, UK_uksi_2001_1701, UK_uksi_2006_2183, UK_uksi_2006_2184, UK_uksi_2007_3075, UK_uksi_2007_3077, UK_uksi_2007_3106, UK_uksi_2008_2164, UK_uksi_2010_330, UK_uksi_2010_332, UK_uksi_2011_1483, UK_uksi_2012_3032, UK_uksi_2015_1640, UK_uksi_2015_668, UK_uksi_2016_1026, UK_uksi_2016_1092, UK_uksi_2016_1154, UK_uksi_2017_1013, UK_uksi_2020_206, UK_wsi_2005_1806.
 - ⬜ **Actor label renames and the Authorised Person class change (2026-10-05):**
   - ✅ hub rows migrated 2026-10-05 (`scripts/migrations/rename_actor_labels_20261005.py`);
   - ✅ legal's `government_label?/1` no longer lists Spc: Authorised Person: live 2026-10-05 (legal bb4bb624); legal's rename task is `mix actors.rename_labels` (6f9600e4), run at our pre-publish message;
