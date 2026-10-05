@@ -150,3 +150,19 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 **Open (Jason):**
 - **`Ind: Public` (1,148 hub rows).** A correlative rule (`correlative-rules.yaml` rule 3) infers it as beneficiary for every active enforcement authority. The label is wrong (the dictionary label is `Public`; `actor_aliases.py` is fixed). The rule also contradicts the spec, which needs an explicit protective purpose for a beneficiary. Decide: retire the rule, or fix its label. The rows are inference-only, so they regenerate at re-parse. Asked legal whether they hold it.
 - **116 adjudicated rows with legacy free-text labels.** Benchmark gold carried forward; resolved at the gold v2 cutover.
+
+## Family group 1 pilot (2026-10-05)
+
+**Sample regenerated** with a `prot` stratum (duty word + protective-purpose wording, in the provision or its stem) and `ben` cut to 500: 6,959 provisions (old sample kept as `sample_20261005_v1.csv`).
+
+**Group 1** (Nuclear, Fire incl. Dangerous & Explosive Substances, Mines & Quarries, Gas & Electrical, Offshore Safety, Consumer/Product Safety) has 1,357 sample provisions.
+
+**Pilot (50 provisions, $0.18, no errors):**
+- beneficiary 0.22 per provision: `prot` gave 10 from 19 (0.53);
+- counterparty 0.16; relation yes 36 / no 14.
+
+**Gaps → fixed the same day:**
+- "economic operator" → `SC: Economic Operator`, with a pattern. Regex clash: `Operator`'s pattern included "economic operator" (338 hub rows in 26 laws). Fixed by a new per-label `exclude` field (actors.rs; excluded spans are blanked for that label only, and matched spans are removed by range).
+- "prosecutor" → `Gvt: Prosecutor` (trigger-only).
+
+**Re-run:** 3 of 50 relabelled; 0 gaps.
