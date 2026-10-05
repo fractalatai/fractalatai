@@ -20,11 +20,11 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 
 ## Todo
 
-- ⬜ Training set: non-benchmark, live, substantive provisions spread across ~560 laws, stratified so beneficiary and counterparty get 1,000+ actors each, **and holder-unknown Obligations, including duties with an applying provision (701 in 51 laws, #60)**, are well represented. Hold out a test split
+- ✅ Training set: `scripts/ml/sample_drrp_training.py` → `data/training/drrp-v1.1/sample.csv`, 6,121 provisions in 656 laws (5,524 train / 597 test, split by law, 61 test laws). Details below
 - ⬜ Label at `drrp-v1.1-2026-10-05` (#60 applying provisions); build prompts as `scripts/benchmarks/gold_v2/label.py` does (stems + references + `applying()`). Evaluate also on `data/audit/holder60_cases_20261005.tsv`
 - ✅ (from #60) Data protection labels added (`37530cd`): `Public: Data Controller`, `Public: Data Processor` (gated to PUBLIC: Data), `Ind: Data Subject`, `Gvt: Agency: Information Commissioner`. DPA s.91(1) now labels `Public: Data Controller`
 - ✅ (from #60) Holders in ANOTHER instrument → issue #77 and skill `cross-instrument-holders` (periodic Claude-agent pass, Jason-approved, adjudicated tier). Reminder: SessionStart hook + lat-sync step 7. First pass pending: 6 candidates in 4 laws
-- ⬜ Cost check before running. Per call (smoke test, Gemini 3.8 Flash): ~6.35K tokens in, of which 6.1K is the system prompt (cacheable), and ~170 out + 200–600 thinking. **(Jason)** prices it in the console and approves
+- ⬜ Cost check before running. Per call (smoke test, Gemini 3.8 Flash): ~6.35K tokens in, of which 6.1K is the system prompt (cacheable), and ~170 out + 200–600 thinking. **(Jason)** prices it in the console and approves. **Proposed:** a 200-provision pilot first (measure beneficiary/counterparty yield and real tokens), then the full run
 - ⬜ Label with the definitive prompt, one model, per provision. Resumable and versioned; nothing written to provision_actors
 - ⬜ Retrain the SLM (RunPod) on position + type, and purpose per provision. Not `act`
 - ⬜ Evaluate against held-out labels, the 50 hand-checked rows (`data/audit/poscorr_sample38_20261001.tsv`) and gold v2 when ready. It must match 3.8 Flash on the counterparty/beneficiary split before the run uses it
@@ -55,3 +55,27 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
     - `check_due.py --hook` runs from a SessionStart hook in `.claude/settings.json`.
   - Spec row "Holder named in another instrument".
   - First run: 6 candidates in 4 laws, all resolved, all parents in the hub.
+
+## Training sample (2026-10-05)
+
+`scripts/ml/sample_drrp_training.py` (seed 60). One unit is one provision.
+
+**Universe:** 141,511 substantive, non-repealed provisions with text, outside Schedules, in 656 live hub laws. Excluded: 4,018 laws that are benchmark (`gold_benchmarks`, `is_benchmark`), gold v2 (7), `enabling_extent` (0 today) or revoked.
+
+**Strata:** a provision takes the first that applies; flags kept. Round-robin across laws with a per-law cap of 3% of the stratum.
+
+| Stratum | Available (laws) | Sampled train / test |
+|---|---|---|
+| ben (any tier beneficiary, or protective-purpose wording) | 15,401 (535) | 1,361 / 139 |
+| cp (any tier counterparty) | 19,746 (555) | 1,087 / 113 |
+| app (holder unknown + applying provision, #60) | 181 (30) | 96 / 25 |
+| hu (other holder-unknown Obligation) | 3,905 (389) | 725 / 75 |
+| lib (Liberty) | 8,716 (485) | 450 / 50 |
+| none (no Obligation/Liberty: the negatives, raised to 1,000 for the #65 false positives) | 83,132 (644) | 902 / 98 |
+| general | 10,430 (542) | 903 / 97 |
+
+**Notes:**
+- Flags in the sample: ben 1,500, cp 1,923, holder-unknown 1,402, applying 141.
+- The tier positions are the noisy ones being replaced; they only steer the sample. The protective-wording cue adds only 244 provisions corpus-wide and is mixed ("for the benefit of the community").
+- **Beneficiary yield is unknown until labelled.** If ~60% confirm, that's ~900 beneficiary actors, short of the 1,000+ target, so the pilot measures it before the full run.
+- **Token estimate from gold v2 batch 1** (Gemini 3.8 Flash, 1,218 provisions: 6.00M in, 1.43M out incl. thinking; explicit caching was off then): ~4.9K in and ~1.2K out per provision. For 6,121 provisions that's ~30M in and ~7.2M out; with the 6.1K system prompt cached, most input is cache reads.
