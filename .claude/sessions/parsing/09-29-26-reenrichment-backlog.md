@@ -47,9 +47,9 @@ This session runs the **single run**: one enrichment pass and **one** publish, a
 - ⬜ Correlatives (claim/liability/protected holders), current_* and as-made verdicts reviewed together (Jason)
 - ⬜ **Purpose change list for compliance (legal#172):** per law, old `purpose` values → new (from `purpose_profile`, share ≥ 0.05), sent to legal after the dry run. Process+Rule has no 1:1 mapping
 - ⬜ **(Jason)** Compliance screening: `current_verdict` or `is_making`. Decided before the publish
-- ⬜ **(Jason)** Verifier / gas transporter label repair (2026-10-05):
+- ⬜ Verifier / gas transporter label repair (2026-10-05):
   - `Spc: Inspector` sits on 182 hub rows of verifier text and `SC: T&L: Carrier` on 64 rows of gas-transporter text. Same class (governed), so DRRP is unchanged; label precision only. Extractor fixed in `9b91854`.
-  - 17 of the 24 laws are in the backlog. **Proposed:** add the other 7 to the run's re-parse: UK_asp_2003_2, UK_asp_2003_8, UK_ssi_2004_508, UK_ukpga_1990_8, UK_ukpga_1997_8, UK_ukpga_2008_32, UK_uksi_2015_962.
+  - 17 of the 24 laws are in the backlog; **the other 7 are added to the run's re-parse (Jason, 2026-10-05):** UK_asp_2003_2, UK_asp_2003_8, UK_ssi_2004_508, UK_ukpga_1990_8, UK_ukpga_1997_8, UK_ukpga_2008_32, UK_uksi_2015_962.
 - ⬜ Economic operator repair (2026-10-05):
   - `Operator` was matching "economic operator" (the product-safety umbrella for manufacturer/importer/distributor): 468 provisions in 26 laws, 338 Operator rows (120 active).
   - Fixed by a per-label `exclude` in the dictionary, plus the new `SC: Economic Operator`.
