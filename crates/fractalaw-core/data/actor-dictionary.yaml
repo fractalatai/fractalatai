@@ -474,7 +474,7 @@
   category: Org
   regex_patterns:
     - "(?:[Oo]wners?|mine owner|owner of a non-production installation|installation owner)"
-  triggers: [owner, owners, the owner]
+  triggers: [owner, owners, the owner, proprietor, proprietors]
 
 - label: "Org: Occupier"
   type: governed
@@ -561,7 +561,7 @@
   category: Ind
   regex_patterns:
     - "(?:managers?|mine manager|manager of a mine|installation manager)"
-  triggers: [manager, managers]
+  triggers: [manager, managers, installation manager, offshore installation manager]
 
 - label: "Ind: Supervisor"
   type: governed
@@ -1152,7 +1152,7 @@
 - label: "Org: Partnership"
   type: governed
   category: Org
-  triggers: [partnership, unincorporated body, Scottish partnership, unincorporated association, limited liability partnership]
+  triggers: [partnership, unincorporated body, Scottish partnership, unincorporated association, limited liability partnership, partner, partners]
 
 - label: "Org: Tenant"
   type: governed
@@ -1550,4 +1550,15 @@
   type: governed
   category: Org  # non-construction (construction subcontractors are SC: C: Contractor)
   triggers: [subcontractor, subcontractors]
+
+# ── Real gaps among GPT-5.5 batch 1 OTHER actors (2026-10-05): trigger-only ──
+- label: "Spc: Shotfirer"
+  type: governed
+  category: Spc
+  triggers: [shotfirer, shot-firer, shotfirers]
+
+- label: "Ind: Legal Representative"
+  type: governed
+  category: Ind
+  triggers: [solicitor, advocate, barrister, advocate or solicitor, legal representative]
 
