@@ -24,7 +24,7 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - ⬜ Label at `drrp-v1.1-2026-10-05` (#60 applying provisions); build prompts as `scripts/benchmarks/gold_v2/label.py` does (stems + references + `applying()`). Evaluate also on `data/audit/holder60_cases_20261005.tsv`
 - ✅ (from #60) Data protection labels added (`37530cd`): `Public: Data Controller`, `Public: Data Processor` (gated to PUBLIC: Data), `Ind: Data Subject`, `Gvt: Agency: Information Commissioner`. DPA s.91(1) now labels `Public: Data Controller`
 - ✅ (from #60) Holders in ANOTHER instrument → issue #77 and skill `cross-instrument-holders` (periodic Claude-agent pass, Jason-approved, adjudicated tier). Reminder: SessionStart hook + lat-sync step 7. First pass pending: 6 candidates in 4 laws
-- ⬜ Cost check before running. Per call (smoke test, Gemini 3.8 Flash): ~6.35K tokens in, of which 6.1K is the system prompt (cacheable), and ~170 out + 200–600 thinking. **(Jason)** prices it in the console and approves. **Proposed:** a 200-provision pilot first (measure beneficiary/counterparty yield and real tokens), then the full run
+- ✅ Cost check: Jason approved per group; actual $3.92 per 1,000 with the explicit context cache
 - ⬜ **Before labelling (Jason 2026-10-05):**
   - ✅ LAT at legal's latest. The `pull-lat --stale` dry run (2026-10-05, after legal restarted :7447) gives 741 in_sync and 0 text changes; 154 not_held; the 4 known delete candidates were never applied
   - ✅ Actor dictionary reconciled with legal (`050e829`):
@@ -34,7 +34,7 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
   - ✅ Label rename migration applied 2026-10-05 (`scripts/migrations/rename_actor_labels_20261005.py`): 2,599 provision_actors rows and 53 gold rows renamed, 16 collisions merged; no old labels remain. Backup: `data/backups/pre_actor_rename_20261005.dump` (pg_dump -Fc of provision_actors, gold_benchmarks, gold_v2). Legal's side waits for the single run's publish (backlog checklist)
 - ⬜ Label versions now include the dictionary hash (`label_version()`, currently `drrp-v1.1-2026-10-05+dict.85e950d2`), so the 245 pilot/probe labels made with the old dictionary will be relabelled in the family pilots
 - ⬜ **Label by family, in order of actor-dictionary confidence** (memory `feedback_actor_dictionary_gap`). Per family group: a pilot of ~50 → add the OTHER actors to the dictionary (and tell legal) → bulk. High-confidence families first (OH&S sub-families, Fire, Nuclear, Consumer/Product Safety…). The LLM work improves the dictionary
-- ⬜ Label with the definitive prompt, one model, per provision. Resumable and versioned; nothing written to provision_actors
+- ✅ Label with the definitive prompt (drrp-v1.1), one model, per provision: all 6,959 sample provisions labelled 2026-10-05, $27.28, 0 errors; 0 open dictionary gaps (summary below)
 - ⬜ Retrain the SLM (RunPod) on position + type, and purpose per provision. Not `act`
 - ⬜ Evaluate against held-out labels, the 50 hand-checked rows (`data/audit/poscorr_sample38_20261001.tsv`) and gold v2 when ready. It must match 3.8 Flash on the counterparty/beneficiary split before the run uses it
 - ⬜ LLM tier: `gemini_llm_batch.py` moves to per-provision labelling with `drrp_prompt.py`; the per-actor `--position-correction` mode is retired
@@ -267,3 +267,25 @@ Legal's first checks missed bracket-cased patterns; the re-check found three ove
 **Pilot:** 50 drawn, of which 26 were new (the rest were labelled in earlier groups, where the substring filters overlap). $0.22, no errors, **0 dictionary gaps**.
 - Beneficiary 0.04, counterparty 0.18 per provision; 4 holder-unknown in `hu`.
 - About 1,147 remain for the bulk run (~$5).
+
+## Family group 5 bulk and the full sample (2026-10-05)
+
+**Group 5** paused at the gate **three times**, each time on a new domain body:
+1. "evaluation body" → Spc: Evaluation Body, plus EU: Committee of the Regions;
+2. "recognised body" → Finance: Recognised Body / Clearing Member, plus Aviation: Commander / Crew;
+3. "Committee on Climate Change" → Gvt: Agency: Committee on Climate Change, Gvt: Intelligence Service, Gvt: Authority: Safeguarding Children Board, and the school governing body. Jason: governed, with a new domain prefix, so **Education: School Governing Body**.
+
+**End-of-run gaps:** Org: Insurer, Spc: Auditor, Spc: Standardisation Body, Data: Subscriber, Finance: Auction Platform; "designated counterparty" trigger. Final relabel: 65 provisions.
+
+**Full sample, labelled:** 6,959 provisions, 0 errors, **$27.28** ($3.92 per 1,000). Relation yes 4,164 / no 2,795.
+
+| Split | Provisions | Active | Mentioned | Counterparty | Beneficiary | Holder unknown | Inferred |
+|---|---|---|---|---|---|---|---|
+| train | 6,357 | 3,628 | 3,847 | 1,081 | 598 | 485 | 190 |
+| test | 741 | 509 | 407 | 129 | 82 | 66 | 114 |
+
+- The table holds 139 more provisions than the sample: the earlier pilot (206) and probe (39) from the first draw, at the same prompt version and usable as training rows.
+- **Beneficiary: 680 in total, short of the 1,000 target.** Genuine protective-purpose duties are rare under the act test. Use class weighting in training.
+- **Dictionary over the day:** 132 → ~230 labels, reconciled with legal. Regex clashes fixed: company officer, economic operator, verifier, gas transporter, temporary work agency, prosecutor / Lord Advocate.
+
+**Next:** export the labels into the SLM fine-tune format and retrain on RunPod (Jason launches), then evaluate against the held-out test laws, the 50 hand-checked rows, `holder60_cases` and gold v2.
