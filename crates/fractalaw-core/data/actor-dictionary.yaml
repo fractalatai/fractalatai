@@ -358,7 +358,7 @@
   type: government
   category: Gvt
   regex_patterns:
-    - "(?:[Cc]ourt|[Jj]ustice of the [Pp]eace|[Tt]ribunal|[Ss]heriff|[Mm]agistrate|prosecutor|Lord Advocate)"
+    - "(?:[Cc]ourt|[Jj]ustice of the [Pp]eace|[Tt]ribunal|[Ss]heriff|[Mm]agistrate)"  # prosecutor, Lord Advocate: own labels (2026-10-05)
   triggers: [court, tribunal, judge, judiciary, employment tribunal, magistrates]
   drrp_keywords: [tribunal, court, sheriff, procurator fiscal]
 
@@ -1293,6 +1293,8 @@
 - label: "Gvt: Minister: Lord Advocate"
   type: government
   category: Gvt
+  regex_patterns:
+    - "Lord Advocate"
   triggers: [Lord Advocate]
 
 - label: "Gvt: Parliament"
@@ -1320,5 +1322,7 @@
 - label: "Gvt: Prosecutor"
   type: government
   category: Gvt
+  regex_patterns:
+    - "(?:[Pp]rosecutors?|[Pp]rocurator [Ff]iscal|Director of Public Prosecutions|Crown Prosecution Service)"
   triggers: [prosecutor, prosecuting authority, procurator fiscal, Director of Public Prosecutions, Crown Prosecution Service]
 

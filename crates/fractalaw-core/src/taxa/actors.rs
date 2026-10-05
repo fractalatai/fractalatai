@@ -838,6 +838,16 @@ mod tests {
     }
 
     #[test]
+    fn prosecutor_and_lord_advocate_are_not_judiciary() {
+        let g = |t: &str| extract_actors(t).government_labels();
+        let l = g(" The procurator fiscal may instruct the prosecutor to discontinue proceedings. ");
+        assert!(l.contains(&"Gvt: Prosecutor".to_string()) && !l.contains(&"Gvt: Judiciary".to_string()), "{l:?}");
+        let l = g(" The Lord Advocate may issue guidance. ");
+        assert!(l.contains(&"Gvt: Minister: Lord Advocate".to_string()) && !l.contains(&"Gvt: Judiciary".to_string()), "{l:?}");
+        assert!(g(" The court may order the forfeiture. ").contains(&"Gvt: Judiciary".to_string()));
+    }
+
+    #[test]
     fn public_specialists_not_extracted_for_ohs() {
         let text = "The provider shall ensure the keeper is informed.";
         let actors = extract_actors_for_family(text, Some("OH&S: Occupational / Personal Safety"));
