@@ -108,3 +108,20 @@ CREATE TABLE IF NOT EXISTS gold_benchmarks (
     gold_position TEXT NOT NULL,
     PRIMARY KEY (section_id, actor_label)
 );
+
+-- SLM training labels (definitive prompt, one model, per provision); raw responses, resumable and versioned.
+-- Never read by the pipeline tiers; training data only (session parsing/2026-10-01-training-labels-slm.md)
+CREATE TABLE IF NOT EXISTS drrp_training_labels_raw (
+    section_id     TEXT NOT NULL,
+    law_name       TEXT NOT NULL,
+    text_md5       TEXT NOT NULL,
+    model          TEXT NOT NULL,
+    prompt_version TEXT NOT NULL,
+    split          TEXT,
+    stratum        TEXT,
+    response       JSONB,
+    error          TEXT,
+    usage          JSONB,
+    created_at     TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (section_id, text_md5, model, prompt_version)
+);
