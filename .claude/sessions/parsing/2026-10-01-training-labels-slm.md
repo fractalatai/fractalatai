@@ -226,3 +226,13 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - Relabel: 7 of 1,222; 0 gaps after.
 
 **Running totals (groups 1–3):** 4,214 provisions; 508 beneficiaries, 758 counterparties; $16.22.
+
+## Family group 4 pilot (2026-10-05)
+
+**Group 4:** Maritime Safety, Energy, Building Safety, Planning & Infrastructure, Health (Public, Drug & Medicine, Coronavirus), Wildlife, Marine & Riverine, Animals, Plant Health, Fisheries, GMOs, Agriculture (incl. pesticides), Food, Trees, Historic Environment, Buildings; 1,564 sample provisions.
+
+**Pilot:** 51 provisions, $0.25, no errors.
+- Thinking is heavier (965 tokens per provision): $4.96 per 1,000.
+- Counterparty 0.37 per provision (licensing, grants, planning), beneficiary 0.04.
+
+**Gap:** "eligible farm business" → `Org: Farm Business` (trigger-only). 0 gaps after relabel.
