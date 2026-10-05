@@ -259,3 +259,11 @@ Legal's first checks missed bracket-cased patterns; the re-check found three ove
 - **OH Advisor** keeps the occupational forms; plain doctor/physician/nurse move to `Spc: Health Care Professional`.
 
 **Stale check extended:** a provision also relabels when its response uses a label whose triggers or patterns changed. 245 of 5,778 relabelled (~$1); only accepted one-offs remain.
+
+## Family group 5 pilot (2026-10-05)
+
+**Group 5:** everything still unlabelled: Climate Change, Road/Air/Rail transport, Data, Finance, bare PUBLIC, HR Insurance, X: No Family, todo, Oil & Gas, and laws with no family (`--family "(none)"`).
+
+**Pilot:** 50 drawn, of which 26 were new (the rest were labelled in earlier groups, where the substring filters overlap). $0.22, no errors, **0 dictionary gaps**.
+- Beneficiary 0.04, counterparty 0.18 per provision; 4 holder-unknown in `hu`.
+- About 1,147 remain for the bulk run (~$5).
