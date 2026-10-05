@@ -126,12 +126,14 @@ def register_dictionary(conn, version: str, entries: dict) -> None:
     conn.commit()
 
 
-def stale_reason(resp: dict, ctx: str, current: set[str], added: dict) -> str | None:
+def stale_reason(resp: dict, ctx: str, current: set[str], added: dict, changed: set[str] = frozenset()) -> str | None:
     for a in resp.get("actors", []):
         if a["label"].startswith("OTHER"):
             return f"OTHER ({a['label']})"
         if a["label"] not in current:
             return f"label gone ({a['label']})"
+        if a["label"] in changed:
+            return f"changed label ({a['label']})"
     for label, rx in added.items():
         if rx.search(ctx):
             return f"new label {label}"
@@ -256,10 +258,13 @@ def main() -> None:
             if dv == dict_version:
                 continue
             added = {lab: match_all[lab] for lab in current - set(labels or {}) if lab in match_all} if labels else match_all
-            why = stale_reason(resp, " ".join([t for _, t in stems] + [text]), current, added)
+            # labels whose triggers/patterns changed since: a response using one may have chosen differently
+            changed_labels = {lab for lab in current & set(labels or {}) if labels[lab] != entries[lab]}
+            added.update({lab: match_all[lab] for lab in changed_labels if lab in match_all})
+            why = stale_reason(resp, " ".join([t for _, t in stems] + [text]), current, added, changed_labels)
             if not why:
                 continue
-            reasons[why.split(" (")[0].split(" ")[0] if not why.startswith("new label") else "new label"] += 1
+            reasons[why.split(" (")[0] if not why.startswith("new label") else "new/changed label text"] += 1
         jobs.append((r, md5, user_prompt(sid, text, stems, references(sid, text, texts), applying(sid, parts, apps))))
     if args.limit:
         jobs = jobs[: args.limit]

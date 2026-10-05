@@ -725,7 +725,7 @@
   type: governed
   category: Spc
   regex_patterns:
-    - "(?:[Uu]ser inspectorate|[Ii]nspectors?|[Vv]erifier|[Ww]ell examiner)"
+    - "(?:[Uu]ser inspectorate|[Ii]nspectors?|[Ww]ell examiner)"  # verifier: Spc: Verifier (2026-10-05)
   triggers: [inspector, inspectors]
 
 - label: "Spc: Employees' Representative"
@@ -853,6 +853,7 @@
   category: SC
   regex_patterns:
     - "(?:[Tt]ransporter|[Cc]arriers?)"
+  exclude: ["[Gg]as transporters?"]  # Svc: Gas Transporter (2026-10-05)
   triggers: [carrier, carriers]
 
 - label: "SC: T&L: Driver"
@@ -1165,7 +1166,7 @@
 - label: "Spc: OH Advisor"
   type: governed
   category: Spc
-  triggers: [occupational health nurse, physician, doctor]
+  triggers: [occupational health nurse, occupational health adviser, employment medical adviser, appointed doctor]  # plain doctor/physician/nurse: Spc: Health Care Professional (2026-10-05)
 
 - label: "Spc: Surveyor"
   type: governed
@@ -1335,6 +1336,8 @@
 - label: "Spc: Verifier"
   type: governed
   category: Spc
+  regex_patterns:  # was an alternative under Spc: Inspector; an accredited (e.g. emissions) verifier isn't an inspector
+    - "[Vv]erifiers?"
   triggers: [verifier, accredited verifier]
 
 - label: "Spc: Laboratory"
@@ -1345,6 +1348,8 @@
 - label: "Svc: Gas Transporter"
   type: governed
   category: Svc
+  regex_patterns:  # excluded from SC: T&L: Carrier's "transporter"
+    - "[Gg]as transporters?"
   triggers: [gas transporter, gas transporters]
 
 - label: "Ind: Transferor"
@@ -1416,7 +1421,7 @@
 - label: "Spc: Health Care Professional"
   type: governed
   category: Spc
-  triggers: [health care professional, healthcare professional, registered medical practitioner, registered nurse]
+  triggers: [health care professional, healthcare professional, registered medical practitioner, registered nurse, doctor, physician, nurse]
 
 - label: "Gvt: Consular Officer"
   type: government

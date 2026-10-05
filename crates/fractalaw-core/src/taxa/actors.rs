@@ -858,6 +858,16 @@ mod tests {
     }
 
     #[test]
+    fn verifier_and_gas_transporter_have_their_own_labels() {
+        let l = extract_actors(" The verifier must check the annual emissions report. ").governed_labels();
+        assert!(l.contains(&"Spc: Verifier".to_string()) && !l.contains(&"Spc: Inspector".to_string()), "{l:?}");
+        let l = extract_actors(" The gas transporter shall maintain the network. ").governed_labels();
+        assert!(l.contains(&"Svc: Gas Transporter".to_string()) && !l.contains(&"SC: T&L: Carrier".to_string()), "{l:?}");
+        assert!(extract_actors(" The carrier shall keep the transfer note. ").governed_labels().contains(&"SC: T&L: Carrier".to_string()));
+        assert!(extract_actors(" An inspector may enter the premises. ").governed_labels().contains(&"Spc: Inspector".to_string()));
+    }
+
+    #[test]
     fn public_specialists_not_extracted_for_ohs() {
         let text = "The provider shall ensure the keeper is informed.";
         let actors = extract_actors_for_family(text, Some("OH&S: Occupational / Personal Safety"));
