@@ -236,3 +236,17 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - Counterparty 0.37 per provision (licensing, grants, planning), beneficiary 0.04.
 
 **Gap:** "eligible farm business" → `Org: Farm Business` (trigger-only). 0 gaps after relabel.
+
+## Family group 4 bulk (2026-10-05)
+
+**Result:** 1,564 provisions labelled, no errors, $6.54 for the group ($4.18 per 1,000).
+- Actors: active 864, mentioned 959, counterparty 276, beneficiary 146 (`prot` 140 from 419).
+- Holder unknown: 37 of 188 in `hu`.
+
+**13 gaps (16 uses):**
+- **Added (trigger-only):** Spc: Health Care Professional (27 provisions/9 laws), Gvt: Consular Officer (consular/diplomatic/maritime representative; 27/12), Spc: Public Analyst (food examiner; 28/4), Gvt: CfD Counterparty (15/2), Spc: Insolvency Practitioner, Spc: Inspection Body (implementing body), Ind: Pilot.
+- **Triggers:** NRI → Org: Investor; approved certifier → Spc: Certification Body.
+- **Accepted:** welfare attorney, interested party.
+- **Relabel:** 18 of 1,564; 0 gaps after.
+
+**Running totals (groups 1–4):** 5,778 provisions; 654 beneficiaries, 1,034 counterparties; $22.76.
