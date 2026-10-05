@@ -173,8 +173,40 @@ def v12_affected(ctx: str, text: str, resp: dict) -> str | None:
     return None
 
 
+# Rules added in drrp-v1.3 (Jason, 2026-10-05, from the batch 1 referee). Class-definition items have no reliable
+# text signal; the referee catches them.
+_TRIGGER = re.compile(r"having regard to|\bwhere\b[^.;]{0,80}\b(?:risks?|danger)|in (?:the )?light of|taking (?:into )?account", re.I)
+_COMMENCE = re.compile(r"on such days? as|may by order appoint|appointed day", re.I)
+_LAYING = re.compile(r"\blai?(?:d|ys?|ying)\b[^.;]{0,80}\bbefore\b[^.;]{0,30}\b(?:Parliament|Assembly|House)", re.I)
+_ENFORCING = re.compile(r"(?:shall be|is|are)\s+(?:responsible\s+as\s+)?the\s+enforcing\s+authorit|\bfunctions\s+of\s+(?:the|a)\s+[^.;]{0,40}(?:committee|board|council)", re.I)
+_MONEY = re.compile(r"money provided by Parliament", re.I)
+_DISAPPLY = re.compile(r"shall not apply[^.;]{0,80}\b(?:until|before|after)\b", re.I)
+
+
+def v13_affected(ctx: str, text: str, resp: dict) -> str | None:
+    actors = resp.get("actors") or []
+    if any(a["position"] == "beneficiary" for a in actors) and _TRIGGER.search(ctx):
+        return "trigger-condition beneficiary"
+    if _COMMENCE.search(ctx) or resp.get("purpose") == "Enactment+Citation+Commencement":
+        return "commencement power"
+    if _LAYING.search(ctx):
+        return "laying before Parliament"
+    if _ENFORCING.search(text):
+        return "enforcing authority / functions"
+    if _MONEY.search(ctx):
+        return "money provided by Parliament"
+    if _DISAPPLY.search(ctx) or resp.get("purpose") == "Transitional Arrangement":
+        return "time-limited disapplication"
+    return None
+
+
+# The rules a label must be checked against when carried forward INTO each prompt version
+RULESETS = {"drrp-v1.2-2026-10-05": v12_affected, "drrp-v1.3-2026-10-05": v13_affected}
+
+
 def carry_forward(conn, model: str, carry_from: str, rows: list[dict], texts: dict[str, str]) -> collections.Counter:
-    """Copy each provision's latest `carry_from` label to PROMPT_VERSION unless a v1.2 rule could change it."""
+    """Copy each provision's latest `carry_from` label to PROMPT_VERSION unless a rule new in PROMPT_VERSION could change it."""
+    affected = RULESETS[PROMPT_VERSION]
     have = {r[0] for r in conn.execute(
         "SELECT section_id || '|' || text_md5 FROM drrp_training_labels_raw WHERE model = %s AND prompt_version = %s",
         (model, PROMPT_VERSION)).fetchall()}
@@ -188,7 +220,7 @@ def carry_forward(conn, model: str, carry_from: str, rows: list[dict], texts: di
         if not text or hashlib.md5(text.encode()).hexdigest() != md5 or f"{sid}|{md5}" in have:
             continue
         ctx = " ".join([texts.get(a) or "" for a in ancestors(sid)] + [text])
-        why = v12_affected(ctx, text, resp)
+        why = affected(ctx, text, resp)
         if why:
             out[why] += 1
             continue
