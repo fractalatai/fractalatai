@@ -47,10 +47,10 @@ This session runs the **single run**: one enrichment pass and **one** publish, a
 - ⬜ Correlatives (claim/liability/protected holders), current_* and as-made verdicts reviewed together (Jason)
 - ⬜ **Purpose change list for compliance (legal#172):** per law, old `purpose` values → new (from `purpose_profile`, share ≥ 0.05), sent to legal after the dry run. Process+Rule has no 1:1 mapping
 - ⬜ **(Jason)** Compliance screening: `current_verdict` or `is_making`. Decided before the publish
-- ⬜ **(Jason)** Economic operator repair (2026-10-05):
+- ⬜ Economic operator repair (2026-10-05):
   - `Operator` was matching "economic operator" (the product-safety umbrella for manufacturer/importer/distributor): 468 provisions in 26 laws, 338 Operator rows (120 active).
   - Fixed by a per-label `exclude` in the dictionary, plus the new `SC: Economic Operator`.
-  - 16 laws are in the backlog. **Proposed:** add the other 10 to the run's re-parse: UK_eudr_2010_35, UK_eudr_2014_29, UK_eudr_2014_30, UK_eudr_2014_33, UK_eudr_2014_34, UK_eudr_2014_35, UK_eudr_2014_68, UK_eur_2016_425, UK_uksi_2012_3032, UK_uksi_2016_1092.
+  - 16 laws are in the backlog; **the other 10 are added to the run's re-parse (Jason, 2026-10-05):** UK_eudr_2010_35, UK_eudr_2014_29, UK_eudr_2014_30, UK_eudr_2014_33, UK_eudr_2014_34, UK_eudr_2014_35, UK_eudr_2014_68, UK_eur_2016_425, UK_uksi_2012_3032, UK_uksi_2016_1092.
 - ⬜ Company officer repair (2026-10-05, `0e7846d`):
   - Gvt: Officer was matching "director … or other similar officer of the body corporate": 401 hub provisions in 144 laws, 166 active rows (false government Responsibility holders).
   - The extractor is fixed. The 90 backlog laws are re-parsed in the run anyway.
