@@ -222,6 +222,112 @@ def references(section_id: str, text: str, texts: dict[str, str]) -> list[tuple[
     return out[:4]
 
 
+# Applying provisions (#60): a named party's duty to comply with, or ensure compliance with, requirements
+# that cover other provisions ("Every employer shall ensure that every workplace … complies with any
+# requirement of these Regulations"). They name the holder of passive/thing-subject duties they cover.
+_SCOPE = (r"(?:these\s+Regulations|this\s+(?:Order|Act|Part|Schedule)|Part\s+\d+[A-Z]*\b|Schedules?\s+\d+[A-Z]*\b"
+          r"|(?:regulations?|sections?|articles?)\s+\d+[A-Z]*\b(?:\(\w{1,4}\))*(?:\s*(?:,|to|and|or)\s*\d+[A-Z]*\b(?:\(\w{1,4}\))*)*)")
+_REQ = r"(?:any|the|all|each\s+of\s+the|such)?\s*(?:requirements?|provisions?|duties)\s+(?:of|in|imposed\s+by|under|contained\s+in)\s+"
+_APPLY = re.compile(
+    r"\b(?:shall|must)\b.{0,200}?(?:"
+    rf"\bcompl(?:y|ies)\s+with\s+(?:{_REQ})?(?P<s1>{_SCOPE})"                       # comply / ensure X complies with …
+    rf"|\b(?:ensure|secure)\s+that\s+{_REQ}(?P<s2>{_SCOPE}).{{0,80}}?\b(?:are|is)\s+complied\s+with"  # … are complied with
+    # the scope must be this law's: not "regulation 48 of the Construction and Use Regulations",
+    # "Article 21 of RAMS" or "Part 1 of Schedule 1 to the 2011 Order"
+    r")(?!(?:\(\w{1,4}\))*(?:\s*\(.{0,200}?\))?\s+(?:of|to)\s+(?!these\s+Regulations\b|this\s+(?:Act|Order|Part)\b))", re.I | re.S)
+# Mentions of compliance that put no one under a duty to comply
+_NOT_APPLYING = re.compile(
+    r"\boffence\b|\bguilty\b|\bfail(?:s|ed|ure)?\s+to\s+comply|\bcontravene|\bin\s+order\s+to\s+comply|\benabl"
+    r"|\bpresumed\b|\btreated\s+as\b|\bdeemed\s+to\s+compl|\bopinion\b|\bsatisfied\b|\bneed\s+not\b|\bshall\s+not\s+apply\b"
+    r"|\bnot\s+compl|\bnon-?complian|\bregard\s+to\b|\bunless\b|\bas\s+if\b|\bwarn|\bstate\s+that\b|\bwhen\s+enforcing\b"
+    r"|\bevidence\b|\bshowing\b|\bnotice\b|\bwhether\b|\bdoes\s+not\b|\bMember\s+States\b"
+    r"|\b(?:taken|made|necessary|practicable|measures)\s+(?:\w+\s+){0,3}to\s+comply\b", re.I)
+_NUM = re.compile(r"(\d+)([A-Z]*)((?:\(\w{1,4}\))*)")
+
+
+def _base(local: str) -> tuple[str, str]:
+    """('reg', '6') from 'reg.6(1)(a)'; ('sch', '2') from 'sch.2.reg.3'."""
+    kind, _, rest = local.partition(".")
+    m = _NUM.match(rest.removeprefix("Article "))
+    return kind, (m.group(1) + m.group(2)) if m else ""
+
+
+def _covers(scope: str, applier_part: str | None):
+    """Predicate over (local id, part) for one scope expression."""
+    s = re.sub(r"\s+", " ", scope.strip())
+    low = s.lower()
+    if low in ("these regulations", "this order", "this act"):
+        return lambda local, part: not local.startswith("sch.")
+    if low == "this part":
+        return lambda local, part: applier_part is not None and part == applier_part and not local.startswith("sch.")
+    if low == "this schedule":
+        return lambda local, part: False  # schedules aren't labelled on their own scope here
+    if low.startswith("part"):
+        n = s.split()[1]
+        return lambda local, part: part == n and not local.startswith("sch.")
+    if low.startswith("schedule"):
+        n = s.split()[1]
+        return lambda local, part: local.startswith("sch.") and _base(local)[1] == n
+    # regulations/sections/articles: numbers, ranges ("5 to 27") and sub-refs ("14(4)")
+    named, ranged, prefixes = set(), set(), []  # "regulation 8" ≠ 8A; "regulations 5 to 27" includes 8A
+    toks = re.findall(r"\d+[A-Z]*(?:\(\w{1,4}\))*|\bto\b", s)
+    i = 0
+    while i < len(toks):
+        t = toks[i]
+        if t != "to" and i + 2 < len(toks) and toks[i + 1] == "to" and toks[i + 2] != "to":
+            ranged.update(range(int(_NUM.match(t).group(1)), int(_NUM.match(toks[i + 2]).group(1)) + 1))
+            i += 3
+            continue
+        if t != "to":
+            m = _NUM.match(t)
+            prefixes.append(t) if m.group(3) else named.add(m.group(1) + m.group(2))
+        i += 1
+
+    def pred(local, part):
+        if local.startswith("sch.") or "." not in local:
+            return False
+        rest = local.split(".", 1)[1].removeprefix("Article ")
+        base = _base(local)[1]
+        digits = re.match(r"\d+", base)
+        return (base in named or (digits is not None and int(digits.group()) in ranged)
+                or any(rest.startswith(p) for p in prefixes))
+    return pred
+
+
+def applying_index(texts: dict[str, str], parts: dict[str, str | None]) -> dict[str, list]:
+    """Per law, the applying provisions: [(section_id, rendered text, covers(local, part))]."""
+    index: dict[str, list] = {}
+    for sid, text in texts.items():
+        if not text or "compl" not in text.lower():
+            continue
+        law, local = sid.split(":", 1)
+        stems = [texts[a] for a in reversed(ancestors(sid)) if texts.get(a)]
+        full = " ".join(stems + [text])
+        if _NOT_APPLYING.search(full):
+            continue
+        for m in _APPLY.finditer(full):
+            scope = m.group("s1") or m.group("s2")
+            rendered = " … ".join([t[:400] for t in stems] + [text])
+            if "—" in text or "–" in text or text.rstrip().endswith(":"):
+                items = [texts[k] for k in sorted(texts) if k.startswith(sid + "(") and k.count("(") == sid.count("(") + 1 and texts[k]]
+                rendered += " " + " ".join(t[:200] for t in items[:6])
+            index.setdefault(law, []).append((sid, rendered, _covers(scope, parts.get(sid))))
+    return index
+
+
+def applying(section_id: str, parts: dict[str, str | None], index: dict[str, list]) -> list[tuple[str, str]]:
+    """Applying provisions (same law) whose scope covers this provision, excluding its own stem and items."""
+    law, local = section_id.split(":", 1)
+    own = {section_id, *ancestors(section_id)}
+    out = []
+    for sid, rendered, covers in index.get(law, []):
+        if sid in own or section_id in ancestors(sid) or sid in {s for s, _ in out}:
+            continue
+        if covers(local, parts.get(section_id)):
+            out.append((sid, rendered))
+    return out[:4]
+
+
 def user_prompt(section_id: str, text: str, stems: list[tuple[str, str]], refs: list[tuple[str, str]] = ()) -> str:
     ctx = "\n".join(f"[{sid}] {t[:1500]}" for sid, t in reversed(stems)) or "(none)"
     ref = "\n".join(f"[{sid}] {t[:1500]}" for sid, t in refs) or "(none)"
