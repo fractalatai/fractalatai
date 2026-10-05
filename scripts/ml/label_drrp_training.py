@@ -152,6 +152,55 @@ def stale_reason(resp: dict, ctx: str, current: set[str], added: dict, changed: 
     return None
 
 
+# Rules added in drrp-v1.2 (Jason, 2026-10-05; DRRP-CLASSIFICATION.md special cases): a v1.1 label is carried
+# forward unless one of these could change it.
+_MEMBER_STATE = re.compile(r"\bMember States?\b|\bthird countr", re.I)
+_TRANSITIONAL = re.compile(r"\btransitional\b", re.I)
+_HEADLESS = re.compile(r"\b(?:shall|must|may)\b[^.;]{0,120}(?:[—–:]|\s-)\s*$", re.I)
+
+
+def v12_affected(ctx: str, text: str, resp: dict) -> str | None:
+    actors = resp.get("actors") or []
+    if _MEMBER_STATE.search(ctx) or any(a["label"] == "EU: Member State" for a in actors):
+        return "member state/place"
+    if resp.get("purpose") == "Transitional Arrangement" or _TRANSITIONAL.search(ctx):
+        return "transitional"
+    if _HEADLESS.search(text.rstrip()) and (resp.get("relation") == "no" or resp.get("purpose") == "Procedure+Detail"):
+        return "headless stem"
+    passive = resp.get("relation") == "yes" and not any(a["position"] == "active" for a in actors)
+    if passive and any(a["position"] == "counterparty" and not a.get("act") for a in actors):
+        return "passive counterparty act"
+    return None
+
+
+def carry_forward(conn, model: str, carry_from: str, rows: list[dict], texts: dict[str, str]) -> collections.Counter:
+    """Copy each provision's latest `carry_from` label to PROMPT_VERSION unless a v1.2 rule could change it."""
+    have = {r[0] for r in conn.execute(
+        "SELECT section_id || '|' || text_md5 FROM drrp_training_labels_raw WHERE model = %s AND prompt_version = %s",
+        (model, PROMPT_VERSION)).fetchall()}
+    old = conn.execute(
+        "SELECT DISTINCT ON (section_id, text_md5) section_id, text_md5, law_name, split, stratum, dict_version, response "
+        "FROM drrp_training_labels_raw WHERE model = %s AND prompt_version = %s AND error IS NULL AND section_id = ANY(%s) "
+        "ORDER BY section_id, text_md5, created_at DESC", (model, carry_from, [r["section_id"] for r in rows])).fetchall()
+    out = collections.Counter()
+    for sid, md5, law, split, stratum, dv, resp in old:
+        text = texts.get(sid)
+        if not text or hashlib.md5(text.encode()).hexdigest() != md5 or f"{sid}|{md5}" in have:
+            continue
+        ctx = " ".join([texts.get(a) or "" for a in ancestors(sid)] + [text])
+        why = v12_affected(ctx, text, resp)
+        if why:
+            out[why] += 1
+            continue
+        conn.execute(
+            "INSERT INTO drrp_training_labels_raw (section_id, law_name, text_md5, model, prompt_version, dict_version, split, "
+            "stratum, response, usage) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT DO NOTHING",
+            (sid, law, md5, model, PROMPT_VERSION, dv, split, stratum, json.dumps(resp), json.dumps({"carried_from": carry_from})))
+        out["carried"] += 1
+    conn.commit()
+    return out
+
+
 def report(conn, model: str, ids: set[str] | None, entries: dict, price: dict | None = None) -> None:
     price = price or PRICES["gemini"]
     rows = conn.execute(
@@ -224,6 +273,7 @@ def main() -> None:
     ap.add_argument("--model", choices=["gemini", "openai"], default="gemini",
                     help="gemini (gemini-3.8-flash) or openai (gpt-5.5:low; prompt caching is automatic)")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--carry-from", help="carry labels from this prompt version unless a v1.2 rule could change them")
     ap.add_argument("--report", action="store_true", help="report only")
     args = ap.parse_args()
     model = MODELS[args.model]
@@ -256,6 +306,15 @@ def main() -> None:
             "ORDER BY r.section_id, r.text_md5, r.created_at DESC", (model, PROMPT_VERSION, sorted(ids))).fetchall()
     texts = {sid: t for sid, t, _ in law_rows}
     parts = {sid: p for sid, _, p in law_rows}
+    if args.carry_from and not args.dry_run:
+        with psycopg.connect(PG) as conn:
+            print(f"carry-forward from {args.carry_from}: {dict(carry_forward(conn, model, args.carry_from, rows, texts))}")
+        with psycopg.connect(PG) as conn:
+            prior = conn.execute(
+                "SELECT DISTINCT ON (r.section_id, r.text_md5) r.section_id, r.text_md5, r.dict_version, r.response, v.labels "
+                "FROM drrp_training_labels_raw r LEFT JOIN drrp_dictionary_versions v USING (dict_version) "
+                "WHERE r.model = %s AND r.prompt_version = %s AND r.error IS NULL AND r.section_id = ANY(%s) "
+                "ORDER BY r.section_id, r.text_md5, r.created_at DESC", (model, PROMPT_VERSION, sorted(ids))).fetchall()
     apps = applying_index(texts, parts)
     current = set(entries)
     match_all = matcher(entries)
