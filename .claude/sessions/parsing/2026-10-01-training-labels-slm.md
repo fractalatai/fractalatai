@@ -189,3 +189,18 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 **Pilot:** 50 provisions, $0.20, no errors, **0 dictionary gaps**.
 - Beneficiary 0.12 per provision (`prot` 6 from 21); counterparty 0.18; relation yes 30 / no 20.
 - 1,561 remain for the bulk run (~$6).
+
+## Family group 2 bulk (2026-10-05)
+
+**Result:** 1,635 provisions labelled, no errors, $6.37 for the group ($3.90 per 1,000).
+- Actors: active 1,144, mentioned 923, counterparty 334, **beneficiary 277** (`prot` gave 249 from 674); 0.17 per provision.
+- Holder unknown: 40 of 143 in `hu`.
+
+**Running totals (groups 1 + 2):** 2,992 provisions, 505 beneficiaries, 575 counterparties.
+
+**9 gaps, fixed the same day (`c5876c1`):**
+- **"Temporary work agency":** it was on the extraction **blacklist** (to stop `Gvt: Agency`), which hid it from the governed pass as well. Moved to `GOVERNMENT_MASK` with "agency worker"; `Org: Temporary Work Agency` gets a pattern; test added. No hub repair is needed: there were never wrong rows, the actor was just invisible.
+- **Trigger-only:** Org: Developer, Org: Community Body (incl. crofting), SC: Filler, EU: Economic and Social Committee, EU: Advisory Committee on Safety and Health at Work.
+- **Accepted:** visiting force, headquarters.
+
+**Relabel:** 19 of 1,635; 0 gaps.
