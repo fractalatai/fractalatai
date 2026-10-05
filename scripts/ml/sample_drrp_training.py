@@ -6,6 +6,7 @@ provisions with text, outside Schedules, in live hub laws that are not benchmark
 is_benchmark), not gold v2 laws (no benchmark leakage) and not enabling_extent scoped LAT (#66).
 
 Strata (a provision takes the first that applies; all flags are kept):
+  prot     a duty word (shall/must) and protective-purpose wording, in the provision or its stem
   ben      any tier put an actor at beneficiary, or the text has a protective-purpose cue
   cp       any tier put an actor at counterparty
   app      holder-unknown Obligation with an applying provision (#60)
@@ -37,12 +38,18 @@ import psycopg2
 
 ROOT = "/var/home/jason/fractalaw"
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
-from drrp_prompt import PROMPT_VERSION, applying, applying_index  # noqa: E402
+from drrp_prompt import PROMPT_VERSION, ancestors, applying, applying_index  # noqa: E402
 
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 DUCK = os.path.join(ROOT, "data/fractalaw.duckdb")
-ORDER = ["ben", "cp", "app", "hu", "lib", "none", "general"]
-QUOTA = {"ben": 1500, "cp": 1200, "app": 400, "hu": 800, "lib": 500, "none": 1000, "general": 1000}
+ORDER = ["prot", "ben", "cp", "app", "hu", "lib", "none", "general"]
+# prot: the pilot showed old-tier beneficiary flags yield 0.02 beneficiaries per provision, protective-purpose
+# duty wording 0.36 (2026-10-05), so prot takes everything available and ben shrinks to 500
+QUOTA = {"prot": 2500, "ben": 500, "cp": 1200, "app": 400, "hu": 800, "lib": 500, "none": 1000, "general": 1000}
+MODAL = re.compile(r"\b(?:shall|must)\b", re.I)
+PROT_CUE = re.compile(
+    r"\b(?:ensure|secure|protect|safeguard|prevent|reduce|minimi[sz]e)\b[^.;]{0,120}\b(?:health|safety|welfare|risks?|harm|injur\w*|danger)\b"
+    r"|\b(?:health|safety|welfare)\b[^.;]{0,40}\bof\b|\bexposed\s+to\s+(?:risks?|danger)|\bwell-?being\b", re.I)
 # Protective-purpose wording: the duty protects a party who doesn't receive its act (beneficiary)
 BEN_CUE = re.compile(
     r"\b(?:health|safety|welfare)\b[^.;]{0,40}\bof\b[^.;]{0,30}\b(?:employees|persons|workers|people|public|children|patients|passengers|residents|users)\b"
@@ -100,7 +107,9 @@ def main() -> None:
     for law, sid, text, _, types, cp, ben, active, n_actors in rows:
         obligation, liberty = "Obligation" in types, "Liberty" in types
         hu = obligation and not active
-        flags = {"ben": ben or bool(BEN_CUE.search(text)), "cp": cp,
+        ctx = " ".join([texts.get(a) or "" for a in ancestors(sid)] + [text])
+        flags = {"prot": bool(MODAL.search(ctx) and PROT_CUE.search(ctx)),
+                 "ben": ben or bool(BEN_CUE.search(text)), "cp": cp,
                  "app": hu and bool(applying(sid, parts, idx)), "hu": hu, "lib": liberty,
                  "none": not (obligation or liberty)}
         stratum = next((s for s in ORDER[:-1] if flags[s]), "general")

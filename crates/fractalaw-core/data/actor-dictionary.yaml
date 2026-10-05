@@ -494,7 +494,8 @@
   type: governed
   category: other
   regex_patterns:
-    - "(?:[Oo]perators?|(?:berth|mine|well|economic|meter)[\\s-]operator|operator of a production installation)"
+    - "(?:[Oo]perators?|(?:berth|mine|well|meter)[\\s-]operator|operator of a production installation)"
+  exclude: ["[Ee]conomic[\\s-]operators?"]  # SC: Economic Operator (2026-10-05)
   triggers: [operator, operators, the operator]
 
 - label: "Ind: Employee"
@@ -1308,4 +1309,16 @@
   type: governed
   category: Svc
   triggers: [statutory undertaker, statutory undertakers]
+
+- label: "SC: Economic Operator"
+  type: governed
+  category: SC
+  regex_patterns:  # product safety / market surveillance umbrella: manufacturer, importer, distributor, authorised representative
+    - "[Ee]conomic[\\s-]operators?"
+  triggers: [economic operator, economic operators]
+
+- label: "Gvt: Prosecutor"
+  type: government
+  category: Gvt
+  triggers: [prosecutor, prosecuting authority, procurator fiscal, Director of Public Prosecutions, Crown Prosecution Service]
 

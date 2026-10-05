@@ -20,7 +20,7 @@ Dictionary gaps are reported, never silently absorbed (Jason, 2026-10-05: jump o
 
   label_drrp_training.py --pilot 200 --dry-run   # which provisions, no calls
   label_drrp_training.py --pilot 200             # pilot: proportional per stratum, then a report
-  label_drrp_training.py --family "OH&S"         # bulk for laws whose family contains this (case-insensitive)
+  label_drrp_training.py --family "FIRE,NUCLEAR" --pilot 50   # a family group's pilot (substring match)
   label_drrp_training.py                         # the whole sample
   label_drrp_training.py --report                # report on what's labelled so far
 """
@@ -83,7 +83,7 @@ def call(model: str, cache: str | None, system: str, user: str) -> dict:
 
 
 def pick_pilot(rows: list[dict], n: int, seed: int) -> list[dict]:
-    """Proportional per stratum (at least 10 each), deterministic."""
+    """Proportional per stratum (at least max(2, n // 20) each), deterministic."""
     by = collections.defaultdict(list)
     for r in rows:
         by[r["stratum"]].append(r)
@@ -92,7 +92,7 @@ def pick_pilot(rows: list[dict], n: int, seed: int) -> list[dict]:
     for s, v in sorted(by.items()):
         v = sorted(v, key=lambda r: r["section_id"])
         rnd.shuffle(v)
-        out += v[: max(10, round(n * len(v) / len(rows)))]
+        out += v[: max(2, n // 20, round(n * len(v) / len(rows)))]
     return out
 
 
@@ -200,7 +200,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--sample", default=SAMPLE)
     ap.add_argument("--pilot", type=int, default=0, help="label a proportional pilot of N provisions")
-    ap.add_argument("--family", help="only laws whose DuckDB family contains this (case-insensitive)")
+    ap.add_argument("--family", help="only laws whose DuckDB family contains one of these (comma-separated, case-insensitive)")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--seed", type=int, default=60)
     ap.add_argument("--workers", type=int, default=8)
@@ -216,7 +216,8 @@ def main() -> None:
     rows = list(csv.DictReader(open(args.sample)))
     if args.family:
         fam = dict(duckdb.connect(DUCK, read_only=True).execute("SELECT name, coalesce(family, '') FROM legislation").fetchall())
-        rows = [r for r in rows if args.family.lower() in fam.get(r["law_name"], "").lower()]
+        wanted = [f.strip().lower() for f in args.family.split(",") if f.strip()]
+        rows = [r for r in rows if any(w in fam.get(r["law_name"], "").lower() for w in wanted)]
     if args.pilot:
         rows = pick_pilot(rows, args.pilot, args.seed)
     ids = {r["section_id"] for r in rows}

@@ -113,6 +113,11 @@ struct ActorDef {
     drrp_keywords: Vec<String>,
     #[serde(default)]
     families: Vec<String>,
+    /// Phrases removed from the text before this label's patterns run: a longer phrase that names a
+    /// different actor ("economic operator" is SC: Economic Operator, not Operator). The regex crate has
+    /// no lookaround, so a pattern can't exclude its own context.
+    #[serde(default)]
+    exclude: Vec<String>,
     #[serde(default)]
     category: String,
     /// Regex bucket override: `governed` keeps a government-type entry matching
@@ -137,6 +142,8 @@ struct CompiledDictionary {
     all_labels: HashSet<String>,
     /// Labels whose dictionary `type` is `government` (holder class, DRRP-CLASSIFICATION.md layer 3).
     government_labels: HashSet<String>,
+    /// Per-label exclusions (the entry's `exclude` phrases), applied before that label's patterns.
+    excludes: HashMap<String, Vec<Regex>>,
 }
 
 /// The YAML file, embedded at compile time.
@@ -153,8 +160,14 @@ static DICTIONARY: LazyLock<CompiledDictionary> = LazyLock::new(|| {
     let mut government_keywords = Vec::new();
     let mut all_labels = HashSet::new();
     let mut government_labels = HashSet::new();
+    let mut excludes: HashMap<String, Vec<Regex>> = HashMap::new();
 
     for def in &defs {
+        if !def.exclude.is_empty() {
+            excludes.entry(def.label.clone()).or_default().extend(def.exclude.iter().map(|p| {
+                Regex::new(p).unwrap_or_else(|e| panic!("bad exclude regex for '{}': {e}", def.label))
+            }));
+        }
         all_labels.insert(def.label.clone());
         if def.actor_type == "government" {
             government_labels.insert(def.label.clone());
@@ -209,6 +222,7 @@ static DICTIONARY: LazyLock<CompiledDictionary> = LazyLock::new(|| {
         government_keywords,
         all_labels,
         government_labels,
+        excludes,
     }
 });
 
@@ -303,7 +317,20 @@ fn run_patterns(text: &str, patterns: &[(String, Regex)]) -> Vec<ActorMatch> {
     let mut remaining = padded.clone();
     let mut found = Vec::new();
     for (label, regex) in patterns {
-        if let Some(m) = regex.find(&remaining) {
+        // An excluded phrase is blanked (same length, so offsets hold) for this label only.
+        let masked;
+        let haystack: &str = match DICTIONARY.excludes.get(label) {
+            Some(ex) => {
+                let mut t = remaining.clone();
+                for re in ex {
+                    t = re.replace_all(&t, |c: &regex::Captures| " ".repeat(c[0].len())).to_string();
+                }
+                masked = t;
+                &masked
+            }
+            None => &remaining,
+        };
+        if let Some(m) = regex.find(haystack) {
             // The match includes boundary chars — trim them to get the keyword.
             let raw = m.as_str();
             let keyword = raw.trim().trim_matches(|c: char| c.is_ascii_punctuation());
@@ -315,8 +342,10 @@ fn run_patterns(text: &str, patterns: &[(String, Regex)]) -> Vec<ActorMatch> {
                 keyword: keyword.to_lowercase(),
                 offset,
             });
-            // Remove first match to prevent duplicate detection
-            remaining = regex.replace(&remaining, "").to_string();
+            // Remove the matched span to prevent duplicate detection (by range: with an exclusion,
+            // the first match in the unmasked text may be the excluded phrase)
+            let range = m.range();
+            remaining.replace_range(range, "");
         }
     }
     found.sort_by(|a, b| a.label.cmp(&b.label));
@@ -791,6 +820,21 @@ mod tests {
         }
         assert!(has_label(&extract_actors_for_family(text, Some("OH&S: Occupational / Personal Safety")).governed, "Ind: Company Officer"));
         assert!(!has_label(&extract_actors_for_family(text, Some("OH&S: Occupational / Personal Safety")).government, "Gvt: Officer"));
+    }
+
+    #[test]
+    fn economic_operator_is_not_operator() {
+        // Product safety regs: "economic operator" (manufacturer/importer/distributor/authorised rep) was
+        // matching Operator (338 hub rows on 468 provisions, 2026-10-05).
+        let text = "An economic operator must, on request, identify any economic operator who has supplied them with a product.";
+        let actors = extract_actors(text);
+        assert!(has_label(&actors.governed, "SC: Economic Operator"), "{:?}", actors.governed);
+        assert!(!has_label(&actors.governed, "Operator"), "{:?}", actors.governed);
+        // A real operator in the same provision still matches
+        let actors = extract_actors(" The operator shall notify the economic operator of the defect. ");
+        assert!(has_label(&actors.governed, "Operator"), "{:?}", actors.governed);
+        assert!(has_label(&actors.governed, "SC: Economic Operator"), "{:?}", actors.governed);
+        assert!(has_label(&extract_actors(" The operator of the installation must keep records. ").governed, "Operator"));
     }
 
     #[test]
