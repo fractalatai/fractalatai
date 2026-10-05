@@ -25,6 +25,7 @@ Authorities, agencies, ministers, EU institutions. These appear in `government_a
 | Gvt: Agency: Office for Environmental Protection | UK |
 | Gvt: Agency: Office of Rail and Road | UK |
 | Gvt: Agency: OFCOM | UK |
+| Gvt: Agency: Information Commissioner | UK |
 | Gvt: Agency: Natural Resources Body for Wales | UK |
 | Gvt: Agency: Maritime and Coastguard Agency | UK |
 | Gvt: Agency: Oil and Gas Authority | UK |
@@ -83,6 +84,7 @@ Businesses, individuals, specialists, supply-chain actors. These appear in `gove
 | Ind: Duty Holder | Individual |
 | Ind: Manager | Individual |
 | Ind: Supervisor | Individual |
+| Ind: Data Subject | Individual |
 | Ind: Person | Individual |
 | Ind: User | Individual |
 | Spc: Inspector | Specialist |
@@ -118,3 +120,5 @@ Businesses, individuals, specialists, supply-chain actors. These appear in `gove
 | Public: Provider | PUBLIC |
 | Public: Keeper | PUBLIC |
 | Public: Dealer | PUBLIC |
+| Public: Data Controller | PUBLIC: Data |
+| Public: Data Processor | PUBLIC: Data |

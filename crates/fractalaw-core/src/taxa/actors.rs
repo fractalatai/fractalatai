@@ -733,6 +733,29 @@ mod tests {
     }
 
     #[test]
+    fn data_protection_actors_for_public_data_family() {
+        // DPA 2018 s.48(1), s.91 (#60 follow-up: the controller was OTHER:)
+        let text = "Where a data subject requests the rectification of personal data, the controller must inform the data subject and any processor in writing, and notify the Information Commissioner.";
+        let actors = extract_actors_for_family(text, Some("💙 PUBLIC: Data"));
+        for label in ["Public: Data Controller", "Public: Data Processor", "Ind: Data Subject"] {
+            assert!(has_label(&actors.governed, label), "{label} missing: {:?}", actors.governed);
+        }
+        assert!(has_label(&actors.government, "Gvt: Agency: Information Commissioner"), "{:?}", actors.government);
+        assert!(super::is_government("Gvt: Agency: Information Commissioner"));
+        assert!(!super::is_government("Public: Data Controller"));
+    }
+
+    #[test]
+    fn controller_not_extracted_outside_public_data() {
+        // Landfill tax "controller of a landfill site", air traffic controller: not data controllers
+        for fam in [Some("💚 ENVIRONMENTAL PROTECTION"), Some("PUBLIC"), None] {
+            let actors = extract_actors_for_family("A controller of a landfill site must pay the tax to the end processor.", fam);
+            assert!(!has_label(&actors.governed, "Public: Data Controller"), "{fam:?}: {:?}", actors.governed);
+            assert!(!has_label(&actors.governed, "Public: Data Processor"), "{fam:?}: {:?}", actors.governed);
+        }
+    }
+
+    #[test]
     fn public_specialists_not_extracted_for_ohs() {
         let text = "The provider shall ensure the keeper is informed.";
         let actors = extract_actors_for_family(text, Some("OH&S: Occupational / Personal Safety"));

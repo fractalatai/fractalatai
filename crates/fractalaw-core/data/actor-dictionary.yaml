@@ -143,6 +143,14 @@
   triggers: [ofcom, office of communications]
   drrp_keywords: [ofcom]
 
+- label: "Gvt: Agency: Information Commissioner"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "Information Commissioner(?:'s Office)?"
+  triggers: [information commissioner, the commissioner (data protection)]
+  drrp_keywords: [information commissioner]
+
 - label: "Gvt: Agency: Natural Resources Body for Wales"
   type: government
   category: Gvt
@@ -673,6 +681,13 @@
     - "[Hh]irers?"
   triggers: [hirer, hirers, the hirer]
 
+- label: "Ind: Data Subject"
+  type: governed
+  category: Ind
+  regex_patterns:
+    - "[Dd]ata subjects?"
+  triggers: [data subject, data subjects]
+
 - label: "Ind: Young Person"
   type: governed
   category: Ind
@@ -897,6 +912,24 @@
     - "(?:[Dd]ealers?|registered (?:firearms )?dealer)"
   triggers: [dealer, dealers]
   families: ["PUBLIC"]
+
+# Data protection (DPA 2018, PECR): "controller" and "processor" mean other things elsewhere
+# (landfill site controller, air traffic controller, end processor), so they're gated to PUBLIC: Data.
+- label: "Public: Data Controller"
+  type: governed
+  category: Public
+  regex_patterns:
+    - "(?:[Jj]oint |[Dd]ata )?[Cc]ontrollers?"
+  triggers: [controller, data controller, joint controllers]
+  families: ["PUBLIC: Data"]
+
+- label: "Public: Data Processor"
+  type: governed
+  category: Public
+  regex_patterns:
+    - "(?:[Dd]ata )?[Pp]rocessors?"
+  triggers: [processor, data processor]
+  families: ["PUBLIC: Data"]
 
 # ── Specialist: Wildlife & Countryside (family-gated) ─────────────
 
