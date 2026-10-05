@@ -56,6 +56,10 @@ This session runs the **single run**: one enrichment pass and **one** publish, a
   - **`Ind: Public` is the canonical label for the public**: "innocent" third parties with no defined role or organisation. The dictionary's `Public` was renamed via `renamed_from`.
   - Hub: `scripts/migrations/retire_public_correlative_20261005.py` deletes the rule's 1,148 rows (99 laws), then `rename_actor_labels_20261005.py` renames 4,972 `Public` rows. Both are dry-run clean and await approval.
   - Legal, at pre-publish: delete the inferred `Ind: Public` beneficiary entries (`reason: inferred, position: beneficiary, drrp: none`; 1,137 rows, 97 laws), then rename `Public` → `Ind: Public` across stored rows.
+- ⬜ **(Jason)** 23 legal laws with bare "Public" as a holder in responsibilities/powers entries (legal_register):
+  - All 23 have no LAT in the hub (not_held), so the single run can't re-derive them. Our DuckDB has no "Public" on the government side for them; legal's entries are stale from an older publish.
+  - Recommended: legal removes "Public" from those government-side entries in its pre-publish migration. Layer 4 "never cross-assign": a governed actor never holds a Responsibility or Power.
+  - Laws: UK_asc_2025_4, UK_asp_2012_8, UK_asp_2016_2, UK_nia_2011_9, UK_nisr_1999_90, UK_nisr_2008_315, UK_nisr_2009_238, UK_ssi_2025_417, UK_ukpga_1937_67, UK_ukpga_1962_58, UK_ukpga_1968_27, UK_ukpga_1984_22, UK_ukpga_1991_65, UK_ukpga_2025_10, UK_uksi_1975_335, UK_uksi_2003_835, UK_uksi_2004_756, UK_uksi_2005_1992, UK_uksi_2005_676, UK_uksi_2006_336, UK_uksi_2008_1660, UK_uksi_2010_404, UK_uksi_2013_602
 - ⬜ **Actor label renames and the Authorised Person class change (2026-10-05):**
   - ✅ hub rows migrated 2026-10-05 (`scripts/migrations/rename_actor_labels_20261005.py`);
   - ✅ legal's `government_label?/1` no longer lists Spc: Authorised Person: live 2026-10-05 (legal bb4bb624); legal's rename task is `mix actors.rename_labels` (6f9600e4), run at our pre-publish message;
