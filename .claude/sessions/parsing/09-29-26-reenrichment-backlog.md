@@ -51,10 +51,11 @@ This session runs the **single run**: one enrichment pass and **one** publish, a
   - Gvt: Officer was matching "director … or other similar officer of the body corporate": 401 hub provisions in 144 laws, 166 active rows (false government Responsibility holders).
   - The extractor is fixed. The 90 backlog laws are re-parsed in the run anyway.
   - **54 laws outside the backlog added to the run's re-parse** (Jason, 2026-10-05; regex/LLM rows, not just backfill): UK_asc_2026_5, UK_asp_2003_8, UK_asp_2005_13, UK_ssi_2009_266, UK_ssi_2014_161, UK_ssi_2014_258, UK_ukpga_1947_39, UK_ukpga_1961_34, UK_ukpga_1968_72, UK_ukpga_1971_60, UK_ukpga_1971_61, UK_ukpga_1974_37, UK_ukpga_1976_72, UK_ukpga_1982_16, UK_ukpga_1982_45, UK_ukpga_1984_26, UK_ukpga_1987_12, UK_ukpga_1989_15, UK_ukpga_1989_40, UK_ukpga_1990_8, UK_ukpga_1994_21, UK_ukpga_1996_6, UK_ukpga_1997_8, UK_ukpga_2000_23, UK_ukpga_2000_5, UK_ukpga_2003_21, UK_ukpga_2004_20, UK_ukpga_2005_16, UK_ukpga_2006_28, UK_ukpga_2006_36, UK_ukpga_2008_32, UK_ukpga_2010_15, UK_ukpga_2018_12, UK_ukpga_2022_30, UK_uksi_1997_2962, UK_uksi_2001_1701, UK_uksi_2006_2183, UK_uksi_2006_2184, UK_uksi_2007_3075, UK_uksi_2007_3077, UK_uksi_2007_3106, UK_uksi_2008_2164, UK_uksi_2010_330, UK_uksi_2010_332, UK_uksi_2011_1483, UK_uksi_2012_3032, UK_uksi_2015_1640, UK_uksi_2015_668, UK_uksi_2016_1026, UK_uksi_2016_1092, UK_uksi_2016_1154, UK_uksi_2017_1013, UK_uksi_2020_206, UK_wsi_2005_1806.
-- ⬜ **(Jason)** `Ind: Public` correlative rule (`correlative-rules.yaml` rule 3: every active enforcement authority → inferred `Ind: Public` beneficiary):
-  - Hub: 1,148 rows. Legal: 1,137 rows in 97 laws, only in legal_articles.actors; 13 rows also carry `Public`.
-  - Decide: retire the rule, or fix its label to `Public`.
-  - Laws outside the run: legal adds the decision (rename or delete) to `mix actors.rename_labels` at the pre-publish message.
+- ⬜ `Ind: Public` (Jason, 2026-10-05):
+  - The correlative rule is **retired** (not required).
+  - **`Ind: Public` is the canonical label for the public**: "innocent" third parties with no defined role or organisation. The dictionary's `Public` was renamed via `renamed_from`.
+  - Hub: `scripts/migrations/retire_public_correlative_20261005.py` deletes the rule's 1,148 rows (99 laws), then `rename_actor_labels_20261005.py` renames 4,972 `Public` rows. Both are dry-run clean and await approval.
+  - Legal, at pre-publish: delete the inferred `Ind: Public` beneficiary entries (`reason: inferred, position: beneficiary, drrp: none`; 1,137 rows, 97 laws), then rename `Public` → `Ind: Public` across stored rows.
 - ⬜ **Actor label renames and the Authorised Person class change (2026-10-05):**
   - ✅ hub rows migrated 2026-10-05 (`scripts/migrations/rename_actor_labels_20261005.py`);
   - ✅ legal's `government_label?/1` no longer lists Spc: Authorised Person: live 2026-10-05 (legal bb4bb624); legal's rename task is `mix actors.rename_labels` (6f9600e4), run at our pre-publish message;
