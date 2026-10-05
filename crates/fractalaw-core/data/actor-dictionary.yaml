@@ -733,7 +733,7 @@
   category: Spc
   regex_patterns:
     - "(?:[Ee]mployees' representative|[Ss]afety representatives?|[Tt]rade [Uu]nions? representatives?)"
-  triggers: [employees' representative, employees representative, safety representative, workers representative]
+  triggers: [employees' representative, employees representative, safety representative, workers representative, European Works Council, works council]
 
 - label: "Spc: Trade Union"
   type: governed
@@ -1555,7 +1555,7 @@
 - label: "Spc: Shotfirer"
   type: governed
   category: Spc
-  triggers: [shotfirer, shot-firer, shotfirers]
+  triggers: [shotfirer, shot-firer, shotfirers, trainee shotfirer]
 
 - label: "Ind: Legal Representative"
   type: governed

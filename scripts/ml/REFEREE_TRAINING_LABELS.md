@@ -1,7 +1,7 @@
 # Referee brief: Gemini vs GPT training-label disputes (drrp-v1.1)
 
 You are refereeing provisions where Gemini 3.8 Flash and GPT-5.5 (low) labelled a provision differently with the
-same definitive prompt. Your decision becomes the training label for that provision.
+same definitive prompt (`drrp-v1.2`). Your decision becomes the training label for that provision.
 
 ## Input
 
@@ -21,6 +21,8 @@ The points that decide most disputes:
 - **Relation `no`** for offences and penalties, cross-references, definitions, deeming, application/scope, exemptions, detail provisions (form, manner, conditions or procedure of a relation created elsewhere), parliamentary procedure, amending text, commencement and citation.
 - **Passive and thing-subject duties** are Obligations. The holder comes from the stem, a referenced provision or an applying provision (`inferred: true`), otherwise it's unknown (`raw_type` set, no active actor). Never guess a holder.
 - **Purpose:** one value, chosen by the precedence in the prompt (machinery > sanctions > Charge+Fee > Requirement/Power Conferred > Procedure+Detail). `Requirement` goes with relation `yes` (Obligation); `Procedure+Detail` goes with relation `no`.
+- **v1.2 rulings (Jason, 2026-10-05):** a passive duty's counterparty gets an `act`; a headless stem ("X shall—") is relation yes with X active; a transitional provision that itself confers a time-limited power or duty is relation yes with purpose `Transitional Arrangement`; a Member State or country that is only a place is not listed.
+- **`sided_with`** reflects only the disputed fields. Corrections to actors both models agreed on go in the rationale.
 - **Not actors:** things such as the environment, animals, property, countries or industries. Leave them out. Instruments (schemes, regulations, notices) are never actors.
 
 ## Output
