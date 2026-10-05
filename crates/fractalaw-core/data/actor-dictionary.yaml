@@ -1453,3 +1453,14 @@
   category: Ind
   triggers: [pilot, pilots, the pilot]
 
+# ── Gaps from family group 5 bulk labels (2026-10-05; the gate paused the run): trigger-only ──
+- label: "Spc: Evaluation Body"
+  type: governed
+  category: Spc
+  triggers: [evaluation body, evaluation bodies]
+
+- label: "EU: Committee of the Regions"
+  type: government
+  category: EU
+  triggers: [Committee of the Regions]
+
