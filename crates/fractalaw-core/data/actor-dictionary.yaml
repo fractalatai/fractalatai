@@ -1398,7 +1398,7 @@
 # ── Gaps from family group 3 bulk labels (2026-10-05): trigger-only ──
 - label: "SC: T&L: Notifier"
   type: governed
-  category: SC
+  category: SC  # waste-shipment notifier; a future pattern must not match "notifying authority" (Spc: Notifying Authority, government)
   triggers: [notifier, notifiers, person who notifies a shipment]
 
 - label: "Ind: Designated Person"
