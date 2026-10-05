@@ -250,3 +250,12 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - **Relabel:** 18 of 1,564; 0 gaps after.
 
 **Running totals (groups 1–4):** 5,778 provisions; 654 beneficiaries, 1,034 counterparties; $22.76.
+
+## Overlaps from legal's case-insensitive re-check (2026-10-05)
+
+Legal's first checks missed bracket-cased patterns; the re-check found three overlaps that we have too. Fixed (`91b0f6c`):
+- **Verifier** was an alternative under `Spc: Inspector`; it is now its own pattern (182 hub rows).
+- **Gas transporter** was caught by `SC: T&L: Carrier`'s "transporter"; it's now excluded from Carrier and has its own pattern (64 hub rows).
+- **OH Advisor** keeps the occupational forms; plain doctor/physician/nurse move to `Spc: Health Care Professional`.
+
+**Stale check extended:** a provision also relabels when its response uses a label whose triggers or patterns changed. 245 of 5,778 relabelled (~$1); only accepted one-offs remain.
