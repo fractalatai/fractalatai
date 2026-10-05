@@ -166,3 +166,18 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - "prosecutor" → `Gvt: Prosecutor` (trigger-only).
 
 **Re-run:** 3 of 50 relabelled; 0 gaps.
+
+## Family group 1 bulk (2026-10-05)
+
+**Result:** 1,357 provisions labelled, no errors, $5.08 for the group ($3.74 per 1,000). The gate never triggered: every new actor appeared once.
+- Actors: active 900, mentioned 788, counterparty 241, **beneficiary 228** (0.17 per provision; `prot` gave 212 from 521). Projects to ~1,180 beneficiaries across the sample.
+- Holder unknown: 40 of 122 in `hu`; the other 82 got holders from the text. Relation yes 877 / no 480.
+
+**13 one-off gaps:**
+- **Added (trigger-only, `fc1adf8`):** Spc: Accreditation Body (UKAS / national accreditation body), Spc: Verifier, Spc: Laboratory, Svc: Gas Transporter, Ind: Transferor, Ind: Transferee, Org: Social Partner.
+- **Accepted as unlabelled:** interested parties, entrusted body, members of a fact-finding mission, service authorities of a visiting force.
+- **Relabel:** 23 of 1,357; 0 gaps after.
+
+**Remaining sample by family:** OH&S Occupational/Personal 1,247; Environmental Protection 425; Maritime Safety 397; Climate Change 337; Water 309; **(no family) 288**; Waste 285; Town & Country Planning 188; HR Employment 179; Energy 176; Building Safety 173; Road Safety 169; …
+
+**Open:** the 288 no-family provisions can't be selected by `--family`; they need their own run.
