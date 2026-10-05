@@ -246,7 +246,7 @@
   category: Gvt
   regex_patterns:
     - "(?:[Ll]ocal [Aa]uthority?i?e?s?|council of a county|(?:county|district)(?: borough | )council|London Borough Council|council constituted)"
-  triggers: [local authority, local authorities, county council, district council, london borough council]
+  triggers: [local authority, local authorities, county council, district council, london borough council, weights and measures authority]
   drrp_keywords: [local authority, authority, council]
 
 - label: "Gvt: Authority: Planning"
@@ -481,7 +481,7 @@
   category: Org
   regex_patterns:
     - "(?:[Oo]ccupiers?|[Pp]erson who is in occupation)"
-  triggers: [occupier, occupiers, the occupier]
+  triggers: [occupier, occupiers, the occupier, persons in lawful occupation, person in lawful occupation]
 
 - label: "Org: Company"
   type: governed
@@ -1566,4 +1566,15 @@
   type: governed
   category: Ind  # consultees / stakeholders (Jason, 2026-10-05; was accepted as too generic)
   triggers: [interested party, interested parties, other interested parties, stakeholders]
+
+# ── Gaps from the referee, batch 1 (2026-10-05): trigger-only ──
+- label: "Spc: Recognised Third Party Organisation"
+  type: governed
+  category: Spc
+  triggers: [recognised third party organisation, recognised third-party organisation, user inspectorate]
+
+- label: "Spc: Arbitrator"
+  type: governed
+  category: Spc
+  triggers: [arbitrator, arbiter, single arbiter]
 
