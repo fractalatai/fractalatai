@@ -1578,3 +1578,24 @@
   category: Spc
   triggers: [arbitrator, arbiter, single arbiter]
 
+# ── Remaining identified gaps (Jason: fill them, 2026-10-05): trigger-only ──
+- label: "Gvt: Visiting Force"
+  type: government
+  category: Gvt  # foreign armed forces present under the Visiting Forces Act
+  triggers: [visiting force, visiting forces, service authorities of a visiting force, headquarters of a visiting force]
+
+- label: "Intl: International Organisation"
+  type: government
+  category: Intl  # international (non-EU) public bodies
+  triggers: [international organisation, Secretariat of the Basel Convention, Organisation for the Prohibition of Chemical Weapons, OPCW, fact-finding mission, members of a fact-finding mission, inspection team]
+
+- label: "Intl: Foreign State"
+  type: government
+  category: Intl  # only when the state acts or receives the act; a country named as a place is not an actor
+  triggers: [foreign state, state of export, country of destination, competent authority of destination, government of a country outside the United Kingdom]
+
+- label: "EU: Euratom"
+  type: government
+  category: EU
+  triggers: [Euratom, European Atomic Energy Community]
+
