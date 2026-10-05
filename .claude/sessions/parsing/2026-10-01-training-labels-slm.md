@@ -181,3 +181,11 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 **Remaining sample by family:** OH&S Occupational/Personal 1,247; Environmental Protection 425; Maritime Safety 397; Climate Change 337; Water 309; **(no family) 288**; Waste 285; Town & Country Planning 188; HR Employment 179; Energy 176; Building Safety 173; Road Safety 169; …
 
 **Open:** the 288 no-family provisions can't be selected by `--family`; they need their own run.
+
+## Family group 2 pilot (2026-10-05)
+
+**Group 2:** OH&S Occupational/Personal Safety, HR Employment, HR Working Time, Town & Country Planning; 1,635 sample provisions.
+
+**Pilot:** 50 provisions, $0.20, no errors, **0 dictionary gaps**.
+- Beneficiary 0.12 per provision (`prot` 6 from 21); counterparty 0.18; relation yes 30 / no 20.
+- 1,561 remain for the bulk run (~$6).
