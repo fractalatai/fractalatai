@@ -8,68 +8,90 @@
 
 **Overlap:** 75 labels shared, with no class disagreements; 54 legal-only; 57 fractalaw-only.
 
+**Label prefixes are groups** (Jason): `Ind:` individual, `Org:` organisation, `SC:` supply chain (`SC: C:` construction, `SC: T&L:` transport & logistics), `Spc:` specialist, `Gvt:` / `EU:` government. `Svc:` (legal's maintainer, repairer) reads as service; to confirm. The prefix says what the actor **is**. Family gating belongs in `families:`, not the prefix. Some labels use a family prefix instead (`Public:`, `Offshore:`, `Maritime:`). New labels follow the group rule. Renaming published labels needs legal's agreement, so it's flagged here rather than done.
+
 **Proposal (legal suggested, Jason to confirm):**
-- fractalaw's YAML becomes **canonical**, and legal's regex library keys its patterns to our labels.
-- Additions go in as **trigger-only** entries first. Those are LLM-visible and regex-inert, so the regex tier's output doesn't change until patterns are added with tests. Broad patterns like `[Hh]olders?`, `[Gg]enerators?` or `[Cc]onsumer` would shift regex extraction across the corpus.
+- fractalaw's YAML becomes **canonical**, and legal keys its regex patterns to our labels.
+- Additions go in **trigger-only** first: LLM-visible, regex-inert. Patterns follow later with tests, so the regex tier doesn't shift across the corpus in the meantime.
 
-## A. Add from legal (no equivalent in fractalaw)
+## A. Add (no equivalent in fractalaw), under the group rule
 
-- **Supply chain:** SC: Producer, SC: Exporter, SC: Retailer, SC: Seller, SC: Consumer, SC: Customer, SC: Marketer, SC: Storer, SC: Generator, SC: T&L: Consignor, SC: T&L: Consignee, SC: T&L: Handler, SC: C: Constructor, SC: Domestic Client.
-- **Environment:** Env: Disposer, Env: Polluter, Env: Recycler, Env: Reuser, Env: Treater.
-- **Individuals:** Ind: Holder, Ind: Appointed Person, Ind: Relevant Person, Ind: Suitable Person, Ind: Chair, Ind: Diver.
-- **Organisations:** Org: Investor, Org: Lessee, Org: Partnership.
-- **Maritime:** Maritime: master, Maritime: crew. Rename to `Maritime: Master` / `Maritime: Crew` for casing?
-- **Specialists and services:** Spc: Advisor, Spc: OH Advisor, Spc: Surveyor, Spc: Technician, Svc: Maintainer, Svc: Repairer.
-- **Government:** Gvt: Authority: Energy (NI), Gvt: Ministry: Department of the Environment (NI), HM Forces: Navy.
-- **Public:** Public: Parents.
-
-## B. Same concept, different label: pick one name (Jason)
-
-| fractalaw | legal | Note |
+| Group | Labels | Note |
 |---|---|---|
-| SC: Applicant | Ind: Applicant | |
-| Spc: Authorised Person (government) | Ind: Authorised Person (governed) | **Class differs.** Legal also lists "Spc: Authorised Person" in its government exact set. |
-| Spc: Licence Holder | Ind: Licence Holder | |
-| Public: Keeper (PUBLIC-gated) | SC: Keeper ("person who … keeps") | |
-| Public: Dealer (PUBLIC-gated) | SC: Dealer (scrap metal dealer) | |
-| SC: Authorised Representative | Spc: Representative | |
-| Gvt: Ministry, Gvt: Agency, Gvt: Devolved Admin | `Gvt: Ministry:` etc. (trailing colon) | Legal's catch-all form |
-| SC: Notified Body, Spc: Approved Body, Spc: Conformity Assessment Body … | Spc: Body (one pattern for all) | Keep ours (more specific) |
+| SC | Producer, Exporter, Retailer, Seller, Consumer, Customer, Marketer, Storer, Generator, Agent | Generator covers both waste and electricity, so gate later if the regex needs it |
+| SC: T&L | Consignor, Consignee, Handler | |
+| SC: C | Constructor, Domestic Client | Legal has `SC: Domestic Client`. Construction actors use `SC: C:`, so use `SC: C: Domestic Client` |
+| Ind | Holder, Appointed Person, Relevant Person, Suitable Person, Chair, Diver, **Parent** | Legal's `Public: Parents` → `Ind: Parent` (an individual; Public is a family) |
+| Org | Investor, Lessee, Partnership | |
+| Spc | Advisor, OH Advisor, Surveyor, Technician | |
+| Svc | Maintainer, Repairer | |
+| Env | Disposer, Polluter, Recycler, Reuser, Treater | Legal's group. The waste-chain roles could be `SC:`, but Polluter isn't supply chain. Keep `Env:` for convergence |
+| Maritime | Master, Crew | Legal's lowercase `Maritime: master/crew`. A domain prefix like `Offshore:`; by the group rule these are `Ind:`. Decide with the family-prefix question (E) |
+| Gvt | Authority: Energy (NI), Ministry: Department of the Environment (NI) | |
+| HM Forces | Navy | |
 
-## C. Don't add (too broad for a label)
+**Agent stays, but not with legal's pattern.** `[Aa]gents?` mostly hits substances (chemical 133, biological 96, process, extinguishing, oxidising, physical agent). The actor senses in the corpus are:
+- "owner or agent" / "servant or agent" (~87 "or agent");
+- "his / the / an agent";
+- "authorised agent" (24);
+- "agent of the operator / owner / Crown / licence holder";
+- "agent … acting on behalf";
+- customs, property, travel, handling and diplomatic agents.
 
-- `: He` (pronoun `[Hh]e`).
+When it gets a regex, match these forms (`authorised agent`, `agents? (of|for) (the|a|an|any|his|its)`, `(owner|operator|servant|employer) or agent`, `(his|its|their) agents?`, `(customs|shipping|handling|forwarding|property|travel|letting) agent`), never the bare word. Our Rust regex has no lookbehind, so legal's `(?<![Bb]iological )` exclusion can't be ported anyway. As trigger-only, the LLM sees the label and reads "chemical agent" correctly.
+
+## B. Same concept, different label: decided by the group rule
+
+| Concept | fractalaw now | legal | **Proposed** | Why |
+|---|---|---|---|---|
+| Applicant | SC: Applicant | Ind: Applicant | **Ind: Applicant** | An applicant isn't a supply-chain role. Legal already uses it |
+| Licence / permit holder | Spc: Licence Holder; Ind: Licensee; Offshore: Licensee | Ind: Licence Holder; Ind: Licensee | **Ind: Licensee**, absorbing "licence/permit holder"; retire Spc: Licence Holder | Not a specialist. Both sides already have Ind: Licensee |
+| Appellant | Ind: Appellant **and** Spc: Appellant (our duplicate) | — | **Ind: Appellant**; retire Spc: Appellant | Duplicate |
+| Authorised person | Spc: Authorised Person, `type: government` but `match_group: governed` | Ind: Authorised Person, governed | **Spc: Authorised Person, type governed** | Our prompt sends government-authorised officers to Gvt: Officer, so this label is the specialist authorised by the duty holder (electrical, mines, rail). **Class change:** existing rows go Responsibility → Duty at the next backfill |
+| Authorised representative | SC: Authorised Representative | Spc: Representative | **SC: Authorised Representative** | The EU product-law role, appointed by the manufacturer, is supply chain. Legal's generic one maps here or to Spc: Employees' Representative |
+| Keeper | Public: Keeper (PUBLIC-gated) | SC: Keeper ("person who … keeps") | **SC: Keeper**, gated by `families:` where ambiguous | Keeper of waste/animals/vehicles; Public is a family not a group. Published label: rename with legal |
+| Dealer | Public: Dealer (PUBLIC-gated) | SC: Dealer (scrap metal) | **SC: Dealer** | Supply chain. Published label: rename with legal |
+| Provider | Public: Provider (PUBLIC-gated) | — | **Svc: Provider** | Service provider. Published label: rename with legal |
+| Data controller / processor | Public: Data Controller / Processor (added today, unpublished) | — | **Org: Data Controller**, **Svc: Data Processor** (both keep `families: ["PUBLIC: Data"]`) | Rename now, before anything is published |
+| Catch-all government | Gvt: Ministry / Agency / Devolved Admin | `Gvt: Ministry:` etc. (trailing colon) | **ours** | Legal maps |
+| Conformity/approval bodies | SC: Notified Body, Spc: Approved Body, Spc: Conformity Assessment Body, … | Spc: Body (one pattern) | **ours** (more specific) | Legal maps |
+
+## C. Don't adopt
+
+- `: He` (the pronoun).
 - `Organisation` (third party / organisations).
 - `Gvt: Official` ("Official").
-- `SC: Agent` (`[Aa]gents?`, which matches agency, agent of a company, chemical agent…).
 - `Spc: Body` (see B).
 
-## D. New: in neither (from the pilot)
+## D. New: in neither list (from the pilot)
 
 | Actor | Proposed label | Class |
 |---|---|---|
 | Council of the European Union | EU: Council | government |
 | European Parliament | EU: Parliament | government |
 | Tenant | Org: Tenant (beside Org: Landlord) | governed |
-| Safety committee | Spc: Safety Committee | governed |
+| Safety committee | Spc: Safety Committee (beside Spc: Employees' Representative, Spc: Trade Union) | governed |
 | FACTS adviser | covered by Spc: Advisor (A) | governed |
 | "taker of the provisional measure" | none: too specific | — |
 
-## E. fractalaw-only (57): legal to add patterns keyed to these labels
+## E. Later (with legal): family prefixes vs group prefixes
 
-These include:
+`Public: Keeper / Dealer / Provider`, `Offshore: Licensee` and `Maritime: master / crew` use a family/domain prefix instead of a group. Under the group rule they become `SC: Keeper`, `SC: Dealer`, `Svc: Provider`, `Ind: Licensee` (gated) and `Ind: Ship's Master` / `Ind: Crew`, with family gating in `families:`. These are published labels, so they rename only as a joint change with legal (old → new map applied on both sides, then republish). Part of B proposes doing this for Keeper, Dealer and Provider now; the rest can wait.
+
+Our 57 labels legal lacks, for legal to add patterns keyed to them:
 - EU agencies (ECHA, EEA, EFSA), EU: Member State;
-- devolved ministers (Scottish/Welsh), Gvt: Mayor, Gvt: Authority: Combined County / Health Body / Fire and Rescue;
-- Gvt: Agency: GEMA / NDA / MCA / Oil and Gas Authority / Information Commissioner;
-- Ind: Person in Control, Ind: Claimant, Ind: Appellant, Ind: Hirer, Ind: Data Subject;
-- Public: Data Controller / Data Processor / Provider;
+- devolved ministers, Gvt: Mayor, Combined County / Health Body / Fire and Rescue authorities;
+- GEMA / NDA / MCA / OGA / Information Commissioner;
+- Ind: Person in Control, Claimant, Appellant, Hirer, Data Subject;
+- the data protection roles;
 - the conformity, approval and certification bodies;
-- insolvency roles (liquidator, receiver, trustee in bankruptcy), Svc: Water Undertaker, Offshore: Licensee, SC: Downstream User, SC: Registrant.
+- insolvency roles; Svc: Water Undertaker; SC: Downstream User, SC: Registrant.
 
 ## Next
 
-Once Jason has decided B and confirmed "canonical + trigger-only first":
-1. Add A + D to the YAML (trigger-only), plus the B renames, with tests for any patterns added.
-2. Send legal the final label list.
-3. Re-run the pilot's `OTHER:` provisions to confirm they map.
-4. Start the family-ordered labelling.
+Once Jason has confirmed B and "canonical + trigger-only first":
+1. Add A + D to the YAML (trigger-only).
+2. Apply the B renames and the Authorised Person class fix, with tests.
+3. Send legal the final label list and the old → new rename map.
+4. Re-run the pilot's `OTHER:` provisions to confirm they map.
+5. Start the family-ordered labelling.
