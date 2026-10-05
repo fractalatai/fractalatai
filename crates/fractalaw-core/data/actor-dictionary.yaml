@@ -1485,3 +1485,24 @@
   category: Aviation
   triggers: [crew member, crew of an aircraft, flight crew, cabin crew]
 
+# ── Gaps from family group 5 (third gate pause, 2026-10-05): public bodies, trigger-only ──
+- label: "Gvt: Agency: Committee on Climate Change"
+  type: government
+  category: Gvt
+  triggers: [Committee on Climate Change, Climate Change Committee]
+
+- label: "Gvt: Intelligence Service"
+  type: government
+  category: Gvt
+  triggers: [intelligence service, intelligence services, Security Service, Secret Intelligence Service, GCHQ, head of an intelligence service]
+
+- label: "Gvt: Authority: School Governing Body"
+  type: government
+  category: Gvt  # statutory public body; Jason to confirm government vs governed (2026-10-05)
+  triggers: [governing body of a maintained school, school governing body]
+
+- label: "Gvt: Authority: Safeguarding Children Board"
+  type: government
+  category: Gvt
+  triggers: [Local Safeguarding Children Board, safeguarding children board, safeguarding partners]
+
