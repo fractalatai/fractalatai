@@ -81,6 +81,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--family", help="comma-separated DuckDB family substrings (as label_drrp_training.py)")
     ap.add_argument("--out", required=True, help="disputes JSONL for the referee")
+    ap.add_argument("--second-model", default=MODELS["openai"], help="the second model's name (default gpt-5.5:low)")
+    ap.add_argument("--ids", help="file of section_ids (one per line) to compare instead of --family")
     args = ap.parse_args()
 
     rows = list(csv.DictReader(open(SAMPLE)))
@@ -89,6 +91,9 @@ def main() -> None:
         wanted = [f.strip().lower() for f in args.family.split(",") if f.strip()]
         rows = [r for r in rows if any((w == "(none)" and not fam.get(r["law_name"], "").strip())
                                        or (w != "(none)" and w in fam.get(r["law_name"], "").lower()) for w in wanted)]
+    if args.ids:
+        wanted_ids = {line.strip() for line in open(args.ids) if line.strip()}
+        rows = [r for r in rows if r["section_id"] in wanted_ids]
     ids = {r["section_id"] for r in rows}
     meta = {r["section_id"]: r for r in rows}
 
@@ -106,7 +111,7 @@ def main() -> None:
     by = collections.defaultdict(dict)
     for sid, model, md5, resp in latest:
         by[sid][model] = (md5, resp)
-    g_model, o_model = MODELS["gemini"], MODELS["openai"]
+    g_model, o_model = MODELS["gemini"], args.second_model
     pairs = {sid: m for sid, m in by.items() if g_model in m and o_model in m and m[g_model][0] == m[o_model][0]}
 
     cats, cat_provs, per_stratum = collections.Counter(), collections.Counter(), collections.defaultdict(collections.Counter)

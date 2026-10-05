@@ -53,7 +53,8 @@ API = "https://generativelanguage.googleapis.com/v1beta"
 # USD per M tokens (thinking/reasoning billed as output). Gemini 3.8 Flash standard rates through 2026-12-31;
 # GPT-5.5 standard (2026-10-05)
 PRICES = {"gemini": {"input": 0.75, "cached": 0.075, "output": 3.75},
-          "openai": {"input": 5.00, "cached": 0.50, "output": 30.00}}
+          "openai": {"input": 5.00, "cached": 0.50, "output": 30.00},
+          "gpt-5.4-mini": {"input": 0.75, "cached": 0.075, "output": 4.50}}
 
 
 def usage_tokens(u: dict) -> tuple[int, int, int, int]:
@@ -305,11 +306,15 @@ def main() -> None:
     ap.add_argument("--model", choices=["gemini", "openai"], default="gemini",
                     help="gemini (gemini-3.8-flash) or openai (gpt-5.5:low; prompt caching is automatic)")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--model-name", help="override the provider's model, e.g. gpt-5.4-mini:low")
+    ap.add_argument("--ids", help="file of section_ids to label (one per line), within the sample")
     ap.add_argument("--carry-from", help="carry labels from this prompt version unless a v1.2 rule could change them")
     ap.add_argument("--report", action="store_true", help="report only")
     args = ap.parse_args()
+    if args.model_name:
+        MODELS[args.model] = args.model_name
     model = MODELS[args.model]
-    price = PRICES[args.model]
+    price = PRICES.get(model.split(":")[0], PRICES[args.model])
     entries = dictionary_entries()
     dict_version = dictionary_version()
 
@@ -320,6 +325,9 @@ def main() -> None:
         # "(none)" selects laws with no family in DuckDB (empty or missing)
         rows = [r for r in rows if any((w == "(none)" and not fam.get(r["law_name"], "").strip())
                                        or (w != "(none)" and w in fam.get(r["law_name"], "").lower()) for w in wanted)]
+    if args.ids:
+        wanted_ids = {line.strip() for line in open(args.ids) if line.strip()}
+        rows = [r for r in rows if r["section_id"] in wanted_ids]
     if args.pilot:
         rows = pick_pilot(rows, args.pilot, args.seed)
     ids = {r["section_id"] for r in rows}
