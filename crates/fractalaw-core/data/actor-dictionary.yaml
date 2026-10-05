@@ -1436,7 +1436,7 @@
 - label: "Gvt: CfD Counterparty"
   type: government
   category: Gvt
-  triggers: [CFD counterparty, CfD counterparty, contract for difference counterparty]
+  triggers: [CFD counterparty, CfD counterparty, contract for difference counterparty, designated counterparty]
 
 - label: "Spc: Insolvency Practitioner"
   type: governed
@@ -1506,4 +1506,31 @@
   type: government
   category: Gvt  # if Ind: Young Person ever gets a child/children pattern, exclude this name from it (legal's near-miss)
   triggers: [Local Safeguarding Children Board, safeguarding children board, safeguarding partners]
+
+# ── Gaps from family group 5 (end of run, 2026-10-05): trigger-only ──
+- label: "Org: Insurer"
+  type: governed
+  category: Org
+  triggers: [insurer, insurers, authorised insurer]
+
+- label: "Spc: Auditor"
+  type: governed
+  category: Spc
+  triggers: [auditor, auditors, statutory auditor]
+
+- label: "Spc: Standardisation Body"
+  type: governed
+  category: Spc
+  triggers: [standardisation body, recognised standardisation body, British Standards Institution]
+
+- label: "Data: Subscriber"
+  type: governed
+  category: Data  # PECR: subscriber to an electronic communications service
+  families: ["PUBLIC: Data"]
+  triggers: [subscriber, subscribers]
+
+- label: "Finance: Auction Platform"
+  type: governed
+  category: Finance  # UK ETS auctioning (SI 2021/484)
+  triggers: [auction platform, appointed auction platform, auctioneer]
 
