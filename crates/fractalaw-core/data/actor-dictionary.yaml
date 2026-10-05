@@ -1503,6 +1503,6 @@
 
 - label: "Gvt: Authority: Safeguarding Children Board"
   type: government
-  category: Gvt
+  category: Gvt  # if Ind: Young Person ever gets a child/children pattern, exclude this name from it (legal's near-miss)
   triggers: [Local Safeguarding Children Board, safeguarding children board, safeguarding partners]
 
