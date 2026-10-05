@@ -325,3 +325,37 @@ Legal's first checks missed bracket-cased patterns; the re-check found three ove
 **Batch 1 at v1.2: 75.9% agree, 327 disputed.** Purpose 197, relation 114, active↔mentioned 79, GPT-only actor 53, counterparty↔mentioned 46, raw_type 35, beneficiary↔mentioned 33, label 26, counterparty↔beneficiary 8.
 
 **Referee:** running on all 327 in batches of 50 → `referee/batch1.jsonl`.
+
+## Referee: batch 1 (327 disputes, 2026-10-05)
+
+**Output:** `referee/batch1.jsonl`, validated: 327 decisions, ids match, all labels and purposes valid, non-active hold none.
+
+**sided_with:** **Gemini 219, GPT 76**, mixed 13, neither 19.
+- Relation disputes: Gemini right 99, GPT 15.
+- Purpose disputes: Gemini 163, GPT 31.
+
+**GPT is systematically wrong on:**
+- purpose precedence: Requirement/Power Conferred for enforcement, appeals, fees and liability (~60);
+- detail provisions as relations (exemption-power conditions, "have regard to", notice/report contents, trigger items);
+- applying-provision overreach.
+
+**Gemini is systematically wrong on:**
+- beneficiary for people in trigger conditions (→ mentioned; most "neither");
+- the party subject to a power as mentioned (should be counterparty);
+- `inferred` on applying-provision holders;
+- the v1.2 transitional duty;
+- the machinery order for disapplication and deeming.
+
+**The referee overrode agreed labels** in a few cases (e.g. UK_uksi_2016_721 reg.26(2), UK_uksi_1989_971 reg.22 items). Consensus isn't always right.
+
+**Rule gaps to rule on:**
+- trigger-condition actors;
+- commencement power vs consistency;
+- whether laying before Parliament/Assembly is "parliamentary procedure";
+- enforcing-authority designation and "functions" lists;
+- class-definition items outside content lists;
+- Exemption vs Transitional precedence;
+- money clauses ("paid out of money provided by Parliament");
+- two roles for one actor.
+
+**Dictionary gaps:** recognised third party organisation, arbiter, weights and measures authority (trigger), persons in lawful occupation (trigger).
