@@ -359,3 +359,33 @@ Legal's first checks missed bracket-cased patterns; the re-check found three ove
 - two roles for one actor.
 
 **Dictionary gaps:** recognised third party organisation, arbiter, weights and measures authority (trigger), persons in lawful occupation (trigger).
+
+## Rulings round 2 (prompt v1.3), gap fill, and the second model for groups 2–5 (2026-10-05)
+
+**Referee batch 1 rulings → prompt `drrp-v1.3-2026-10-05`** (Jason agreed all):
+- trigger-condition actors are `mentioned`;
+- commencement powers are a Liberty;
+- laying before Parliament/Assembly is a government Obligation;
+- enforcing-authority designations and functions lists: relation no, Establishment+Constitution;
+- class-definition items: relation no;
+- time-limited disapplications: Exemption;
+- money provided by Parliament: relation no, Charge+Fee;
+- one actor, two roles: strongest role.
+
+**Commits:** spec `c85f577`, prompt `1377a8c`, per-version carry rules `7cdb038`.
+
+**Dictionary gaps filled** (`221c561`): Gvt: Visiting Force, Intl: International Organisation (new `Intl:` prefix: Basel Secretariat, OPCW fact-finding missions), Intl: Foreign State (only when it acts or receives the act), EU: Euratom. Plus Spc: Recognised Third Party Organisation, Spc: Arbitrator, and triggers for weights & measures authority and lawful occupation.
+
+**Why GPT-5.5 is dearer:** $5 / $0.50 / $30 per M against Gemini Flash $0.75 / $0.075 / $3.75. That's ~$16.49 per 1,000 against $3.92.
+
+**GPT-5.4-mini** ($0.75 / $0.075 / $4.50) on the 327 refereed provisions: $0.71 ($2.17 per 1,000). Scored against the referee (`score_vs_referee.py`):
+
+| Model | Exact | Relation | Purpose | Actors |
+|---|---|---|---|---|
+| Gemini | 71% | 94% | 90% | 79% |
+| GPT-5.4-mini | 36% | 82% | 59% | 57% |
+| GPT-5.5 (v1.2) | 27% | 69% | 48% | 50% |
+
+Mini invents labels (18 on 327) but is better than GPT-5.5 here at an eighth of the cost.
+
+**Jason: GPT-5.4-mini is the second model for groups 2–5** (5,602 provisions, ~$12, gate off). It's a disagreement detector; the referee decides.
