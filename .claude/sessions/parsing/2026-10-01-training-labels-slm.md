@@ -25,6 +25,10 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - ✅ (from #60) Data protection labels added (`37530cd`): `Public: Data Controller`, `Public: Data Processor` (gated to PUBLIC: Data), `Ind: Data Subject`, `Gvt: Agency: Information Commissioner`. DPA s.91(1) now labels `Public: Data Controller`
 - ✅ (from #60) Holders in ANOTHER instrument → issue #77 and skill `cross-instrument-holders` (periodic Claude-agent pass, Jason-approved, adjudicated tier). Reminder: SessionStart hook + lat-sync step 7. First pass pending: 6 candidates in 4 laws
 - ⬜ Cost check before running. Per call (smoke test, Gemini 3.8 Flash): ~6.35K tokens in, of which 6.1K is the system prompt (cacheable), and ~170 out + 200–600 thinking. **(Jason)** prices it in the console and approves. **Proposed:** a 200-provision pilot first (measure beneficiary/counterparty yield and real tokens), then the full run
+- ⬜ **Before labelling (Jason 2026-10-05):**
+  - LAT at legal's latest. Last apply was 2026-09-30, and the `pull-lat --stale` dry run is blocked because Zenoh 7447 is down; asked legal. The labeller labels current text, since text_md5 is checked at run time.
+  - Reconcile the actor dictionary against legal's actor list. Legal already has consignor, consignee and probably producer; asked legal for the list.
+- ⬜ **Label by family, in order of actor-dictionary confidence** (memory `feedback_actor_dictionary_gap`). Per family group: a pilot of ~50 → add the OTHER actors to the dictionary (and tell legal) → bulk. High-confidence families first (OH&S sub-families, Fire, Nuclear, Consumer/Product Safety…). The LLM work improves the dictionary
 - ⬜ Label with the definitive prompt, one model, per provision. Resumable and versioned; nothing written to provision_actors
 - ⬜ Retrain the SLM (RunPod) on position + type, and purpose per provision. Not `act`
 - ⬜ Evaluate against held-out labels, the 50 hand-checked rows (`data/audit/poscorr_sample38_20261001.tsv`) and gold v2 when ready. It must match 3.8 Flash on the counterparty/beneficiary split before the run uses it
@@ -99,3 +103,14 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 - **OTHER labels:** 15 in total, e.g. consignor, consignee, producer, tenant, master of a vessel, safety committee, EU Council/Parliament. All other labels are dictionary labels.
 
 **Protective-purpose probe:** 39 provisions where a duty word (in the provision or its stem) occurs with protective wording ("ensure … health/safety/risk", "health and safety of", "exposed to risks", "well-being"). They gave **0.36 beneficiaries per provision**, e.g. COSHH NI reg.7(1) employer → employee, quarry operator → workers. 1,654 such provisions are unsampled (241 laws), which projects to ~600 more beneficiaries for ~$6.
+
+## Family order for labelling (2026-10-05)
+
+**Jason:** the actor dictionary is a known gap, stale against legal's list. Order the LLM work by dictionary confidence per family, run high-confidence families first, and pilot even those so new actors are caught before the bulk run.
+
+**First proxy (sample laws):** the share of "shall/must" provisions where the existing tiers found no actor at all.
+- **Lowest:** Nuclear 19%, Fire 20%, Mines & Quarries 20%, Working Time 21%, Consumer/Product Safety 22%, Gas & Electrical 22%, Planning 23%, Offshore 24%, Dangerous & Explosive Substances 25%.
+- **Occupational / Personal Safety:** 29% (776 sampled provisions).
+- **Highest:** Road Safety 55%, Rail 47%, Climate Change 43%, Data 42%, Air Safety 40%.
+
+**Caveat:** this proxy mixes dictionary gaps with passive/impersonal duties (#60). The per-family pilot's OTHER rate is the real confidence signal.
