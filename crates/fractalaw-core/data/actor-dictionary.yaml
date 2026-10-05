@@ -1326,3 +1326,39 @@
     - "(?:[Pp]rosecutors?|[Pp]rocurator [Ff]iscal|Director of Public Prosecutions|Crown Prosecution Service)"
   triggers: [prosecutor, prosecuting authority, procurator fiscal, Director of Public Prosecutions, Crown Prosecution Service]
 
+# ── Gaps from family group 1 bulk labels (2026-10-05): trigger-only ──
+- label: "Spc: Accreditation Body"
+  type: governed
+  category: Spc
+  triggers: [national accreditation body, UK national accreditation body, United Kingdom Accreditation Service, UKAS, accreditation body]
+
+- label: "Spc: Verifier"
+  type: governed
+  category: Spc
+  triggers: [verifier, accredited verifier]
+
+- label: "Spc: Laboratory"
+  type: governed
+  category: Spc
+  triggers: [competent laboratory, approved laboratory, laboratory]
+
+- label: "Svc: Gas Transporter"
+  type: governed
+  category: Svc
+  triggers: [gas transporter, gas transporters]
+
+- label: "Ind: Transferor"
+  type: governed
+  category: Ind
+  triggers: [transferor]
+
+- label: "Ind: Transferee"
+  type: governed
+  category: Ind
+  triggers: [transferee]
+
+- label: "Org: Social Partner"
+  type: governed
+  category: Org
+  triggers: [social partners, management and labour, organisations of employers and workers]
+
