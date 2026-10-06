@@ -429,6 +429,9 @@ def main() -> None:
                      json.dumps(resp) if resp else None, error, json.dumps(usage) if usage else None))
                 conn.commit()
                 ok, err = ok + (error is None), err + (error is not None)
+                if error and ("insufficient_quota" in error or "no credits remaining" in error) and not stop.is_set():
+                    stop.set()  # a billing failure won't clear by retrying: stop now
+                    print(f"  STOP: the API account is out of credit ({error[:120]}…). Top up and re-run; failed rows are retried.", flush=True)
                 for a in (resp or {}).get("actors", []):
                     if a["label"].startswith("OTHER") and other_key(a["label"]) not in acc:
                         seen_other[other_key(a["label"])] += 1
