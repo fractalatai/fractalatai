@@ -57,3 +57,5 @@ Selection unit text: median 302 characters, p90 807. The long units (21 over 4,0
 - Companies Act 1989 s.164(1): closing words cut mid-phrase ("In the application of this subsection in Scotland,").
 
 **For Jason:** gas regs reg.40(2) purpose: his current row decision approves Requirements (he changed it to Application in the pilot, then reverted), but PURPOSE-CLASSIFICATION.md cites reg.40(2) as the Application example.
+
+**Resolved (Jason, 2026-10-06):** gas regs reg.40(2) purpose is **Application, exemption and transition**. *"The section is titled Exemption certificates."* Recorded on the sentence page and in both gold versions; the purpose doc's example stands. The title decided it: more evidence that section titles (P1group/Title, on the legal-side list) are the cheapest purpose signal, and that purpose belongs to the section.
