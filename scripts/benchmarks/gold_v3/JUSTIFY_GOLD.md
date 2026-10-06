@@ -35,6 +35,7 @@ The evidence is **evidence, not truth**. The models followed an older prompt (`d
 - **Conditions on a power continue it** (REL-14 → `continues`, 2026-10-06): "shall not grant … unless satisfied", "a notice may not be given—".
 - **Access duties** (POS-18): on a `continues` row of an access duty, the party given access is `counterparty`, act `give_access`.
 - **Purpose:** Transitional is merged into **Application, exemption and transition** (11 classes).
+- **Beneficiary test** (POS-19): decide beneficiary vs mentioned from the words. If the party is named as what is protected ("health and safety **of** X", "protect X", "the interests of X"), it's a beneficiary, even inside a condition on a power. If the words only set when or whether the rule applies ("where X…", "if X…", "having regard to X"), it's mentioned. A recipient of the act is a counterparty.
 - **Cross-instrument holders** (HOLD-14): the holder comes from the parent Act when you can resolve it from the text given. Otherwise it is holder unknown.
 
 ## Fields to propose (per provision)
