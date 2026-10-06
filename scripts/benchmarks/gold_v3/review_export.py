@@ -21,6 +21,8 @@ import psycopg2
 ROOT = "/var/home/jason/fractalaw"
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 CATALOGUE = os.path.join(ROOT, "docs/architecture/DRRP-RULE-CATALOGUE.md")
+# derived at freeze, not reviewed (Jason, 2026-10-06): purpose_fine = Requirements + relation yes/no
+DERIVED = {"purpose_fine"}
 FIELD_ORDER = {"relation": 0, "raw_type": 1, "purpose": 2, "purpose_fine": 3, "actor": 4}
 
 
@@ -72,6 +74,8 @@ def main() -> None:
     by_sid: dict[str, list] = {}
     for sid, field, actor, proposed, rule_ids, reason, evid, agree, diff, cat in cur.fetchall():
         if only and sid not in only:
+            continue
+        if field in DERIVED:
             continue
         by_sid.setdefault(sid, []).append({
             "key": row_key(sid, field, actor), "field": field, "actor_label": actor, "proposed": proposed,

@@ -36,10 +36,9 @@ The evidence is **evidence, not truth**. The models followed an older prompt (`d
 | `relation` | `"yes"` / `"no"` | REL-* |
 | `raw_type` | `"Obligation"` / `"Liberty"` / `null`; set only when relation is yes and no actor is active | HOLD-15, DEF-02, TYPE-* |
 | `purpose` | one of the 12 coarse classes, exactly as written in PURPOSE-CLASSIFICATION.md | `P:<class>` plus the deciding cue, e.g. `P:Interpretation` |
-| `purpose_fine` | only when purpose = `Requirements`: `"Substantive"` (creates its own duty) or `"Procedure/Detail"` (form, manner, timing or content of a duty created elsewhere, usually relation `no`) | `P:Requirements-fine` |
 | `actor` (one per label) | `{"position", "holds", "inferred", "act"}` | POS-*, HOLD-*, TYPE-*, INF-*, ACT-*, LBL-* |
 
-Purpose is always proposed, including for relation `no` rows. There are no purpose rule IDs yet (the purpose catalogue comes with phase 2), so cite `P:<class>` and quote the deciding words in the reason.
+Purpose detail (Substantive vs Procedure/Detail under Requirements) is **not** proposed: it is derived from purpose plus relation when the gold set is frozen (Jason, 2026-10-06). Purpose is always proposed, including for relation `no` rows. There are no purpose rule IDs yet (the purpose catalogue comes with phase 2), so cite `P:<class>` and quote the deciding words in the reason.
 
 ## Difficulty (per field)
 
@@ -58,7 +57,6 @@ Write one JSON line per provision to the output file you are given:
   {"field": "relation", "proposed": "yes", "rule_ids": ["REL-01", "REL-42"], "reason": "…", "difficulty": "easy"},
   {"field": "raw_type", "proposed": null, "rule_ids": ["HOLD-02"], "reason": "…", "difficulty": "easy"},
   {"field": "purpose", "proposed": "Requirements", "rule_ids": ["P:Requirements"], "reason": "…", "difficulty": "easy"},
-  {"field": "purpose_fine", "proposed": "Substantive", "rule_ids": ["P:Requirements-fine"], "reason": "…", "difficulty": "easy"},
   {"field": "actor", "actor_label": "Org: Employer", "proposed": {"position": "active", "holds": "Obligation", "inferred": false, "act": null},
    "rule_ids": ["HOLD-01", "TYPE-01"], "reason": "…", "difficulty": "easy"}
 ]}
