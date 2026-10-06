@@ -254,7 +254,7 @@
   category: Gvt
   regex_patterns:
     - "[Pp]lanning [Aa]uthority?i?e?s?"
-  triggers: [planning authority, planning authorities]
+  triggers: [planning authority, planning authorities, regional planning authority, district planning authority]
   drrp_keywords: [authority]
 
 - label: "Gvt: Authority: Fire and Rescue"
@@ -359,7 +359,7 @@
   category: Gvt
   regex_patterns:
     - "(?:[Cc]ourt|[Jj]ustice of the [Pp]eace|[Tt]ribunal|[Ss]heriff|[Mm]agistrate)"  # prosecutor, Lord Advocate: own labels (2026-10-05)
-  triggers: [court, tribunal, judge, judiciary, employment tribunal, magistrates]
+  triggers: [court, tribunal, judge, judiciary, employment tribunal, magistrates, Central Arbitration Committee, CAC]
   drrp_keywords: [tribunal, court, sheriff, procurator fiscal]
 
 - label: "Gvt: Emergency Services: Police"
@@ -733,7 +733,7 @@
   category: Spc
   regex_patterns:
     - "(?:[Ee]mployees' representative|[Ss]afety representatives?|[Tt]rade [Uu]nions? representatives?)"
-  triggers: [employees' representative, employees representative, safety representative, workers representative, European Works Council, works council]
+  triggers: [employees' representative, employees representative, safety representative, workers representative, European Works Council, works council, workmen's inspector, workmen's inspectors, nominated person, safety representative, recipient of information under the works council arrangements]
 
 - label: "Spc: Trade Union"
   type: governed
@@ -1410,7 +1410,7 @@
 - label: "Ind: Designated Person"
   type: governed
   category: Ind
-  triggers: [designated person, designated persons]
+  triggers: [designated person, designated persons, experts designated by each Member State, designated expert]
 
 # ── Gaps from family group 4 pilot (2026-10-05): trigger-only ──
 - label: "Org: Farm Business"
@@ -1598,4 +1598,30 @@
   type: government
   category: EU
   triggers: [Euratom, European Atomic Energy Community]
+
+# ── Dictionary gaps from the batch 2 referee (2026-10-06): trigger-only ──
+- label: "Org: Diving Contractor"
+  type: governed
+  category: Org
+  triggers: [diving contractor, diving contractors]
+
+- label: "Spc: Poison Centre"
+  type: governed
+  category: Spc  # CLP Art 45: the body appointed to receive emergency health response information
+  triggers: [poison centre, appointed body under Article 45, body appointed to receive information relating to emergency health response]
+
+- label: "Ind: Visitor"
+  type: governed
+  category: Ind  # Occupiers' Liability Acts
+  triggers: [visitor, visitors, lawful visitor]
+
+- label: "Gvt: Independent Anti-slavery Commissioner"
+  type: government
+  category: Gvt
+  triggers: [Independent Anti-slavery Commissioner, Commissioner]
+
+- label: "Gvt: Planning Inspector"
+  type: government
+  category: Gvt  # person appointed by the Secretary of State to determine an appeal or hold an inquiry
+  triggers: [inspector appointed by the Secretary of State, Planning Inspectorate, person appointed to determine the appeal, inquiry inspector]
 
