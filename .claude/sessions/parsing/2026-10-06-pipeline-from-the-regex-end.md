@@ -64,6 +64,7 @@ Jason (2026-10-06): legal will have refactoring to do once we've worked this thr
 - **Provision titles:** read P1group/Title in legal's LAT parser so section/regulation titles reach fractalaw. It changes `lat_hash` for ~all laws (one re-pull). The cheapest purpose signal (phase 0b).
 - **Law-level purpose:** retire legal's own 15-value PurposeClassifier (from the law title) and derive law-level purpose from fractalaw's provision purposes (#172), so there's one vocabulary.
 - The purpose vocabulary migration of the published `purposes` field (after phase 0b).
+- **List items counted once** (Jason, 2026-10-06): an item that only completes its stem carries no DRRP of its own (`drrp_types = []`), but its actors and their positions are still sent. Legal's per-provision display shows the obligation on the stem. Worth telling legal with the other changes.
 - Actor label renames and the class change are already queued for the single run (`mix actors.rename_labels`).
 - ~~Actor entries keyed by (label, role)~~: not this iteration (Jason, 2026-10-06). One entry per label stays; the loss is tracked in #78.
 
