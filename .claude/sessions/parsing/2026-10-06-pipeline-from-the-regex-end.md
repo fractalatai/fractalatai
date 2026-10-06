@@ -35,7 +35,13 @@ Most of the cost and rules sit where the cheap tiers could decide.
 ## Todo
 
 - ✅ Suspend the training-labels workstream properly (status, state, pointers, commits)
-- ⬜ **Gemini critical review of this meta-plan** (gemini-review skill; one call, ~cents). Fold in its findings and Jason's rulings
+- ✅ **Gemini critical review of this meta-plan** (Gemini 2.5 Pro, raw: `data/code-review/drrp-pipeline-regex-end-meta-plan.md`). Action summary below; ⬜ Jason's rulings on it
+- ⬜ **Phase 0a: A trustworthy yardstick first** (from the Gemini review). A human-verified gold set (stratified, rare classes over-sampled: Liberty, beneficiary, applying holders), used to measure the bias of the 7K LLM "silver" labels **before** any tier is scored against them. Merges with gold v2 / Jason's 300-label spot check. **(Jason)** size and his review time
+- ⬜ **Phase 0b: Purpose suitability review** (Jason, 2026-10-06: "the Purpose classification is a legacy of my time working with Airtable"):
+  - which consumers actually use purpose (the purpose profile for legal#172, the DRRP gates #76, compliance screening);
+  - whether the 18 values are needed, or a coarse operative/machinery/procedure/sanctions split would do;
+  - legal compatibility (the published field).
+  - Decide **before** phases 2–3 build gates or a classifier on it
 - ⬜ **Phase 1: Tier measurement** (`parsing/2026-10-06-phase1-tier-measurement.md`). Score each existing tier against the labels, regex first. Where each tier is right or wrong, and what consumers lose
 - ⬜ **Phase 2: Regex end and guards** (`parsing/2026-10-06-phase2-regex-and-guards.md`):
   - regex purpose on the published vocabulary (#76) and updated purpose gates;
@@ -51,6 +57,29 @@ Most of the cost and rules sit where the cheap tiers could decide.
   - acceptance thresholds per tier and end to end, before the single run;
   - the referee is used only for gold and release QA
 - ⬜ Then the single run (`parsing/09-29-26-reenrichment-backlog.md`) on the improved pipeline
+
+## Gemini review feedback (2026-10-06)
+
+Raw review: `data/code-review/drrp-pipeline-regex-end-meta-plan.md`. Claude's reading of it:
+
+**Valid, and adopted into the plan (pending Jason):**
+- **Circularity.** Scoring tiers against LLM labels caps quality at the LLM's level, and the gates could silently drop exactly the relations the LLM misses. The refereed batches are still LLM-derived, so they don't fix this. → Phase 0a: a human-verified gold set measures the silver labels' bias first.
+- **Order.** The ruler comes first: gold and measurement before improving tiers. → Phase 0a before phase 1; phase 6's gold work moves forward.
+- **Phase 3 may be redundant.** Measure the existing dependency-feature classifier against the SLM in phase 1 (a bake-off). If the SLM wins, cut phase 3 and go regex → SLM → LLM.
+- **Rare classes.** Report metrics per class (Liberty, beneficiary, applying holders), not just overall accuracy. The sample over-weights duties.
+- **Error analysis, not just scores.** Phase 1 records *why* each tier fails (syntax, missing keyword, semantics), to drive phase 2.
+- **Acceptance metrics per phase**, to be set by Jason. Gemini proposes:
+  - prefilter precision > 99.8%;
+  - purpose-gate recall > 99.5% on gold relations;
+  - SLM resolving ≥ 80% without escalation, with (holder, position) F1 > 0.9 and beneficiary F1 > 0.7;
+  - end to end: Making > 99%, holder P/R > 98%, correlatives F1 > 0.95, purpose-profile JS divergence < 0.1.
+
+**Over-reach, or adopt lightly:**
+- A full cost/error optimisation model for escalation thresholds: a simple threshold sweep on gold will do.
+- Feeding upstream confidence into the SLM as a feature: worth it only if phase 1 shows gate errors cascading.
+- "0.5% loss is an illusion": overstated, but valid as a reason to re-measure it on gold.
+
+**Plus Jason's point:** the purpose scheme itself is an Airtable legacy, so review its suitability (phase 0b) before gates or a classifier depend on it.
 
 ## Dependencies
 
