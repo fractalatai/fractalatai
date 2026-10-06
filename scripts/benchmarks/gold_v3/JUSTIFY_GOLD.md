@@ -28,6 +28,10 @@ The evidence is **evidence, not truth**. The models followed an older prompt (`d
 - **#67 access rights** (INF-01) also apply when the access duty's holder is unknown ("open to inspection by the public" → the public is `active`, holds `Liberty`, `inferred: true`).
 - **One entry per label, strongest role** (POS-15) is still in force. If a second role or a second same-label person is dropped, say what was dropped in the reason. That feeds #78.
 - **Stems and list items are counted once** (REL-45, REL-28, POS-17; Jason 2026-10-06). A stem that begins a duty or power ("X shall—", "X may … requiring the person to—") is `yes` with its holder active. An item that only completes it is relation **`continues`**: no holder, no raw_type, and the stem's holder is **not** listed. The item's own actors keep their role in the stem's relation (counterparty with its act, beneficiary, or mentioned). An item with its own duty or power is `yes`; criterion and class-definition items stay `no` (REL-15). The source puts a stem's closing words ("… as it may reasonably require …") on the stem row; they belong to the stem.
+- **Detail of a duty continues it** (REL-28, 2026-10-06): a provision that only sets the content, form, manner, timing or discharge of a duty created elsewhere is `continues`, not `no` (it replaces the old `no` for REL-11/12/13 and the detail half of REL-16). `no` means the provision touches no duty or power at all. Conditions on **a power** (REL-14) stay `no`.
+- **"No person shall be engaged/employed/permitted"** (HOLD-17): the engager holds it, from the applying provision (`inferred: true`); the person engaged is `mentioned`.
+- **Participation** (TYPE-07): "shall take part in … or shall be consulted" is a Liberty for the participants.
+- **Purpose:** Requirements is for provisions about obligations. A condition on an exemption, or on how a power applies, is Application and exemption. Choose one class (the dominant one).
 - **Cross-instrument holders** (HOLD-14): the holder comes from the parent Act when you can resolve it from the text given. Otherwise it is holder unknown.
 
 ## Fields to propose (per provision)

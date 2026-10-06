@@ -323,6 +323,8 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
       if (r.field === "actor") {
         val = inputs.position.value === "(not an actor here)" ? { listed: false }
           : { position: inputs.position.value, holds: inputs.holds.value, inferred: inputs.inferred.checked, act: inputs.act.value || null };
+        if (val.position === "active" && val.holds === "none") { showNotice("An active actor holds an Obligation or a Liberty: choose one under Holds."); return; }
+        if (val.position && val.position !== "active" && val.holds !== "none") { showNotice("Only an active actor holds an Obligation or a Liberty: set Holds to none, or the role to active."); return; }
       } else {
         val = inputs.value.value === "" ? null : inputs.value.value;
       }
