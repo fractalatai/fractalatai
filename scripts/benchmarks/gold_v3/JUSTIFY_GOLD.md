@@ -54,7 +54,7 @@ Purpose detail (Substantive vs Procedure/Detail under Requirements) is **not** p
 - **`hard`**: the evidence disagrees with you, two rules pull different ways (name both), or you are unsure.
 - **`new_edge`**: no rule in the catalogue fits. Set `rule_ids: ["NEW"]` and write the candidate rule in the reason, in one line.
 
-Be honest: a confident wrong `easy` costs Jason more than a `hard`.
+Be honest: a confident wrong `easy` costs Jason more than a `hard`. Evidence that predates a ruling (the models and referee followed `drrp-v1.3`) doesn't make a row hard when the ruling covers the case word for word: grade it easy and name the ruling.
 
 ## Output
 
