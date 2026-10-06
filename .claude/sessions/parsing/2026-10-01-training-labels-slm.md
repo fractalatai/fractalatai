@@ -407,3 +407,15 @@ Mini invents labels (18 on 327) but is better than GPT-5.5 here at an eighth of 
 - designation powers inside definitions;
 - "means at their disposal" (counterparty/supply?);
 - definition of "time-limited" for evidential savings.
+
+## Batch 2 with GPT-5.4-mini (2026-10-06)
+
+**Credit:** the OpenAI account ran out overnight (2026-10-05 ~21:00). The groups 2–5 mini run failed ~2,230 calls on retries; it was stopped, and the labeller now stops at the first billing error (`6c8a60c`).
+- Jason: ~£40 went on GPT-5.5 because the total cost wasn't approved up front. He topped up $20 ($16 left) and asked for batch 2 only. Memory: `feedback_paid_api_walk_dont_run`.
+- Added `--max-cost` (`e1989f9`).
+
+**Batch 2 (group 2, 1,635 provisions):** smoke test 10 ($0.03), then the rest with a $5 cap. **$3.26 actual** ($2.02 per 1,000); ~$12.70 OpenAI credit left.
+
+**Gemini vs mini: 58.3% agree, 681 disputed** (vs 22–25% with GPT-5.5 on batch 1).
+- 137 were only label slips or dropped actors on mini's side: **settled for Gemini** (`referee/batch2_auto.jsonl`, `auto-gemini`).
+- 544 substantive disputes: Opus referee, two agents in parallel (`referee/batch2a.jsonl`, `batch2b.jsonl`).
