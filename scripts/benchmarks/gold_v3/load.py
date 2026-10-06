@@ -105,6 +105,15 @@ def main() -> None:
         proposed_actors = {f.get("actor_label") for f in fields if f["field"] == "actor"}
         for lab_actor in sorted({a["label"] for lab in labs.values() for a in lab.get("actors") or []} - proposed_actors):
             who = [m for m, lab in labs.items() if any(a.get("label") == lab_actor for a in lab.get("actors") or [])]
+            relation = next((f["proposed"] for f in fields if f["field"] == "relation"), None)
+            was_active = any(a.get("label") == lab_actor and a.get("position") == "active"
+                             for lab in labs.values() for a in lab.get("actors") or [])
+            if relation == "continues" and was_active:  # the stem's holder, left off the item by design (REL-28)
+                fields.append({"field": "actor", "actor_label": lab_actor, "proposed": {"listed": False}, "rule_ids": ["REL-28"],
+                               "reason": f"The stem's holder ({', '.join(who)} listed it as active here). Under the 2026-10-06 ruling "
+                                         f"it is counted once, on the stem, and not repeated on an item that continues it.",
+                               "difficulty": "easy"})
+                continue
             fields.append({"field": "actor", "actor_label": lab_actor, "proposed": {"listed": False}, "rule_ids": ["LBL"],
                            "reason": f"Listed by {', '.join(who)} but not by the justifier: confirm it is not an actor here, "
                                      f"or give its role.", "difficulty": "hard"})
