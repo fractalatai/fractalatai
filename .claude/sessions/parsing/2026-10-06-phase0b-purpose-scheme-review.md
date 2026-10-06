@@ -20,10 +20,9 @@ The 18-value purpose scheme is a legacy of Jason's Airtable work. It's involved 
 - ✅ (legal, 2026-10-06; below) Consumers: who uses purpose and how. That covers the purpose profile (legal#172, law shares ≥ 0.05), the DRRP gates (#76, `SKIP_PURPOSES`), compliance screening and the change list, and legal's UI/search. Asked legal 2026-10-06
 - ⬜ Statutory vocabulary: the terms legislation itself uses in provision titles, cross-headings and Part titles (first counts below)
 - ✅ (legal, 2026-10-06; below) **Provision titles: do we have them?** Our LAT rows have no titles (e.g. `UK_uksi_1992_3004:reg.2` is empty; "Interpretation" isn't stored). Asked legal whether it can serve titles, cross-headings and Part titles. Titles may be the cheapest purpose signal of all
-- ⬜ Options, with evidence (measured on the 6,959 labels):
-  - (A) keep the 18 values, renamed to statutory terms;
-  - (B) a heading-derived purpose: the provision's own title/heading class;
-  - (C) a smaller set of statutory terms, scoped to what the consumers need
+- ⬜ **Layered purpose** (Jason, 2026-10-06: "let's not limit ourselves to 1 method: a coarse/simple method could feed into a finer/more complex when needed"). Design the layers, with evidence on the 6,959 labels:
+  - **coarse:** cheap cues (text, headings, titles when available) to a small set of statutory-term classes, high precision, else "undetermined" → escalate;
+  - **fine:** classifier/SLM/LLM refines within the coarse class, only where a consumer needs it
 - ⬜ **(Jason)** Choose; then the spec, the published-field migration with legal, and the phase 2 gates
 
 ## First evidence (2026-10-06)
@@ -64,6 +63,31 @@ These are the law's own purpose words, and they map onto a smaller, statute-shap
 2. Retire legal's law-level classifier and derive law-level purpose from ours (#172), so there's one vocabulary.
 3. Provision titles plus cross-headings plus Part titles could drive a regex-tier purpose (phase 2) with the LLM only for the residual.
 4. **(Jason)** Fold the P1group/Title parser change into the single run's re-parse wave?
+
+## Measurements (2026-10-06)
+
+**Headings are mostly subject matter, not function.**
+- Cross-headings cover only **14%** of the 6,959 labelled provisions; Part/Chapter titles cover **58%**.
+- Most are topical ("height of chimneys", "glass", "parking in London"). Even functional ones are mixed: provisions under "Offences" most often label as Procedure+Detail (27%).
+- The function words (Interpretation, Offences, Duties, Citation and commencement) live mainly in **section titles**, which we don't hold yet (the legal refactoring list).
+
+**The stored (regex) purpose is essentially absent as a classifier.**
+- 70% of provisions carry the legacy catch-all `Process+Rule+Constraint+Condition` and 16% `Unclassified`, so it agrees with the labelled purpose **5.5%** of the time (385/6,959).
+- Only commencement is recognised well (77%), and Interpretation partly (32%).
+- So the regex end of purpose has to be (re)built, not tuned.
+
+**Layered design direction:**
+- **Coarse layer (regex/text cues; headings and titles as extra evidence).** A few statutory-term classes, each with high-precision cues:
+  - Citation and commencement ("may be cited as", "comes into force");
+  - Interpretation ("means", "includes", "references to");
+  - Application / Exemption ("applies to", "shall not apply");
+  - Amendment / Revocation (already scope);
+  - Offences and penalties ("commits an offence", "liable on conviction");
+  - Duties (shall/must + actor);
+  - Powers (may + actor);
+  - otherwise undetermined → escalate.
+- **Fine layer** only where a consumer needs it (e.g. within Duties: an own duty vs procedure/detail; within Powers: conferred vs enforcement).
+- **Next:** measure each coarse cue's precision and coverage on the labels, and decide the class list in statutory terms (Jason).
 
 ## Dependencies
 
