@@ -11,6 +11,9 @@ set never overlaps training data. Three parts:
   sample_drrp_training.py --pool test --out data/gold/v3/pool.csv   # first
   select_gold.py                                   # → data/gold/v3/selection.csv
   select_gold.py --size 1000 --natural 150 --seed 63
+
+The 2026-10-06 selection (data/gold/v3/selection.csv) is frozen: its targets used the cue as it was then, so
+re-running after cue changes can pick different rows. Don't overwrite it.
 """
 
 import argparse

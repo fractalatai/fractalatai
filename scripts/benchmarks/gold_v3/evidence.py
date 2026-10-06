@@ -22,12 +22,20 @@ import json
 import os
 import sys
 
+import re
+
 import duckdb
 import psycopg2
 
 ROOT = "/var/home/jason/fractalaw"
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from drrp_prompt import ancestors, applying, applying_index, references, user_prompt  # noqa: E402
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from coarse_purpose import classify, coarse  # noqa: E402
+
+# “term” means …, including the Welsh form “term” (“term in Welsh”) means …
+DEFINES = re.compile(r"“([^”]{2,60})”(?:\s*\(“[^”]{1,60}”\))?\s+(?:means|includes|has the (?:same )?meaning)", re.I)
 
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 DUCK = os.path.join(ROOT, "data/fractalaw.duckdb")
@@ -54,6 +62,11 @@ def main() -> None:
     parts = {sid: r[3] for sid, r in rows.items()}
     titles = {(r[1], r[5]): (r[4], r[2]) for r in rows.values() if r[4] in ("part", "chapter", "heading") and r[5]}
     app_idx = applying_index(texts, parts)
+    # the law's own definitions ("the Authority" means …), so a justifier needn't guess defined terms
+    defs: dict[str, dict] = {}
+    for dsid, dr in rows.items():
+        for m in DEFINES.finditer(dr[2] or ""):
+            defs.setdefault(dr[1], {}).setdefault(m.group(1).strip(), (dsid, dr[2]))
 
     cur.execute("""SELECT section_id, actor_label, regex_position, regex_drrp, cls_position, cls_drrp, slm_position, slm_drrp,
                           llm_position, llm_drrp, inferred_position, inferred_drrp, adj_position, adj_drrp, position, drrp,
@@ -97,6 +110,17 @@ def main() -> None:
                      for p in ("/".join(segs[:i]) for i in range(1, len(segs))) if (law, p) in titles]
             stems = [(a, texts[a]) for a in ancestors(sid) if texts.get(a)]
             refs = references(sid, text, texts)
+            # references in the stem too ("The measures required by paragraph (1) …" on a list item)
+            seen = {sid, *(a for a, _ in stems), *(x for x, _ in refs)}
+            for a, t in stems:
+                for x, xt in references(a, t, texts):
+                    if x not in seen:
+                        refs.append((x, xt))
+                        seen.add(x)
+            body = " ".join([t for _, t in stems] + [text])
+            used = sorted((term for term in defs.get(law, {})
+                           if re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", body, re.I)), key=len, reverse=True)[:8]
+            definitions = [defs[law][term] for term in used]
             apps = applying(sid, parts, app_idx)
             md5 = hashlib.md5(text.encode()).hexdigest()
             lab = labels.get(sid, {})
@@ -105,9 +129,12 @@ def main() -> None:
                 "section_id": sid, "law_name": law, "law_title": law_title.get(law), "text_md5": md5,
                 "selection": sel[sid]["part"], "stratum": sel[sid]["stratum"],
                 "headings": heads, "text": text,
-                "context": user_prompt(sid, text, stems, refs, apps),
+                "context": user_prompt(sid, text, stems, refs, apps).replace(
+                    "\n\nPROVISION TO LABEL", "\n\nDEFINITIONS (same law; terms used above):\n"
+                    + ("\n".join(f"[{d}] {t[:600]}" for d, t in definitions) or "(none)") + "\n\nPROVISION TO LABEL", 1),
+                "definitions": [d for d, _ in definitions],
                 "has_stem": bool(stems), "has_refs": bool(refs), "has_applying": bool(apps),
-                "cue": {"coarse_purpose": sel[sid]["coarse_purpose_cue"], "how": sel[sid]["cue_how"]},
+                "cue": dict(zip(("coarse_purpose", "how"), (lambda c: (coarse(c[0]), c[1]))(classify(sid, texts)))),
                 "tiers": {"purposes": r[6], "drrp_types": r[7], "actors": actors.get(sid, [])},
                 "labels": lab, "stale_labels": stale,
             }, ensure_ascii=False) + "\n")

@@ -53,7 +53,7 @@ FROM_18 = {
 CUES = [
     ("Citation and commencement", r"\bmay be cited as\b|\bcomes? into (?:force|operation)\b|\bshall come into (?:force|operation)\b"
                                   r"|\bextends? (?:only )?to (?:England|Wales|Scotland|Northern Ireland|Great Britain|the United Kingdom)"),
-    ("Amendment and revocation", r"\b(?:is|are) (?:hereby )?(?:revoked|repealed)\b|\bfor .{1,80} substitute\b|\bthere (?:is|are|shall be) inserted\b"
+    ("Amendment and revocation", r"\b(?:is|are) hereby (?:revoked|repealed)\b|\b(?:Regulations|Order|Act|Rules|Directive|provisions?)\b[^.;]{0,60}\b(?:is|are) (?:revoked|repealed)\b|\bfor .{1,80} substitute\b|\bthere (?:is|are|shall be) inserted\b"
                                  r"|\b(?:is|are) amended as follows\b|\bomit\b"),
     ("Transitional and saving", r"\bcontinues? to have effect\b|\bas if (?:this|these|that) .{0,40}had not\b|\btransitional\b|\bsaving\b"),
     ("Interpretation", r"^In (?:this|these) [^,]{0,40},|“[^”]{1,80}” (?:means|includes|has the (?:same )?meaning)"
@@ -61,7 +61,7 @@ CUES = [
     ("Offences and penalties", r"\b(?:is|shall be) guilty of an offence\b|\bcommits an offence\b|\bliable,? on (?:summary )?conviction\b"
                                r"|\bliable to (?:a fine|imprisonment)\b"),
     ("Appeals and defences", r"\bit (?:is|shall be) a defence\b|\bmay appeal\b|\ban appeal (?:lies|shall lie)\b"),
-    ("Constitution", r"\bthere shall (?:continue to )?be a body\b|\bis (?:hereby )?established\b|\bshall consist of\b|\bshall be a body corporate\b"),
+    ("Constitution", r"\bthere shall (?:continue to )?be a body\b|\bis (?:hereby )?established\b|\b(?:body|committee|board|panel|council|commission|tribunal|authority)\b[^.;]{0,40}\bshall consist of\b|\bshall be a body corporate\b"),
     ("Enforcement", r"\binspectors?\b|\benforcing authorit|\bimprovement notice\b|\bprohibition notice\b|\benforcement notice\b"
                     r"|\bpower(?:s)? of entry\b|\benter (?:any )?premises\b|\btake samples\b|\bseize\b"),
     ("Application and exemption", r"\b(?:shall|do|does) not apply\b|\bapplies? (?:only )?(?:to|in relation to)\b|\bshall apply (?:to|in relation to)\b"
