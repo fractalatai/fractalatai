@@ -18,7 +18,7 @@ import re
 
 import yaml
 
-PROMPT_VERSION = "drrp-v1.3-2026-10-05"
+PROMPT_VERSION = "drrp-v1.4-2026-10-06"
 DICTIONARY = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "crates/fractalaw-core/data/actor-dictionary.yaml")
 
 # Published purposes, table order (fractalaw_core::taxa::purpose::PUBLISHED_PURPOSES)
@@ -80,6 +80,17 @@ For each ACTOR (person, body or class of persons) the provision refers to:
 - **Enforcing-authority designations and functions lists.** "X shall be (responsible as) the enforcing authority for …" and lists of a body's functions that impose no duty in their own text → relation `no`, purpose `Establishment+Constitution`.
 - **Money provided by Parliament.** "There shall be paid out of money provided by Parliament …" is an authority to spend → relation `no`, purpose `Charge+Fee`.
 - **Time-limited disapplications** ("these Regulations shall not apply until …") → purpose `Exemption`.
+- **A power to exempt** ("may by certificate exempt …") → relation `yes`, that actor `active` with Liberty, purpose `Exemption`. **Conditions on another provision's power** ("shall not grant any such exemption unless satisfied …", "shall not consent unless— (a) …") → detail: relation `no`, `Procedure+Detail`.
+- **Functions of a governed party** ("safety representatives shall have the following functions— (a) …") → relation `yes`, that party `active` with Liberty, purpose `Power Conferred`. (Only the functions of a BODY are `Establishment+Constitution`.)
+- **Content list or detail.** "The notice/report/register … must— (a) …": a content list (relation `yes`) when it completes a duty created in this same provision; a detail provision (relation `no`, `Procedure+Detail`) when it details something required elsewhere ("the notice referred to in paragraph (1) must contain"), enforcement notices included.
+- **Timing items** ("at suitable intervals", "within 8 weeks") and **discharge details** ("shall comply with his duty under paragraph (1) by …") → relation `no`, `Procedure+Detail`.
+- **Mixed provisions.** If a provision creates any duty or power of its own (e.g. an exemption plus a fallback duty), relation `yes`, and its purpose follows that operative part (`Requirement`/`Power Conferred`).
+- **Withheld conduct** ("ensure that workers do not eat …", "shall not be permitted to remain"): the parties whose conduct is permitted or withheld are `counterparty`, act `other`.
+- **Savings of old law or status** ("continues to have effect as if …", reliance on old documents as evidence) → relation `no`, purpose `Transitional Arrangement` (ahead of the machinery order). Pure deeming with no time element stays `Interpretation+Definition`, including electronic-delivery rules ("has effect as a delivery only if …").
+- **Designation inside a definition** ("as may be designated by the Secretary of State by order" within a definition) → relation `no`, `Interpretation+Definition`. A Gazette notification inside a citation/commencement provision → relation `no`, `Enactment+Citation+Commencement`.
+- **"Means at their disposal."** "Ensure the nominees have adequate time and means" → the nominees are `mentioned`; a counterparty with `supply` needs the text to say the party is provided with something.
+- **Appeals.** A provision about an appeal or review of a decision has purpose `Defence+Appeal`; relation `yes` only if it creates its own duty or power.
+- A relation-`no` class-definition or criterion item has purpose `Application+Scope`.
 - **Instruments are never actors.** A scheme, regulations, an order, a notice or a licence is not an actor. "The scheme may specify…" is a Liberty of the scheme maker when the stem or referenced provisions name it; otherwise raw_type with no active actor.
 - **Applications to a court or tribunal.** "On the application of X, the court may…" → the court (`Gvt: Judiciary`) is `active` with Liberty. X is `mentioned`: its application is a condition, not a liberty of X.
 - **Statutory defences.** "It is a defence for an accused … to prove that …" → relation `no`; the accused is `mentioned`.
@@ -118,7 +129,7 @@ Choosing one: ask what the provision does in its own text, read with its stem.
 - Precedence when two fit: machinery > sanctions > `Charge+Fee` > `Requirement` / `Power Conferred` > `Procedure+Detail`; within machinery, the order listed ("may be cited as … comes into force … extends to" is `Enactment+Citation+Commencement`). A definition containing "shall" is a definition; an offence provision is an offence. Between `Requirement` and `Power Conferred`, the provision's main relation decides.
 - The `Requirement` / `Procedure+Detail` test is the one above: creates its own duty → `Requirement`; qualifies one created elsewhere → `Procedure+Detail`. A duty with a qualifier stays `Requirement` ("Except in such cases as may be prescribed, it shall be the duty of every employer to prepare a written statement").
 - List items and fragments take their stem's purpose ("A scheme must— (a) …" items are `Requirement`), unless the item does something else itself (an exemption or definition inside a list).
-- Consistency: `Requirement` goes with relation `yes` (Obligation); `Power Conferred` with relation `yes` (Liberty); machinery and `Procedure+Detail` with relation `no`, except (1) a transitional provision that itself confers a time-limited power or duty (relation `yes`, purpose `Transitional Arrangement`) and (2) a power to commence ("on such day as the Secretary of State may by order appoint": relation `yes`, that actor `active` with Liberty, purpose `Enactment+Citation+Commencement`). Enforcement, fees and sanctions may go either way (an inspector's power is a Liberty; an offence creates no relation).
+- Consistency: `Requirement` goes with relation `yes` (Obligation); `Power Conferred` with relation `yes` (Liberty); machinery and `Procedure+Detail` with relation `no`, except (1) a transitional provision that itself confers a time-limited power or duty (relation `yes`, purpose `Transitional Arrangement`) (2) a power to commence ("on such day as the Secretary of State may by order appoint": relation `yes`, that actor `active` with Liberty, purpose `Enactment+Citation+Commencement`), and (3) a power to exempt (relation `yes`, Liberty, purpose `Exemption`). Enforcement, fees and sanctions may go either way (an inspector's power is a Liberty; an offence creates no relation).
 
 ## Actor labels
 Use ONLY labels from this dictionary (exact spelling). [government] vs [governed] is the holder class. If no label fits, use "OTHER: <short description>". Use the most specific label that fits. Don't invent actors that the provision (with its stem) doesn't refer to.
