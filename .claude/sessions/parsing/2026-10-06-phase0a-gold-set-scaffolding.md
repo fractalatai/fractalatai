@@ -284,3 +284,13 @@ Two Opus agents (48 + 47), brief at `b4256d4`, with Postgres precedent.
 5. Permission with no person ("Allowances may be traded"): yes raw Liberty, or `no`?
 6. Purpose: transitional duty (Application vs Requirements); government functions lists (Requirements vs Constitution); exception to an offence (Application vs Offences/Appeals); deeming compliance (Interpretation vs Application).
 7. Dictionary: support panel (CTSA 2015 s.36), nominated recipient (FIT); Spc: Verifier is governed but Scottish verifiers are usually local authorities.
+
+**Batch 2 review (Jason, 2026-10-06):** complete. Over 240 provisions: 1,073 approved, 28 changed, 5 queried. Jason: *"we are classifying at too granular a level - some clauses are simply snippets - especially on Purpose. Laws tag entire sections."* Measured: the 1,000 provisions fall in 609 sections (median 10 rows each); of 27 reviewed sections with more than one provision, 10 had mixed purposes. Section-level purpose was offered; Jason chose **granular, with an escape rule**: a snippet takes purpose `inherit` (the nearest ancestor's), so it needn't be labelled. `3bde7e7` (docs), `989d2b3` (brief + page: `inherit` added to the purpose picker, republished as page version 7).
+
+Other batch 2 rulings: how vs who/when/what/where (procedural conditions on a power are Requirements); a power to authorise others is Permissions; "an offence will not be committed … provided" is Offences and penalties; a list item with its own laying duty is `yes` (Water Act s.81(5)(a)); a duty for existing cases lists its holder (reg.18(5)).
+
+Still `query`: s.69A(7)(e) (a modification clause: which purpose?); reg.4(2) deemed compliance; SI 2012/3032 reg.2 (is a `Gvt: Authorised Person` label needed alongside `Gvt: Officer`?). Dictionary gap: well-operator (`OTHER:` for now).
+
+## Batch 3 (2026-10-06)
+
+First batch with purpose `inherit`. Two Opus agents (48 + 47), brief at `989d2b3`.
