@@ -294,3 +294,43 @@ Still `query`: s.69A(7)(e) (a modification clause: which purpose?); reg.4(2) dee
 ## Batch 3 (2026-10-06)
 
 First batch with purpose `inherit`. Two Opus agents (48 + 47), brief at `989d2b3`.
+**Stopped (Jason, 2026-10-06):** batch 3 was stopped mid-run; nothing loaded or published. Jason: *"'continues the stem' is also another way of saying 'inherit'. It's telling us we're into the weeds of snippets of laws"* and *"are we creating some large, very particular rulebook?"* Yes: the catalogue holds 123 active rules, 44 added or amended on 10-06, many from a single provision.
+
+## Redesign draft: label sentences, not rows (2026-10-06, for Jason's agreement)
+
+**Problem.** We label the source's rows. A sentence split into a stem and items becomes several rows, each needing a label, plus rules for how the pieces relate. 86 of the 240 reviewed relations are `continues`; 23 of 123 rules exist for stems, items and continuation; purpose was being forced onto fragments.
+
+**1. The unit is the sentence.** A stem ("X shall—", "The notice must specify—") is joined with all its items and closing words into one unit. A row with no stem above it is its own unit.
+
+| | rows | units |
+|---|---|---|
+| 61 test laws | 17,837 | 10,462 (2,142 multi-row) |
+| gold selection | 1,000 | 883 (311 sampled items fold into their sentence) |
+| reviewed so far | 240 | 231 |
+
+Unit text: median 265 characters, p90 718; 3 units over 4,000 (long schedule lists), max 37 rows.
+
+**One label per unit:** relation, raw_type, purpose, and every actor in the whole sentence with one role. Items are never labelled; they inherit everything.
+
+**2. What happens to `continues` and `inherit`.** Inside a sentence they disappear. Left: a **whole sentence** that only details a duty or power created in another sentence ("A notice of appeal shall be accompanied by…"). 31 of the 86 reviewed `continues` were these. Options: keep `continues` for them only, or fold them into `no` with a pointer. Purpose `inherit` stays for whole sentences that are fragments of their section.
+
+**3. Rules vs precedents.** The catalogue becomes a short list of general principles. Decisions on individual provisions stay in `drrp_gold` as precedents (examples), not rules. A precedent becomes a rule only when the same pattern recurs in about 3 or more provisions. Target: about 30 to 40 principles.
+
+**Retire outright** (only exist for rows inside a sentence): REL-02, REL-13, REL-15, REL-16, REL-30, REL-45, HOLD-02, TYPE-06, POS-17, POS-18, INF-04's stem clause; the item half of REL-28. Also the 10-06 item refinements (items picking the holder, item laying duties, stem beneficiaries on items).
+
+**4. The 240 reviewed:**
+- 127 single-row units: carry over as they are;
+- 27 units whose stem was reviewed but whose items weren't: keep the stem's decisions; the agent proposes only the extra actors found in the items;
+- 77 units where only items were reviewed: re-labelled at the unit; the item decisions are shown as precedent.
+
+**5. Remaining work:** about 650 new units in batches of about 100, after the rulebook is pruned.
+
+**6. Tooling:** `units.py` (assembles sentences; replaces the row selection with units), the evidence pack gains the assembled sentence, `drrp_gold` keys by unit root, the review page shows one card per sentence (stem with items indented).
+
+**7. Pipeline consequence:** the regex, classifier and small-model stages should also label sentences. Until they do, evaluation maps their row output to units: the root row's relation, plus the union of the actors across the unit's rows. Stems and lists counted once was already on the pipeline list; this makes it the unit.
+
+**Decisions needed:**
+1. Agree the sentence as the unit.
+2. Whole-sentence detail of another duty: keep `continues` for it, or `no` with a pointer?
+3. Agree rules vs precedents, with a threshold of about 3.
+4. Prune the catalogue to principles before the next batch (draft for review).
