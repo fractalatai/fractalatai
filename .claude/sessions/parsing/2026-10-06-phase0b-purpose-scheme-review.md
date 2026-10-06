@@ -20,10 +20,13 @@ The 18-value purpose scheme is a legacy of Jason's Airtable work. It's involved 
 - ✅ (legal, 2026-10-06; below) Consumers: who uses purpose and how. That covers the purpose profile (legal#172, law shares ≥ 0.05), the DRRP gates (#76, `SKIP_PURPOSES`), compliance screening and the change list, and legal's UI/search. Asked legal 2026-10-06
 - ⬜ Statutory vocabulary: the terms legislation itself uses in provision titles, cross-headings and Part titles (first counts below)
 - ✅ (legal, 2026-10-06; below) **Provision titles: do we have them?** Our LAT rows have no titles (e.g. `UK_uksi_1992_3004:reg.2` is empty; "Interpretation" isn't stored). Asked legal whether it can serve titles, cross-headings and Part titles. Titles may be the cheapest purpose signal of all
-- ⬜ **Layered purpose** (Jason, 2026-10-06: "let's not limit ourselves to 1 method: a coarse/simple method could feed into a finer/more complex when needed"). Design the layers, with evidence on the 6,959 labels:
+- ✅ (12 coarse classes decided 2026-10-06; `PURPOSE-CLASSIFICATION.md` § Layered purpose) **Layered purpose** (Jason, 2026-10-06: "let's not limit ourselves to 1 method: a coarse/simple method could feed into a finer/more complex when needed"). Design the layers, with evidence on the 6,959 labels:
   - **coarse:** cheap cues (text, headings, titles when available) to a small set of statutory-term classes, high precision, else "undetermined" → escalate;
   - **fine:** classifier/SLM/LLM refines within the coarse class, only where a consumer needs it
-- ⬜ **(Jason)** Choose; then the spec, the published-field migration with legal, and the phase 2 gates
+- ✅ (Jason, 2026-10-06) Choose: 12 coarse classes in statutory terms; Enforcement its own class; Constitution kept
+- ⬜ Coarse layer build (phase 2): stem inheritance, enforcement cues, section titles when served; re-measure
+- ⬜ Fine layer: Duties → Requirement vs Procedure/Detail (feeds the DRRP gate); others only on consumer need
+- ⬜ Published-field migration with legal (legal-side refactoring list); retire legal's law-level classifier (#172)
 
 ## First evidence (2026-10-06)
 
