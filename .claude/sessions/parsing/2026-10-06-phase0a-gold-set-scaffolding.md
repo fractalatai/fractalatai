@@ -163,7 +163,7 @@ Two pilot provisions were re-justified (gas regs reg.40(2), GHG ETS reg.44A(8)(a
 
 The selection is frozen.
 
-**Open question for Jason:** a word-based beneficiary test. "Health and safety **of** X", "protect X", "the interests of X" → beneficiary, whether in a duty or a condition; "where/if/having regard to X" → mentioned. It would flip the persons in reg.40(2) to beneficiary.
+**Adopted (Jason, 2026-10-06): the beneficiary test (POS-19)**, now in the spec, catalogue and brief. reg.40(2) Person was changed to beneficiary on the page and in Postgres. The test: "Health and safety **of** X", "protect X", "the interests of X" → beneficiary, whether in a duty or a condition; "where/if/having regard to X" → mentioned. It would flip the persons in reg.40(2) to beneficiary.
 
 **Batches:** the 950 are split into 10 mixed batches of 95 (`data/gold/v3/batches/batch01..10.jsonl`, seed 64). Each has about 70 labelled, 14 natural and 11 target. **One batch at a time** (Jason), because each can change the rules for the next. Jason keeps reviewing the easy rows until he's confident in them.
 
