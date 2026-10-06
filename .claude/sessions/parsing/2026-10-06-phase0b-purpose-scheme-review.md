@@ -89,6 +89,25 @@ These are the law's own purpose words, and they map onto a smaller, statute-shap
 - **Fine layer** only where a consumer needs it (e.g. within Duties: an own duty vs procedure/detail; within Powers: conferred vs enforcement).
 - **Next:** measure each coarse cue's precision and coverage on the labels, and decide the class list in statutory terms (Jason).
 
+## Coarse cue measurement, first pass (2026-10-06)
+
+Text-only regex cues (first match wins; script in the session scratchpad, to move into `scripts/benchmarks/` when adopted), scored against Gemini v1.3 purposes (6,959) mapped onto coarse classes:
+- **High precision, low recall:**
+
+  | Class | Precision | Recall |
+  |---|---|---|
+  | Offences & penalties | 97% | 30% |
+  | Interpretation | 93% | 19% |
+  | Appeals & defences | 100% | 16% |
+  | Fees & charges | 86% | 20% |
+  | Amendment & revocation | 82% | 15% |
+
+- **Citation & commencement:** 72% precision, 77% recall.
+- **Duties:** 81% / 64%. **Powers:** 39%; enforcement powers use "may" too. **Enforcement:** no cue yet.
+- **Undetermined:** 2,317 (33%), mostly list items with no modal of their own (1,310 Duties). Inheriting the stem's class should take most of them.
+
+**Read:** the coarse layer works as a high-precision "decide what's easy" layer. Recall comes from stem inheritance and section titles, not from more regex.
+
 ## Dependencies
 
 - Legal's answers on headings and purpose usage
