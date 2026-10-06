@@ -68,7 +68,7 @@ Purpose isn't cosmetic. `provision_scope` uses it to decide **structural vs subs
 **Consistency with DRRP** (a QA check, not a derivation):
 - `Requirement` ⇒ a relation exists with Obligation.
 - `Power Conferred` ⇒ a relation exists with Liberty.
-- Machinery and `Procedure+Detail` ⇒ relation `none`, **except** `Transitional Arrangement` where the provision itself confers a time-limited power or imposes a time-limited duty, and `Enactment+Citation+Commencement` where it confers a power to commence: relation exists (Jason, 2026-10-05; DRRP-CLASSIFICATION.md special cases).
+- Machinery and `Procedure+Detail` ⇒ relation `none`, **except** `Transitional Arrangement` where the provision itself confers a time-limited power or imposes a time-limited duty, `Enactment+Citation+Commencement` where it confers a power to commence, and `Exemption` where it confers a power to exempt: relation exists (Jason, 2026-10-05; DRRP-CLASSIFICATION.md special cases).
 - `Enforcement+Prosecution`, `Charge+Fee` and sanctions may go either way: an inspector's power is a Power, while an offence creates no relation.
 - A mismatch is a labelling error in one of the two fields.
 
