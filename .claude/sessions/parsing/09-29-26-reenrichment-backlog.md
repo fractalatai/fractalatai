@@ -75,7 +75,7 @@ This session runs the **single run**: one enrichment pass and **one** publish, a
 
 ## Dependencies
 
-- ⬜ SLM retrained on drrp-v1.0 labels (`parsing/2026-10-01-training-labels-slm.md`): the run uses it
+- ⬜ The pipeline improved from the regex end (meta-plan `parsing/2026-10-06-pipeline-from-the-regex-end.md`, phases 1–6); replaces "SLM retrained on drrp-v1.0 labels" (training-labels session, suspended 2026-10-06)
 
 - ✅ #62 hub sync + diff-apply; #63 provenance; refined zero-actor guard (`e7bc2ab`)
 - ⬜ RunPod per batch (Jason launches when the local steps are done)
