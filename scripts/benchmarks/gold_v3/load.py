@@ -33,7 +33,10 @@ MODELS = ("gemini", "mini", "gpt55", "referee")
 # agreement counts the referee and Gemini only: GPT-5.4-mini and GPT-5.5 scored far below Gemini against the
 # referee (exact 36% / 27% vs 71%), so they are shown as evidence but not counted
 COUNTED = ("gemini", "referee")
-FINE = {"Requirement": "Requirement", "Procedure+Detail": "Procedure/Detail"}
+FINE = {"Requirement": "Substantive", "Procedure+Detail": "Procedure/Detail"}
+# purpose names the justifier pilot used before the 2026-10-06 rename
+RENAME = {"Duties": "Requirements", "Powers": "Permissions", "Requirement": "Substantive",
+          "P:Duties": "P:Requirements", "P:Powers": "P:Permissions", "P:Duties-fine": "P:Requirements-fine"}
 
 
 def act(a):
@@ -108,11 +111,14 @@ def main() -> None:
         for f in fields:
             field, actor = f["field"], f.get("actor_label") or ""
             proposed = f["proposed"]
+            if field in ("purpose", "purpose_fine"):
+                proposed = RENAME.get(proposed, proposed)
+            f["rule_ids"] = [RENAME.get(r, r) for r in f.get("rule_ids") or []]
             if field == "actor" and isinstance(proposed, dict) and "act" in proposed:
                 proposed = {**proposed, "act": act(proposed["act"])}
             evid = {m: model_value(lab, field, actor) for m, lab in labs.items()}
             if field == "purpose":
-                evid["cue"] = ev["cue"]["coarse_purpose"]
+                evid["cue"] = RENAME.get(ev["cue"]["coarse_purpose"], ev["cue"]["coarse_purpose"])
             pv = pipeline_value(ev, field, actor)
             if pv is not None:
                 evid["pipeline"] = pv

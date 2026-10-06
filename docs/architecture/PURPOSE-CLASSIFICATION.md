@@ -9,16 +9,16 @@
 
 Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds a finer, more complex one only when needed. The class names are the terms legislation itself uses in its headings, not invented categories.
 
-**Coarse layer: 12 classes**
+**Coarse layer: 12 classes.** Class names avoid the DRRP vocabulary (Obligation, Liberty, Duty, Right, Responsibility, Power): `Duties` → **Requirements** and `Powers` → **Permissions** (Jason, 2026-10-06), and the fine split is **Substantive** vs Procedure/Detail.
 
 | Class | Replaces (of the 18) |
 |---|---|
 | Citation and commencement | Enactment+Citation+Commencement, Extent |
 | Interpretation | Interpretation+Definition |
 | Application and exemption | Application+Scope, Exemption |
-| Duties | Requirement, Procedure+Detail |
-| Powers | Power Conferred |
-| Enforcement | Enforcement+Prosecution (its own class, not split under Powers: compliance users look for it directly) |
+| Requirements | Requirement, Procedure+Detail |
+| Permissions | Power Conferred |
+| Enforcement | Enforcement+Prosecution (its own class, not split under Permissions: compliance users look for it directly) |
 | Offences and penalties | Offence, Liability |
 | Appeals and defences | Defence+Appeal |
 | Fees and charges | Charge+Fee |
@@ -32,7 +32,7 @@ Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds 
 - section titles once legal serves them, then cross-headings;
 - otherwise `undetermined`, which escalates to the fine layer.
 
-**Fine layer:** classifier or LLM, only where a consumer needs the split. The first is **Duties → Requirement vs Procedure/Detail**, which feeds the DRRP gate.
+**Fine layer:** classifier or LLM, only where a consumer needs the split. The first is **Requirements → Substantive vs Procedure/Detail**, which feeds the DRRP gate.
 
 **Evidence:** first cue pass (phase 0b session, 2026-10-06), on 6,959 labelled provisions. Precision when a cue fires:
 
@@ -43,10 +43,10 @@ Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds 
 | Appeals | 100% |
 | Fees | 86% |
 | Amendment | 82% |
-| Duties | 81% |
+| Requirements | 81% |
 | Citation | 72% |
 
-Recall is low until stem inheritance is added. Powers vs Enforcement needs enforcement cues.
+Recall is low until stem inheritance is added. Permissions vs Enforcement needs enforcement cues.
 
 ## What purpose is
 

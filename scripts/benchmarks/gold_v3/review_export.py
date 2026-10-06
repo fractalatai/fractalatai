@@ -32,6 +32,19 @@ def row_key(section_id: str, field: str, actor: str) -> str:
     return doc_id(section_id) + "~" + field + ("~" + hashlib.md5(actor.encode()).hexdigest()[:10] if actor else "")
 
 
+def stems(context: str) -> list[dict]:
+    """The STEM CONTEXT block of drrp_prompt.user_prompt, outermost first: [{id, text}]."""
+    m = re.search(r"STEM CONTEXT \(ancestors, outermost first\):\n(.*?)\n\nREFERENCED", context, re.S)
+    out = []
+    for line in (m.group(1).split("\n") if m else []):
+        hit = re.match(r"^\[([^\]]+)\] (.*)$", line)
+        if hit:
+            out.append({"id": hit.group(1), "text": hit.group(2)})
+        elif out:
+            out[-1]["text"] += "\n" + line
+    return out
+
+
 def rule_texts() -> dict:
     out = {}
     for line in open(CATALOGUE):
@@ -76,7 +89,7 @@ def main() -> None:
         rows.sort(key=lambda r: (FIELD_ORDER[r["field"]], r["actor_label"]))
         doc = {
             "order": order.get(sid, 0), "section_id": sid, "law_name": ev["law_name"], "law_title": ev.get("law_title") or ev["law_name"],
-            "headings": [h["title"] for h in ev.get("headings") or []], "text": ev["text"], "context": ev["context"],
+            "headings": [h["title"] for h in ev.get("headings") or []], "text": ev["text"], "stems": stems(ev["context"]), "context": ev["context"],
             "selection": ev["selection"], "text_md5": ev["text_md5"], "gold_version": args.gold_version,
             "hardest": min(rank.get(r["difficulty"], 1) for r in rows), "n_rows": len(rows), "rows": rows,
         }

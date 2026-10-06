@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Coarse purpose layer, first cut (PURPOSE-CLASSIFICATION.md § Layered purpose, decided 2026-10-06).
 
-Twelve classes in statutory terms. A provision takes the first class whose text cue fires. A list item
+Twelve classes in statutory terms (Duties/Powers renamed Requirements/Permissions 2026-10-06 to keep clear of DRRP words). A provision takes the first class whose text cue fires. A list item
 with no cue of its own inherits its nearest stem's class. Otherwise it is `undetermined` (escalates to
 the fine layer). This is the measurement prototype for phase 2. The Rust regex tier is the production
 home once the cues settle.
@@ -23,7 +23,7 @@ from drrp_prompt import ancestors  # noqa: E402
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 
 CLASSES = [
-    "Citation and commencement", "Interpretation", "Application and exemption", "Duties", "Powers",
+    "Citation and commencement", "Interpretation", "Application and exemption", "Requirements", "Permissions",
     "Enforcement", "Offences and penalties", "Appeals and defences", "Fees and charges",
     "Amendment and revocation", "Transitional and saving", "Constitution",
 ]
@@ -33,14 +33,14 @@ FROM_18 = {
     "Enactment+Citation+Commencement": "Citation and commencement", "Extent": "Citation and commencement",
     "Interpretation+Definition": "Interpretation",
     "Application+Scope": "Application and exemption", "Exemption": "Application and exemption",
-    "Requirement": "Duties", "Procedure+Detail": "Duties", "Power Conferred": "Powers",
+    "Requirement": "Requirements", "Procedure+Detail": "Requirements", "Power Conferred": "Permissions",
     "Enforcement+Prosecution": "Enforcement", "Offence": "Offences and penalties", "Liability": "Offences and penalties",
     "Defence+Appeal": "Appeals and defences", "Charge+Fee": "Fees and charges",
     "Amendment": "Amendment and revocation", "Repeal+Revocation": "Amendment and revocation",
     "Transitional Arrangement": "Transitional and saving", "Establishment+Constitution": "Constitution",
 }
 
-# ordered: first match wins, so specific classes come before Duties/Powers
+# ordered: first match wins, so specific classes come before Requirements/Permissions
 CUES = [
     ("Citation and commencement", r"\bmay be cited as\b|\bcomes? into (?:force|operation)\b|\bshall come into (?:force|operation)\b"
                                   r"|\bextends? (?:only )?to (?:England|Wales|Scotland|Northern Ireland|Great Britain|the United Kingdom)"),
@@ -58,8 +58,8 @@ CUES = [
     ("Application and exemption", r"\b(?:shall|do|does) not apply\b|\bapplies? (?:only )?(?:to|in relation to)\b|\bshall apply (?:to|in relation to)\b"
                                   r"|\bnothing in (?:this|these)\b.{0,60}\bappl|\bexempt"),
     ("Fees and charges", r"\bfees?\b.{0,40}\b(?:payable|shall be paid|charge)|\bmay charge\b|\bshall pay\b.{0,40}\bfee"),
-    ("Duties", r"\b(?:shall|must)\b|\bit shall be the duty\b|\bis required to\b|\bfunctions\b"),
-    ("Powers", r"\bmay\b"),
+    ("Requirements", r"\b(?:shall|must)\b|\bit shall be the duty\b|\bis required to\b|\bfunctions\b"),
+    ("Permissions", r"\bmay\b"),
 ]
 _CUES = [(name, re.compile(rx, re.I | re.M)) for name, rx in CUES]
 
