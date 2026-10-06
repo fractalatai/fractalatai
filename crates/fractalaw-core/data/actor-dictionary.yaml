@@ -113,6 +113,20 @@
     - "(?:Scottish Environment Protection Agency|SEPA)"
   triggers: [scottish environment protection agency, sepa]
 
+- label: "Gvt: Agency: Civil Aviation Authority"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "(?:Civil Aviation Authority|\\bCAA\\b)"
+  triggers: [civil aviation authority, caa]
+
+- label: "Gvt: Registrar General"
+  type: government
+  category: Gvt
+  regex_patterns:
+    - "Registrar[- ]General"
+  triggers: [registrar general, registrar-general]
+
 - label: "Gvt: Agency: Office for Nuclear Regulation"
   type: government
   category: Gvt
