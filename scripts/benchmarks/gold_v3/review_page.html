@@ -83,6 +83,11 @@ article.prov { background: var(--sheet); border: 1px solid var(--line); border-r
 .stem p { margin: 0; font: 15px/1.5 var(--serif); color: var(--ink-2); max-width: 80ch; white-space: pre-wrap; }
 .stem .lbl, .text-lbl { font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
 .text-lbl { padding: 12px 16px 0; display: block; }
+.text.lead { padding-bottom: 4px; }
+.text.tail { padding-top: 4px; }
+ul.items { list-style: none; margin: 0; padding: 0 16px 0 36px; display: grid; gap: 3px; }
+ul.items li { font: 14.5px/1.5 var(--serif); color: var(--ink-3); max-width: 76ch; }
+.item-id { font: 500 12px/1 var(--mono); color: var(--ink-3); }
 .note { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
 .text { font: 16px/1.55 var(--serif); padding: 4px 16px 12px; margin: 0; white-space: pre-wrap; max-width: 80ch; }
 details.ctx { padding: 0 16px 10px; }
@@ -177,7 +182,7 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
   const PURPOSES = ["Citation and commencement", "Interpretation", "Application and exemption", "Requirements", "Permissions", "Enforcement",
     "Offences and penalties", "Appeals and defences", "Fees and charges", "Amendment and revocation", "Transitional and saving", "Constitution"];
   const CHOICES = {
-    relation: ["yes", "no"],
+    relation: ["yes", "no", "continues"],
     raw_type: ["", "Obligation", "Liberty"],
     purpose: PURPOSES,
     purpose_fine: ["Substantive", "Procedure/Detail"],
@@ -215,6 +220,7 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
       return JSON.stringify(v);
     }
     if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
+    if (field === "relation" && v === "continues") return "continues the stem (counted on the stem)";
     return String(v);
   }
   function sameVal(field, a, b) {
@@ -407,7 +413,19 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
         for (const x of p.stems) st.append(el("p", null, x.text));
         art.append(st);
       }
-      art.append(el("span", "text-lbl", "Provision"), el("p", "text", p.text || "(no text)"));
+      art.append(el("span", "text-lbl", "Provision"));
+      const cut = (p.text || "").indexOf("—");
+      if (p.items && p.items.length && cut >= 0) {
+        // the source keeps a stem's lead-in and closing words on one row; show its items between them, as printed
+        art.append(el("p", "text lead", p.text.slice(0, cut + 1)));
+        const ol = el("ul", "items");
+        for (const it of p.items) { const li = el("li"); li.append(el("span", "item-id", it.label), document.createTextNode(" " + it.text)); ol.append(li); }
+        art.append(ol);
+        const tail = p.text.slice(cut + 1).trim();
+        if (tail) art.append(el("p", "text tail", tail));
+      } else {
+        art.append(el("p", "text", p.text || "(no text)"));
+      }
       const det = el("details", "ctx"); det.append(el("summary", null, "Full context the models saw, including referenced and applying provisions"), el("pre", null, p.context || ""));
       art.append(det);
       const box = el("div", "rows"); for (const r of rows) box.append(renderRow(p, r)); art.append(box);

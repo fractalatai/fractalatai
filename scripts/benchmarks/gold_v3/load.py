@@ -148,6 +148,20 @@ def main() -> None:
                  reason = EXCLUDED.reason, evidence = EXCLUDED.evidence, agree = EXCLUDED.agree,
                  difficulty = EXCLUDED.difficulty, catalogue_ver = EXCLUDED.catalogue_ver, created_at = now()
                WHERE drrp_gold.decision IS NULL""", out)
+        # a re-justified provision drops undecided rows its new justification no longer proposes
+        keep = collections.defaultdict(set)
+        for r in out:
+            keep[r[1]].add((r[3], r[4]))
+        dropped = 0
+        for sid, pairs in keep.items():
+            cur.execute("SELECT field, actor_label FROM drrp_gold WHERE gold_version = %s AND section_id = %s AND decision IS NULL",
+                        (args.gold_version, sid))
+            for field, actor in cur.fetchall():
+                if (field, actor) not in pairs and field != "purpose_fine":
+                    cur.execute("DELETE FROM drrp_gold WHERE gold_version = %s AND section_id = %s AND field = %s AND actor_label = %s "
+                                "AND decision IS NULL", (args.gold_version, sid, field, actor))
+                    dropped += 1
+        print(f"dropped {dropped} undecided rows no longer proposed")
     print(f"written to drrp_gold ({args.gold_version}); decided rows untouched")
 
 

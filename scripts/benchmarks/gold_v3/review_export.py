@@ -16,7 +16,12 @@ import json
 import os
 import re
 
+import sys
+
 import psycopg2
+
+sys.path.insert(0, "/var/home/jason/fractalaw/scripts")
+from drrp_prompt import ancestors  # noqa: E402
 
 ROOT = "/var/home/jason/fractalaw"
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
@@ -86,6 +91,14 @@ def main() -> None:
     os.makedirs(args.out, exist_ok=True)
     for f in os.listdir(args.out):
         os.remove(os.path.join(args.out, f))
+    # list items under each provision, so the page can show a stem as printed (lead-in, items, closing words)
+    laws = sorted({evidence[s]["law_name"] for s in by_sid})
+    cur.execute("SELECT section_id, text FROM legislation_text WHERE law_name = ANY(%s) ORDER BY sort_key", (laws,))
+    children: dict[str, list] = {}
+    for csid, ctext in cur.fetchall():
+        anc = ancestors(csid)
+        if anc and anc[0] in by_sid and ctext:
+            children.setdefault(anc[0], []).append({"id": csid, "label": csid[len(anc[0]):], "text": ctext})
     rank = {"new_edge": 0, "hard": 1, "easy": 2}
     manifest = []
     for sid, rows in sorted(by_sid.items(), key=lambda kv: order.get(kv[0], 1e9)):
@@ -93,7 +106,7 @@ def main() -> None:
         rows.sort(key=lambda r: (FIELD_ORDER[r["field"]], r["actor_label"]))
         doc = {
             "order": order.get(sid, 0), "section_id": sid, "law_name": ev["law_name"], "law_title": ev.get("law_title") or ev["law_name"],
-            "headings": [h["title"] for h in ev.get("headings") or []], "text": ev["text"], "stems": stems(ev["context"]), "context": ev["context"],
+            "headings": [h["title"] for h in ev.get("headings") or []], "text": ev["text"], "stems": stems(ev["context"]), "items": children.get(sid, []), "context": ev["context"],
             "selection": ev["selection"], "text_md5": ev["text_md5"], "gold_version": args.gold_version,
             "hardest": min(rank.get(r["difficulty"], 1) for r in rows), "n_rows": len(rows), "rows": rows,
         }
