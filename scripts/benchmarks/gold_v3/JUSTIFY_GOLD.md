@@ -36,6 +36,10 @@ The evidence is **evidence, not truth**. The models followed an older prompt (`d
 - **Access duties** (POS-18): on a `continues` row of an access duty, the party given access is `counterparty`, act `give_access`.
 - **Purpose:** Transitional is merged into **Application, exemption and transition** (11 classes).
 - **Beneficiary test** (POS-19): decide beneficiary vs mentioned from the words. If the party is named as what is protected ("health and safety **of** X", "protect X", "the interests of X"), it's a beneficiary, even inside a condition on a power. If the words only set when or whether the rule applies ("where X…", "if X…", "having regard to X"), it's mentioned. A recipient of the act is a counterparty.
+- **Engagers** (HOLD-17, refined 10-06): every applying holder who can engage someone holds "No person shall be engaged…": the employer **and** the self-employed person; the employee isn't listed.
+- **Stem beneficiaries on items** (POS-17, refined 10-06): a `continues` item also lists the stem's protected party as `beneficiary`; only the stem's holder isn't repeated.
+- **Hazards aren't actors** (LBL-14, 10-06): biological agents, substances and micro-organisms are never listed.
+- **Purpose, 10-06:** Interpretation is for meanings only; "the application of" a power or rule is Application. "S is the regulator of B from <date>" is Application (transition), not Constitution. Detail of where or how a register is kept `continues` the keeping duty (REL-28).
 - **Cross-instrument holders** (HOLD-14): the holder comes from the parent Act when you can resolve it from the text given. Otherwise it is holder unknown.
 
 ## Fields to propose (per provision)
