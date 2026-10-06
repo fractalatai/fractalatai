@@ -114,6 +114,21 @@ Opus justifier, brief `JUSTIFY_GOLD.md`, no paid API. Output `data/gold/v3/justi
 - an empty law title (UK_ukpga_2015_6);
 - cue false positives: "revoked", the "FINAL PROVISIONS" heading, "shall consist of".
 
+## Option A re-justification (2026-10-06)
+
+Jason ruled that stems and list items are counted once (REL-45/REL-28/POS-17). The 22 list items in the pilot were re-justified (`justified/pilot_optionA.jsonl`):
+- **11 `continues`.** The stem holder is left off the item; the item's own actors keep their role.
+- **11 `no`.** 4 are criterion items. In the other 7 the stem itself begins no duty or power (exemption, offence, saving, detail).
+
+Jason's 5 approvals on s.16(5)(b) predated the ruling, so they were cleared and are to be re-reviewed. Backup: `data/gold/v3/decisions_backup/`.
+
+Open rule questions from the re-justification:
+- where REL-15 (class definition) stops and POS-17 (item names the party) starts;
+- "unless" items under a prohibition;
+- the stem's holder named again in the item's own text;
+- "X required by para (1) shall consist of—" lists (REL-16 detail, or a stem?);
+- the same label as the stem holder (e.g. Gvt: Minister).
+
 ## Classification scheme inventory (2026-10-06)
 
 **Per actor on a provision:**
