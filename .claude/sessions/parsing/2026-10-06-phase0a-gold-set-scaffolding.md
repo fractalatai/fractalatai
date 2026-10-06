@@ -1,0 +1,94 @@
+---
+session: "Phase 0a: Gold set scaffolding (1,000 provisions, rule-justified)"
+status: pending
+opened: 2026-10-06
+closed:
+outcome:
+related: ["parsing/2026-10-06-pipeline-from-the-regex-end.md", "parsing/2026-10-06-phase0b-purpose-scheme-review.md", "benchmarks/2026-09-30-gold-v2.md", 74]
+---
+
+# Session: Phase 0a: Gold set scaffolding (PENDING)
+
+## Problem
+
+Every tier will be measured against a yardstick. LLM labels can't be that yardstick (circularity: Gemini review). **Jason (2026-10-06):** a human-approved gold set of **1,000** provisions.
+
+He isn't an expert in assigning the hard provisions, and we've built a complex flat set of rules. So:
+- each gold label carries an **argument/justification**: a citation of one of **our rules** (a pre-defined set) plus a one-line reason;
+- most rows fall out easily, leaving a core of truly hard ones, which may surface edge cases no rule covers yet;
+- **Jason reviews a readable table of evidence and approves or not.** He shouldn't have to match raw provision text to rules;
+- **all classification schemes** are covered.
+
+Getting the scaffolding right makes the final task easier.
+
+## Todo
+
+- ⬜ **(Jason)** Which schemes go into the gold set (inventory below; recommendation: the core now, the others as later modules on the same scaffolding)
+- ⬜ **Rule catalogue:** every rule with a stable ID, grouped by scheme, from DRRP-CLASSIFICATION.md (layers 1–5 and special cases), PURPOSE-CLASSIFICATION.md and `drrp_prompt.py`. One line each plus an example. Rules that only exist in prompt wording become catalogue entries. Purpose rules wait for phase 0b
+- ⬜ **Gold record schema** (below): per provision, per scheme label, rule IDs, reason, evidence, difficulty, Jason's decision
+- ⬜ **Selection of 1,000:** only from laws held out of SLM training (the 61 test-split laws, 741 already labelled, plus further held-out laws). Stratified across schemes, with rare classes over-sampled (Liberty, beneficiary, applying-provision holders, passive duties, counterparty acts, each purpose)
+- ⬜ **Auto-justification:** a Claude agent (referee-style, no paid API) assigns each label its rule IDs and reason, using the catalogue and the tier evidence. It grades difficulty: **easy** (tiers agree and a rule clearly applies), **hard** (tiers disagree or rules conflict), **new edge** (no rule fits, so a candidate rule)
+- ⬜ **Review table** for Jason (format to decide, below): easy rows first in bulk, then the hard core
+- ⬜ **Jason's review;** hard and new-edge rows → rulings → catalogue updates → re-justify the affected rows
+- ⬜ The gold set is frozen (versioned) and becomes the yardstick for phase 1 and the release QA; it replaces the gold v2 plan's role
+
+## Classification scheme inventory (2026-10-06)
+
+**Per actor on a provision:**
+- label (~245 dictionary labels);
+- position (`active` / `counterparty` / `beneficiary` / `mentioned`);
+- holds (`Obligation` / `Liberty` / `none`);
+- `inferred` (#67 access rights, #60 applying holders);
+- act (9 values, #75);
+- holder class (government/governed, from the dictionary);
+- correlatives (derived, so not labelled).
+
+**Per provision:**
+- relation (yes/no) and raw_type (holder unknown);
+- DRRP types (derived);
+- **purpose** (18 published; phase 0b may change it);
+- scope (substantive / structural / amendment / out);
+- duty_family (4) / duty_sub_type (21) (regex);
+- **POPIMAR** (16, multi-label, regex);
+- **significance** (gravity, strength, scope duty-bearer, protected class: H/M/L, SLM; hierarchy and overall derived);
+- **fitness/applicability** (polarity AppliesTo/DisappliesTo/ExtendsTo; person/process/place/plant/property/sector; scope dimensions);
+- extent (source data);
+- clause modal/qualifier (internal).
+
+**Per law (all derived):**
+- verdict (making / empowering / no_obligations / holder unknown), current_*;
+- holder lists, correlative holder lists;
+- purpose profile, significance rating, compiled applicability.
+
+Also: legal's own law-level purpose (15 values, from the law title), plus triage, application regions and domain/family classification.
+
+**Recommendation for gold scope:**
+1. **Core now:** relation, raw_type, purpose, and per actor label / position / holds / inferred / act. These are labelled per provision and feed the verdict, holder lists and correlatives.
+2. **Later modules, same scaffolding:** POPIMAR, significance, fitness. They're separate pipelines with their own consumers, and each would need its own rule catalogue.
+3. **Out of scope:** derived schemes (DRRP types, correlatives, law-level), which are checked by computing them from gold. Also source data (extent) and internal ones (clause structure).
+
+## Gold record (draft)
+
+One row per (provision, scheme field), so the table reads naturally:
+
+| Field | Content |
+|---|---|
+| provision | section_id, law title, **provision title / cross-heading** (phase 0b), short text excerpt; the full text and stem one click away |
+| scheme / field | e.g. `relation`, `purpose`, `actor: Org: Employer → position` |
+| proposed value | e.g. `yes`, `Requirement`, `active` |
+| rule(s) | catalogue IDs + one-line rule text, e.g. `D-07 Passive duty: holder from applying provision` |
+| reason | one sentence linking the rule to this text |
+| evidence | regex / classifier / SLM / Gemini / 2nd model / referee outputs; agree ✓ or ✗ |
+| difficulty | easy / hard / new edge |
+| Jason | approve / change to … / comment |
+
+## Review table: options
+
+- **(a) An interactive page** (a claude.ai artifact). Filter by difficulty, scheme and law; one-click approve; comments; decisions saved in the page's database, so Claude reads them back. Easy rows can be approved in bulk.
+- **(b) A spreadsheet** (xlsx/CSV), one sheet per difficulty. Simple, but approvals come back by file.
+
+## Dependencies
+
+- Phase 0b: the purpose vocabulary decision (gold purpose labels use the final vocabulary)
+- Section titles (P1group/Title) would make provision titles show in the review table; cross-headings and Part titles are available now
+- Labels and evidence already in hand: Gemini v1.3 on 6,959 (incl. 741 test-split), refereed batches 1–2, `holder60_cases`, the 50 hand-checked rows
