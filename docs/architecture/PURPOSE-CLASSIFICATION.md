@@ -3,6 +3,51 @@
 **Status:** agreed. Jason signed it off on 2026-10-01, single label included, after reviews by Gemini and sertantai-legal (adopted changes below). The law-level profile is agreed on sertantai-legal#172 and built.
 **Fixes:** #40 (Process+Rule too broad), #47 (Offence/Enforcement coverage). **Supersedes:** #69 (provision function).
 
+**Revision in progress (2026-10-06, phase 0b):** a layered scheme replaces the single 18-value label (section below). The 18 values stay the published field until the migration with legal. Legal reports that #172's profile isn't built yet, so nothing depends on the 18 values.
+
+## Layered purpose (decided 2026-10-06)
+
+Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds a finer, more complex one only when needed. The class names are the terms legislation itself uses in its headings, not invented categories.
+
+**Coarse layer: 12 classes**
+
+| Class | Replaces (of the 18) |
+|---|---|
+| Citation and commencement | Enactment+Citation+Commencement, Extent |
+| Interpretation | Interpretation+Definition |
+| Application and exemption | Application+Scope, Exemption |
+| Duties | Requirement, Procedure+Detail |
+| Powers | Power Conferred |
+| Enforcement | Enforcement+Prosecution (its own class, not split under Powers: compliance users look for it directly) |
+| Offences and penalties | Offence, Liability |
+| Appeals and defences | Defence+Appeal |
+| Fees and charges | Charge+Fee |
+| Amendment and revocation | Amendment, Repeal+Revocation |
+| Transitional and saving | Transitional Arrangement |
+| Constitution | Establishment+Constitution ("there shall be a body called X" is neither a duty nor a power) |
+
+**How the coarse layer decides:**
+- high-precision text cues;
+- a list item inherits its stem's class;
+- section titles once legal serves them, then cross-headings;
+- otherwise `undetermined`, which escalates to the fine layer.
+
+**Fine layer:** classifier or LLM, only where a consumer needs the split. The first is **Duties → Requirement vs Procedure/Detail**, which feeds the DRRP gate.
+
+**Evidence:** first cue pass (phase 0b session, 2026-10-06), on 6,959 labelled provisions. Precision when a cue fires:
+
+| Class | Precision |
+|---|---|
+| Offences | 97% |
+| Interpretation | 93% |
+| Appeals | 100% |
+| Fees | 86% |
+| Amendment | 82% |
+| Duties | 81% |
+| Citation | 72% |
+
+Recall is low until stem inheritance is added. Powers vs Enforcement needs enforcement cues.
+
 ## What purpose is
 
 `purposes` says **what a provision does**: its function in the law. It is orthogonal to DRRP, which says **who holds what**.
