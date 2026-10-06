@@ -733,7 +733,7 @@
   category: Spc
   regex_patterns:
     - "(?:[Ee]mployees' representative|[Ss]afety representatives?|[Tt]rade [Uu]nions? representatives?)"
-  triggers: [employees' representative, employees representative, safety representative, workers representative, European Works Council, works council, workmen's inspector, workmen's inspectors, nominated person, safety representative, recipient of information under the works council arrangements]
+  triggers: [employees' representative, employees representative, safety representative, workers representative, European Works Council, works council, workmen's inspector, workmen's inspectors, nominated person, recipient of information under the works council arrangements]
 
 - label: "Spc: Trade Union"
   type: governed
@@ -1618,7 +1618,7 @@
 - label: "Gvt: Independent Anti-slavery Commissioner"
   type: government
   category: Gvt
-  triggers: [Independent Anti-slavery Commissioner, Commissioner]
+  triggers: [Independent Anti-slavery Commissioner]
 
 - label: "Gvt: Planning Inspector"
   type: government
