@@ -1,0 +1,518 @@
+<title>Sentence Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+:root {
+  --paper: #f5f6f4;
+  --sheet: #ffffff;
+  --ink: #1c2321;
+  --ink-2: #4c5753;
+  --ink-3: #78837f;
+  --line: #d8ddd9;
+  --line-2: #e8ebe9;
+  --accent: #0d5c58;
+  --accent-ink: #ffffff;
+  --accent-soft: #e2efed;
+  --ok: #2d6f45;
+  --ok-soft: #e3f0e7;
+  --warn: #93600f;
+  --warn-soft: #f8edd8;
+  --bad: #a3322f;
+  --bad-soft: #f7e3e2;
+  --edge: #6a3fa0;
+  --edge-soft: #eee6f7;
+  --focus: #1b7f79;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --paper: #131816; --sheet: #1b2220; --ink: #e4ebe8; --ink-2: #b2bdb9; --ink-3: #85918d;
+    --line: #34403c; --line-2: #262f2c; --accent: #5fbcb4; --accent-ink: #0c1312; --accent-soft: #1f3533;
+    --ok: #7cc795; --ok-soft: #1d3326; --warn: #e2b260; --warn-soft: #3a2f19; --bad: #ec8b86; --bad-soft: #3d2221;
+    --edge: #c4a2ee; --edge-soft: #2e2440; --focus: #7fd3cc;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #131816; --sheet: #1b2220; --ink: #e4ebe8; --ink-2: #b2bdb9; --ink-3: #85918d;
+  --line: #34403c; --line-2: #262f2c; --accent: #5fbcb4; --accent-ink: #0c1312; --accent-soft: #1f3533;
+  --ok: #7cc795; --ok-soft: #1d3326; --warn: #e2b260; --warn-soft: #3a2f19; --bad: #ec8b86; --bad-soft: #3d2221;
+  --edge: #c4a2ee; --edge-soft: #2e2440; --focus: #7fd3cc;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font: 14px/1.5 var(--sans); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 64px; display: grid; gap: 18px; }
+header.top { display: grid; gap: 6px; }
+.eyebrow { font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font: 600 26px/1.15 var(--serif); margin: 0; text-wrap: balance; }
+.lede { color: var(--ink-2); max-width: 68ch; margin: 0; }
+.summary { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: baseline; padding: 12px 14px; background: var(--sheet); border: 1px solid var(--line); border-radius: 6px; }
+.stat { display: grid; gap: 2px; }
+.stat b { font: 600 20px/1 var(--sans); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12px; color: var(--ink-3); }
+.bar { flex: 1 1 220px; height: 8px; border-radius: 4px; background: var(--line-2); overflow: hidden; display: flex; align-self: center; }
+.bar i { display: block; height: 100%; }
+.controls { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--paper); padding-block: 8px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; border-bottom: 1px solid var(--line); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--sheet); }
+.seg button { border: 0; background: transparent; color: var(--ink-2); font: 500 12.5px/1 var(--sans); padding: 7px 10px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.ctl-label { font-size: 12px; color: var(--ink-3); }
+select, input[type="text"], textarea { font: inherit; color: var(--ink); background: var(--sheet); border: 1px solid var(--line); border-radius: 5px; padding: 6px 8px; }
+textarea { width: 100%; min-height: 54px; resize: vertical; }
+button.btn { font: 500 13px/1 var(--sans); border-radius: 5px; padding: 7px 11px; cursor: pointer; border: 1px solid var(--line); background: var(--sheet); color: var(--ink); }
+button.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button.btn.danger { border-color: var(--bad); color: var(--bad); }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button:disabled { opacity: .5; cursor: default; }
+.bulk { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.notice { padding: 12px 14px; border-radius: 6px; background: var(--warn-soft); color: var(--ink); border: 1px solid var(--line); }
+.list { display: grid; gap: 14px; }
+article.prov { background: var(--sheet); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.prov-head { padding: 12px 16px 10px; display: grid; gap: 4px; border-bottom: 1px solid var(--line-2); }
+.prov-id { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; }
+.sid { font: 500 13px/1.3 var(--mono); color: var(--accent); word-break: break-all; }
+.law { font: 600 15px/1.3 var(--serif); }
+.crumbs { font-size: 12px; color: var(--ink-3); }
+.crumbs span + span::before { content: " › "; }
+.stem { margin: 0; padding: 12px 16px 0; display: grid; gap: 4px; }
+.stem p { margin: 0; font: 15px/1.5 var(--serif); color: var(--ink-2); max-width: 80ch; white-space: pre-wrap; }
+.stem .lbl, .text-lbl { font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.text-lbl { padding: 12px 16px 0; display: block; }
+.text.lead { padding-bottom: 4px; }
+.text.tail { padding-top: 4px; }
+ul.items { list-style: none; margin: 0; padding: 0 16px 0 36px; display: grid; gap: 3px; }
+ul.items li { font: 14.5px/1.5 var(--serif); color: var(--ink-3); max-width: 76ch; }
+.item-id { font: 500 12px/1 var(--mono); color: var(--ink-3); }
+.note { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+.text { font: 16px/1.55 var(--serif); padding: 4px 16px 12px; margin: 0; white-space: pre-wrap; max-width: 80ch; }
+details.ctx { padding: 0 16px 10px; }
+.notes { margin: 0 16px 10px; padding: 8px 12px; border-left: 3px solid var(--ink-3); background: var(--paper); border-radius: 4px; }
+.notes .lbl { font: 500 11px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); display: block; margin-bottom: 4px; }
+.notes ul { margin: 0; padding-left: 18px; font-size: 13.5px; color: var(--ink-2); }
+.flags { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 8px; }
+.flags span { font: 500 11px/1 var(--mono); padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--ink-3); }
+details.ctx summary { cursor: pointer; font-size: 12.5px; color: var(--ink-2); }
+details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: var(--ink-2); background: var(--paper); border-radius: 5px; padding: 10px; margin: 8px 0 0; max-height: 360px; overflow: auto; }
+.rows { display: grid; }
+.row { display: grid; grid-template-columns: minmax(150px, 1.05fr) minmax(0, 3fr) minmax(190px, auto); gap: 10px 16px; padding: 12px 16px; border-top: 1px solid var(--line-2); position: relative; }
+.row::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; }
+.row[data-d="hard"]::before { background: var(--warn); }
+.row[data-d="new_edge"]::before { background: var(--edge); }
+.row[data-s="approve"] { background: color-mix(in srgb, var(--ok-soft) 55%, var(--sheet)); }
+.row[data-s="change"] { background: color-mix(in srgb, var(--warn-soft) 55%, var(--sheet)); }
+.row[data-s="query"] { background: color-mix(in srgb, var(--edge-soft) 55%, var(--sheet)); }
+.fname { font: 600 12px/1.3 var(--sans); text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); }
+.actor { font: 500 13px/1.3 var(--mono); color: var(--ink); text-transform: none; letter-spacing: 0; display: block; margin-top: 3px; word-break: break-word; }
+.value { font: 600 15px/1.35 var(--sans); margin-top: 6px; }
+.pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.pill { font: 500 11px/1 var(--sans); padding: 4px 7px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+.pill.easy { background: var(--ok-soft); color: var(--ok); }
+.pill.hard { background: var(--warn-soft); color: var(--warn); }
+.pill.new_edge { background: var(--edge-soft); color: var(--edge); }
+.pill.agree { background: transparent; border-color: var(--line); color: var(--ink-2); }
+.pill.disagree { background: var(--bad-soft); color: var(--bad); }
+.why { display: grid; gap: 8px; min-width: 0; }
+.reason { margin: 0; max-width: 72ch; }
+.rules { display: grid; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.rules li { font-size: 12.5px; color: var(--ink-2); }
+.rules code { font: 500 11.5px/1 var(--mono); color: var(--accent); background: var(--accent-soft); padding: 2px 5px; border-radius: 3px; margin-right: 6px; }
+.evid { display: flex; flex-wrap: wrap; gap: 5px; }
+.ev { font: 12px/1.3 var(--sans); padding: 3px 7px; border-radius: 4px; border: 1px solid var(--line); color: var(--ink-2); max-width: 100%; overflow-wrap: anywhere; }
+.ev b { font-weight: 600; color: var(--ink); margin-right: 4px; }
+.ev.same { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.ev.diff { border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); background: var(--bad-soft); }
+.act { display: grid; gap: 6px; align-content: start; }
+.act .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.status { font-size: 12px; color: var(--ink-2); }
+.status b { color: var(--ink); }
+.editor { grid-column: 1 / -1; display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: 6px; background: var(--paper); }
+.editor .fields { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: end; }
+.editor label { display: grid; gap: 3px; font-size: 12px; color: var(--ink-3); }
+.empty { padding: 30px 16px; text-align: center; color: var(--ink-3); background: var(--sheet); border: 1px solid var(--line); border-radius: 6px; }
+@media (max-width: 760px) {
+  .row { grid-template-columns: 1fr; }
+  .bulk { margin-left: 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .row { transition: background-color .2s ease; }
+}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Fractalaw · DRRP gold set · sentence units</div>
+    <h1>Sentence review</h1>
+    <p class="lede">Each card labels one whole legal sentence: a stem with its items and closing words, as the law reads it. Each row is one proposed label for the sentence, with the rule that justifies it and a one-line reason. "Policy notes" are where the agent found a provisional default straining; your earlier row decisions on this sentence are shown below for comparison. Rows that match your earlier decisions are already approved.</p>
+  </header>
+
+  <section class="summary" id="summary" aria-live="polite"></section>
+
+  <div class="controls" role="toolbar" aria-label="Filters">
+    <span class="ctl-label">Difficulty</span>
+    <div class="seg" id="f-diff">
+      <button type="button" data-v="all" aria-pressed="true">All</button>
+      <button type="button" data-v="easy" aria-pressed="false">Easy</button>
+      <button type="button" data-v="hard" aria-pressed="false">Hard</button>
+      <button type="button" data-v="new_edge" aria-pressed="false">New edge</button>
+    </div>
+    <span class="ctl-label">Status</span>
+    <div class="seg" id="f-status">
+      <button type="button" data-v="open" aria-pressed="true">To review</button>
+      <button type="button" data-v="done" aria-pressed="false">Reviewed</button>
+      <button type="button" data-v="query" aria-pressed="false">Queries</button>
+      <button type="button" data-v="all" aria-pressed="false">All</button>
+    </div>
+    <label class="ctl-label" for="f-field">Field</label>
+    <select id="f-field">
+      <option value="all">All fields</option>
+      <option value="relation">Creates an obligation or liberty?</option>
+      <option value="raw_type">Type when no holder is named</option>
+      <option value="purpose">Purpose</option>
+      <option value="actor">Actors</option>
+    </select>
+    <div class="bulk" id="bulk"></div>
+  </div>
+
+  <div id="notice" class="notice" hidden></div>
+  <div class="list" id="list"><div class="empty">Loading the gold rows…</div></div>
+</div>
+
+<script>
+(function () {
+  const PURPOSES = ["Citation and commencement", "Interpretation", "Application, exemption and transition", "Requirements", "Permissions", "Enforcement",
+    "Offences and penalties", "Appeals and defences", "Fees and charges", "Amendment and revocation", "Constitution"];
+  const CHOICES = {
+    relation: ["yes", "no", "continues"],
+    raw_type: ["", "Obligation", "Liberty"],
+    purpose: [...PURPOSES, "inherit"],
+    purpose_fine: ["Substantive", "Procedure/Detail"],
+  };
+  const POSITIONS = ["active", "counterparty", "beneficiary", "mentioned", "(not an actor here)"];
+  const HOLDS = ["none", "Obligation", "Liberty"];
+  const ACTS = ["", "notify", "supply", "consult", "pay", "give_access", "charge", "answer_request", "other"];
+  const FIELD_NAME = { relation: "Creates an obligation or liberty?", raw_type: "Type when no holder is named", purpose: "Purpose", purpose_fine: "Purpose detail", actor: "Actor" };
+  const HOLDER_SOURCE = { "HOLD-02": "Holder taken from the stem", "HOLD-04": "Holder taken from a referenced provision",
+    "HOLD-05": "Holder taken from an applying provision", "HOLD-06": "Holder taken from an applying provision",
+    "HOLD-07": "Holder taken from an applying provision", "HOLD-08": "Holder taken from an applying provision",
+    "HOLD-09": "Holder taken from an applying provision", "HOLD-14": "Holder taken from the parent Act", "INF-01": "Implied right of access (inferred)" };
+  const EV_NAME = { gemini: "Gemini", referee: "Referee", mini: "GPT-mini", gpt55: "GPT-5.5", pipeline: "Pipeline", cue: "Cue" };
+
+  const state = { provisions: [], decisions: {}, decDocs: {}, diff: "all", status: "open", field: "all", editing: null, canWrite: true, confirmBulk: false, busy: false };
+  let db = null;
+
+  const $ = (id) => document.getElementById(id);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+
+  function fmt(field, v) {
+    if (v === null || v === undefined || v === "") return field === "raw_type" ? "not needed (a holder is named)" : "—";
+    if (field === "purpose" && v === "inherit") return "inherit (no purpose of its own: takes the purpose of the provision above)";
+    if (typeof v === "object" && !Array.isArray(v)) {
+      if (v.listed === false) return "not listed";
+      if ("position" in v || "holds" in v) {
+        const parts = ["role: " + (v.position || "?")];
+        if (v.holds && v.holds !== "none") parts.push("holds " + v.holds);
+        if (v.inferred) parts.push("inferred");
+        if (v.act) parts.push("act: " + v.act);
+        return parts.join(" · ");
+      }
+      if (v.final) {
+        const f = v.final; return (f[0] || "?") + (f[1] ? " · " + f[1] : "") + (v.method ? " (" + v.method + ")" : "");
+      }
+      return JSON.stringify(v);
+    }
+    if (Array.isArray(v)) return v.length ? v.join(", ") : "—";
+    if (field === "relation" && v === "continues") return "continues the stem (counted on the stem)";
+    return String(v);
+  }
+  function sameVal(field, a, b) {
+    if (field === "actor") {
+      if (!a || !b || typeof b !== "object") return false;
+      if (a.listed === false || b.listed === false) return (a.listed === false) === (b.listed === false);
+      if (b.final) return b.final[0] === a.position;
+      return ["position", "holds", "act"].every((k) => (a[k] || null) === (b[k] || null)) && !!a.inferred === !!b.inferred;
+    }
+    if (Array.isArray(b)) return b.includes(a);
+    return (a ?? null) === (b ?? null);
+  }
+
+  function rowsOf(p) { return Array.isArray(p.rows) ? p.rows : []; }
+  const pidOf = (key) => key.split("~")[0];
+  const slotOf = (key) => key.slice(pidOf(key).length + 1).replace(/~/g, "__");
+  function decisionOf(r) { return state.decisions[r.key] || null; }
+  function rowVisible(r) {
+    const d = decisionOf(r);
+    if (state.diff !== "all" && r.difficulty !== state.diff) return false;
+    if (state.field !== "all" && r.field !== state.field) return false;
+    if (state.status === "open" && d) return false;
+    if (state.status === "done" && !d) return false;
+    if (state.status === "query" && !(d && d.decision === "query")) return false;
+    return true;
+  }
+
+  function renderSummary() {
+    const all = state.provisions.flatMap(rowsOf);
+    const n = all.length;
+    const c = { approve: 0, change: 0, query: 0 };
+    for (const r of all) { const d = decisionOf(r); if (d && c[d.decision] !== undefined) c[d.decision]++; }
+    const done = c.approve + c.change + c.query;
+    const diff = { easy: 0, hard: 0, new_edge: 0 };
+    for (const r of all) diff[r.difficulty] = (diff[r.difficulty] || 0) + 1;
+    const s = $("summary"); s.replaceChildren();
+    const stat = (num, label) => { const d = el("div", "stat"); d.append(el("b", null, num), el("span", null, label)); return d; };
+    s.append(stat(state.provisions.length, "provisions"), stat(n, "gold rows"),
+      stat(done + " / " + n, "reviewed"), stat(c.change, "changed"), stat(c.query, "queries"),
+      stat(diff.easy + " · " + diff.hard + " · " + diff.new_edge, "easy · hard · new edge"));
+    const bar = el("div", "bar"); bar.setAttribute("aria-hidden", "true");
+    for (const [k, col] of [["approve", "var(--ok)"], ["change", "var(--warn)"], ["query", "var(--edge)"]]) {
+      const i = el("i"); i.style.width = (n ? (100 * c[k] / n) : 0) + "%"; i.style.background = col; bar.append(i);
+    }
+    s.append(bar);
+  }
+
+  function bulkCandidates() {
+    const out = [];
+    for (const p of state.provisions) for (const r of rowsOf(p))
+      if (rowVisible(r) && r.difficulty === "easy" && r.agree !== false && !decisionOf(r)) out.push(r);
+    return out;
+  }
+  function renderBulk() {
+    const b = $("bulk"); b.replaceChildren();
+    if (!state.canWrite || !db) return;
+    const cands = bulkCandidates();
+    if (!cands.length) return;
+    if (!state.confirmBulk) {
+      const btn = el("button", "btn", "Approve " + cands.length + " easy rows shown");
+      btn.type = "button"; btn.title = "Easy rows in the current view where no model or referee disagrees";
+      btn.onclick = () => { state.confirmBulk = true; renderBulk(); };
+      b.append(btn);
+    } else {
+      b.append(el("span", "status", "Approve " + cands.length + " rows?"));
+      const yes = el("button", "btn primary", "Approve them"); yes.type = "button"; yes.disabled = state.busy;
+      yes.onclick = async () => { state.busy = true; renderBulk(); await saveMany(cands.map((r) => [r, "approve", null, ""])); state.busy = false; state.confirmBulk = false; render(); };
+      const no = el("button", "btn", "Cancel"); no.type = "button"; no.onclick = () => { state.confirmBulk = false; renderBulk(); };
+      b.append(yes, no);
+    }
+  }
+
+  function editorFor(p, r) {
+    const box = el("div", "editor");
+    const fields = el("div", "fields");
+    const d = decisionOf(r);
+    const start = d && d.decision === "change" && d.decided != null ? d.decided : r.proposed;
+    const inputs = {};
+    const sel = (name, opts, cur, id) => {
+      const lab = el("label", null, name); const s = el("select"); s.id = id;
+      for (const o of opts) { const op = el("option", null, o === "" ? "—" : o); op.value = o; if ((cur ?? "") === o) op.selected = true; s.append(op); }
+      lab.append(s); fields.append(lab); return s;
+    };
+    const base = "ed-" + r.key.replace(/[^a-zA-Z0-9]/g, "-");
+    if (r.field === "actor") {
+      const v = start && typeof start === "object" ? start : {};
+      inputs.position = sel("Role", POSITIONS, v.listed === false ? "(not an actor here)" : (v.position || "mentioned"), base + "-pos");
+      inputs.holds = sel("Holds", HOLDS, v.holds || "none", base + "-holds");
+      inputs.act = sel("Act", ACTS, v.act || "", base + "-act");
+      const lab = el("label", null, "Inferred"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.id = base + "-inf"; cb.checked = !!v.inferred; lab.append(cb); fields.append(lab); inputs.inferred = cb;
+    } else {
+      inputs.value = sel("Value", CHOICES[r.field] || [], start ?? "", base + "-val");
+    }
+    const cl = el("label", null, "Comment (optional)"); cl.style.width = "100%";
+    const ta = el("textarea"); ta.id = base + "-cmt"; ta.value = (d && d.comment) || ""; cl.append(ta);
+    const btns = el("div", "btns"); btns.style.display = "flex"; btns.style.gap = "6px";
+    const save = el("button", "btn primary", "Save change"); save.type = "button";
+    save.onclick = async () => {
+      let val;
+      if (r.field === "actor") {
+        val = inputs.position.value === "(not an actor here)" ? { listed: false }
+          : { position: inputs.position.value, holds: inputs.holds.value, inferred: inputs.inferred.checked, act: inputs.act.value || null };
+        if (val.position === "active" && val.holds === "none") { showNotice("An active actor holds an Obligation or a Liberty: choose one under Holds."); return; }
+        if (val.position && val.position !== "active" && val.holds !== "none") { showNotice("Only an active actor holds an Obligation or a Liberty: set Holds to none, or the role to active."); return; }
+      } else {
+        val = inputs.value.value === "" ? null : inputs.value.value;
+      }
+      await save1(r, "change", val, ta.value.trim());
+      state.editing = null; render();
+    };
+    const q = el("button", "btn", "Save as query"); q.type = "button";
+    q.onclick = async () => { await save1(r, "query", null, ta.value.trim()); state.editing = null; render(); };
+    const cancel = el("button", "btn", "Cancel"); cancel.type = "button"; cancel.onclick = () => { state.editing = null; render(); };
+    btns.append(save, q, cancel);
+    box.append(fields, cl, btns);
+    return box;
+  }
+
+  function renderRow(p, r) {
+    const d = decisionOf(r);
+    const row = el("div", "row"); row.dataset.d = r.difficulty; if (d) row.dataset.s = d.decision;
+    const left = el("div");
+    const fn = el("div", "fname", FIELD_NAME[r.field] || r.field);
+    if (r.actor_label) fn.append(el("span", "actor", r.actor_label));
+    left.append(fn, el("div", "value", fmt(r.field, r.proposed)));
+    if (r.field === "actor") {
+      const src = (r.rules || []).map((x) => HOLDER_SOURCE[x.id]).find(Boolean);
+      if (src && r.proposed && r.proposed.position === "active") left.append(el("div", "note", src));
+    }
+    const pills = el("div", "pills");
+    pills.append(el("span", "pill " + r.difficulty, r.difficulty === "new_edge" ? "new edge" : r.difficulty));
+    if (r.agree === true) pills.append(el("span", "pill agree", "models agree"));
+    if (r.agree === false) pills.append(el("span", "pill disagree", "models differ"));
+    if (r.agree == null) pills.append(el("span", "pill agree", "no model label"));
+    left.append(pills);
+
+    const mid = el("div", "why");
+    mid.append(el("p", "reason", r.reason || ""));
+    const ul = el("ul", "rules");
+    for (const ru of r.rules || []) { const li = el("li"); li.append(el("code", null, ru.id), document.createTextNode(ru.text || "")); ul.append(li); }
+    mid.append(ul);
+    const ev = el("div", "evid");
+    for (const k of ["referee", "gemini", "mini", "gpt55", "pipeline", "cue"]) {
+      if (!r.evidence || !(k in r.evidence)) continue;
+      const v = r.evidence[k];
+      if (r.field === "purpose_fine" && v == null) continue;
+      const counted = k === "gemini" || k === "referee";
+      const chip = el("span", "ev" + (counted ? (sameVal(r.field, r.proposed, v) ? " same" : " diff") : ""));
+      chip.append(el("b", null, EV_NAME[k] || k), document.createTextNode(fmt(r.field, v)));
+      ev.append(chip);
+    }
+    mid.append(ev);
+
+    const act = el("div", "act");
+    if (d) {
+      const st = el("div", "status");
+      st.append(el("b", null, d.decision === "approve" ? "Approved" : d.decision === "change" ? "Changed to " + fmt(r.field, d.decided) : "Query"));
+      if (d.comment) st.append(document.createTextNode(" · " + d.comment));
+      act.append(st);
+    }
+    if (state.canWrite && db) {
+      const btns = el("div", "btns");
+      const a = el("button", "btn primary", d && d.decision === "approve" ? "Approved" : "Approve"); a.type = "button";
+      a.disabled = !!(d && d.decision === "approve");
+      a.onclick = async () => { await save1(r, "approve", null, ""); render(); };
+      const c = el("button", "btn", "Change…"); c.type = "button"; c.onclick = () => { state.editing = r.key; render(); };
+      btns.append(a, c);
+      if (d) { const u = el("button", "btn danger", "Undo"); u.type = "button"; u.onclick = async () => { await undo(r); render(); }; btns.append(u); }
+      act.append(btns);
+    }
+    row.append(left, mid, act);
+    if (state.editing === r.key) row.append(editorFor(p, r));
+    return row;
+  }
+
+  function render() {
+    renderSummary(); renderBulk();
+    const list = $("list"); list.replaceChildren();
+    let shown = 0;
+    for (const p of state.provisions) {
+      const rows = rowsOf(p).filter(rowVisible);
+      if (!rows.length) continue;
+      shown++;
+      const art = el("article", "prov");
+      const head = el("div", "prov-head");
+      const idl = el("div", "prov-id"); idl.append(el("span", "law", p.law_title || p.law_name), el("span", "sid", p.section_id));
+      head.append(idl);
+      if (p.headings && p.headings.length) { const cr = el("div", "crumbs"); for (const h of p.headings) cr.append(el("span", null, h)); head.append(cr); }
+      art.append(head);
+      if (p.stems && p.stems.length) {
+        const st = el("div", "stem"); st.append(el("span", "lbl", "Stem"));
+        for (const x of p.stems) st.append(el("p", null, x.text));
+        art.append(st);
+      }
+      art.append(el("span", "text-lbl", p.unit ? "Sentence" + (p.members && p.members.length > 1 ? " (" + p.members.length + " rows)" : "") : "Provision"));
+      const cut = (p.text || "").indexOf("—");
+      if (p.items && p.items.length && cut >= 0) {
+        // the source keeps a stem's lead-in and closing words on one row; show its items between them, as printed
+        art.append(el("p", "text lead", p.text.slice(0, cut + 1)));
+        const ol = el("ul", "items");
+        for (const it of p.items) { const li = el("li"); li.append(el("span", "item-id", it.label), document.createTextNode(" " + it.text)); ol.append(li); }
+        art.append(ol);
+        const tail = p.text.slice(cut + 1).trim();
+        if (tail) art.append(el("p", "text tail", tail));
+      } else {
+        art.append(el("p", "text", p.text || "(no text)"));
+      }
+      if (p.flags && p.flags.length) { const fl = el("div", "flags"); for (const f of p.flags) fl.append(el("span", null, f.replace(/_/g, " "))); art.append(fl); }
+      if (p.policy_notes && p.policy_notes.length) {
+        const nb = el("div", "notes"); nb.append(el("span", "lbl", "Policy notes"));
+        const ul = el("ul"); for (const n of p.policy_notes) ul.append(el("li", null, (n.default ? "Default " + n.default + ": " : "") + n.note)); nb.append(ul); art.append(nb);
+      }
+      const det = el("details", "ctx"); det.append(el("summary", null, "Full context: referenced and applying provisions, definitions"), el("pre", null, p.context || ""));
+      art.append(det);
+      if (p.row_decisions && p.row_decisions.length) {
+        const rd = el("details", "ctx"); rd.append(el("summary", null, "Your earlier row-level decisions on this sentence (" + p.row_decisions.length + ")"));
+        const lines = p.row_decisions.map((d) => d.row.split(":")[1] + "  " + (d.field === "actor" ? d.actor_label : d.field) + ": " + fmt(d.field, d.value) + "  [" + d.decision + "]" + (d.comment ? "  " + d.comment : ""));
+        rd.append(el("pre", null, lines.join("\n"))); art.append(rd);
+      }
+      const box = el("div", "rows"); for (const r of rows) box.append(renderRow(p, r)); art.append(box);
+      list.append(art);
+    }
+    if (!shown) list.append(el("div", "empty", state.provisions.length ? "Nothing in this view. Try another filter." : "No gold rows have been loaded yet."));
+  }
+
+  // decisions/<provision doc id> = {section_id, rows: {<slot>: decision | null}}: one document per provision
+  function body(r, decision, decided, comment) {
+    return { key: r.key, field: r.field, actor_label: r.actor_label || "", decision, decided: decided ?? null, comment: comment || "", at: new Date().toISOString() };
+  }
+  async function writeSlots(pid, sectionId, slots) {
+    const ref = db.collection("decisions").doc(pid);
+    try {
+      if (state.decDocs[pid]) await ref.update({ rows: slots });
+      else await ref.set({ section_id: sectionId, rows: slots });
+      return true;
+    } catch (e) {
+      if (e && e.code === "invalid_argument") { state.canWrite = false; showNotice("You can view these rows but not record decisions."); }
+      else showNotice("Could not save (" + (e && e.code || "error") + "). Try again.");
+      return false;
+    }
+  }
+  function sectionOf(pid) { const p = state.provisions.find((x) => rowsOf(x).some((r) => pidOf(r.key) === pid)); return p ? p.section_id : ""; }
+  async function save1(r, decision, decided, comment) {
+    if (!db) return;
+    const pid = pidOf(r.key);
+    await writeSlots(pid, sectionOf(pid), { [slotOf(r.key)]: body(r, decision, decided, comment) });
+  }
+  async function saveMany(items) {
+    const by = {};
+    for (const [r, dec, val, cmt] of items) { const pid = pidOf(r.key); (by[pid] = by[pid] || {})[slotOf(r.key)] = body(r, dec, val, cmt); }
+    for (const pid of Object.keys(by)) { const ok = await writeSlots(pid, sectionOf(pid), by[pid]); if (!ok) break; }
+  }
+  async function undo(r) {
+    const pid = pidOf(r.key);
+    await writeSlots(pid, sectionOf(pid), { [slotOf(r.key)]: null });
+  }
+  function showNotice(msg) { const n = $("notice"); n.textContent = msg; n.hidden = false; }
+
+  function bindSeg(id, key) {
+    const seg = $(id);
+    seg.addEventListener("click", (ev) => {
+      const b = ev.target.closest("button"); if (!b) return;
+      for (const x of seg.querySelectorAll("button")) x.setAttribute("aria-pressed", x === b ? "true" : "false");
+      state[key] = b.dataset.v; state.confirmBulk = false; render();
+    });
+  }
+  bindSeg("f-diff", "diff"); bindSeg("f-status", "status");
+  $("f-field").addEventListener("change", (e) => { state.field = e.target.value; state.confirmBulk = false; render(); });
+
+  async function start() {
+    db = await window.claude?.use?.("db") ?? null;
+    if (!db) { $("list").replaceChildren(el("div", "empty", "The gold rows live in this page's database, which isn't available in this view. Open the page signed in to claude.ai.")); return; }
+    const user = await window.claude.use("user");
+    if (user) { const w = await user.can("data.write"); if (w === false) state.canWrite = false; }
+    db.collection("provisions").orderBy("order").onSnapshot((snap) => {
+      state.provisions = snap.docs.map((d) => d.data()).filter(Boolean); render();
+    }, (e) => showNotice("Lost the connection to the gold rows (" + e.code + "). Reload the page."));
+    db.collection("decisions").onSnapshot((snap) => {
+      const m = {}, docs = {};
+      for (const d of snap.docs) {
+        const v = d.data(); if (!v) continue; docs[d.id] = true;
+        for (const x of Object.values(v.rows || {})) if (x && x.key && x.decision) m[x.key] = x;
+      }
+      state.decisions = m; state.decDocs = docs; render();
+    }, (e) => showNotice("Lost the connection to the decisions (" + e.code + "). Reload the page."));
+  }
+  start();
+})();
+</script>
