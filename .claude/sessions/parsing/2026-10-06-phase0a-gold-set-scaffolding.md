@@ -1,13 +1,13 @@
 ---
 session: "Phase 0a: Gold set scaffolding (1,000 provisions, rule-justified)"
-status: pending
+status: active
 opened: 2026-10-06
 closed:
 outcome:
 related: ["parsing/2026-10-06-pipeline-from-the-regex-end.md", "parsing/2026-10-06-phase0b-purpose-scheme-review.md", "benchmarks/2026-09-30-gold-v2.md", 74]
 ---
 
-# Session: Phase 0a: Gold set scaffolding (PENDING)
+# Session: Phase 0a: Gold set scaffolding (ACTIVE)
 
 ## Problem
 
@@ -25,12 +25,57 @@ Getting the scaffolding right makes the final task easier.
 
 - ✅ (Jason, 2026-10-06: the core now; POPIMAR, significance and fitness later as modules) Which schemes go into the gold set (inventory below; recommendation: the core now, the others as later modules on the same scaffolding)
 - ✅ (`docs/architecture/DRRP-RULE-CATALOGUE.md`, edbb86b: 114 rules, conflicts C1–C13, gaps G1–G3; ⬜ Jason's rulings on C2, C4, C7, C9, C10, G1–G3) **Rule catalogue:** every rule with a stable ID, grouped by scheme, from DRRP-CLASSIFICATION.md (layers 1–5 and special cases), PURPOSE-CLASSIFICATION.md and `drrp_prompt.py`. One line each plus an example. Rules that only exist in prompt wording become catalogue entries. Purpose rules wait for phase 0b
-- ⬜ **Gold record schema** (below): per provision, per scheme label, rule IDs, reason, evidence, difficulty, Jason's decision
-- ⬜ **Selection of 1,000:** only from laws held out of SLM training (the 61 test-split laws, 741 already labelled, plus further held-out laws). Stratified across schemes, with rare classes over-sampled (Liberty, beneficiary, applying-provision holders, passive duties, counterparty acts, each purpose)
-- ⬜ **Auto-justification:** a Claude agent (referee-style, no paid API) assigns each label its rule IDs and reason, using the catalogue and the tier evidence. It grades difficulty: **easy** (tiers agree and a rule clearly applies), **hard** (tiers disagree or rules conflict), **new edge** (no rule fits, so a candidate rule)
+- ✅ (`drrp_gold` in `scripts/pg_schema.sql`, created; loader `scripts/benchmarks/gold_v3/load.py`) **Gold record schema** (below): per provision, per scheme label, rule IDs, reason, evidence, difficulty, Jason's decision
+- ✅ (`scripts/benchmarks/gold_v3/select.py` → `data/gold/v3/selection.csv`; below) **Selection of 1,000:** only from laws held out of SLM training (the 61 test-split laws, 741 already labelled, plus further held-out laws). Stratified across schemes, with rare classes over-sampled (Liberty, beneficiary, applying-provision holders, passive duties, counterparty acts, each purpose)
+- ⬜ (brief `scripts/benchmarks/gold_v3/JUSTIFY_GOLD.md`; evidence pack `evidence.py`; **pilot of 50 running**) **Auto-justification:** a Claude agent (referee-style, no paid API) assigns each label its rule IDs and reason, using the catalogue and the tier evidence. It grades difficulty: **easy** (tiers agree and a rule clearly applies), **hard** (tiers disagree or rules conflict), **new edge** (no rule fits, so a candidate rule)
 - ⬜ **Review table** for Jason: **an interactive page** (Jason, 2026-10-06, "if easy enough to spin up"): easy rows first in bulk, then the hard core
 - ⬜ **Jason's review;** hard and new-edge rows → rulings → catalogue updates → re-justify the affected rows
 - ⬜ The gold set is frozen (versioned) and becomes the yardstick for phase 1 and the release QA; it replaces the gold v2 plan's role
+
+## Build (2026-10-06)
+
+**Rulings that shape the gold set** (Jason, 2026-10-06):
+- the spec, not the v1.3 prompt, is the gold standard: functions lists, applying-provision pointer, `serve` → `notify`, #67 without a named holder, parent-Act holders;
+- **one entry per label stays** (POS-15). The second role is dropped and noted in the reason; #78 tracks the loss;
+- purpose is labelled with the **12 coarse classes**, plus `purpose_fine` (Requirement vs Procedure/Detail) under Duties.
+
+**Pool:** `sample_drrp_training.py --pool test` writes every provision of the 61 test-split laws: 11,733 provisions, no training overlap. Same universe as the sample, so no Schedules (a known limit). The #77 finder found **0** cross-instrument candidates in these laws, so that pass isn't a prerequisite here.
+
+**Selection** (seed 63): 1,000 provisions in all 61 laws.
+
+| Part | Rows | What it is |
+|---|---|---|
+| labelled | 726 | already labelled (Gemini v1.3 on all; mini 258, GPT-5.5 134, referee 129) |
+| natural | 150 | random from the rest: the corpus's own mix, for unbiased rates |
+| target | 124 | rare cases, from unlabelled rows |
+
+The target rows: Liberty 45, Enforcement 12, Appeals 10, Fees 10, Transitional 10, Constitution 9, Amendment 8, Citation 8, Interpretation 6, applying holders 4, functions lists 2. Applying holders and functions lists are scarce in these laws.
+
+Flags across the 1,000:
+
+| Flag | Rows |
+|---|---|
+| Liberty | 164 |
+| beneficiary cue | 182 |
+| counterparty | 263 |
+| holder unknown | 188 |
+| applying | 33 |
+
+**Coarse purpose cue with stem inheritance** (`coarse_purpose.py`, on the 6,959 labels): undetermined drops from 2,317 to **624**. Duties: 82% precision, 86% recall. Enforcement (42%) and Constitution (11%) cues still need work (phase 2).
+
+**Evidence pack** (`evidence.py` → `data/gold/v3/evidence.jsonl`), per provision:
+- the law title, Part/Chapter titles and cross-heading;
+- the exact model context (stem, referenced and applying provisions);
+- the pipeline tiers per actor;
+- each model's v1.3 label, the referee decision and the coarse cue.
+
+**Gold rows** (`drrp_gold`): one row per (provision, field[, actor]), holding:
+- proposed value, catalogue rule IDs and a one-line reason;
+- evidence (models, referee, pipeline, cue);
+- `agree` (models/referee only) and difficulty;
+- Jason's decision (approve / change / query).
+
+Actors that a model listed but the justifier left out get their own row for review. Decided rows are never overwritten.
 
 ## Classification scheme inventory (2026-10-06)
 
