@@ -274,3 +274,13 @@ Still `query` (7): s.60(2)(b) relation; reg.4(7)(b) purpose; reg.46(3)(g)(i) Per
 ## Batch 2 (2026-10-06)
 
 Two Opus agents (48 + 47), brief at `b4256d4`, with Postgres precedent.
+95 provisions, 430 rows; relation 83 easy / 11 hard / 1 new_edge, purpose 18 hard, actor 43 hard / 4 new_edge. On the page (240 provisions).
+
+**Rule questions raised:**
+1. Item that picks the holder ("… is the Secretary of State or Eurocontrol, the Secretary of State"; "if prepared by the Secretary of State, be laid before Parliament"): active or mentioned on a `continues` row? (s.44(6)(a), s.81(5)(a); proposed mentioned, as approved for s.44(6)(c).)
+2. Subject-only stem with modals in the items ("The digitally excluded operator—", reg.8(3)): proposed yes, operator active.
+3. Passive duty whose only party is in the trigger ("Where a supplier provides information …, it shall be measured"): supplier active?
+4. REL-46 when no holder is named ("Health surveillance may be provided as part of a national health system"): raw Liberty.
+5. Permission with no person ("Allowances may be traded"): yes raw Liberty, or `no`?
+6. Purpose: transitional duty (Application vs Requirements); government functions lists (Requirements vs Constitution); exception to an offence (Application vs Offences/Appeals); deeming compliance (Interpretation vs Application).
+7. Dictionary: support panel (CTSA 2015 s.36), nominated recipient (FIT); Spc: Verifier is governed but Scottish verifiers are usually local authorities.
