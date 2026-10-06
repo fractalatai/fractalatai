@@ -1,13 +1,56 @@
 ---
 session: "Phase 0b: Purpose scheme review"
-status: pending
+status: closed
 opened: 2026-10-06
-closed:
-outcome:
+closed: 2026-10-06
+outcome: partial
 related: ["parsing/2026-10-06-pipeline-from-the-regex-end.md", "docs/architecture/PURPOSE-CLASSIFICATION.md", "sertantai-legal#172", 76]
+
+summary: >
+  Reviewed the 18-value Airtable-era purpose scheme with legal and measured it: the stored regex purpose agrees
+  with labels 5.5% of the time and headings are mostly topical. Decided a layered scheme of 11 coarse statutory-term
+  classes (Requirements/Permissions renamed from Duties/Powers, Transitional merged into Application), single-select.
+  Build, fine layer and migration move to the new meta-plan.
+
+decisions:
+  - what: Layered purpose; 11 coarse classes in statutory terms; fine layer only where a consumer needs it
+    why: Laws' own words are easier to reason with; consumers (legal#172, #76 gates) need few classes
+    result: PURPOSE-CLASSIFICATION.md § Layered purpose
+  - what: Rename Duties/Powers to Requirements/Permissions
+    why: Keep purpose clear of the DRRP vocabulary (Obligation/Liberty, duty)
+    result: Applied across docs, brief and page
+  - what: Transitional merged into Application, exemption and transition; single-select
+    why: Transition is application in time; single-select is the stronger data model
+    result: 11 classes
+  - what: Purpose belongs to whole sections; snippets inherit (Jason, gold review)
+    why: 10 of 27 reviewed multi-provision sections had mixed clause-level purposes
+    result: Carries into the new plan's unit design
+
+metrics:
+  stored_purpose: { agreement_with_labels: "5.5%", catch_all_share: "70%", unclassified: "16%" }
+  headings: { cross_heading_coverage: "14%", part_title_coverage: "58%" }
+  coarse_cues: { undetermined: "624/6959", requirements_precision: "82%", requirements_recall: "86%" }
+
+lessons:
+  - title: Headings are topical; function words live in section titles we don't hold
+    detail: Cross-headings and Part titles mostly name subject matter ("height of chimneys"); Interpretation, Offences and Citation sit in section titles, which legal's parser drops (P1group/Title). Titles are the cheapest purpose signal once served.
+    tag: data
+  - title: The existing regex purpose must be rebuilt, not tuned
+    detail: 70% catch-all and 16% unclassified; only commencement (77%) is recognised well.
+    tag: data
+
+artifacts:
+  - docs/architecture/PURPOSE-CLASSIFICATION.md
+  - scripts/benchmarks/gold_v3/coarse_purpose.py
+
+depends_on:
+  - 2026-10-06-pipeline-from-the-regex-end
+
+enables:
+  - coarse purpose layer at section level (new meta-plan)
 ---
 
-# Session: Phase 0b: Purpose scheme review (PENDING)
+# Session: Phase 0b: Purpose scheme review (CLOSED)
 
 ## Problem
 
@@ -18,16 +61,16 @@ The 18-value purpose scheme is a legacy of Jason's Airtable work. It's involved 
 ## Todo
 
 - ✅ (legal, 2026-10-06; below) Consumers: who uses purpose and how. That covers the purpose profile (legal#172, law shares ≥ 0.05), the DRRP gates (#76, `SKIP_PURPOSES`), compliance screening and the change list, and legal's UI/search. Asked legal 2026-10-06
-- ⬜ Statutory vocabulary: the terms legislation itself uses in provision titles, cross-headings and Part titles (first counts below)
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) Statutory vocabulary: the terms legislation itself uses in provision titles, cross-headings and Part titles (first counts below)
 - ✅ (legal, 2026-10-06; below) **Provision titles: do we have them?** Our LAT rows have no titles (e.g. `UK_uksi_1992_3004:reg.2` is empty; "Interpretation" isn't stored). Asked legal whether it can serve titles, cross-headings and Part titles. Titles may be the cheapest purpose signal of all
 - ✅ (12 coarse classes decided 2026-10-06; `PURPOSE-CLASSIFICATION.md` § Layered purpose) **Layered purpose** (Jason, 2026-10-06: "let's not limit ourselves to 1 method: a coarse/simple method could feed into a finer/more complex when needed"). Design the layers, with evidence on the 6,959 labels:
   - **coarse:** cheap cues (text, headings, titles when available) to a small set of statutory-term classes, high precision, else "undetermined" → escalate;
   - **fine:** classifier/SLM/LLM refines within the coarse class, only where a consumer needs it
 - ✅ (Jason, 2026-10-06) Choose: 12 coarse classes in statutory terms; Enforcement its own class; Constitution kept
 - ✅ (Jason, 2026-10-06) Rename to keep purpose clear of the DRRP vocabulary: Duties → **Requirements**, Powers → **Permissions**; fine split **Substantive** vs Procedure/Detail
-- ⬜ Coarse layer build (phase 2): stem inheritance, enforcement cues, section titles when served; re-measure
-- ⬜ Fine layer: Duties → Requirement vs Procedure/Detail (feeds the DRRP gate); others only on consumer need
-- ⬜ Published-field migration with legal (legal-side refactoring list); retire legal's law-level classifier (#172)
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) Coarse layer build (phase 2): stem inheritance, enforcement cues, section titles when served; re-measure
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) Fine layer: Duties → Requirement vs Procedure/Detail (feeds the DRRP gate); others only on consumer need
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) Published-field migration with legal (legal-side refactoring list); retire legal's law-level classifier (#172)
 
 ## First evidence (2026-10-06)
 

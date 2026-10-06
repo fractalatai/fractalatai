@@ -1,14 +1,52 @@
 ---
 session: "Meta-plan: improve the DRRP pipeline from the regex end"
-status: active
+status: closed
 opened: 2026-10-06
-closed:
-outcome:
+closed: 2026-10-06
+outcome: partial
 issue: 72
-related: [60, 65, 74, 75, 76, "parsing/2026-10-01-training-labels-slm.md", "docs/architecture/DRRP-LABELLING-REVIEW-2026-10-06.md"]
+related: [60, 65, 74, 75, 76, 78, "parsing/2026-10-01-training-labels-slm.md", "docs/architecture/DRRP-LABELLING-REVIEW-2026-10-06.md"]
+
+summary: >
+  Replaced building training data from the LLM end with improving each tier from the regex end, using
+  LLM labels as evaluation. After a Gemini review it put a human gold set first (phase 0a) and a purpose review (0b).
+  Phase 0a misfired: the plan never fixed the unit of analysis, so the gold set labelled row snippets and grew
+  a case-law rulebook. Closed for a new meta-plan built on sentence units.
+
+decisions:
+  - what: Improve tiers from the regex end; LLM labels become the evaluation set, not training data
+    why: The one-prompt LLM approach grew to ~45 rules and ~10K tokens; 32% of provisions have no duty word
+    result: Principle carries into the new plan
+  - what: Human gold set before scoring any tier (Gemini review)
+    why: Scoring against LLM labels is circular
+    result: Phase 0a built the machinery; the unit was wrong
+  - what: Layered purpose with statutory-term classes (phase 0b)
+    why: The 18-value scheme is an Airtable legacy, involved in 58% of model disputes
+    result: 11 coarse classes; carries into the new plan
+
+metrics:
+  labelling_review: { substantive: 234000, no_duty_word: "32%", purpose_in_disputes: "58%", purpose_gate_skip: "28%", gate_relation_loss: "0.5%" }
+
+lessons:
+  - title: A pipeline plan must start from what is labelled, not from the tiers
+    detail: Six phases were planned around tiers (regex, classifier, SLM, LLM) with stubs written up front. None defined the unit of meaning (the legal sentence vs the source row), and the first phase spent a day learning that. Define the unit, the label set and the yardstick before phasing the tiers.
+    tag: methodology
+  - title: Stubs written before the yardstick exists go stale
+    detail: The phase 1–6 stubs assumed row-level labels and the old purpose scheme; all were deleted unopened. Write stubs for the next one or two phases only.
+    tag: methodology
+
+artifacts:
+  - docs/architecture/DRRP-LABELLING-REVIEW-2026-10-06.md
+  - data/code-review/drrp-pipeline-regex-end-meta-plan.md
+
+depends_on:
+  - 2026-10-01-training-labels-slm
+
+enables:
+  - new meta-plan (sentence units, rules vs precedents)
 ---
 
-# Session: Meta-plan: improve the DRRP pipeline from the regex end (ACTIVE)
+# Session: Meta-plan: improve the DRRP pipeline from the regex end (CLOSED)
 
 ## Problem
 
@@ -35,28 +73,28 @@ Most of the cost and rules sit where the cheap tiers could decide.
 ## Todo
 
 - ✅ Suspend the training-labels workstream properly (status, state, pointers, commits)
-- ✅ **Gemini critical review of this meta-plan** (Gemini 2.5 Pro, raw: `data/code-review/drrp-pipeline-regex-end-meta-plan.md`). Action summary below; ⬜ Jason's rulings on it
-- ⬜ **Phase 0a: A trustworthy yardstick first** (from the Gemini review). A human-verified gold set (stratified, rare classes over-sampled: Liberty, beneficiary, applying holders), used to measure the bias of the 7K LLM "silver" labels **before** any tier is scored against them. Merges with gold v2 / Jason's 300-label spot check. **(Jason)** size and his review time
-- ⬜ **Phase 0b: Purpose suitability review** (Jason, 2026-10-06: "the Purpose classification is a legacy of my time working with Airtable"):
+- ✅ **Gemini critical review of this meta-plan** (Gemini 2.5 Pro, raw: `data/code-review/drrp-pipeline-regex-end-meta-plan.md`). Action summary below; ⏸️ Jason's rulings on it
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) **Phase 0a: A trustworthy yardstick first** (from the Gemini review). A human-verified gold set (stratified, rare classes over-sampled: Liberty, beneficiary, applying holders), used to measure the bias of the 7K LLM "silver" labels **before** any tier is scored against them. Merges with gold v2 / Jason's 300-label spot check. **(Jason)** size and his review time
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) **Phase 0b: Purpose suitability review** (Jason, 2026-10-06: "the Purpose classification is a legacy of my time working with Airtable"):
   - which consumers actually use purpose (the purpose profile for legal#172, the DRRP gates #76, compliance screening);
   - whether the 18 values are needed, or a coarse operative/machinery/procedure/sanctions split would do;
   - legal compatibility (the published field).
   - Decide **before** phases 2–3 build gates or a classifier on it
-- ⬜ **Phase 1: Tier measurement** (`parsing/2026-10-06-phase1-tier-measurement.md`). Score each existing tier against the labels, regex first. Where each tier is right or wrong, and what consumers lose
-- ⬜ **Phase 2: Regex end and guards** (`parsing/2026-10-06-phase2-regex-and-guards.md`):
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) **Phase 1: Tier measurement** (`parsing/2026-10-06-phase1-tier-measurement.md`). Score each existing tier against the labels, regex first. Where each tier is right or wrong, and what consumers lose
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) **Phase 2: Regex end and guards** (`parsing/2026-10-06-phase2-regex-and-guards.md`):
   - regex purpose on the published vocabulary (#76) and updated purpose gates;
   - the duty-word prefilter;
   - regex `act` (#75);
   - patterns for the ~100 trigger-only dictionary labels (by frequency, with masks and tests)
-- ⬜ **Phase 3: Middle tiers** (`parsing/2026-10-06-phase3-classifier-tier.md`):
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) **Phase 3: Middle tiers** (`parsing/2026-10-06-phase3-classifier-tier.md`):
   - retrain the cheap position classifier and add a cheap purpose classifier (embeddings) on the labels;
   - confidence thresholds decide what escalates
-- ⬜ **Phase 4: SLM on the residual** (`parsing/2026-10-06-phase4-slm-residual.md`): retrain on what actually reaches the SLM after phases 2–3. Relation + actors (+ act?), not purpose. RunPod: Jason launches, cost approved first
-- ⬜ **Phase 5: LLM tier on the low-confidence residual** (`parsing/2026-10-06-phase5-llm-short-prompt.md`): split the prompt into a short relation/actor prompt; purpose leaves the LLM. Rule governance: a rule enters only if it can change a verdict, holder or correlative
-- ⬜ **Phase 6: Evaluation and QA** (`parsing/2026-10-06-phase6-evaluation-qa.md`; gold v2 is `benchmarks/2026-09-30-gold-v2.md`):
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) **Phase 4: SLM on the residual** (`parsing/2026-10-06-phase4-slm-residual.md`): retrain on what actually reaches the SLM after phases 2–3. Relation + actors (+ act?), not purpose. RunPod: Jason launches, cost approved first
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) **Phase 5: LLM tier on the low-confidence residual** (`parsing/2026-10-06-phase5-llm-short-prompt.md`): split the prompt into a short relation/actor prompt; purpose leaves the LLM. Rule governance: a rule enters only if it can change a verdict, holder or correlative
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) **Phase 6: Evaluation and QA** (`parsing/2026-10-06-phase6-evaluation-qa.md`; gold v2 is `benchmarks/2026-09-30-gold-v2.md`):
   - acceptance thresholds per tier and end to end, before the single run;
   - the referee is used only for gold and release QA
-- ⬜ Then the single run (`parsing/09-29-26-reenrichment-backlog.md`) on the improved pipeline
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) Then the single run (`parsing/09-29-26-reenrichment-backlog.md`) on the improved pipeline
 
 ## Legal-side refactoring (collected; for after this plan is worked through)
 
@@ -96,7 +134,7 @@ Raw review: `data/code-review/drrp-pipeline-regex-end-meta-plan.md`. Claude's re
 - ✅ Labels for evaluation: Gemini v1.3 (6,959, 656 laws, test split by law), refereed batches 1–2, `holder60_cases`, the 50 hand-checked rows
 - ✅ Spec and prompt v1.4 (rulings 1–15) committed. Under this plan, most purpose rulings move to the purpose tier's label definitions
 - ✅ Actor dictionary reconciled with legal (~245 labels; many trigger-only, which is phase 2's input)
-- ⬜ Gemini review of this plan
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) Gemini review of this plan
 - **Paid services: walk, don't run** (memory `feedback_paid_api_walk_dont_run`). Every paid run gets a total cost approved first; OpenAI credit ~$12.70
 - Enables: the single run (backlog session), gold v2 (#74)
 

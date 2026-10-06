@@ -1,13 +1,89 @@
 ---
 session: "Phase 0a: Gold set scaffolding (1,000 provisions, rule-justified)"
-status: active
+status: closed
 opened: 2026-10-06
-closed:
-outcome:
-related: ["parsing/2026-10-06-pipeline-from-the-regex-end.md", "parsing/2026-10-06-phase0b-purpose-scheme-review.md", "benchmarks/2026-09-30-gold-v2.md", 74]
+closed: 2026-10-06
+outcome: partial
+related: ["parsing/2026-10-06-pipeline-from-the-regex-end.md", "parsing/2026-10-06-phase0b-purpose-scheme-review.md", "benchmarks/2026-09-30-gold-v2.md", 74, 78]
+
+summary: >
+  Built the gold-set machinery (frozen 1,000-provision selection from the 61 test laws, evidence pack, rule
+  catalogue, Opus justifier brief, drrp_gold table, interactive review page) and reviewed 240 provisions
+  (1,106 rows) over a pilot and two batches. Stopped as a misfire: we labelled the source's rows, so sentence
+  snippets needed their own rules, and folding every review decision into the rulebook grew it to 123 rules
+  (44 touched in one day) without converging. Superseded by labelling whole sentences, with rules kept apart from precedents.
+
+decisions:
+  - what: Gold labels follow the spec, not the v1.3 prompt; one entry per label stays (POS-15), losses tracked in #78
+    why: The spec holds the 10-05/10-06 rulings; multi-role entries are a model change not wanted this iteration
+    result: Brief and catalogue cite spec rules; #78 opened
+  - what: Relation gained a third value, continues (stems and items counted once; detail of a duty elsewhere)
+    why: Counting a stem's relation on every item multiplied duties; "no" must mean "touches no duty"
+    result: 86 of 240 reviewed relations were continues; this is what exposed the row-vs-sentence problem
+  - what: Beneficiary test (POS-19); engagers incl. the self-employed (HOLD-17); hazards aren't actors (LBL-14); permitted discharge is a Liberty (REL-46)
+    why: Jason's review decisions on pilot and batch provisions
+    result: Kept as precedents for the new plan; most will not survive as general rules
+  - what: Purpose escape value inherit (Jason, batch 2)
+    why: Purpose was forced onto snippets; laws give purpose to whole sections
+    result: Page and brief updated; superseded inside sentences by the sentence unit
+  - what: Stop batch 3 and redesign around sentence units (Jason, 2026-10-06)
+    why: continues and inherit both say the unit is wrong; the rulebook was becoming case law
+    result: Redesign draft below; the new meta-plan takes it up
+
+metrics:
+  selection: { pool: 11733, selected: 1000, labelled: 726, natural: 150, target: 124, laws: 61 }
+  review: { provisions_reviewed: 240, rows: 1106, approved: 1073, changed: 28, queried: 5 }
+  justifier_batches: { pilot: 50, batch1: 95, batch2: 95, batch1_rows: 434, batch2_rows: 430, hard_actor_rows_b1: 41, hard_actor_rows_b2: 43 }
+  rulebook: { active_rules: 123, touched_2026_10_06: 44, snippet_rules: 23, new_rulings_per_batch: "~6" }
+  units: { test_law_rows: 17837, sentence_units: 10462, selection_units: 883, sampled_items_folding_in: 311, reviewed_units: 231 }
+  purpose_granularity: { reviewed_sections_multi_provision: 27, mixed_purpose: 10 }
+
+lessons:
+  - title: Fix the unit of meaning before labelling anything
+    detail: We labelled the source's rows. 39% of the selection were pieces of a sentence with a stem, so relation, holder, actors and purpose each needed snippet rules (23 of 123 rules; 36% of reviewed relations were "continues"). Decide what a label attaches to (here, the whole legal sentence) first.
+    tag: methodology
+  - title: Every reviewer decision folded into the rulebook becomes case law
+    detail: Promoting each batch's changes into catalogue rules produced ~6 new rulings per batch, 44 rules touched in a day, and oscillation (conditions on a power went Application → Requirements → split by how vs who/when). Keep decisions as precedents in the gold table; promote a pattern to a rule only when it recurs (about 3+ provisions).
+    tag: methodology
+  - title: Watch the ruling rate as a stop signal
+    detail: The batch plan assumed rulings would taper ("less change by the end"). They didn't; flat ~6 per batch was the evidence that the scheme, not the labels, was the problem. Track it per batch and stop when it doesn't fall.
+    tag: methodology
+  - title: Don't turn an uncommented change into a rule
+    detail: A Worker change on Art.6(2)(c) with no comment was read as "stem beneficiaries go on items" (POS-17); the next batch's query reversed it. Ask when a change carries no reason.
+    tag: methodology
+  - title: Clause-level purpose is incoherent
+    detail: 10 of 27 reviewed sections with more than one sampled provision had mixed purposes. Laws assign purpose to whole sections; snippets have none of their own.
+    tag: data
+  - title: The artifact review loop worked
+    detail: One db doc per provision for proposals and one per provision for decisions, with if_version pins, let Jason review 1,106 rows in a day; ArtifactData update merges nested maps (other slots survive). Splitting each batch over two Opus agents halved wall time with consistent output.
+    tag: tooling
+
+artifacts:
+  - docs/architecture/DRRP-RULE-CATALOGUE.md
+  - docs/architecture/DRRP-CLASSIFICATION.md
+  - docs/architecture/PURPOSE-CLASSIFICATION.md
+  - crates/fractalaw-core/data/actor-dictionary.yaml
+  - scripts/benchmarks/gold_v3/select_gold.py
+  - scripts/benchmarks/gold_v3/coarse_purpose.py
+  - scripts/benchmarks/gold_v3/evidence.py
+  - scripts/benchmarks/gold_v3/load.py
+  - scripts/benchmarks/gold_v3/review_export.py
+  - scripts/benchmarks/gold_v3/review_import.py
+  - scripts/benchmarks/gold_v3/review_page.html
+  - scripts/benchmarks/gold_v3/JUSTIFY_GOLD.md
+  - scripts/ml/sample_drrp_training.py
+  - scripts/pg_schema.sql
+  - https://claude.ai/artifact/PkoqADCn2TXvSAEkPaTE6w
+
+depends_on:
+  - 2026-10-06-pipeline-from-the-regex-end
+  - 2026-10-01-training-labels-slm
+
+enables:
+  - sentence-unit gold set (new meta-plan)
 ---
 
-# Session: Phase 0a: Gold set scaffolding (ACTIVE)
+# Session: Phase 0a: Gold set scaffolding (CLOSED)
 
 ## Problem
 
@@ -24,13 +100,13 @@ Getting the scaffolding right makes the final task easier.
 ## Todo
 
 - ✅ (Jason, 2026-10-06: the core now; POPIMAR, significance and fitness later as modules) Which schemes go into the gold set (inventory below; recommendation: the core now, the others as later modules on the same scaffolding)
-- ✅ (`docs/architecture/DRRP-RULE-CATALOGUE.md`, edbb86b: 114 rules, conflicts C1–C13, gaps G1–G3; ⬜ Jason's rulings on C2, C4, C7, C9, C10, G1–G3) **Rule catalogue:** every rule with a stable ID, grouped by scheme, from DRRP-CLASSIFICATION.md (layers 1–5 and special cases), PURPOSE-CLASSIFICATION.md and `drrp_prompt.py`. One line each plus an example. Rules that only exist in prompt wording become catalogue entries. Purpose rules wait for phase 0b
+- ✅ (`docs/architecture/DRRP-RULE-CATALOGUE.md`, edbb86b: 114 rules, conflicts C1–C13, gaps G1–G3; ⏸️ Jason's rulings on C2, C4, C7, C9, C10, G1–G3) **Rule catalogue:** every rule with a stable ID, grouped by scheme, from DRRP-CLASSIFICATION.md (layers 1–5 and special cases), PURPOSE-CLASSIFICATION.md and `drrp_prompt.py`. One line each plus an example. Rules that only exist in prompt wording become catalogue entries. Purpose rules wait for phase 0b
 - ✅ (`drrp_gold` in `scripts/pg_schema.sql`, created; loader `scripts/benchmarks/gold_v3/load.py`) **Gold record schema** (below): per provision, per scheme label, rule IDs, reason, evidence, difficulty, Jason's decision
 - ✅ (`scripts/benchmarks/gold_v3/select_gold.py` → `data/gold/v3/selection.csv`; below) **Selection of 1,000:** only from laws held out of SLM training (the 61 test-split laws, 741 already labelled, plus further held-out laws). Stratified across schemes, with rare classes over-sampled (Liberty, beneficiary, applying-provision holders, passive duties, counterparty acts, each purpose)
-- ⬜ (brief `scripts/benchmarks/gold_v3/JUSTIFY_GOLD.md`; evidence pack `evidence.py`; pilot of 50 done, loaded; below) **Auto-justification:** a Claude agent (referee-style, no paid API) assigns each label its rule IDs and reason, using the catalogue and the tier evidence. It grades difficulty: **easy** (tiers agree and a rule clearly applies), **hard** (tiers disagree or rules conflict), **new edge** (no rule fits, so a candidate rule)
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) (brief `scripts/benchmarks/gold_v3/JUSTIFY_GOLD.md`; evidence pack `evidence.py`; pilot of 50 done, loaded; below) **Auto-justification:** a Claude agent (referee-style, no paid API) assigns each label its rule IDs and reason, using the catalogue and the tier evidence. It grades difficulty: **easy** (tiers agree and a rule clearly applies), **hard** (tiers disagree or rules conflict), **new edge** (no rule fits, so a candidate rule)
 - ✅ (https://claude.ai/artifact/PkoqADCn2TXvSAEkPaTE6w; `review_page.html`, `review_export.py`, `review_import.py`) **Review table** for Jason: **an interactive page** (Jason, 2026-10-06, "if easy enough to spin up"): easy rows first in bulk, then the hard core
-- ⬜ **Jason's review;** hard and new-edge rows → rulings → catalogue updates → re-justify the affected rows
-- ⬜ The gold set is frozen (versioned) and becomes the yardstick for phase 1 and the release QA; it replaces the gold v2 plan's role
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) **Jason's review;** hard and new-edge rows → rulings → catalogue updates → re-justify the affected rows
+- ⏸️ (deferred — superseded by the sentence-unit meta-plan, 2026-10-06) The gold set is frozen (versioned) and becomes the yardstick for phase 1 and the release QA; it replaces the gold v2 plan's role
 
 ## Build (2026-10-06)
 
