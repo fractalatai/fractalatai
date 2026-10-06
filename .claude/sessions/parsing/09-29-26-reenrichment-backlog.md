@@ -14,6 +14,7 @@ The first #62 hub sync (2026-09-27) flagged 422 laws `reparse_needed`: their tex
 
 ## Todo
 
+- ⬜ **Data model before the run** (rulings 2026-10-06, `DRRP-CLASSIFICATION.md`): actor entries keyed by (label, role) (`provision_actors` PK change, payload, legal); applying-provision rows become pointers (`none`); parent-Act holders (#77) applied; public access Liberty when the duty holder is unknown (#67)
 - ⬜ Build the backlog list: `lat_sync_state.reparse_needed` ∪ legal's `reenrichment-list.csv` (101) ∪ extent re-parse sync 6 (UK_ukpga_1990_16, UK_ukpga_1988_52, UK_ukpga_1993_11, UK_anaw_2017_2, UK_ukpga_1989_14, UK_uksi_2000_3184 — the last is served by legal again after being archived as revoked), minus laws legal discarded as not Making (lean LAT) and the benchmark laws (#65)
 - ⬜ From legal's Tier 1 writes (2026-09-29):
   - **Re-enrich** after the Tier 1 sync (applied 2026-09-29, 26 hub laws; 136 renames from legal's log, 13,763 actors carried): UK_ukpga_2023_55, UK_ukpga_1996_18, UK_ukpga_1991_22, UK_ukpga_2008_29 (reparse_needed).

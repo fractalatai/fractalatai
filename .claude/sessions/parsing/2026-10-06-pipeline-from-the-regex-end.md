@@ -65,6 +65,7 @@ Jason (2026-10-06): legal will have refactoring to do once we've worked this thr
 - **Law-level purpose:** retire legal's own 15-value PurposeClassifier (from the law title) and derive law-level purpose from fractalaw's provision purposes (#172), so there's one vocabulary.
 - The purpose vocabulary migration of the published `purposes` field (after phase 0b).
 - Actor label renames and the class change are already queued for the single run (`mix actors.rename_labels`).
+- **Actor entries keyed by (label, role)** (Jason, 2026-10-06: label every role; two persons under one label each get an entry). The `actors[]` payload can carry the same label twice, so legal's storage and anything keyed on label must accept that. Fractalaw side: `provision_actors` PK `(section_id, actor_label)` → add a role/instance key; prompt output; reconcile; backfill. Built before the single run.
 
 ## Gemini review feedback (2026-10-06)
 
