@@ -9,8 +9,8 @@ set never overlaps training data. Three parts:
             coarse purpose class (by the coarse cue, coarse_purpose.py)
 
   sample_drrp_training.py --pool test --out data/gold/v3/pool.csv   # first
-  select.py                                   # → data/gold/v3/selection.csv
-  select.py --size 1000 --natural 150 --seed 63
+  select_gold.py                                   # → data/gold/v3/selection.csv
+  select_gold.py --size 1000 --natural 150 --seed 63
 """
 
 import argparse

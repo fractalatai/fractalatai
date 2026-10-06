@@ -2,8 +2,8 @@
 """Load justified gold v3 labels into Postgres drrp_gold, with per-field evidence (phase 0a).
 
 Input: the justifier's JSONL (JUSTIFY_GOLD.md) plus data/gold/v3/evidence.jsonl. For every proposed field it
-attaches what each model, the referee and the pipeline said, and sets `agree` (every model/referee label that
-exists says the same; the pipeline tiers are shown but not counted, being the thing under test).
+attaches what each model, the referee and the pipeline said, and sets `agree` (the Gemini and referee labels
+that exist say the same; mini, GPT-5.5 and the pipeline tiers are shown but not counted).
 An actor that a model or the referee listed but the justifier didn't becomes its own row, proposed
 `{"listed": false}`, difficulty hard, so the review sees the omission.
 
@@ -30,6 +30,9 @@ from coarse_purpose import FROM_18  # noqa: E402
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 CATALOGUE = "docs/architecture/DRRP-RULE-CATALOGUE.md"
 MODELS = ("gemini", "mini", "gpt55", "referee")
+# agreement counts the referee and Gemini only: GPT-5.4-mini and GPT-5.5 scored far below Gemini against the
+# referee (exact 36% / 27% vs 71%), so they are shown as evidence but not counted
+COUNTED = ("gemini", "referee")
 FINE = {"Requirement": "Requirement", "Procedure+Detail": "Procedure/Detail"}
 
 
@@ -113,7 +116,7 @@ def main() -> None:
             pv = pipeline_value(ev, field, actor)
             if pv is not None:
                 evid["pipeline"] = pv
-            counted = [evid[m] for m in MODELS if m in evid and not (field == "purpose_fine" and evid[m] is None)]
+            counted = [evid[m] for m in COUNTED if m in evid and not (field == "purpose_fine" and evid[m] is None)]
             agree = all(same(field, proposed, v) for v in counted) if counted else None
             out.append((args.gold_version, sid, ev["text_md5"], field, actor, Json(proposed), f.get("rule_ids") or [],
                         f.get("reason") or "", Json(evid), agree, f.get("difficulty") or "hard", cat_ver))

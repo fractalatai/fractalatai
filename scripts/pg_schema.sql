@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS drrp_gold (
     rule_ids       TEXT[] NOT NULL,           -- catalogue IDs, e.g. {REL-01,HOLD-05}; '{NEW}' = no rule fits
     reason         TEXT NOT NULL,             -- one sentence linking the rule to this text
     evidence       JSONB,                     -- {tier: value} for regex, cls, slm, gemini, mini, referee, adjudicated
-    agree          BOOLEAN,                   -- every model/referee label that exists agrees (NULL: none); pipeline shown, not counted
+    agree          BOOLEAN,                   -- Gemini and referee labels (where they exist) agree (NULL: none); others shown, not counted
     difficulty     TEXT NOT NULL,             -- easy | hard | new_edge
     catalogue_ver  TEXT NOT NULL,             -- git hash of DRRP-RULE-CATALOGUE.md used
     decision       TEXT,                      -- approve | change | query (NULL = not reviewed)
