@@ -23,12 +23,12 @@ Getting the scaffolding right makes the final task easier.
 
 ## Todo
 
-- ⬜ **(Jason)** Which schemes go into the gold set (inventory below; recommendation: the core now, the others as later modules on the same scaffolding)
+- ✅ (Jason, 2026-10-06: the core now; POPIMAR, significance and fitness later as modules) Which schemes go into the gold set (inventory below; recommendation: the core now, the others as later modules on the same scaffolding)
 - ⬜ **Rule catalogue:** every rule with a stable ID, grouped by scheme, from DRRP-CLASSIFICATION.md (layers 1–5 and special cases), PURPOSE-CLASSIFICATION.md and `drrp_prompt.py`. One line each plus an example. Rules that only exist in prompt wording become catalogue entries. Purpose rules wait for phase 0b
 - ⬜ **Gold record schema** (below): per provision, per scheme label, rule IDs, reason, evidence, difficulty, Jason's decision
 - ⬜ **Selection of 1,000:** only from laws held out of SLM training (the 61 test-split laws, 741 already labelled, plus further held-out laws). Stratified across schemes, with rare classes over-sampled (Liberty, beneficiary, applying-provision holders, passive duties, counterparty acts, each purpose)
 - ⬜ **Auto-justification:** a Claude agent (referee-style, no paid API) assigns each label its rule IDs and reason, using the catalogue and the tier evidence. It grades difficulty: **easy** (tiers agree and a rule clearly applies), **hard** (tiers disagree or rules conflict), **new edge** (no rule fits, so a candidate rule)
-- ⬜ **Review table** for Jason (format to decide, below): easy rows first in bulk, then the hard core
+- ⬜ **Review table** for Jason: **an interactive page** (Jason, 2026-10-06, "if easy enough to spin up"): easy rows first in bulk, then the hard core
 - ⬜ **Jason's review;** hard and new-edge rows → rulings → catalogue updates → re-justify the affected rows
 - ⬜ The gold set is frozen (versioned) and becomes the yardstick for phase 1 and the release QA; it replaces the gold v2 plan's role
 
@@ -89,6 +89,6 @@ One row per (provision, scheme field), so the table reads naturally:
 
 ## Dependencies
 
-- Phase 0b: the purpose vocabulary decision (gold purpose labels use the final vocabulary)
+- Phase 0b: the purpose vocabulary decision. **Gold purpose labels wait for the purpose refactor** (Jason, 2026-10-06)
 - Section titles (P1group/Title) would make provision titles show in the review table; cross-headings and Part titles are available now
 - Labels and evidence already in hand: Gemini v1.3 on 6,959 (incl. 741 test-split), refereed batches 1–2, `holder60_cases`, the 50 hand-checked rows
