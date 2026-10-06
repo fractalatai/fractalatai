@@ -22,6 +22,7 @@ is by LAW (deterministic hash), so no law appears in both splits.
   sample_drrp_training.py --summary            # availability per stratum, no sample written
   sample_drrp_training.py                      # write data/training/drrp-v1.1/sample.csv
   sample_drrp_training.py --quota ben=1500 --quota cp=1200 --test-share 0.1 --seed 60
+  sample_drrp_training.py --pool test --out data/gold/v3/pool.csv   # every test-split provision, no quota (gold set, phase 0a)
 """
 
 import argparse
@@ -69,6 +70,8 @@ def main() -> None:
     ap.add_argument("--test-share", type=float, default=0.10, help="share of laws held out as test (default 0.10)")
     ap.add_argument("--seed", type=int, default=60)
     ap.add_argument("--summary", action="store_true", help="print availability only")
+    ap.add_argument("--pool", choices=["test", "train", "all"],
+                    help="write the whole pool for this split (no quota, no round-robin) instead of a sample")
     args = ap.parse_args()
     quota = dict(QUOTA)
     for q in args.quota:
@@ -126,7 +129,15 @@ def main() -> None:
         print(f"  {s:8s} available {len(p):7,} in {len({x['law_name'] for x in p}):4d} laws; quota {quota[s]:5,}")
     if args.summary:
         return
+    if args.pool:
+        sample = [x for s in ORDER for x in pool[s]
+                  if args.pool == "all" or (x["law_name"] in test_laws) == (args.pool == "test")]
+    else:
+        sample = draw(pool, quota, args)
+    write(sample, test_laws, args)
 
+
+def draw(pool: dict, quota: dict, args) -> list:
     rnd = random.Random(args.seed)
     sample = []
     for s in ORDER:
@@ -149,7 +160,10 @@ def main() -> None:
                 break
             depth += 1
         sample += taken
+    return sample
 
+
+def write(sample: list, test_laws: set, args) -> None:
     for x in sample:
         x["split"] = "test" if x["law_name"] in test_laws else "train"
         x["prompt_version"] = PROMPT_VERSION

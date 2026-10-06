@@ -134,3 +134,27 @@ CREATE TABLE IF NOT EXISTS drrp_dictionary_versions (
     labels       JSONB NOT NULL,
     created_at   TIMESTAMPTZ DEFAULT now()
 );
+
+-- Gold v3 (phase 0a, session parsing/2026-10-06-phase0a-gold-set-scaffolding.md): one row per
+-- (provision, field[, actor]), each with the rule IDs that justify it (docs/architecture/DRRP-RULE-CATALOGUE.md),
+-- a one-line reason, the tier evidence, a difficulty grade and Jason's decision. Frozen by gold_version.
+CREATE TABLE IF NOT EXISTS drrp_gold (
+    gold_version   TEXT NOT NULL,             -- e.g. 'gold-v3-draft'; frozen copies get 'gold-v3.0'
+    section_id     TEXT NOT NULL,
+    text_md5       TEXT NOT NULL,             -- the text the label was made for (a LAT re-pull makes it stale)
+    field          TEXT NOT NULL,             -- relation | raw_type | purpose | purpose_fine | actor
+    actor_label    TEXT NOT NULL DEFAULT '',  -- field = actor only ('' otherwise)
+    proposed       JSONB NOT NULL,            -- value; actor: {position, holds, inferred, act}
+    rule_ids       TEXT[] NOT NULL,           -- catalogue IDs, e.g. {REL-01,HOLD-05}; '{NEW}' = no rule fits
+    reason         TEXT NOT NULL,             -- one sentence linking the rule to this text
+    evidence       JSONB,                     -- {tier: value} for regex, cls, slm, gemini, mini, referee, adjudicated
+    agree          BOOLEAN,                   -- every model/referee label that exists agrees (NULL: none); pipeline shown, not counted
+    difficulty     TEXT NOT NULL,             -- easy | hard | new_edge
+    catalogue_ver  TEXT NOT NULL,             -- git hash of DRRP-RULE-CATALOGUE.md used
+    decision       TEXT,                      -- approve | change | query (NULL = not reviewed)
+    decided        JSONB,                     -- the corrected value when decision = change
+    comment        TEXT,
+    decided_at     TIMESTAMPTZ,
+    created_at     TIMESTAMPTZ DEFAULT now(),
+    PRIMARY KEY (gold_version, section_id, field, actor_label)
+);
