@@ -238,3 +238,25 @@ One row per (provision, scheme field), so the table reads naturally:
 - Phase 0b: the purpose vocabulary decision. **Gold purpose labels wait for the purpose refactor** (Jason, 2026-10-06)
 - Section titles (P1group/Title) would make provision titles show in the review table; cross-headings and Part titles are available now
 - Labels and evidence already in hand: Gemini v1.3 on 6,959 (incl. 741 test-split), refereed batches 1–2, `holder60_cases`, the 50 hand-checked rows
+
+## Batch 1 (2026-10-06)
+
+**Before the run:** imported the page decisions (225 approved, 12 changed). Jason's changes carried new rulings, folded into the spec, catalogue and brief (`2e18535`, `450e344`):
+- HOLD-17: the engagers are the employer **and** the self-employed person (EAW reg.16); the employee isn't listed;
+- POS-17: the stem's beneficiary is listed on each `continues` item (read from an uncommented change on Art.6(2)(c); to be confirmed);
+- LBL-14: hazards (biological agents, substances) aren't actors;
+- purpose: "the application of" a power is Application, not Interpretation (Companies Act 1989 s.112(2)(b)); "S is the regulator from <date>" is Application, not Constitution.
+
+**Run:** two Opus agents (48 + 47). 95 provisions, 434 rows. Relation: 32 yes, 23 no, 40 continues (batch 1b: 17/9/21; 1a: 15/14/19). Hard: relation 13, purpose 22, actor 41; new_edge 1. On the page (195 docs). Open now: 359 easy, 79 hard, 1 new_edge.
+
+**Rule questions raised:**
+1. Compensation (a duty to compensate for lawful acts) maps to Offences and penalties via Liability: it isn't a sanction.
+2. No purpose class for parliamentary procedure (annulment clauses).
+3. Stem actors other than the holder on `continues` items: list them or not (the pilot left them off)?
+4. The act on a `continues` row of a notice served under a power ("the notice must specify").
+5. A fee amount ("the fee shall be £32"): continues the payment duty?
+6. REL-15 vs REL-28 for "unless—" / "if—" condition items under a prohibition.
+7. The continued relation's holder named in the row's own text ("The Executive shall not grant"): leave it off?
+8. Item picking the holder case by case (s.44(6)(c), new_edge).
+9. Non-binding "should" in directives: no duty, but can set content.
+10. Dictionary gaps: CAA, Registrar General.
