@@ -306,6 +306,7 @@ def main() -> None:
     ap.add_argument("--model", choices=["gemini", "openai"], default="gemini",
                     help="gemini (gemini-3.8-flash) or openai (gpt-5.5:low; prompt caching is automatic)")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--max-cost", type=float, default=0, help="stop once the run's actual spend (USD) reaches this (0: no cap)")
     ap.add_argument("--model-name", help="override the provider's model, e.g. gpt-5.4-mini:low")
     ap.add_argument("--ids", help="file of section_ids to label (one per line), within the sample")
     ap.add_argument("--carry-from", help="carry labels from this prompt version unless a v1.2 rule could change them")
@@ -412,6 +413,7 @@ def main() -> None:
             return job, None, str(e)[:500]
 
     ok = err = skipped = 0
+    spent = 0.0
     try:
         with ThreadPoolExecutor(args.workers) as pool, psycopg.connect(PG) as conn:
             for fut in as_completed([pool.submit(run, j) for j in jobs]):
@@ -429,6 +431,12 @@ def main() -> None:
                      json.dumps(resp) if resp else None, error, json.dumps(usage) if usage else None))
                 conn.commit()
                 ok, err = ok + (error is None), err + (error is not None)
+                if usage:
+                    p_, c_, o_, _ = usage_tokens(usage)
+                    spent += ((p_ - c_) * price["input"] + c_ * price["cached"] + o_ * price["output"]) / 1e6
+                if args.max_cost and spent >= args.max_cost and not stop.is_set():
+                    stop.set()
+                    print(f"  STOP: cost cap ${args.max_cost:.2f} reached (spent ${spent:.2f}); re-run to continue", flush=True)
                 if error and ("insufficient_quota" in error or "no credits remaining" in error) and not stop.is_set():
                     stop.set()  # a billing failure won't clear by retrying: stop now
                     print(f"  STOP: the API account is out of credit ({error[:120]}…). Top up and re-run; failed rows are retried.", flush=True)
@@ -444,7 +452,7 @@ def main() -> None:
     finally:
         if cache:
             delete_cache(cache)
-    print(f"done: {ok} labelled, {err} errors, {skipped} skipped by the gate")
+    print(f"done: {ok} labelled, {err} errors, {skipped} skipped (gate/cap/billing); this run spent ${spent:.2f}")
     with psycopg.connect(PG) as conn:
         report(conn, model, ids, entries, price)
     if stop.is_set():
