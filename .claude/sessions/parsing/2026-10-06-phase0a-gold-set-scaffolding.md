@@ -27,8 +27,8 @@ Getting the scaffolding right makes the final task easier.
 - ✅ (`docs/architecture/DRRP-RULE-CATALOGUE.md`, edbb86b: 114 rules, conflicts C1–C13, gaps G1–G3; ⬜ Jason's rulings on C2, C4, C7, C9, C10, G1–G3) **Rule catalogue:** every rule with a stable ID, grouped by scheme, from DRRP-CLASSIFICATION.md (layers 1–5 and special cases), PURPOSE-CLASSIFICATION.md and `drrp_prompt.py`. One line each plus an example. Rules that only exist in prompt wording become catalogue entries. Purpose rules wait for phase 0b
 - ✅ (`drrp_gold` in `scripts/pg_schema.sql`, created; loader `scripts/benchmarks/gold_v3/load.py`) **Gold record schema** (below): per provision, per scheme label, rule IDs, reason, evidence, difficulty, Jason's decision
 - ✅ (`scripts/benchmarks/gold_v3/select_gold.py` → `data/gold/v3/selection.csv`; below) **Selection of 1,000:** only from laws held out of SLM training (the 61 test-split laws, 741 already labelled, plus further held-out laws). Stratified across schemes, with rare classes over-sampled (Liberty, beneficiary, applying-provision holders, passive duties, counterparty acts, each purpose)
-- ⬜ (brief `scripts/benchmarks/gold_v3/JUSTIFY_GOLD.md`; evidence pack `evidence.py`; **pilot of 50 running**) **Auto-justification:** a Claude agent (referee-style, no paid API) assigns each label its rule IDs and reason, using the catalogue and the tier evidence. It grades difficulty: **easy** (tiers agree and a rule clearly applies), **hard** (tiers disagree or rules conflict), **new edge** (no rule fits, so a candidate rule)
-- ⬜ **Review table** for Jason: **an interactive page** (Jason, 2026-10-06, "if easy enough to spin up"): easy rows first in bulk, then the hard core
+- ⬜ (brief `scripts/benchmarks/gold_v3/JUSTIFY_GOLD.md`; evidence pack `evidence.py`; pilot of 50 done, loaded; below) **Auto-justification:** a Claude agent (referee-style, no paid API) assigns each label its rule IDs and reason, using the catalogue and the tier evidence. It grades difficulty: **easy** (tiers agree and a rule clearly applies), **hard** (tiers disagree or rules conflict), **new edge** (no rule fits, so a candidate rule)
+- ✅ (https://claude.ai/artifact/PkoqADCn2TXvSAEkPaTE6w; `review_page.html`, `review_export.py`, `review_import.py`) **Review table** for Jason: **an interactive page** (Jason, 2026-10-06, "if easy enough to spin up"): easy rows first in bulk, then the hard core
 - ⬜ **Jason's review;** hard and new-edge rows → rulings → catalogue updates → re-justify the affected rows
 - ⬜ The gold set is frozen (versioned) and becomes the yardstick for phase 1 and the release QA; it replaces the gold v2 plan's role
 
@@ -76,6 +76,42 @@ Flags across the 1,000:
 - Jason's decision (approve / change / query).
 
 Actors that a model listed but the justifier left out get their own row for review. Decided rows are never overwritten.
+
+## Pilot: 50 provisions justified (2026-10-06)
+
+Opus justifier, brief `JUSTIFY_GOLD.md`, no paid API. Output `data/gold/v3/justified/pilot.jsonl`. **271 gold rows**, including 8 actors that a model listed and the justifier dropped.
+
+| Field | Easy | Hard | New edge |
+|---|---|---|---|
+| relation | 37 | 13 | 0 |
+| raw_type | 44 | 6 | 0 |
+| purpose | 33 | 17 | 0 |
+| purpose_fine | 14 | 10 | 0 |
+| actor | 68 | 27 | 2 |
+
+**Agreement** with Gemini and the referee: 162 agree, 14 disagree, 95 have no label. Every easy row agrees where labels exist.
+- Agreement counts Gemini and the referee only. GPT-mini and GPT-5.5 are too noisy (mini put `act: other` on active actors), so they're shown but not counted.
+
+**Edge candidates:**
+- One active actor holding a Liberty and an Obligation in one provision (G1/#78; TCP inquiry rules reg.18(10));
+- `OTHER: Registry administrator`, a dictionary gap (the government registry administrator; `Spc: Administrator` is governed).
+
+**Where the catalogue was hard to apply** (to rule on with Jason):
+- list items, completing vs criterion (REL-31/32 vs REL-15; 6 rows), incl. "unless (a) it has been thoroughly examined" conditions under a prohibition;
+- REL-16 making a substantive content list relation `no` ("The measures required by paragraph (1) shall consist of—", PUWER reg.11(2));
+- transitional power vs time-limited disapplication (REL-38 vs REL-08);
+- a saved duty (REL-20 vs REL-38);
+- Powers vs Enforcement when a regulator has a notice or information power;
+- conditions on a power mapping to Duties;
+- two acts in one duty ("allow time off and provide means");
+- listing stem actors on relation-`no` items.
+
+**Evidence gaps the pilot found:**
+- defined terms ("the Authority", "the Agency") aren't in the context;
+- some referenced provisions are missing, and some applying/referenced provisions are wrong (Energy Information reg.4(2) is an exemption);
+- garbled formula text (UK_uksi_2020_1265 reg.13(2));
+- an empty law title (UK_ukpga_2015_6);
+- cue false positives: "revoked", the "FINAL PROVISIONS" heading, "shall consist of".
 
 ## Classification scheme inventory (2026-10-06)
 
