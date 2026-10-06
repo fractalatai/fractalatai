@@ -25,7 +25,7 @@ import psycopg2
 
 ROOT = "/var/home/jason/fractalaw"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from coarse_purpose import classify  # noqa: E402
+from coarse_purpose import classify, coarse  # noqa: E402
 
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 FUNCTIONS = re.compile(r"\b(?:shall have the following functions|the functions of [^.]{1,60} (?:shall be|are)\s*[—–-])", re.I)
@@ -104,12 +104,12 @@ def main() -> None:
         w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
         w.writeheader()
         for sid in sorted(chosen):
-            w.writerow({**pool[sid], "part": chosen[sid], "coarse_purpose_cue": purpose[sid][0], "cue_how": purpose[sid][1]})
+            w.writerow({**pool[sid], "part": chosen[sid], "coarse_purpose_cue": coarse(purpose[sid][0]), "cue_how": purpose[sid][1]})
 
     print(f"gold v3 selection: {len(chosen):,} provisions in {len({pool[s]['law_name'] for s in chosen})} laws → {args.out}")
     for k, v in sorted(collections.Counter(chosen.values()).items()):
         print(f"  {k:36s}{v:5d}")
-    print("  coarse purpose (cue):", dict(collections.Counter(purpose[s][0] for s in chosen).most_common()))
+    print("  coarse purpose (cue):", dict(collections.Counter(coarse(purpose[s][0]) for s in chosen).most_common()))
     print("  strata:", dict(collections.Counter(pool[s]["stratum"] for s in chosen).most_common()))
     print(f"  flags: lib {sum(pool[s]['f_lib'] == '1' for s in chosen)}, ben {sum(pool[s]['f_ben'] == '1' for s in chosen)}, "
           f"cp {sum(pool[s]['f_cp'] == '1' for s in chosen)}, app {sum(pool[s]['f_app'] == '1' for s in chosen)}, "

@@ -23,21 +23,30 @@ from drrp_prompt import ancestors  # noqa: E402
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 
 CLASSES = [
-    "Citation and commencement", "Interpretation", "Application and exemption", "Requirements", "Permissions",
+    "Citation and commencement", "Interpretation", "Application, exemption and transition", "Requirements", "Permissions",
     "Enforcement", "Offences and penalties", "Appeals and defences", "Fees and charges",
-    "Amendment and revocation", "Transitional and saving", "Constitution",
+    "Amendment and revocation", "Constitution",
 ]
+# cue labels finer than the coarse classes (Transitional merged into Application, 2026-10-06); the cue keeps the
+# finer label so the gold selection's targets stay reproducible
+COARSE_OF = {"Application and exemption": "Application, exemption and transition",
+             "Transitional and saving": "Application, exemption and transition"}
+
+
+def coarse(label: str) -> str:
+    return COARSE_OF.get(label, label)
+
 
 # the 18 published values -> coarse class
 FROM_18 = {
     "Enactment+Citation+Commencement": "Citation and commencement", "Extent": "Citation and commencement",
     "Interpretation+Definition": "Interpretation",
-    "Application+Scope": "Application and exemption", "Exemption": "Application and exemption",
+    "Application+Scope": "Application, exemption and transition", "Exemption": "Application, exemption and transition",
     "Requirement": "Requirements", "Procedure+Detail": "Requirements", "Power Conferred": "Permissions",
     "Enforcement+Prosecution": "Enforcement", "Offence": "Offences and penalties", "Liability": "Offences and penalties",
     "Defence+Appeal": "Appeals and defences", "Charge+Fee": "Fees and charges",
     "Amendment": "Amendment and revocation", "Repeal+Revocation": "Amendment and revocation",
-    "Transitional Arrangement": "Transitional and saving", "Establishment+Constitution": "Constitution",
+    "Transitional Arrangement": "Application, exemption and transition", "Establishment+Constitution": "Constitution",
 }
 
 # ordered: first match wins, so specific classes come before Requirements/Permissions
@@ -100,6 +109,7 @@ def main() -> None:
     wrong = collections.defaultdict(collections.Counter)
     for sid, g in gold.items():
         k, how = classify(sid, texts, not args.no_inherit)
+        k = coarse(k)
         how_n[how] += 1
         n_gold[g] += 1
         pred[k] += 1

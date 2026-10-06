@@ -36,6 +36,10 @@ COUNTED = ("gemini", "referee")
 FINE = {"Requirement": "Substantive", "Procedure+Detail": "Procedure/Detail"}
 # purpose names the justifier pilot used before the 2026-10-06 rename
 RENAME = {"Duties": "Requirements", "Powers": "Permissions", "Requirement": "Substantive",
+          "Application and exemption": "Application, exemption and transition",
+          "Transitional and saving": "Application, exemption and transition",
+          "P:Application and exemption": "P:Application, exemption and transition",
+          "P:Transitional and saving": "P:Application, exemption and transition",
           "P:Duties": "P:Requirements", "P:Powers": "P:Permissions", "P:Duties-fine": "P:Requirements-fine"}
 
 

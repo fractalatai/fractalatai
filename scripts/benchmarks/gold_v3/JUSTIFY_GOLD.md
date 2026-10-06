@@ -18,7 +18,7 @@ The evidence is **evidence, not truth**. The models followed an older prompt (`d
 
 1. `docs/architecture/DRRP-RULE-CATALOGUE.md`: **read it first.** Every relation/actor field cites its IDs (e.g. `REL-01`, `HOLD-05`, `POS-06`, `ACT-03`). Retired (struck-through) rules are not cited.
 2. `docs/architecture/DRRP-CLASSIFICATION.md` (the spec), including the 2026-10-06 rulings. Where the catalogue and the spec differ, the spec wins; say so in the reason.
-3. `docs/architecture/PURPOSE-CLASSIFICATION.md` § "Layered purpose": the **12 coarse classes**.
+3. `docs/architecture/PURPOSE-CLASSIFICATION.md` § "Layered purpose": the **11 coarse classes**.
 4. Actor labels only from `crates/fractalaw-core/data/actor-dictionary.yaml`, or `OTHER: <description>` if none fits (that's a `new_edge`).
 
 **Where the spec now differs from the v1.3 prompt the models used** (follow the spec, and expect the evidence to disagree):
@@ -32,6 +32,9 @@ The evidence is **evidence, not truth**. The models followed an older prompt (`d
 - **"No person shall be engaged/employed/permitted"** (HOLD-17): the engager holds it, from the applying provision (`inferred: true`); the person engaged is `mentioned`.
 - **Participation** (TYPE-07): "shall take part in … or shall be consulted" is a Liberty for the participants.
 - **Purpose:** Requirements is for provisions about obligations. A condition on an exemption, or on how a power applies, is Application and exemption. Choose one class (the dominant one).
+- **Conditions on a power continue it** (REL-14 → `continues`, 2026-10-06): "shall not grant … unless satisfied", "a notice may not be given—".
+- **Access duties** (POS-18): on a `continues` row of an access duty, the party given access is `counterparty`, act `give_access`.
+- **Purpose:** Transitional is merged into **Application, exemption and transition** (11 classes).
 - **Cross-instrument holders** (HOLD-14): the holder comes from the parent Act when you can resolve it from the text given. Otherwise it is holder unknown.
 
 ## Fields to propose (per provision)
@@ -40,7 +43,7 @@ The evidence is **evidence, not truth**. The models followed an older prompt (`d
 |---|---|---|
 | `relation` | `"yes"` / `"no"` / `"continues"` (an item completing its stem's relation, REL-28) | REL-* |
 | `raw_type` | `"Obligation"` / `"Liberty"` / `null`; set only when relation is yes and no actor is active | HOLD-15, DEF-02, TYPE-* |
-| `purpose` | one of the 12 coarse classes, exactly as written in PURPOSE-CLASSIFICATION.md | `P:<class>` plus the deciding cue, e.g. `P:Interpretation` |
+| `purpose` | one of the 11 coarse classes, exactly as written in PURPOSE-CLASSIFICATION.md | `P:<class>` plus the deciding cue, e.g. `P:Interpretation` |
 | `actor` (one per label) | `{"position", "holds", "inferred", "act"}` | POS-*, HOLD-*, TYPE-*, INF-*, ACT-*, LBL-* |
 
 Purpose detail (Substantive vs Procedure/Detail under Requirements) is **not** proposed: it is derived from purpose plus relation when the gold set is frozen (Jason, 2026-10-06). Purpose is always proposed, including for relation `no` rows. There are no purpose rule IDs yet (the purpose catalogue comes with phase 2), so cite `P:<class>` and quote the deciding words in the reason.

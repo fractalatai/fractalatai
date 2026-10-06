@@ -22,6 +22,7 @@ import psycopg2
 from psycopg2.extras import Json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from load import RENAME  # noqa: E402
 from review_export import row_key  # noqa: E402
 
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
@@ -53,6 +54,10 @@ def main() -> None:
             if not d:
                 cleared.append(by_key[key])
             elif d.get("decision") in VALID:
+                decided = d.get("decided")
+                if isinstance(decided, str):
+                    decided = RENAME.get(decided, decided)  # purpose names decided before a rename
+                d["decided"] = decided
                 updates.append((d["decision"], Json(d.get("decided")) if d["decision"] == "change" else None,
                                 d.get("comment") or None, d.get("at"), *by_key[key]))
     c = collections.Counter(u[0] for u in updates)
