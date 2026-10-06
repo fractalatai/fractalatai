@@ -201,8 +201,31 @@ def v13_affected(ctx: str, text: str, resp: dict) -> str | None:
     return None
 
 
+# Rules added in drrp-v1.4 (Jason, 2026-10-06: rulings 1-15 from the batch 1-2 referee rounds)
+_V14 = [
+    ("exemption power / conditions", re.compile(r"\bmay\b[^.;]{0,80}\bexempt|certificate of exemption|shall not (?:grant|consent|issue|approve)[^.;]{0,80}\bunless", re.I)),
+    ("governed functions", re.compile(r"shall have the following functions|functions of (?:a|the) (?:safety )?representative", re.I)),
+    ("content list / detail", re.compile(r"referred to in (?:paragraph|regulation|section)|\b(?:notice|report|register|assessment|record|statement)\b[^.;]{0,80}\b(?:must|shall)\b[^.;]{0,40}[—–:]\s*$", re.I)),
+    ("timing / discharge", re.compile(r"at suitable intervals|within \d+ (?:days|weeks|months)|comply with (?:his|its|their|the) duty under", re.I)),
+    ("withheld conduct", re.compile(r"\bdoes? not (?:eat|drink|smoke|enter|remain)|shall not be permitted to (?:remain|enter|work)", re.I)),
+    ("savings / deeming", re.compile(r"continues? to have effect|shall continue in force|has effect as a delivery|treated as (?:delivered|served)", re.I)),
+    ("designation / Gazette", re.compile(r"as may be designated by|notified in the (?:London |Edinburgh |Belfast )?Gazette", re.I)),
+    ("means at disposal", re.compile(r"means at (?:his|their|its) disposal", re.I)),
+]
+
+
+def v14_affected(ctx: str, text: str, resp: dict) -> str | None:
+    for name, rx in _V14:
+        if rx.search(ctx if name != "content list / detail" else text):
+            return name
+    if re.search(r"\bappeal|review of (?:the|a|that) decision", ctx, re.I) and resp.get("purpose") != "Defence+Appeal":
+        return "appeals"
+    return None
+
+
 # The rules a label must be checked against when carried forward INTO each prompt version
-RULESETS = {"drrp-v1.2-2026-10-05": v12_affected, "drrp-v1.3-2026-10-05": v13_affected}
+RULESETS = {"drrp-v1.2-2026-10-05": v12_affected, "drrp-v1.3-2026-10-05": v13_affected,
+            "drrp-v1.4-2026-10-06": v14_affected}
 
 
 def carry_forward(conn, model: str, carry_from: str, rows: list[dict], texts: dict[str, str]) -> collections.Counter:
