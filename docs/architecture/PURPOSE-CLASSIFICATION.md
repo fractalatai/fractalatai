@@ -9,13 +9,13 @@
 
 Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds a finer, more complex one only when needed. The class names are the terms legislation itself uses in its headings, not invented categories.
 
-**Coarse layer: 12 classes.** Class names avoid the DRRP vocabulary (Obligation, Liberty, Duty, Right, Responsibility, Power): `Duties` → **Requirements** and `Powers` → **Permissions** (Jason, 2026-10-06), and the fine split is **Substantive** vs Procedure/Detail.
+**Coarse layer: 11 classes.** Class names avoid the DRRP vocabulary (Obligation, Liberty, Duty, Right, Responsibility, Power): `Duties` → **Requirements** and `Powers` → **Permissions** (Jason, 2026-10-06), and the fine split is **Substantive** vs Procedure/Detail.
 
 | Class | Replaces (of the 18) |
 |---|---|
 | Citation and commencement | Enactment+Citation+Commencement, Extent |
 | Interpretation | Interpretation+Definition |
-| Application and exemption | Application+Scope, Exemption |
+| Application, exemption and transition | Application+Scope, Exemption, Transitional Arrangement |
 | Requirements | Requirement, Procedure+Detail |
 | Permissions | Power Conferred |
 | Enforcement | Enforcement+Prosecution (its own class, not split under Permissions: compliance users look for it directly) |
@@ -23,11 +23,11 @@ Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds 
 | Appeals and defences | Defence+Appeal |
 | Fees and charges | Charge+Fee |
 | Amendment and revocation | Amendment, Repeal+Revocation |
-| Transitional and saving | Transitional Arrangement |
 | Constitution | Establishment+Constitution ("there shall be a body called X" is neither a duty nor a power) |
 
 **Class rules from the gold review** (Jason, 2026-10-06):
 - **Requirements** is for provisions about obligations. A condition on an exemption, or on how a power applies ("shall not grant any such exemption unless satisfied", "application of the exercise of a power"), is **Application and exemption**.
+- **Transitional is merged into Application** (Jason, 2026-10-06): transition is application in time, as scope is application to persons, things and places. So the coarse class is **Application, exemption and transition**, with a detail level **Scope / Exemption / Transitional and saving**. The detail is filled only when a consumer needs it, and isn't labelled in the gold set.
 - Purpose stays **single-select**: one class per provision, the dominant one. That's more useful as a data model than multi-select, even where a provision mixes application and transition.
 
 **How the coarse layer decides:**
