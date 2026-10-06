@@ -37,7 +37,8 @@ Getting the scaffolding right makes the final task easier.
 **Rulings that shape the gold set** (Jason, 2026-10-06):
 - the spec, not the v1.3 prompt, is the gold standard: functions lists, applying-provision pointer, `serve` → `notify`, #67 without a named holder, parent-Act holders;
 - **one entry per label stays** (POS-15). The second role is dropped and noted in the reason; #78 tracks the loss;
-- purpose is labelled with the **12 coarse classes**, plus `purpose_fine` (Requirement vs Procedure/Detail) under Duties.
+- purpose is labelled with the **12 coarse classes** (Duties/Powers renamed Requirements/Permissions);
+- **purpose detail is derived, not reviewed** (Jason, 2026-10-06). Substantive vs Procedure/Detail = Requirements + "creates an obligation or liberty?" yes/no. In the pilot the two matched on all 24 rows. It's hidden from the page and dropped from the justifier brief.
 
 **Pool:** `sample_drrp_training.py --pool test` writes every provision of the 61 test-split laws: 11,733 provisions, no training overlap. Same universe as the sample, so no Schedules (a known limit). The #77 finder found **0** cross-instrument candidates in these laws, so that pass isn't a prerequisite here.
 
