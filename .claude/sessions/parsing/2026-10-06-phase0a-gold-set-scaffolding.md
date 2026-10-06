@@ -260,3 +260,17 @@ One row per (provision, scheme field), so the table reads naturally:
 8. Item picking the holder case by case (s.44(6)(c), new_edge).
 9. Non-binding "should" in directives: no duty, but can set content.
 10. Dictionary gaps: CAA, Registrar General.
+
+**Batch 1 review (Jason, 2026-10-06):** complete. Over all 145 provisions: 651 approved, 18 changed, 7 queried; the 5 open pilot rows are closed. Rulings (`6780ecb`, brief `b4256d4`, dictionary `6ab9003`):
+- POS-17: a `continues` item lists **only actors named in its own text** (supersedes the morning's "stem beneficiary on items"; Art.6(2)(c)'s Worker change predates it);
+- REL-45: a stem extending another provision's power ("Regulations under subsection (1) may—") continues it;
+- REL-46: a permitted way of discharging a duty is its own Liberty (AWR reg.13(4): relation set to yes on the page and in Postgres);
+- purpose: annulment clauses are Requirements; class-definition items and conditions on a power stay Application (Jason undid his reg.70(2)(db) and reg.44A(8)(a) changes);
+- LBL-03: a body named only in a deeming clause is mentioned;
+- dictionary: `Gvt: Agency: Civil Aviation Authority`, `Gvt: Registrar General`.
+
+Still `query` (7): s.60(2)(b) relation; reg.4(7)(b) purpose; reg.46(3)(g)(i) Person and SEPA; s.65(1) and s.83(6) labels (now in the dictionary); reg.7(1)(a) Officer.
+
+## Batch 2 (2026-10-06)
+
+Two Opus agents (48 + 47), brief at `b4256d4`, with Postgres precedent.
