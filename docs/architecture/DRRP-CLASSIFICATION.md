@@ -74,16 +74,30 @@ There is **no `Rule` type** (removed 2026-09-30). Every "shall"/"must" that requ
   - Otherwise there is one pair per active holder, so a counterparty to a government Power and a governed Right gets both `liability` and `no_right`.
   - An actor with no correlative sends `[]`, never NULL.
 - **The act (#75, Jason 2026-10-01).** Each counterparty's correlative can carry what it's owed, from a fixed list:
-  - `notify`: told of an event or decision (RIDDOR reg.4, the enforcing authority);
+  - `notify`: told of an event or decision, including being served with a notice (RIDDOR reg.4, the enforcing authority). `serve` was folded into `notify` (Jason, 2026-10-06);
   - `supply`: given information, a copy or a thing (MHSWR reg.10, employees);
   - `consult`: consulted (safety representatives);
   - `pay`: paid;
-  - `give_access`: given access or inspection (EPA s.20(7), the public);
-  - `serve`: served with a notice;
+  - `give_access`: given access or inspection ("the register shall be available for inspection by the operator");
   - `charge`: a charge levied on, or withheld from, the party (HSWA s.9);
   - `answer_request`: the duty answers its request;
   - `other`.
   - Item shape: `{type, to, act}`; `act` absent means unknown.
+  - **Only an Obligation's counterparty carries an act** (Jason, 2026-10-06). A right doesn't: it mirrors the duty's act. Under the #67 access rule the governed party gets two entries (layer 2, one per role): counterparty of the access duty with act `give_access`, and active holder of the inferred Liberty.
+  - **Synonym mapping** (Jason, 2026-10-06): the text's verb maps onto the fixed classes; new verbs never create new classes. The duty's main verb decides ("serve a notice on X informing it" → `notify`).
+
+    | Act | Verbs in the text |
+    |---|---|
+    | `notify` | notify, inform, give notice, serve (a notice), report to, warn, advise |
+    | `supply` | supply, provide, furnish, send, deliver, issue (a certificate), give a copy |
+    | `consult` | consult, seek the views of, invite representations |
+    | `pay` | pay, compensate, reimburse, refund |
+    | `give_access` | permit to inspect, afford access, make available for inspection, allow copies to be taken |
+    | `charge` | charge, levy, impose a fee ("shall not charge" too) |
+    | `answer_request` | respond to, reply to, determine an application |
+    | `other` | anything else, incl. withheld conduct |
+
+    The table becomes a data file for the regex act tier (#75, phase 2). Stored labels with `serve` (126) are read as `notify`; the raw rows are not rewritten.
   - **A passive duty's counterparty also gets an act** (Jason, 2026-10-05): "notice shall be given to the operator" → operator counterparty, act `notify`, even though the holder is unknown. The recipient receives the act either way.
   - **Labelled now:** the definitive prompt labels `act` on each counterparty. Regex derives it for new laws from the clause verb, measured against those labels. It isn't an SLM target.
   - **Published later:** once compliance and legal agree it on #75. It never feeds DRRP or the verdict.
@@ -188,12 +202,12 @@ Law-level holder fields (`duty_holder`, `rights_holder`, `responsibility_holder`
 | **Trigger-condition actors** (Jason, 2026-10-05) | A party named only in a condition or trigger ("having regard to the risks to end-users", "where the vessel presents a risk to persons") is `mentioned`, not a beneficiary. A beneficiary needs the duty's own protective purpose. |
 | **Commencement powers** (Jason, 2026-10-05) | "On such day as X may by order appoint": X holds a Liberty (relation `yes`), purpose `Enactment+Citation+Commencement`. Relation `yes` despite being machinery, like transitional powers. |
 | **Laying before Parliament or an Assembly** (Jason, 2026-10-05) | A duty to lay a report, direction or copy before Parliament or an Assembly is relation `yes`: a government Obligation. "Parliamentary procedure" (relation `none`) means only annulment/affirmation clauses ("subject to annulment…", "may not be made unless a draft has been laid and approved"). |
-| **Enforcing-authority designations and functions lists** (Jason, 2026-10-05) | "X shall be (responsible as) the enforcing authority" and "functions" lists that impose no duty in their own text are relation `none`, purpose `Establishment+Constitution`. |
+| **Enforcing-authority designations** (Jason, 2026-10-05) | "X shall be (responsible as) the enforcing authority" is relation `none`, purpose `Establishment+Constitution`. (Functions lists moved to the row below on 2026-10-06.) |
 | **Class-definition items** (Jason, 2026-10-05) | An item that only defines which class of persons or things a duty covers is relation `none`, under any duty, not only in content lists. The relation stays on the provision above. |
 | **Time-limited disapplications** (Jason, 2026-10-05) | Purpose `Exemption` (machinery order: Exemption before Transitional Arrangement). |
 | **Money provided by Parliament** (Jason, 2026-10-05) | "There shall be paid out of money provided by Parliament…" is an authority to spend: relation `none`, purpose `Charge+Fee`. |
 | **One actor, two roles; two persons, one label** (Jason, 2026-10-06; replaces the 2026-10-05 "strongest role" rule) | Label every role, with no winner. One actor with two roles in a provision (e.g. receives a notification **and** may shorten the period; holds an Obligation **and** a Liberty) gets an entry per role. Two different persons under one label ("an employer shall notify another employer") each get an entry: the first Employer `active`/Obligation, the other Employer `counterparty`, act `notify`. **Data-model change:** an actor entry is keyed by (label, role), not label alone, so `provision_actors` (PK `section_id, actor_label`), the prompt's output and the `actors[]` payload all change. It goes into the single run's build (build then run once). |
-| **Functions lists of a governed party** (Jason, 2026-10-06) | A governed party's listed functions ("safety representatives shall have the following functions—") are relation `yes`, a Liberty (Right), purpose `Power Conferred`. The Establishment rule covers only bodies' functions. |
+| **Functions lists** (Jason, 2026-10-06; replaces the 2026-10-05 "functions lists are `none`" rule) | A list of functions conferred on a party is relation `yes`. **What the party holds follows its holder class (layer 3):** a **government** body's functions are its responsibilities, so an Obligation ("The functions of the CAA shall be—", "OFCOM shall have the following functions—"). A **governed** party's functions are rights, so a Liberty ("Each safety representative shall have the following functions— … but no function … shall be construed as imposing a duty on him"; a safety committee's functions). Provisions that only *mention* functions ("references to the functions of the MMO are to…", "the functions of the Authority are performed on behalf of the Crown") are not functions lists: relation `none`. Purpose waits for the purpose refactor. |
 | **Content list vs detail** (Jason, 2026-10-06) | "The notice/report/register … must— (a)…": a content list (relation `yes`) if it completes a duty created in the same provision; detail (relation `none`, Procedure+Detail) if it details something required elsewhere ("the notice referred to in paragraph (1) must contain"), including enforcement notices. |
 | **Timing items** (Jason, 2026-10-06) | "At suitable intervals", "within 8 weeks": detail, relation `none`, Procedure+Detail. |
 | **Appeal and inquiry procedure** (Jason, 2026-10-06) | Purpose `Defence+Appeal` when the provision concerns an appeal or review of a decision; relation `yes` only where it creates its own duty or power. |
