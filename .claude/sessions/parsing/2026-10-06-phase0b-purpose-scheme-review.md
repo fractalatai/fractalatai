@@ -24,6 +24,7 @@ The 18-value purpose scheme is a legacy of Jason's Airtable work. It's involved 
   - **coarse:** cheap cues (text, headings, titles when available) to a small set of statutory-term classes, high precision, else "undetermined" → escalate;
   - **fine:** classifier/SLM/LLM refines within the coarse class, only where a consumer needs it
 - ✅ (Jason, 2026-10-06) Choose: 12 coarse classes in statutory terms; Enforcement its own class; Constitution kept
+- ✅ (Jason, 2026-10-06) Rename to keep purpose clear of the DRRP vocabulary: Duties → **Requirements**, Powers → **Permissions**; fine split **Substantive** vs Procedure/Detail
 - ⬜ Coarse layer build (phase 2): stem inheritance, enforcement cues, section titles when served; re-measure
 - ⬜ Fine layer: Duties → Requirement vs Procedure/Detail (feeds the DRRP gate); others only on consumer need
 - ⬜ Published-field migration with legal (legal-side refactoring list); retire legal's law-level classifier (#172)
