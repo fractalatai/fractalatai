@@ -45,6 +45,10 @@ The evidence is **evidence, not truth**. The models followed an older prompt (`d
 - **New dictionary labels:** `Gvt: Agency: Civil Aviation Authority`, `Gvt: Registrar General`.
 - **Hazards aren't actors** (LBL-14, 10-06): biological agents, substances and micro-organisms are never listed.
 - **Purpose, 10-06:** Interpretation is for meanings only; "the application of" a power or rule is Application. "S is the regulator of B from <date>" is Application (transition), not Constitution. Detail of where or how a register is kept `continues` the keeping duty (REL-28).
+- **Purpose `inherit`: the escape rule** (Jason, 2026-10-06, batch 2). Purpose was being forced onto snippets; laws give purpose to whole sections. So a provision takes its **own** purpose only when its own words carry one: it creates or confers something, defines a term, applies or disapplies the law, sets an offence, penalty, fee, appeal, amendment or citation. A snippet that only makes sense with the provision above it takes **`inherit`**: its purpose is that of the nearest ancestor (stem, then subsection, then section). Snippets include list items completing a stem, conditions and provisos ("if the person under restraint agrees…"), criterion items, and fragments that set the detail of a duty in the same section. Prefer `inherit` to forcing a class onto a snippet. A provision with no ancestor never inherits. Propose `"inherit"` with rule id `P:inherit`; the reason names the ancestor whose purpose it takes. Grade it easy when the provision is plainly a snippet.
+- **Purpose, batch 2:** who/when/what/where is Application; a procedural condition on exercising a power is Requirements (SSI 2018/219 reg.27(6)); a condition on an exemption or on whom a power reaches stays Application. A power to authorise others to act for a body is Permissions. "An offence will not be committed … provided that" is Offences and penalties.
+- **Item with its own laying duty** (REL-35, batch 2): "if prepared by the Secretary of State, be laid before Parliament" is `yes`, Secretary of State active Obligation. An item that only selects who holds the stem's duty leaves that party `mentioned`.
+- **Duties for existing cases** (batch 2): list the holder as active even when the arrangements are defined in another paragraph (reg.18(5) well-operator).
 - **Cross-instrument holders** (HOLD-14): the holder comes from the parent Act when you can resolve it from the text given. Otherwise it is holder unknown.
 
 ## Fields to propose (per provision)
@@ -53,7 +57,7 @@ The evidence is **evidence, not truth**. The models followed an older prompt (`d
 |---|---|---|
 | `relation` | `"yes"` / `"no"` / `"continues"` (an item completing its stem's relation, REL-28) | REL-* |
 | `raw_type` | `"Obligation"` / `"Liberty"` / `null`; set only when relation is yes and no actor is active | HOLD-15, DEF-02, TYPE-* |
-| `purpose` | one of the 11 coarse classes, exactly as written in PURPOSE-CLASSIFICATION.md | `P:<class>` plus the deciding cue, e.g. `P:Interpretation` |
+| `purpose` | one of the 11 coarse classes, exactly as written in PURPOSE-CLASSIFICATION.md, or `"inherit"` for a snippet (escape rule) | `P:<class>` plus the deciding cue, e.g. `P:Interpretation` |
 | `actor` (one per label) | `{"position", "holds", "inferred", "act"}` | POS-*, HOLD-*, TYPE-*, INF-*, ACT-*, LBL-* |
 
 Purpose detail (Substantive vs Procedure/Detail under Requirements) is **not** proposed: it is derived from purpose plus relation when the gold set is frozen (Jason, 2026-10-06). Purpose is always proposed, including for relation `no` rows. There are no purpose rule IDs yet (the purpose catalogue comes with phase 2), so cite `P:<class>` and quote the deciding words in the reason.
