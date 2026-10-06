@@ -30,6 +30,9 @@ Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds 
 - **Transitional is merged into Application** (Jason, 2026-10-06): transition is application in time, as scope is application to persons, things and places. So the coarse class is **Application, exemption and transition**, with a detail level **Scope / Exemption / Transitional and saving**. The detail is filled only when a consumer needs it, and isn't labelled in the gold set.
 - **Interpretation is for meanings only** (Jason, 2026-10-06): a provision on "the application of" a power or rule (how, when or to whom it applies) is **Application**, even under an interpretation heading (Companies Act 1989 s.112(2)(b)).
 - **Who is the regulator from a date** ("S is the regulator of B from 1st January 2026") is **Application** (transition in time), not Constitution (GHG ETS 2020 reg.13(2)). Constitution is for setting up a body and its make-up.
+- **Parliamentary procedure** (annulment and affirmative clauses) is **Requirements**: the procedure is the "how" (Jason, batch 1). Application says when, who, where and what.
+- **A permitted way of discharging a duty** ("the hirer may inform … by a general announcement") is **Permissions**.
+- Class-definition and criterion items **stay Application** (confirmed in batch 1, GHG ETS reg.70(2)(db)); conditions and limits on a power stay Application (reg.44A(8)(a)).
 - **A condition on an exemption power** is Application (gas regs 1998 reg.40(2)).
 - Purpose stays **single-select**: one class per provision, the dominant one. That's more useful as a data model than multi-select, even where a provision mixes application and transition.
 
