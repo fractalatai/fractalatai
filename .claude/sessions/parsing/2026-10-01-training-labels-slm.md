@@ -419,3 +419,45 @@ Mini invents labels (18 on 327) but is better than GPT-5.5 here at an eighth of 
 **Gemini vs mini: 58.3% agree, 681 disputed** (vs 22–25% with GPT-5.5 on batch 1).
 - 137 were only label slips or dropped actors on mini's side: **settled for Gemini** (`referee/batch2_auto.jsonl`, `auto-gemini`).
 - 544 substantive disputes: Opus referee, two agents in parallel (`referee/batch2a.jsonl`, `batch2b.jsonl`).
+
+## Referee: batch 2 (544 disputes, Opus, 2026-10-06)
+
+**Output:** validated: both halves 272/272, ids match, all labels/purposes valid.
+- Half A: Gemini 221, mini 40, mixed 11.
+- Half B: Gemini 177, mini 77, mixed 11, neither 7.
+- **Total: Gemini 398, mini 117, mixed 22, neither 7.** Plus 137 `auto-gemini`.
+
+**Batch 2 training labels** = consensus (954) + auto-gemini (137) + referee (544).
+
+**Mini is wrong on:**
+- list items under a duty (demotes the stem holder; ~100 in half A);
+- own procedural duties labelled Procedure+Detail;
+- purpose precedence;
+- raw_type set alongside an active holder;
+- `inferred` on express or referenced holders;
+- invented labels;
+- dropped applying-provision holders.
+
+**Gemini is wrong on:**
+- beneficiary for trigger-condition and "have regard to" parties;
+- beneficiary where employees receive the act (health surveillance etc.);
+- detail provisions (notice/report/register contents, timing items) as relations;
+- class-definition items as relations;
+- missed `answer_request`.
+
+**Rule gaps added to the joint ruling:**
+- functions lists of a *governed* party (safety representatives: both referees used Power Conferred);
+- content lists vs detail provisions for "the notice/report … must—";
+- timing items ("at suitable intervals", "within 8 weeks");
+- appeal/inquiry procedure → Defence+Appeal?;
+- exemption powers (Power Conferred vs Exemption);
+- deeming savings vs Transitional Arrangement;
+- "shall not grant … unless" restrictions on another provision's power;
+- "comply with his duty by…" discharge details;
+- mixed provisions (exemption + fallback duty);
+- withheld conduct and counterparty;
+- purpose of relation-no class-definition items.
+
+**Consistency note:** Workplace Regs reg.25(2)(a) was ruled detail by the referee, while sibling 25(2)(b) was auto-settled yes. Resolve with the content-list/detail ruling.
+
+**Dictionary gaps:** diving contractor, appointed body/poison centre (CLP Art 45), visitor (Occupiers' Liability), EU designated experts, Independent Anti-slavery Commissioner, regional vs district planning authority, appeal/inquiry inspectors, Central Arbitration Committee, works-council recipient, mines workmen's inspector, appointed doctor vs employment medical adviser.
