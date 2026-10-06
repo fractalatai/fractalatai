@@ -129,6 +129,24 @@ Open rule questions from the re-justification:
 - "X required by para (1) shall consist of—" lists (REL-16 detail, or a stem?);
 - the same label as the stem holder (e.g. Gvt: Minister).
 
+## Pilot review (2026-10-06)
+
+Jason reviewed the pilot: **215 approved, 12 changed**, 15 left for discussion.
+
+Rulings from the discussion, now in the spec, catalogue and brief:
+- detail of a duty continues it (REL-28 extended);
+- the engager holds "no person shall be engaged" (HOLD-17);
+- participation is a Liberty (TYPE-07);
+- conditions on an exemption are Application and exemption;
+- purpose is single-select.
+
+Decisions agreed in chat were recorded on the page with a comment (reg.8(10), Art.11(2)(e), EAW reg.16 inferred). The 3 detail provisions were re-justified to `continues`. Jason's earlier approval of reg.34N(3) relation `no` was cleared for re-review. SI 2000/1043 reg.11(2) was added to #78.
+
+Open:
+- Transitional merged into Application (11 coarse classes, with a Scope/Exemption/Transitional detail level)?
+- the #67 public on a `continues` row: counterparty `give_access`, beneficiary, or mentioned?
+- conditions on a power: should they follow the detail rule?
+
 ## Classification scheme inventory (2026-10-06)
 
 **Per actor on a provision:**
