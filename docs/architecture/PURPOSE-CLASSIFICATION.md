@@ -26,6 +26,10 @@ Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds 
 | Transitional and saving | Transitional Arrangement |
 | Constitution | Establishment+Constitution ("there shall be a body called X" is neither a duty nor a power) |
 
+**Class rules from the gold review** (Jason, 2026-10-06):
+- **Requirements** is for provisions about obligations. A condition on an exemption, or on how a power applies ("shall not grant any such exemption unless satisfied", "application of the exercise of a power"), is **Application and exemption**.
+- Purpose stays **single-select**: one class per provision, the dominant one. That's more useful as a data model than multi-select, even where a provision mixes application and transition.
+
 **How the coarse layer decides:**
 - high-precision text cues;
 - a list item inherits its stem's class;
