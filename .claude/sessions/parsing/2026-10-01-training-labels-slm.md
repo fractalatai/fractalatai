@@ -1,6 +1,6 @@
 ---
 session: "Training labels and SLM retrain at drrp-v1.1"
-status: active
+status: suspended
 opened: 2026-10-01
 closed:
 outcome:
@@ -8,9 +8,25 @@ issue: 72
 related: [74, 75, 76, "parsing/2026-09-30-issue-72.md"]
 ---
 
-# Session: Training labels and SLM retrain at drrp-v1.1 (ACTIVE)
+# Session: Training labels and SLM retrain at drrp-v1.1 (SUSPENDED)
 
-**Resumed 2026-10-05** after #60 (`parsing/2026-10-05-issue-60.md`, closed): label at `drrp-v1.1-2026-10-05`.
+**Suspended 2026-10-06 (Jason): the approach changed.** The rulings and the one-prompt-for-everything labelling had grown complex and costly. Review: `docs/architecture/DRRP-LABELLING-REVIEW-2026-10-06.md`.
+
+**Jason:** we already have the pipeline, and it starts with regex. **The mistake was building training data from the LLM end of the pipe, not the regex end.**
+
+The work continues under the meta-plan `parsing/2026-10-06-pipeline-from-the-regex-end.md`. The labels made here become its **evaluation data**: Gemini v1.3 on all 6,959, plus refereed batches 1–2.
+
+**State at suspension:**
+- **Gemini labels:** 6,959 provisions at `drrp-v1.3-2026-10-05`, total spend ~$27 + refreshes ~$10.
+- **Second model + Claude referee:** batch 1 (GPT-5.5, 1,357; consensus + 322 referee decisions) and batch 2 (GPT-5.4-mini, 1,635; consensus + 137 auto-Gemini + 544 referee decisions). Files are in `data/training/drrp-v1.1/referee/`.
+- **Prompt v1.4** (rulings 1–15) and spec are committed; the v1.4 label refresh (489 Gemini, ~$2) is **not run**.
+- **OpenAI credit:** ~$12.70 left. No paid run is pending.
+- **Dictionary:** 132 → ~245 labels, reconciled with legal.
+
+**Tooling** (all in `scripts/ml/`):
+- `label_drrp_training.py`: `--carry-from`, `--max-cost`, gate, stale check, `--model-name`, `--ids`;
+- `compare_training_labels.py`, `score_vs_referee.py`, `REFEREE_TRAINING_LABELS.md`;
+- actor-drift `llm_gaps.py`.
 
 ## Problem
 
@@ -21,25 +37,29 @@ The data model is now complete, and the definitive prompt is written: `scripts/d
 ## Todo
 
 - ✅ Training set: `scripts/ml/sample_drrp_training.py` → `data/training/drrp-v1.1/sample.csv`, 6,121 provisions in 656 laws (5,524 train / 597 test, split by law, 61 test laws). Details below
-- ⬜ Label at `drrp-v1.1-2026-10-05` (#60 applying provisions); build prompts as `scripts/benchmarks/gold_v2/label.py` does (stems + references + `applying()`). Evaluate also on `data/audit/holder60_cases_20261005.tsv`
+- ✅ (superseded: labelled at v1.3) Label at `drrp-v1.1-2026-10-05` (#60 applying provisions); build prompts as `scripts/benchmarks/gold_v2/label.py` does (stems + references + `applying()`). Evaluate also on `data/audit/holder60_cases_20261005.tsv`
 - ✅ (from #60) Data protection labels added (`37530cd`): `Public: Data Controller`, `Public: Data Processor` (gated to PUBLIC: Data), `Ind: Data Subject`, `Gvt: Agency: Information Commissioner`. DPA s.91(1) now labels `Public: Data Controller`
 - ✅ (from #60) Holders in ANOTHER instrument → issue #77 and skill `cross-instrument-holders` (periodic Claude-agent pass, Jason-approved, adjudicated tier). Reminder: SessionStart hook + lat-sync step 7. First pass pending: 6 candidates in 4 laws
 - ✅ Cost check: Jason approved per group; actual $3.92 per 1,000 with the explicit context cache
-- ⬜ **Before labelling (Jason 2026-10-05):**
+- ✅ **Before labelling (Jason 2026-10-05):**
   - ✅ LAT at legal's latest. The `pull-lat --stale` dry run (2026-10-05, after legal restarted :7447) gives 741 in_sync and 0 text changes; 154 not_held; the 4 known delete candidates were never applied
   - ✅ Actor dictionary reconciled with legal (`050e829`):
     - Jason's decisions: YAML canonical; group prefixes for cross-domain roles, domain prefixes (Data:, Offshore:, Maritime:, Env:) for domain-specific ones; trigger-only additions; Spc: Authorised Person governed.
     - 175 labels: 45 added, 9 renamed via `renamed_from`.
     - Legal has the final list and rename map.
   - ✅ Label rename migration applied 2026-10-05 (`scripts/migrations/rename_actor_labels_20261005.py`): 2,599 provision_actors rows and 53 gold rows renamed, 16 collisions merged; no old labels remain. Backup: `data/backups/pre_actor_rename_20261005.dump` (pg_dump -Fc of provision_actors, gold_benchmarks, gold_v2). Legal's side waits for the single run's publish (backlog checklist)
-- ⬜ Label versions now include the dictionary hash (`label_version()`, currently `drrp-v1.1-2026-10-05+dict.85e950d2`), so the 245 pilot/probe labels made with the old dictionary will be relabelled in the family pilots
-- ⬜ **Label by family, in order of actor-dictionary confidence** (memory `feedback_actor_dictionary_gap`). Per family group: a pilot of ~50 → add the OTHER actors to the dictionary (and tell legal) → bulk. High-confidence families first (OH&S sub-families, Fire, Nuclear, Consumer/Product Safety…). The LLM work improves the dictionary
+- ✅ (replaced by the `dict_version` column and stale check) Label versions now include the dictionary hash (`label_version()`, currently `drrp-v1.1-2026-10-05+dict.85e950d2`), so the 245 pilot/probe labels made with the old dictionary will be relabelled in the family pilots
+- ✅ (Gemini: all 5 groups; second model + referee: batches 1–2) **Label by family, in order of actor-dictionary confidence** (memory `feedback_actor_dictionary_gap`). Per family group: a pilot of ~50 → add the OTHER actors to the dictionary (and tell legal) → bulk. High-confidence families first (OH&S sub-families, Fire, Nuclear, Consumer/Product Safety…). The LLM work improves the dictionary
 - ✅ Label with the definitive prompt (drrp-v1.1), one model, per provision: all 6,959 sample provisions labelled 2026-10-05, $27.28, 0 errors; 0 open dictionary gaps (summary below)
-- ⬜ Retrain the SLM (RunPod) on position + type, and purpose per provision. Not `act`
-- ⬜ Evaluate against held-out labels, the 50 hand-checked rows (`data/audit/poscorr_sample38_20261001.tsv`) and gold v2 when ready. It must match 3.8 Flash on the counterparty/beneficiary split before the run uses it
-- ⬜ LLM tier: `gemini_llm_batch.py` moves to per-provision labelling with `drrp_prompt.py`; the per-actor `--position-correction` mode is retired
-- ⬜ Regex `act` for new laws (#75), from the clause verb, measured against the labels
-- ⬜ SLM writes purpose: reconcile precedence adjudicated > LLM > SLM > regex; scope re-evaluated after reconcile
+- ⏸️ (moved to meta-plan phase 4: SLM on the residual only, relation + actors, no purpose) Retrain the SLM (RunPod) on position + type, and purpose per provision. Not `act`
+- ⏸️ (moved to meta-plan phase 1: measure every tier against these labels) Evaluate against held-out labels, the 50 hand-checked rows (`data/audit/poscorr_sample38_20261001.tsv`) and gold v2 when ready. It must match 3.8 Flash on the counterparty/beneficiary split before the run uses it
+- ⏸️ (moved to meta-plan phase 5: short relation/actor prompt on the low-confidence residual) LLM tier: `gemini_llm_batch.py` moves to per-provision labelling with `drrp_prompt.py`; the per-actor `--position-correction` mode is retired
+- ⏸️ (moved to meta-plan phase 2) Regex `act` for new laws (#75), from the clause verb, measured against the labels
+- ⏸️ (superseded by meta-plan phase 2/3: regex purpose + guards first, then a cheap purpose classifier) SLM writes purpose: reconcile precedence adjudicated > LLM > SLM > regex; scope re-evaluated after reconcile
+
+- ⏸️ (stopped by Jason 2026-10-06) Second model + referee for batches 3–5
+- ⏸️ (held: the review may move purpose rulings out of the LLM prompt) v1.4 label refresh (489 Gemini, ~$2)
+- ⏸️ (meta-plan phase 6) Edge-case rule governance: new rules enter the relation prompt only if they can change a verdict, holder or correlative
 
 ## Dependencies
 
