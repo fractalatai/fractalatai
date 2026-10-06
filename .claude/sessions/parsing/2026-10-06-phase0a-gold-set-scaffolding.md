@@ -147,6 +147,37 @@ Open:
 - the #67 public on a `continues` row: counterparty `give_access`, beneficiary, or mentioned?
 - conditions on a power: should they follow the detail rule?
 
+## Final pilot rulings and the batch plan (2026-10-06)
+
+**Rulings:**
+- Transitional merged into **Application, exemption and transition** (11 coarse classes);
+- the #67 party on a `continues` row of an access duty is counterparty `give_access` (POS-18);
+- conditions on a power continue it (REL-14 → `continues`).
+
+Two pilot provisions were re-justified (gas regs reg.40(2), GHG ETS reg.44A(8)(a)), and the decisions their new proposals supersede were cleared. **Pilot state:** 226 approved, 11 changed, 5 open (on those two provisions).
+
+**Context fixes before the batches** (`evidence.py`):
+- the law's own definitions of terms used (566/1,000 provisions get some; a term defined only in parent legislation, e.g. "the Agency" in SI 2005/1806, still isn't found);
+- references made in the stem (PUWER reg.11(2)(c) now sees reg.11(1));
+- tighter "revoked" and "shall consist of" cues.
+
+The selection is frozen.
+
+**Open question for Jason:** a word-based beneficiary test. "Health and safety **of** X", "protect X", "the interests of X" → beneficiary, whether in a duty or a condition; "where/if/having regard to X" → mentioned. It would flip the persons in reg.40(2) to beneficiary.
+
+**Batches:** the 950 are split into 10 mixed batches of 95 (`data/gold/v3/batches/batch01..10.jsonl`, seed 64). Each has about 70 labelled, 14 natural and 11 target. **One batch at a time** (Jason), because each can change the rules for the next. Jason keeps reviewing the easy rows until he's confident in them.
+
+Per batch:
+1. Pull decisions from the page (ArtifactData list `decisions`, out_dir), then `review_import.py --write`.
+2. Fold any new rulings into the spec, catalogue and `JUSTIFY_GOLD.md`.
+3. Opus agent: brief + `batches/batchNN.jsonl` → `justified/batchNN.jsonl`.
+4. `load.py justified/batchNN.jsonl --write`.
+5. `review_export.py` (no `--only` exports everything in drrp_gold).
+6. Write the new provision docs to the page. Existing docs need `if_version`, tracked in `data/gold/v3/review_page_versions.json` (update it after each write).
+7. Report the counts, new edges and rule questions to Jason.
+
+Page: https://claude.ai/artifact/PkoqADCn2TXvSAEkPaTE6w
+
 ## Classification scheme inventory (2026-10-06)
 
 **Per actor on a provision:**
