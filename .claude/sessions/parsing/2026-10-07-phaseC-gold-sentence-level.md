@@ -136,3 +136,24 @@ So the same kind of sentence lands in three classes, and Permissions mixes a min
   - **Compensation** (23 laws; Jason earlier: compensation runs opposite to offences);
   - **Service of documents** (42 laws; proposed: Administration, the paperwork).
   - Also EU "Subject matter" (Application), "Urgency procedure" (Subordinate legislation), "Final provisions" and "Transposition" (Citation and commencement): duck-test wording to add, not members.
+
+**Decided (Jason, 2026-10-07):** *"yes to Review and Financial provisions; compensation with appeals; order confirmed"*.
+- **Precedence order (13 members):**
+  1. Citation and commencement
+  2. Amendment and revocation
+  3. Interpretation
+  4. Subordinate legislation
+  5. Application, exemption and transition
+  6. Review
+  7. Appeals, compensation and defences
+  8. Offences and penalties
+  9. Enforcement
+  10. Bodies and their functions
+  11. Fees and charges
+  12. Financial provisions
+  13. **Substantive requirements** (default)
+- **Written to:** PURPOSE-CLASSIFICATION.md (members with duck tests and corpus heading counts, precedence pairs, rejected Gemini points), `coarse_purpose.py` (decision list, default, FROM_18 remap), JUSTIFY_V2.md, the catalogue pointer, the meta-plan, and the page dropdown (not republished until the gold migrates). Committed `fba946a`.
+- **Gold migration under way:**
+  - batch-1 decisions imported (31 rows still open, 13 of them purpose);
+  - an agent is re-sorting all 319 gold purposes under the new order, with section/Part/Chapter titles from legal's headings extract (315 of 319 matched);
+  - only the cases that differ from the mechanical rename (Requirements/Permissions → Substantive requirements, Constitution → Bodies and their functions, Appeals and defences → Appeals, compensation and defences) go to Jason.
