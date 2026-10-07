@@ -132,3 +132,29 @@ None is EHS&HR. Proposal for phase C: drop all 21 from the gold selection (4 are
 - **Test laws: 61 → 60.** The assembler counts above include the Act's 1,062 rows and should be re-run after the sync.
 - **Scoped Acts:** 14 large Acts are now scoped (58,507 → 10,679 rows). None is among the test laws, so the gold set is otherwise unaffected.
 - **Still waiting on legal:** the list-text parser fix and its affected section_ids.
+
+## Legal's list-text repair pulled (2026-10-07)
+
+Legal fixed its LAT parser's list-text bug and gave our 60 test laws a whole-law check.
+
+**Pull** (`pull-lat --laws <60> --apply`, local backup in `data/lat-sync/backup_20261007_test60/`):
+- 55 laws applied, 5 already in sync, no gate failures.
+- 202 rows `text_changed` and 2 `grown`; nothing archived or held.
+- The 55 laws are in `data/lat-sync/reparse_20261007_111737.txt` for the re-parse.
+
+**Gold impact:**
+- 5 of the 222 sentences have new text: Directive 89/391 Art.3, Directive 2000/54 Art.8(1), Reg 1079/2012 Art.3, SI 2002/1861 reg.2, SI 2012/3032 reg.2.
+- All 5 are reorderings: the chapeau moved back to the front, plus de-duplication. Their labels still hold, so there is no re-review.
+- Their text hashes are updated in `gold-v4-sentence`, and their cards on the sentence page carry the repaired text.
+- 20 of the 830 selection units touch repaired rows. They aren't labelled yet, so they'll simply get the new text.
+
+**Assembler fix:**
+- The repair filled the previously empty Water Act s.3 row with the s.3(12) definitions ("'the appropriate authority' means— …"). Their dash made s.3 a stem that swallowed all 22 subsections.
+- A stem now needs list-item children (paragraphs or sub-paragraphs).
+- 6 units in the test laws had this fault, all definitions placed on a section or regulation row: SSI 2000/95 reg.2, Water Act s.3 and s.58, SI 2000/1043 reg.2, SI 2004/1490 reg.2, WSI 2005/1806 reg.5.
+- The selection's 851 units are unchanged.
+
+**CAA 1982 s.44(6):** legal recovered the closing words "shall pay such compensation … appropriate tribunal". They sit on the s.44 row, because legislation.gov.uk has them as a BlockText after subsection (6). The gold labels already carry that duty.
+- **Candidate assembler rule:** trailing text on a section row whose last subsection is a stem continues that stem. Not built yet; it goes to assembler QA.
+
+**Not done:** re-parse of the 55 laws (regex tier). See below.
