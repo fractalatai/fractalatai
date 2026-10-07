@@ -58,6 +58,11 @@ The regex-end meta-plan (closed 2026-10-06) planned around the pipeline's tiers 
   - review `Authorised Person`;
   - split `SC: T&L:` into Supply Chain and Transport & Logistics;
   - **disambiguate `Operator`** into an individual who operates and an organisation that runs an installation, airport, well or activity (phase A doc);
+- **Dictionary enrichment rule** (Jason, 2026-10-07, to stop dictionary drift):
+  - A new named actor (party) label is added to fix a clash only when it is used **across 2 or more distinct Families**, or **repeatedly within one Family**. Families are DuckDB `legislation.family`. "Repeatedly" is to be set from the data; the default is about 3 laws.
+  - Limited or one-off use never triggers enrichment. That clash stays on the generic label, and gold keeps both roles through the position key.
+  - Candidates come from the law's own defined terms ("relevant person", "the operator") and are ranked by the clash counts: `Ind: Person` 54, `Gvt: Authority` 11, `Operator` 6, `Ind: Public` 5.
+  - Each addition needs Jason's approval, mirroring phase B's promotion rule for principles.
 - **#78 sized** (phase A, 2026-10-07): one entry per label loses a role in 198 of 1,413 multi-row sentences with actors (14%). Decide the actor key (label + role/referent, or `holds: both`) **before phase C labels at scale**;
 - phase E: build the sentence assembler (`units.py`) in `fractalaw-core`, with its QA fixes.
 

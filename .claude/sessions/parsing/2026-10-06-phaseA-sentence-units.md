@@ -241,3 +241,13 @@ Gemini 2.5 Pro was asked for a harsh review of option (c) and an answer to quest
 - The review page: slot key, add a second entry, `both` in holds, multi-select act.
 - The loader and importer.
 - The evaluation spec (row tiers against sentence gold) scores multi-label `act` and (label, position) pairs.
+
+**#78, revised option (c) plus the dictionary (Jason, 2026-10-07).**
+- **Who carries what:**
+  - Different parties under one label are mostly generic labels: `Ind: Person` 54, `Gvt: Authority` 11, `Operator` 6, `Ind: Public` 5 of the 165 two-position clashes. A richer dictionary washes these out.
+  - Same-party duty+power is all named holders: the Secretary of State 20, `Ind: Person` 18, SEPA 6 of 60. No dictionary helps there, so `holds: both` stays.
+- **Schema:**
+  - `holds: both`;
+  - `act` as a list;
+  - the position key, kept as a safety net for clashes the dictionary doesn't resolve.
+- **Enrichment rule:** a new label requires use across 2 or more Families, or repeated use in one Family; never one-off (meta-plan).
