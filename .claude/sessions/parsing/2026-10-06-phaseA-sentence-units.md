@@ -216,3 +216,8 @@ An Opus agent checked 32 sampled sentences across the strata and scanned all 60 
 - `OWN_SUBJECT` over-fires ("any changes which could…", "that SEPA may…"): it's a flag only, so low priority.
 
 **Jason's spot-check:** 15 sentences in `data/gold/v4/assembler_spotcheck.md`: 11 fixed or doubtful, 4 OK.
+
+**Jason's spot-check query (2026-10-07): WSI 2005/1806 reg.5(1)** showed only "In these Regulations—". legislation.gov.uk has the definitions under 5.—(1); legal's parse puts them on the reg.5 row.
+- **Fixed in the assembler:** definitions (text opening with a quote mark) on a section row go back to the one child that ends in a dash and has no items. With two such children, the interpretation lead-in ("In this section—") wins over "… there is inserted—".
+- **All 6 cases resolve:** SSI 2000/95 reg.2(1), Water Act s.3(12) and s.58(13), SI 2004/1490 reg.2(1), WSI 2005/1806 reg.5(1), SI 2000/1043 reg.2(1). Flag `definitions_moved`.
+- No gold or selection change. Reported to legal as a source fault.
