@@ -32,12 +32,12 @@ Adopted 2026-10-07 after Gemini's challenge (below) and the heading evidence (37
 | 3 | Interpretation | meanings, deeming, "references to" | Interpretation 583, Definitions 58 |
 | 4 | Subordinate legislation | powers to make further law, what it may contain, how it is made, EU delegated and implementing acts (Interpretation Act 1978 s.21) | Regulations 51, Orders and regulations 34, Exercise of the delegation 29, Committee procedure 22 |
 | 5 | Application, exemption and transition | who, what, where and when the law reaches or leaves out: scope, exemptions and exemption certificates, Crown application, transitional and savings, EU subject matter and addressees | Application 112, Transitional provisions 77, Exemptions 51, Scope 43, Crown application 37 |
-| 6 | Review | review of the law's own operation and effect (post-implementation review) | Review 126 |
-| 7 | Appeals, compensation and defences | remedies running from the state to the governed: appeals and reviews of decisions, compensation, statutory defences | Appeals 68, Defence of due diligence 34, Compensation 23 |
+| 6 | Review | post-implementation review of the law itself: its operation and effect (not review of a decision: that is Appeals) | Review 126 |
+| 7 | Appeals, compensation and defences | remedies running from the state to the governed: appeals and reviews **of decisions**, compensation, statutory defences | Appeals 68, Defence of due diligence 34, Compensation 23 |
 | 8 | Offences and penalties | offences, penalties, offences by bodies corporate, civil sanctions | Offences 108, Penalties 103, Offences by bodies corporate 40 |
-| 9 | Enforcement | enforcement powers, inspectors, powers of entry, notices, directions, enforcing authorities | Enforcement 89, Enforcement notices 34, Powers of entry 19 |
-| 10 | Bodies and their functions | setting up bodies, their make-up and proceedings, their functions, guidance, codes of practice | Guidance 34 |
-| 11 | Fees and charges | fees, charges, payments to or by the regime | Fees 33 |
+| 9 | Enforcement | enforcement powers, inspectors, powers of entry, notices and directions **to the governed**, enforcing authorities | Enforcement 89, Enforcement notices 34, Powers of entry 19 |
+| 10 | Bodies and their functions | setting up bodies, their make-up and proceedings, their functions; directions to a public body; guidance and codes of practice (issuing them, consulting before issuing them) | Guidance 34 |
+| 11 | Fees and charges | fees, charges, levies, tariffs and other payments to or by the regime (not public funding of the Act: that is Financial provisions) | Fees 33 |
 | 12 | Financial provisions | public funding of the Act: expenses, money provided by Parliament, grants | Financial provisions 36, Expenses 23 |
 | 13 | **Substantive requirements** (the default, n.e.c.) | what the law requires to be done: everything no member above claims | 54% of titled sections: health surveillance, monitoring, records, provision of information, risk assessment, obligations of manufacturers/importers/distributors, … |
 
