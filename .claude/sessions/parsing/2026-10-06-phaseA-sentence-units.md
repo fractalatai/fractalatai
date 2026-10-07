@@ -126,3 +126,9 @@ None is EHS&HR. Proposal for phase C: drop all 21 from the gold selection (4 are
 - The 4 reviewed units are gone from `gold-v4-sentence` (19 rows deleted, backup at `data/gold/v4/backup_companies_act_rows_20261007.json`), from the sentence page and from `evidence.jsonl`.
 - `gold-v3-draft` keeps its rows as the record of the row scheme.
 - The gold set is now 222 sentences (1,097 rows). The selection's 851 units drop to 830; phase C's top-up replaces them from in-domain laws.
+
+**Legal closed #166 (2026-10-07).**
+- **Companies Act 1989 is excluded from LAT.** An agent check found no EHS/HR provisions. Its rows are discarded, its `lat_scope` is "excluded" and it will show `row_count` 0 after the next manifest sync. This matches the gold drop.
+- **Test laws: 61 → 60.** The assembler counts above include the Act's 1,062 rows and should be re-run after the sync.
+- **Scoped Acts:** 14 large Acts are now scoped (58,507 → 10,679 rows). None is among the test laws, so the gold set is otherwise unaffected.
+- **Still waiting on legal:** the list-text parser fix and its affected section_ids.
