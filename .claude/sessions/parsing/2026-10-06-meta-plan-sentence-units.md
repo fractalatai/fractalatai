@@ -52,6 +52,14 @@ The regex-end meta-plan (closed 2026-10-06) planned around the pipeline's tiers 
 - whole-sentence detail of a duty in another sentence (31 of the 86 reviewed `continues`): keep `continues` for it, or `no` with a pointer? (phase A);
 - the 3 queries left from batch 2 (a modification clause's purpose; deemed compliance; a `Gvt: Authorised Person` label);
 - dictionary gaps: well-operator, support panel (CTSA 2015 s.36), nominated recipient (FIT); `Spc: Verifier` holder class.
+- dictionary queries from the first sentence review (2026-10-07):
+  - add Gvt: Agency: Scottish Natural Heritage, a `Patient` label and Gvt: Judiciary: Employment Tribunal;
+  - check whether `Ind: Licensee` is really an individual;
+  - review `Authorised Person`;
+  - split `SC: T&L:` into Supply Chain and Transport & Logistics;
+  - **disambiguate `Operator`** into an individual who operates and an organisation that runs an installation, airport, well or activity (phase A doc);
+- **#78 sized** (phase A, 2026-10-07): one entry per label loses a role in 198 of 1,413 multi-row sentences with actors (14%). Decide the actor key (label + role/referent, or `holds: both`) **before phase C labels at scale**;
+- phase E: build the sentence assembler (`units.py`) in `fractalaw-core`, with its QA fixes.
 
 **Legal-side refactoring list** (from the closed meta-plan; for after this plan):
 - provision titles (P1group/Title) in legal's LAT parser, folded into the single run's re-parse wave: the cheapest purpose signal;
@@ -59,6 +67,7 @@ The regex-end meta-plan (closed 2026-10-06) planned around the pipeline's tiers 
 - the published `purposes` field migration;
 - tell legal that items carry no DRRP of their own (the sentence holds it) but still send their actors;
 - actor label renames already queued (`mix actors.rename_labels`).
+- **trailing text on section rows** (legal's BlockText after a subsection, e.g. CAA 1982 s.44's "shall pay such compensation …" belongs to s.44(6)): 17 rows in the 60 test laws. Attach it to the subsection at source.
 - **LAT parser list-text corruption** (legal, 2026-10-07, `lat_parser.ex extract_element_text`):
   - What goes wrong: a row's text is all the list items followed by all the Text, de-duplicated. So the chapeau lands at the end, nested items appear twice, and items are joined without a space.
   - Reach: about 1,672 rows in 543 laws have a moved chapeau; about 403 rows in 224 laws have a missing space.

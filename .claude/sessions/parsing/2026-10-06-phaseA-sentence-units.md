@@ -13,17 +13,17 @@ Labels attached to the source's rows, and a sentence split into a stem and items
 
 ## Todo
 
-- ⬜ Unit definition, written down: what counts as a stem (dash, colon, "the following", "as follows"); nested stems ((2)— (a)— (i)); closing words that the source puts on the stem row; a stem whose items are in a Schedule
-- ⬜ Edge cases, with counts and examples: long lists (over 4,000 characters), "and"/"or" joins, items that are themselves full sentences with their own modal ("(b) the Secretary of State shall…"), provisos ("Provided that…") on separate rows
-- ⬜ **Holder shape per unit** (Gemini): count units with more than one active actor, with mixed Obligation/Liberty, and with the same label in two roles (#78 collisions, which merging items makes more likely); examples of each for Jason
-- ⬜ **Policies, settled from the data in the app** (Jason, 2026-10-06). Provisional defaults until the sentence cards show otherwise: a proviso joins its sentence; a full-sentence item stays in the unit (two holders are two active actors); whole-sentence detail of another sentence keeps `continues`; a unit takes its own purpose or `inherit`. Questions: a proviso on its own row (part of the sentence, or its own unit?); an item that is a full sentence with its own modal and holder (stays in the unit, or splits out?)
-- ⬜ (from the app) a whole sentence that only details a duty or power in another sentence ("A notice of appeal shall be accompanied by…"): keep relation `continues` for it, or `no` with a pointer
-- ⬜ (from the app) purpose for a unit: its own class, or `inherit` from the section when it has no purpose of its own
+- ✅ (in `units.py` docstring and below) Unit definition, written down: what counts as a stem (dash, colon, "the following", "as follows"); nested stems ((2)— (a)— (i)); closing words that the source puts on the stem row; a stem whose items are in a Schedule
+- ✅ (flags: nested 403, closing words 390, full-sentence item 165, sibling "But" 33, section text 17, long 14) Edge cases, with counts and examples: long lists (over 4,000 characters), "and"/"or" joins, items that are themselves full sentences with their own modal ("(b) the Secretary of State shall…"), provisos ("Provided that…") on separate rows
+- ✅ (counted below: 14% of multi-row sentences with actors lose a role under one entry per label) **Holder shape per unit** (Gemini): count units with more than one active actor, with mixed Obligation/Liberty, and with the same label in two roles (#78 collisions, which merging items makes more likely); examples of each for Jason
+- ✅ (first sentence review: all four defaults stood; mixed purposes go to the purpose scheme) **Policies, settled from the data in the app** (Jason, 2026-10-06). Provisional defaults until the sentence cards show otherwise: a proviso joins its sentence; a full-sentence item stays in the unit (two holders are two active actors); whole-sentence detail of another sentence keeps `continues`; a unit takes its own purpose or `inherit`. Questions: a proviso on its own row (part of the sentence, or its own unit?); an item that is a full sentence with its own modal and holder (stays in the unit, or splits out?)
+- ✅ (keep `continues`) (from the app) a whole sentence that only details a duty or power in another sentence ("A notice of appeal shall be accompanied by…"): keep relation `continues` for it, or `no` with a pointer
+- ✅ (own class or `inherit`) (from the app) purpose for a unit: its own class, or `inherit` from the section when it has no purpose of its own
 - ✅ (built; PUWER reg.11(2) and Flood Risk s.43(5) read with closing words after the items) The assembler: `scripts/benchmarks/gold_v3/units.py` (unit id = root row id; ordered member rows; assembled text), tested on the known cases (PUWER reg.11(2), Flood Risk s.43(5), EAW reg.16, the 77 units whose items were reviewed)
-- ⬜ **Assembler QA** (Gemini): a stratified sample of assembled units (nested, long, schedule, proviso) checked by an agent and spot-checked by Jason before phase C labels anything
-- ⬜ Counts on the 61 test laws and the selection, written below; the selection re-keyed to units for phase C
-- ⬜ Note for phase E: the same assembler in `fractalaw-core` so the pipeline labels sentences
-- ⬜ **Disambiguate `Operator`** (Jason, 2026-10-07): one label covers an individual who operates (a machine, a vehicle) and an organisation that runs an installation, airport, well or regulated activity; split it (see below)
+- ⬜ (agent QA done, 5 fixes built; Jason's spot-check open: `data/gold/v4/assembler_spotcheck.md`) **Assembler QA** (Gemini): a stratified sample of assembled units (nested, long, schedule, proviso) checked by an agent and spot-checked by Jason before phase C labels anything
+- ✅ (60 laws: 7,340 sentences, 2,362 multi-row; selection 848 units) Counts on the 61 test laws and the selection, written below; the selection re-keyed to units for phase C
+- ⏸️ (moved to the meta-plan, phase E) Note for phase E: the same assembler in `fractalaw-core` so the pipeline labels sentences
+- ⏸️ (moved to the dictionary-gap list in the meta-plan) **Disambiguate `Operator`** (Jason, 2026-10-07): one label covers an individual who operates (a machine, a vehicle) and an organisation that runs an installation, airport, well or regulated activity; split it (see below)
 - ✅ (listed below; 21 Companies Act units, all three Parts out of domain) **Out-of-domain Parts of massive Acts** (Jason, 2026-10-07): the full Companies Act 1989 is held, so units from its company-law Parts bring dictionary drift and unfamiliar drafting. List the selection's units by Part, mark the out-of-domain ones and carry them to phase C's scope filter (legal's fix is on the legal-side list)
 
 ## Dependencies
@@ -158,3 +158,61 @@ Legal fixed its LAT parser's list-text bug and gave our 60 test laws a whole-law
 - **Candidate assembler rule:** trailing text on a section row whose last subsection is a stem continues that stem. Not built yet; it goes to assembler QA.
 
 **Not done:** re-parse of the 55 laws (regex tier). See below.
+
+## Holder shape per sentence (2026-10-07)
+
+**Source:** the pipeline's actors (`provision_actors`, the reconciled `drrp`/`position`) on the member rows, merged per sentence. These are row-level pipeline labels, not gold, so the figures are estimates of shape, not error rates.
+
+**60 test laws:** 7,349 sentences (2,362 multi-row); 3,610 have actors, 1,413 of them multi-row.
+
+| Shape | Sentences |
+|---|---|
+| more than one active holder | 298 (185 multi-row) |
+| active Obligation and active Liberty in one sentence | 93 (90 multi-row) |
+| same label in two roles (multi-row only; a single row can't have this) | 408 |
+| ↳ role + mentioned only: the strongest role wins, **no loss** | 210 |
+| ↳ **lossy**: two substantive roles for one label | 198 |
+
+**The lossy collisions, per label:**
+- active + counterparty: 131;
+- active Obligation + active Liberty: 59;
+- beneficiary + counterparty: 19;
+- active + beneficiary: 10;
+- all three: 4.
+
+**What's behind them:**
+- Most are a generic label standing for **two different people** in one sentence. `Ind: Person` is typical: "a person may request …; the authority shall notify the person".
+- Some are one holder with a duty and a power: "the Minister may … and shall …" (`Gvt: Authority` in Water Act s.3(6)).
+
+**Reading:**
+- One entry per label (POS-15) loses a role in **198 of 1,413 multi-row sentences with actors (14%)**, which is 5% of all sentences with actors. Rows can't collide, so sentence units created these.
+- Gold (222 reviewed): 23 of 191 sentences with actors have more than one active holder, and 2 mix Obligation and Liberty. The justifiers flagged 3 drops in policy notes, and Jason's review raised none.
+- **This is #78, now with a size:** one entry per label loses a role in about 1 in 7 multi-row sentences. Two fixes:
+  - allow a second entry for a label with a different role (actor key = label + referent/role);
+  - or let `holds` be "both" for the duty-and-power case.
+- **Decide before phase C labels at scale.** It changes the gold schema (`drrp_gold` key is gold_version, section_id, field, actor_label) and the review page.
+
+## Assembler QA (2026-10-07)
+
+An Opus agent checked 32 sampled sentences across the strata and scanned all 60 laws; the scripts are in the scratchpad.
+
+**Sample:** 26 of 32 OK.
+- nested 6/6, closing words 6/6, full-sentence items 5/5, long 1/1;
+- the "not a stem" guard was right 4/4: those faults are source text (definitions sitting on the section row).
+
+**Fixed in `units.py`:**
+1. **Two-dash stems** ("If … believe— (a) (b) then … the commander may take … measures— (i) (ii) (iii) and …"): each dash opens the next run of items, so the middle words now sit between the two runs. 6 sentences: CAA s.94(2), s.84(1), s.78(9), s.88(10); SI 1988/1324 reg.7(1); PHA s.45(9).
+2. **One sentence per row.** An item without a dash ("(b) the following instruments … that is to say (i) (ii)") left its sub-items as sentences of their own too. 9 rows under 4 parents were in two sentences; now 0.
+3. **Lead-ins that lost their dash** are stems. List items always continue their parent's words: "the diving project plan shall;", "In Scotland", "may direct in writing that: shall be exempt …". With no dash, a colon marks where the closing words start. 25 new stems; 6 selection items re-keyed to their lead-in; no gold sentence changed.
+4. **A root that isn't a stem prints only its own row.** A section row with subsections used to print the whole section (CAA s.84: 7,841 characters). 46 sentences affected.
+5. **Stray dash runs** ("–—", SI 2020/1265 reg.47(2)).
+
+**Flagged, not built:**
+- **Sibling "But …" rows** (33 in 12 laws; 12 in GHG ETS): 11 cite the sibling before them, 1 cites another, 21 cite none. Most are full sentences, so the better fix is a `qualifies` link to the previous sibling rather than a join. A bare "But—" (SSI 2018/219 reg.78(4)) can't be read alone, so join that one. Flag: `proviso_row`.
+- **Text on a section row with subsections** (17 rows; flag `section_text`): legislation.gov.uk's trailing BlockText, or definitions. The "last subsection" rule would be wrong 7 times out of 9. Two better rules:
+  - text that opens with a quote mark (definitions) attaches to the child that ends in a dash and has no items: 6 of 6 resolve;
+  - lower-case text attaches to the open stem, the one whose last item ends in ",", "or" or "and" and that has no closing words yet: 8 resolve, 1 is ambiguous.
+  - Better still, legal fixes it at source. It goes on the legal-side list with the CAA s.44 case.
+- `OWN_SUBJECT` over-fires ("any changes which could…", "that SEPA may…"): it's a flag only, so low priority.
+
+**Jason's spot-check:** 15 sentences in `data/gold/v4/assembler_spotcheck.md`: 11 fixed or doubtful, 4 OK.
