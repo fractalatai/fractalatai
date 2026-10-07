@@ -24,6 +24,7 @@ Labels attached to the source's rows, and a sentence split into a stem and items
 - ⬜ Counts on the 61 test laws and the selection, written below; the selection re-keyed to units for phase C
 - ⬜ Note for phase E: the same assembler in `fractalaw-core` so the pipeline labels sentences
 - ⬜ **Disambiguate `Operator`** (Jason, 2026-10-07): one label covers an individual who operates (a machine, a vehicle) and an organisation that runs an installation, airport, well or regulated activity; split it (see below)
+- ⬜ **Out-of-domain Parts of massive Acts** (Jason, 2026-10-07): the full Companies Act 1989 is held, so units from its company-law Parts bring dictionary drift and unfamiliar drafting. List the selection's units by Part, mark the out-of-domain ones and carry them to phase C's scope filter (legal's fix is on the legal-side list)
 
 ## Dependencies
 
