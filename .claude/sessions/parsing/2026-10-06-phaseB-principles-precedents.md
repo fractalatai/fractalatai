@@ -22,7 +22,7 @@ related: ["parsing/2026-10-06-meta-plan-sentence-units.md", "docs/architecture/D
 - ⬜ Spec (`DRRP-CLASSIFICATION.md`) trimmed to match: special-case rows that are precedents move to an appendix or the precedent store
 - ⬜ The justifier brief rewritten for sentence units and principles (input to phase C)
 
-- ⬜ **Consistency check:** run v2 against the 222 gold sentences. List the rows v2 would decide differently (REL-20 enforcing authority, REL-28/REL-33 tie-break, REL-07 commencement and parliamentary procedure, a holder in a `continues` sentence as `mentioned`) for Jason
+- ⬜ (run: 58 conflicts in 35 sentences, grouped G1–G10 in `data/gold/v4/consistency_review.md`; Jason to answer) **Consistency check:** run v2 against the 222 gold sentences. List the rows v2 would decide differently (REL-20 enforcing authority, REL-28/REL-33 tie-break, REL-07 commencement and parliamentary procedure, a holder in a `continues` sentence as `mentioned`) for Jason
 - ⬜ **Exclude amending text from gold** (Q5): find amending-text sentences in gold and the selection and add them to `excluded_units.csv`
 - ⬜ **Enforcing authority and purpose:** the dated-regulator case (GHG ETS reg.13(2), Application) may be a REL-20 designation (Requirements). Ask Jason with the sentence
 
@@ -126,3 +126,27 @@ Jason: *"my so called rulings are drafts based on my best guess looking at snipp
 - `PURPOSE-CLASSIFICATION.md` (designation → Requirements; the dated-regulator case flagged open).
 
 **LAT pulls on hold (Jason, 2026-10-07):** wait for legal to finish the whole parse repair (batches 4–11 from its local legislation.gov.uk copy, plus the #174 definitions/BlockText fix), **even if legal says a phase is complete**. Then do one pull, after a NAS backup, because the pull also archives about 47K rows from the 14 scoped Acts. A dry run on 10-07 showed batch 3 (80 laws, 1,579 rows changed) touches none of the 60 test laws.
+
+## Consistency check (2026-10-07)
+
+Two Opus agents read the 222 gold sentences against v2 (`data/gold/v4/consistency/out1.jsonl`, `out2.jsonl`; merged with groups in `conflicts.json`). The automated invariants (TYPE-03, TYPE-04, ACT-01, label repeats) were mostly clean.
+
+**58 possible conflicts across 35 sentences** (27 high confidence, 31 medium), grouped for Jason in `data/gold/v4/consistency_review.md`:
+
+| Group | Changes | What |
+|---|---|---|
+| G1 | 16 | #78 restorations: act lists (notify + supply), `holds: both` (NRBW reg.53(5), PUWER reg.18(10)), second entries for recipients; ACT-01 fixes |
+| G2 | 11 | named subject → own duty (RIDDOR reg.20(2), CTSA s.38(6), SSI 2018/219 reg.27(6), EAW reg.30(2), gas regs reg.40(2)) |
+| G3 | 9 | agentless manner or content → `continues` (Directive 89/391 Art.14(3), CAA s.56(6), s.83(6), SI 2005/1726 reg.5(2)) |
+| G4 | 11 | named holder in a `continues` sentence → add as `mentioned` |
+| G5 | 2 | commencement → `no` (asp 2019/15 s.32(2)) |
+| G6 | 2 | amending text → exclude (NIA s.40(1); CAA s.69A(7) modifications, Jason's call) |
+| G7 | 3 | GHG ETS reg.13(2): designation or transition (the open purpose question) |
+| G8 | 2 | `deemed-holder` tags (AWR reg.24(3), WSI 2005/1806 reg.43(9)) |
+| G9 | 1 | duplicate label (`OTHER: well-operator` next to `Operator`) |
+| G10 | 1 | → `Gvt: Authorised Person` (deferred to the dictionary task) |
+
+**Agent notes:**
+- 10 actor rows with a null value were treated as removed actors.
+- Definitions of holder terms are not deeming.
+- HW Wales reg.72(2) cites v1 REL-20; the value is unaffected, but under v2 the citation is stale.
