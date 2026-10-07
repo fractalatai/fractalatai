@@ -44,7 +44,7 @@ The regex-end meta-plan (closed 2026-10-06) planned around the pipeline's tiers 
 
 **Decisions that still stand:**
 - the spec, not the v1.3 prompt, is the standard; one entry per label (POS-15), losses tracked in #78;
-- purpose: 11 coarse statutory classes (Requirements/Permissions, Application incl. transition), single-select, layered, fine level only where a consumer needs it;
+- purpose: 12 coarse statutory classes (Subordinate legislation added 2026-10-07) (Requirements/Permissions, Application incl. transition), single-select, layered, fine level only where a consumer needs it;
 - purpose detail (Substantive vs Procedure/Detail) is derived, not labelled;
 - the review loop: an artifact page with one db doc per unit for proposals and one for decisions; Jason approves easy rows in bulk and works the hard core.
 

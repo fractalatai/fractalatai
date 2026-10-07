@@ -86,3 +86,19 @@ So the same kind of sentence lands in three classes, and Permissions mixes a min
 - **What it resolves:** the gold split above, and the batch-1 ruling that parliamentary procedure is Requirements (it would move here).
 - **Cost:** about 7 gold sentences and the batch-1 open rows re-checked; PURPOSE-CLASSIFICATION.md, the brief and the review page choices updated; legal's purpose vocabulary (#172) told.
 - **Boundary case:** local instruments made under an Act that bind a place or class (tree preservation orders, development orders) fit s.21, but they read as administrative. Proposed: include them only when they are made generally, not addressed to a named person. To confirm with Jason.
+
+**Adopted (Jason, 2026-10-07):** *"agree - add Subordinate legislation and tell legal - this fixes the strain we are seeing in the data and should make Purpose tagging these sentences 'easy'"*.
+- **Written:**
+  - PURPOSE-CLASSIFICATION.md (12 classes; the class rules; it replaces the parliamentary-procedure → Requirements ruling);
+  - JUSTIFY_V2.md;
+  - the catalogue's purpose pointer;
+  - the meta-plan;
+  - `coarse_purpose.py`: a cue that fires after commencement and before Requirements/Permissions. All 19 hand-judged sentences cue correctly; across the 825 selection sentences it fires on 35, with 3 misfires (about 91%): CAA s.45(7) offence proceedings, a district designation, a 1933 proceedings clause;
+  - the review page: version 3, with the class in the purpose dropdown.
+- **Gold:**
+  - Batch-1 decisions so far were imported first (1,532 decided, 51 batch-1 rows still open).
+  - Then 14 sentences' purpose was set to Subordinate legislation as `change` decisions: 9 earlier ones (asp 2019/15 s.31(2), s.11(3); CTSA s.27(6), s.46(3); Water Act s.10(1); PHA s.82(5), which resolves Jason's mixed-purpose query; CAA s.83(6); Directive 89/654 Art.9a(4); VCRA s.39(1)) and 5 in batch 1 (s.20(9), which answers Jason's "review the reason this got put as Requirement", plus s.13(4), s.31(1), Art.9a(3), s.104(2)). Jason's earlier comments were kept after "earlier:".
+  - **Kept:** commencement (asp s.32(2), CTSA s.23(1)), a compensation duty, an offence, an application clause, and a report laid before Parliament (Water Act s.81(5)).
+- **Page:** the 14 decision slots were written with pinned versions; a pull-back shows 1,532 = 1,532 decided rows, 0 mismatches.
+- **Legal told** (#172 vocabulary) and warned that ConfersPower is unreliable.
+- Precedents rebuilt.
