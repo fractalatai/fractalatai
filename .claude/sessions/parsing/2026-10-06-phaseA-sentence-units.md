@@ -221,3 +221,23 @@ An Opus agent checked 32 sampled sentences across the strata and scanned all 60 
 - **Fixed in the assembler:** definitions (text opening with a quote mark) on a section row go back to the one child that ends in a dash and has no items. With two such children, the interpretation lead-in ("In this section—") wins over "… there is inserted—".
 - **All 6 cases resolve:** SSI 2000/95 reg.2(1), Water Act s.3(12) and s.58(13), SI 2004/1490 reg.2(1), WSI 2005/1806 reg.5(1), SI 2000/1043 reg.2(1). Flag `definitions_moved`.
 - No gold or selection change. Reported to legal as a source fault.
+
+## Gemini review feedback (2026-10-07): #78 option (c)
+
+Gemini 2.5 Pro was asked for a harsh review of option (c) and an answer to question 2. Raw review: `data/code-review/drrp-issue78-option-c.md`; proposal and examples: scratchpad `issue78_option_c.md`.
+
+**Accepted:**
+- **Key the extra entry by `position`, not a free-text referent.** The key becomes (gold_version, section_id, field, actor_label, position). A quoted referent ("searcher") is hard to keep consistent, can't be predicted as a class, and can't be scored by exact match. Position is already a labelled field, and the split only fires when roles differ, so it is the natural key.
+  - s.47(4) becomes `Ind: Person`/active (Obligation) + `Ind: Person`/beneficiary.
+  - Residual: two parties with the same label and the **same** position but different holds can't both be kept. It hasn't been seen in the data; if it appears, `holds: both` is the fallback.
+- **`holds: both`.** Minimal, still a single-class target, and trivial downstream (duties = Obligation or both).
+- **Question 2: `act` becomes a list** (multi-label). Picking a "dominant" act is subjective and loses Art.8(1)'s distinct acts. The model task becomes multi-label `act`, a standard one.
+
+**Not accepted:**
+- **Splitting two different parties with the same label and the same role** (s.50(8): two authorities, both beneficiaries). Merging loses identity but no role, and the register is per label and role. Kept as one entry.
+
+**Cost of the change, to do before phase C:**
+- PK migration for 1,097 gold rows: position is backfilled from the value, so no data changes.
+- The review page: slot key, add a second entry, `both` in holds, multi-select act.
+- The loader and importer.
+- The evaluation spec (row tiers against sentence gold) scores multi-label `act` and (label, position) pairs.
