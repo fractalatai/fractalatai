@@ -1,12 +1,14 @@
 #!/usr/bin/python3
-"""Coarse purpose layer, first cut (PURPOSE-CLASSIFICATION.md § Layered purpose, decided 2026-10-06).
+"""Purpose as the law's anatomy: a decision list (PURPOSE-CLASSIFICATION.md § Purpose is the law's anatomy, 2026-10-07).
 
-Twelve classes in statutory terms (Duties/Powers renamed Requirements/Permissions 2026-10-06 to keep clear of DRRP words). A provision takes the first class whose text cue fires. A list item
-with no cue of its own inherits its nearest stem's class. Otherwise it is `undetermined` (escalates to
-the fine layer). This is the measurement prototype for phase 2. The Rust regex tier is the production
-home once the cues settle.
+Thirteen members tested in precedence order, first match wins (Rivest's decision lists; a table of precedence with a
+"not elsewhere classified" default, as in Dewey/UDC and ISIC/NACE). Purpose is the topic facet only: whether the
+sentence creates a duty or a power is the DRRP facet and never decides purpose. A provision takes the first member
+whose cue fires; a list item with no cue of its own takes its nearest stem's member; otherwise **Substantive
+requirements**, the default. Empty text is `undetermined`. The Rust regex tier is the production home once the cues
+settle.
 
-  coarse_purpose.py              # score against Gemini v1.3 purposes (6,959) mapped to coarse classes
+  coarse_purpose.py              # score against Gemini v1.3 purposes (6,959) mapped to the members
   coarse_purpose.py --no-inherit # cues only
 """
 
@@ -22,13 +24,15 @@ from drrp_prompt import ancestors  # noqa: E402
 
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 
+DEFAULT = "Substantive requirements"
+# the members in precedence order (first match wins); the default comes last
 CLASSES = [
-    "Citation and commencement", "Interpretation", "Application, exemption and transition", "Requirements", "Permissions",
-    "Enforcement", "Offences and penalties", "Appeals and defences", "Fees and charges",
-    "Amendment and revocation", "Constitution", "Subordinate legislation",
+    "Citation and commencement", "Amendment and revocation", "Interpretation", "Subordinate legislation",
+    "Application, exemption and transition", "Review", "Appeals, compensation and defences", "Offences and penalties",
+    "Enforcement", "Bodies and their functions", "Fees and charges", "Financial provisions", DEFAULT,
 ]
-# cue labels finer than the coarse classes (Transitional merged into Application, 2026-10-06); the cue keeps the
-# finer label so the gold selection's targets stay reproducible
+# cue labels finer than the members (Transitional merged into Application, 2026-10-06); kept so the gold selection's
+# targets stay reproducible
 COARSE_OF = {"Application and exemption": "Application, exemption and transition",
              "Transitional and saving": "Application, exemption and transition"}
 
@@ -37,56 +41,61 @@ def coarse(label: str) -> str:
     return COARSE_OF.get(label, label)
 
 
-# the 18 published values -> coarse class
+# the 18 published values -> members (Requirement/Power Conferred have no member of their own: the default)
 FROM_18 = {
     "Enactment+Citation+Commencement": "Citation and commencement", "Extent": "Citation and commencement",
     "Interpretation+Definition": "Interpretation",
     "Application+Scope": "Application, exemption and transition", "Exemption": "Application, exemption and transition",
-    "Requirement": "Requirements", "Procedure+Detail": "Requirements", "Power Conferred": "Permissions",
-    "Enforcement+Prosecution": "Enforcement", "Offence": "Offences and penalties", "Liability": "Offences and penalties",
-    "Defence+Appeal": "Appeals and defences", "Charge+Fee": "Fees and charges",
+    "Requirement": DEFAULT, "Procedure+Detail": DEFAULT, "Power Conferred": DEFAULT,
+    "Enforcement+Prosecution": "Enforcement", "Offence": "Offences and penalties",
+    "Liability": "Appeals, compensation and defences", "Defence+Appeal": "Appeals, compensation and defences",
+    "Charge+Fee": "Fees and charges",
     "Amendment": "Amendment and revocation", "Repeal+Revocation": "Amendment and revocation",
-    "Transitional Arrangement": "Application, exemption and transition", "Establishment+Constitution": "Constitution",
+    "Transitional Arrangement": "Application, exemption and transition",
+    "Establishment+Constitution": "Bodies and their functions",
 }
 
-# ordered: first match wins, so specific classes come before Requirements/Permissions
+# the decision list: ordered as CLASSES (the default has no cue)
 CUES = [
-    ("Citation and commencement", r"\bmay be cited as\b|\bcomes? into (?:force|operation)\b|\bshall come into (?:force|operation)\b"
-                                  r"|\bextends? (?:only )?to (?:England|Wales|Scotland|Northern Ireland|Great Britain|the United Kingdom)"),
-    # powers to make further law (Interpretation Act 1978 s.21; Jason 2026-10-07). After commencement, so "comes into
-    # force on such day as X may by regulations appoint" stays Citation and commencement; before Requirements/Permissions
+    ("Citation and commencement", r"\bmay be cited as\b|\bcomes? into (?:force|operation)\b|\bshall come into (?:force|operation)\b|\bshall enter into force\b"
+                                  r"|\bextends? (?:only )?to (?:England|Wales|Scotland|Northern Ireland|Great Britain|the United Kingdom)"
+                                  r"|\bshall bring into force the laws, regulations and administrative provisions\b"),
+    # direct amending text only: a power to amend by regulations is Subordinate legislation
+    ("Amendment and revocation", r"\b(?:is|are) hereby (?:revoked|repealed)\b|\b(?:Regulations|Order|Act|Rules|Directive|provisions?)\b[^.;]{0,60}\b(?:is|are) (?:revoked|repealed)\b|\bfor .{1,80} substitute\b|\bthere (?:is|are|shall be) inserted\b"
+                                 r"|\b(?:is|are) amended as follows\b|\bomit\b"),
+    ("Interpretation", r"^In (?:this|these) [^,]{0,40},|“[^”]{1,80}” (?:means|includes|has the (?:same )?meaning)"
+                       r"|\breferences? (?:in [^,]{0,60})?to .{1,80} (?:is|are) to be (?:read|construed)\b|\bshall be construed as\b"),
+    # powers to make further law (Interpretation Act 1978 s.21; Jason 2026-10-07)
     ("Subordinate legislation", r"\b(?:may|shall|must) by (?:regulations|order|rules|scheme|byelaws|statutory instrument)\b"
                                 r"|\bpower to make (?:regulations|an order|orders|rules|byelaws)\b|\bmay make (?:regulations|rules|byelaws|an order)\b"
                                 r"|\b(?:regulations|orders?|rules|byelaws|schemes?) (?:under|made under) (?:this|subsection|section|paragraph|article|regulation)\b[^.;]{0,80}\b(?:may|shall|must)\b"
                                 r"|\b(?:delegated|implementing) acts?\b|\bstatutory instrument containing\b|\bexercisable by statutory instrument\b"
                                 r"|\bsubject to annulment\b|\bresolution of (?:each|either) House\b|\bdraft of (?:the )?(?:regulations|order|instrument)\b"),
-    ("Amendment and revocation", r"\b(?:is|are) hereby (?:revoked|repealed)\b|\b(?:Regulations|Order|Act|Rules|Directive|provisions?)\b[^.;]{0,60}\b(?:is|are) (?:revoked|repealed)\b|\bfor .{1,80} substitute\b|\bthere (?:is|are|shall be) inserted\b"
-                                 r"|\b(?:is|are) amended as follows\b|\bomit\b"),
     ("Transitional and saving", r"\bcontinues? to have effect\b|\bas if (?:this|these|that) .{0,40}had not\b|\btransitional\b|\bsaving\b"),
-    ("Interpretation", r"^In (?:this|these) [^,]{0,40},|“[^”]{1,80}” (?:means|includes|has the (?:same )?meaning)"
-                       r"|\breferences? (?:in [^,]{0,60})?to .{1,80} (?:is|are) to be (?:read|construed)\b|\bshall be construed as\b"),
-    ("Offences and penalties", r"\b(?:is|shall be) guilty of an offence\b|\bcommits an offence\b|\bliable,? on (?:summary )?conviction\b"
-                               r"|\bliable to (?:a fine|imprisonment)\b"),
-    ("Appeals and defences", r"\bit (?:is|shall be) a defence\b|\bmay appeal\b|\ban appeal (?:lies|shall lie)\b"),
-    ("Constitution", r"\bthere shall (?:continue to )?be a body\b|\bis (?:hereby )?established\b|\b(?:body|committee|board|panel|council|commission|tribunal|authority)\b[^.;]{0,40}\bshall consist of\b|\bshall be a body corporate\b"),
-    ("Enforcement", r"\binspectors?\b|\benforcing authorit|\bimprovement notice\b|\bprohibition notice\b|\benforcement notice\b"
-                    r"|\bpower(?:s)? of entry\b|\benter (?:any )?premises\b|\btake samples\b|\bseize\b"),
     ("Application and exemption", r"\b(?:shall|do|does) not apply\b|\bapplies? (?:only )?(?:to|in relation to)\b|\bshall apply (?:to|in relation to)\b"
-                                  r"|\bnothing in (?:this|these)\b.{0,60}\bappl|\bexempt"),
+                                  r"|\bnothing in (?:this|these)\b.{0,60}\bappl|\bexempt|\bbinds? the Crown\b|\bis addressed to the Member States\b"),
+    ("Review", r"\bmust from time to time\b[^.;]{0,40}\b(?:carry out a )?review\b|\bcarry out a review of the regulatory provision\b|\bpublish a report setting out the conclusions of the review\b"),
+    ("Appeals, compensation and defences", r"\bit (?:is|shall be) a defence\b|\bmay appeal\b|\ban appeal (?:lies|shall lie)\b|\bcompensation\b"),
+    ("Offences and penalties", r"\b(?:is|shall be) guilty of an offence\b|\bcommits an offence\b|\bliable,? on (?:summary )?conviction\b"
+                               r"|\bliable to (?:a fine|imprisonment)\b|\bcivil sanction"),
+    ("Enforcement", r"\binspectors?\b|\benforcing authorit|\bimprovement notice\b|\bprohibition notice\b|\benforcement notice\b"
+                    r"|\bpower(?:s)? of entry\b|\benter (?:any )?premises\b|\btake samples\b|\bseize\b|\bfixed penalty\b"),
+    ("Bodies and their functions", r"\bthere shall (?:continue to )?be a body\b|\bis (?:hereby )?established\b|\b(?:body|committee|board|panel|council|commission|tribunal|authority)\b[^.;]{0,40}\bshall consist of\b|\bshall be a body corporate\b"
+                                   r"|\bthe functions of\b|\b(?:may|must|shall) (?:issue|give|publish) guidance\b|\bcode of practice\b"),
     ("Fees and charges", r"\bfees?\b.{0,40}\b(?:payable|shall be paid|charge)|\bmay charge\b|\bshall pay\b.{0,40}\bfee"),
-    ("Requirements", r"\b(?:shall|must)\b|\bit shall be the duty\b|\bis required to\b|\bfunctions\b"),
-    ("Permissions", r"\bmay\b"),
+    ("Financial provisions", r"\bmoney provided by Parliament\b|\bexpenses (?:incurred|of)\b[^.;]{0,60}\b(?:shall|are to) be (?:paid|defrayed)\b|\bConsolidated Fund\b"),
 ]
 _CUES = [(name, re.compile(rx, re.I | re.M)) for name, rx in CUES]
 
 
 def cue(text: str) -> str | None:
+    """The first member whose cue fires (None: no member claims it)."""
     t = (text or "").strip()
     return next((name for name, rx in _CUES if rx.search(t)), None)
 
 
 def classify(section_id: str, texts: dict, inherit: bool = True) -> tuple[str, str]:
-    """(class, how): how = 'cue' | 'stem' | 'none'."""
+    """(member, how): how = 'cue' | 'stem' | 'default' | 'none' (no text)."""
     own = cue(texts.get(section_id, ""))
     if own:
         return own, "cue"
@@ -96,7 +105,7 @@ def classify(section_id: str, texts: dict, inherit: bool = True) -> tuple[str, s
                 c = cue(texts[a])
                 if c:
                     return c, "stem"
-    return "undetermined", "none"
+    return (DEFAULT, "default") if (texts.get(section_id) or "").strip() else ("undetermined", "none")
 
 
 def main() -> None:
@@ -123,7 +132,7 @@ def main() -> None:
         hit[k] += k == g
         if k != g:
             wrong[k][g] += 1
-    print(f"{len(gold):,} labelled provisions; decided by cue {how_n['cue']:,}, stem {how_n['stem']:,}, undetermined {how_n['none']:,}")
+    print(f"{len(gold):,} labelled provisions; decided by cue {how_n['cue']:,}, stem {how_n['stem']:,}, default {how_n['default']:,}, no text {how_n['none']:,}")
     print(f"{'class':28}{'labels':>7}{'pred':>6}{'prec':>6}{'recall':>7}  most common wrong")
     for k in CLASSES + ["undetermined"]:
         pr = hit[k] / pred[k] if pred[k] else 0

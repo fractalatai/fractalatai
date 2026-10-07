@@ -66,7 +66,7 @@ Sources: the phase B session (`.claude/sessions/parsing/2026-10-06-phaseB-princi
 ## Purpose (pointer)
 
 Purpose rules live in `docs/architecture/PURPOSE-CLASSIFICATION.md`:
-- 12 coarse classes (Subordinate legislation added 2026-10-07), single-select;
+- 13 purpose members as the law's anatomy, in precedence order with Substantive requirements as the default (2026-10-07), single-select;
 - a sentence takes its own class, or `inherit` when it has none.
 
 No P: rule is classified here. Two relation halves that sat in the purpose text are now relation principles:

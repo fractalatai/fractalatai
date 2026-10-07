@@ -13,7 +13,7 @@
 
 Three established classification methods, plus the law's own anatomy:
 
-1. **Faceted classification** (S. R. Ranganathan, *Colon Classification*, 1933; *Prolegomena to Library Classification*, 1937). A subject is analysed into independent **facets**, each on its own axis, instead of one tree that mixes them. Purpose (which part of the law) and DRRP (duty or power) are two facets. The 2026-10-06 coarse scheme mixed them: `Requirements`/`Permissions` restated the DRRP mode, and the other classes were topics. So a provision with both a topic and a duty forced a false choice (SI 2001/486 reg.4(1), "he shall vary its exemption certificate"). Separating the facets removes it.
+1. **Faceted classification** (S. R. Ranganathan, *Colon Classification*, 1933; *Prolegomena to Library Classification*, 1937). A subject is analysed into independent **facets**, each on its own axis, instead of one tree that mixes them. Purpose (which part of the law) and DRRP (duty or power) are two facets. The 2026-10-06 coarse scheme (11 classes, then 12) mixed them: `Requirements`/`Permissions` restated the DRRP mode, and the other classes were topics. So a provision with both a topic and a duty forced a false choice (SI 2001/486 reg.4(1), "he shall vary its exemption certificate"). Separating the facets removes it.
 2. **A residual class with a table of precedence.**
    - Library classifications settle which class wins when a work has several aspects: Dewey's *table of preference*, and UDC's and Bliss's *citation order*.
    - Statistical classifications (ISIC, NACE, ICD) classify top-down and end each level with an explicit residual, *"not elsewhere classified" (n.e.c.)*.
@@ -23,42 +23,53 @@ Three established classification methods, plus the law's own anatomy:
 
 ### The members, in precedence order (first match wins)
 
-| # | Purpose | The duck test | Was (2026-10-06) |
+Adopted 2026-10-07 after Gemini's challenge (below) and the heading evidence (37,980 section titles from 1,056 laws; legal's CLML headings extract). Jason: *"yes to Review and Financial provisions; compensation with appeals; order confirmed"*.
+
+| # | Purpose | The duck test | Headings in the corpus (laws) |
 |---|---|---|---|
-| 1 | Citation and commencement | title, commencement, extent | same |
-| 2 | Amendment and revocation | changes the text of other law (excluded from gold, catalogue REL-07) | same |
-| 3 | Interpretation | meanings, deeming, "references to" | same |
-| 4 | Application, exemption and transition | who, what, where and when the law reaches or leaves out, including exemption certificates | same |
-| 5 | Subordinate legislation | powers to make further law, what it may contain, how it is made (Interpretation Act 1978 s.21) | added 2026-10-07 |
-| 6 | Bodies and their functions | setting up bodies, their make-up and proceedings, their functions, guidance, codes of practice, reviews | Constitution, renamed and widened |
-| 7 | Offences and penalties | offences, penalties, civil liability | same |
-| 8 | Appeals and defences | appeals, reviews of decisions, statutory defences | same |
-| 9 | Enforcement | enforcement powers, inspectors, notices, enforcing authorities | same |
-| 10 | Fees and charges | fees, charges, payments to or by the regime | same |
-| 11 | **Substantive requirements** (the default, n.e.c.) | what the law requires to be done: everything no member above claims | replaces Requirements and Permissions |
+| 1 | Citation and commencement | title, commencement, extent, entry into force, final provisions, EU transposition | Citation and commencement 310, Short title 69, Extent 52, Entry into force 34, Transposition 20 |
+| 2 | Amendment and revocation | text that itself changes other law (excluded from gold, catalogue REL-07). A **power** to amend by regulations is Subordinate legislation | Revocation(s) 131, Consequential amendments 47, Repeal(s) 60 |
+| 3 | Interpretation | meanings, deeming, "references to" | Interpretation 583, Definitions 58 |
+| 4 | Subordinate legislation | powers to make further law, what it may contain, how it is made, EU delegated and implementing acts (Interpretation Act 1978 s.21) | Regulations 51, Orders and regulations 34, Exercise of the delegation 29, Committee procedure 22 |
+| 5 | Application, exemption and transition | who, what, where and when the law reaches or leaves out: scope, exemptions and exemption certificates, Crown application, transitional and savings, EU subject matter and addressees | Application 112, Transitional provisions 77, Exemptions 51, Scope 43, Crown application 37 |
+| 6 | Review | review of the law's own operation and effect (post-implementation review) | Review 126 |
+| 7 | Appeals, compensation and defences | remedies running from the state to the governed: appeals and reviews of decisions, compensation, statutory defences | Appeals 68, Defence of due diligence 34, Compensation 23 |
+| 8 | Offences and penalties | offences, penalties, offences by bodies corporate, civil sanctions | Offences 108, Penalties 103, Offences by bodies corporate 40 |
+| 9 | Enforcement | enforcement powers, inspectors, powers of entry, notices, directions, enforcing authorities | Enforcement 89, Enforcement notices 34, Powers of entry 19 |
+| 10 | Bodies and their functions | setting up bodies, their make-up and proceedings, their functions, guidance, codes of practice | Guidance 34 |
+| 11 | Fees and charges | fees, charges, payments to or by the regime | Fees 33 |
+| 12 | Financial provisions | public funding of the Act: expenses, money provided by Parliament, grants | Financial provisions 36, Expenses 23 |
+| 13 | **Substantive requirements** (the default, n.e.c.) | what the law requires to be done: everything no member above claims | 54% of titled sections: health surveillance, monitoring, records, provision of information, risk assessment, obligations of manufacturers/importers/distributors, … |
 
 **Children of Substantive requirements** (a later, finer layer; not labelled in the gold yet, Jason 2026-10-07):
-- **Administration** ("the paperwork"): permits, licences, authorisations, certificates and registration; notification and reporting; records and registers;
+- **Administration** ("the paperwork"): permits, licences, authorisations, certificates and registration; notification and reporting; records and registers; service of documents (42 laws);
 - **General**: the rest (control measures, assessment and planning, information and training, inspection and monitoring by the duty holder, and so on).
 
-**Precedence notes:**
-- Subordinate legislation comes before Bodies and their functions: a minister's power to make regulations is Subordinate legislation, though it is a ministerial function.
-- Offences come before Enforcement.
-- Application comes before the default: an exemption certificate is Application, not Administration (gas regs 1998 reg.40(2); SI 2001/486 reg.4(1)).
-- Gemini challenged this order on 2026-10-07; see the review section below.
+**Precedence: the pairs that decide most conflicts** (Gemini review 2026-10-07, raw: `data/code-review/purpose-anatomy-precedence.md`):
+- **Subordinate legislation > Application:** a regulation-making power with a scope limit is a power ("may by regulations make provision…, but such regulations shall not apply to…").
+- **Interpretation > Application:** a deeming provision that sets scope is still interpretation.
+- **Citation and commencement > Subordinate legislation:** "comes into force on such day as the Secretary of State may by order appoint".
+- **Appeals, compensation and defences > Offences and Enforcement:** a due-diligence defence; "a person on whom an improvement notice is served may appeal".
+- **Offences > Enforcement:** an offence of failing to comply with a notice.
+- **Enforcement > Bodies and their functions:** "The HSE shall be the enforcing authority for these Regulations" (replaces the 10-07 Requirements ruling: topic Enforcement, Obligation in DRRP).
+- **Enforcement > Fees:** a fixed penalty is an enforcement tool.
+- **Subordinate legislation > Bodies and their functions:** a minister's power to make regulations.
+- **Application > the default:** an exemption certificate is Application, not Administration (gas regs 1998 reg.40(2); SI 2001/486 reg.4(1)).
+- **Not adopted from Gemini:** Enforcement above Appeals (that contradicts its own appeal-against-a-notice verdict), and Amendment winning over a power to amend by regulations (Amendment is direct amending text only).
 
-**Not a member:** `Requirements` and `Permissions` (retired 2026-10-07; the DRRP facet carries duty and power). `inherit` stays as the escape value for snippets.
+**Not a member:** `Requirements` and `Permissions` (retired 2026-10-07; the DRRP facet carries duty and power), and `Constitution` (renamed Bodies and their functions). `inherit` stays as the escape value for snippets.
 
 **Class rules from the gold review** (Jason, 2026-10-06):
 - A condition on an exemption, or on how a power applies ("shall not grant any such exemption unless satisfied", "application of the exercise of a power"), is **Application, exemption and transition**.
 - **Transitional is merged into Application** (Jason, 2026-10-06): transition is application in time, as scope is application to persons, things and places. So the coarse class is **Application, exemption and transition**, with a detail level **Scope / Exemption / Transitional and saving**. The detail is filled only when a consumer needs it, and isn't labelled in the gold set.
 - **Interpretation is for meanings only** (Jason, 2026-10-06): a provision on "the application of" a power or rule (how, when or to whom it applies) is **Application**, even under an interpretation heading (Companies Act 1989 s.112(2)(b)).
-- **Designating the enforcing authority or regulator** ("The HSE shall be the enforcing authority for these Regulations") was ruled **Requirements** (Jason 2026-10-07; catalogue v2 REL-27). **To re-decide under the anatomy scheme:** its topic is Enforcement (an enforcing-authority designation); the Obligation stays in DRRP.
+- **Designating the enforcing authority or regulator** ("The HSE shall be the enforcing authority for these Regulations") is **Enforcement** (anatomy scheme, 2026-10-07; it was briefly ruled Requirements). The Obligation stays in DRRP (catalogue v2 REL-27).
 - **Who is the regulator from a date** ("S is the regulator of B from 1st January 2026") is **Application** (transition in time), with relation **`no`**: the sentence is only about the date transfer (Jason 2026-10-07, GHG ETS 2020 reg.13(2)). It is not a REL-27 designation. Bodies and their functions is for setting up a body, its make-up and its functions.
 - **Purpose `inherit`: the escape rule** (Jason, 2026-10-06, batch 2). Purpose was being forced onto snippets; laws give purpose to whole sections. So a provision takes its **own** purpose only when its own words carry one: it creates or confers something, defines a term, applies or disapplies the law, sets an offence, penalty, fee, appeal, amendment or citation. A snippet that only makes sense with the provision above it takes **`inherit`**: its purpose is that of the nearest ancestor (stem, then subsection, then section). Snippets include list items completing a stem, conditions and provisos ("if the person under restraint agrees…"), criterion items, and fragments that set the detail of a duty in the same section. Prefer `inherit` to forcing a class onto a snippet. A provision with no ancestor never inherits.
 - **Who, when, what, where vs how** (Jason, batch 2): Application is about who, when, what and where the law applies. A procedural condition on exercising a power ("SEPA must not grant an application for transfer … unless it is satisfied that—", SSI 2018/219 reg.27(6)) is **Substantive requirements** (child: Administration, a permit transfer). A condition on granting an exemption, or on whom a power reaches (reg.44A(8)(a)), stays Application.
-- **A power to authorise others** to act for a body ("may authorise in writing any person … to carry out any of its functions", SI 2012/3032 reg.35(2)) was ruled Permissions. Under the anatomy scheme it is **Bodies and their functions**, or Enforcement when the functions are enforcement ones (to confirm).
+- **A power to authorise others** to act for a body ("may authorise in writing any person … to carry out any of its functions", SI 2012/3032 reg.35(2)) was ruled Permissions. Under the anatomy scheme it is **Bodies and their functions**, or Enforcement when the functions are enforcement ones (precedence: Enforcement > Bodies).
 - **"An offence will not be committed … provided that"** (SI 2019/156 reg.4(8)) is **Offences and penalties**.
+- **Compensation** goes with appeals and defences: *"Offences and penalties run from government to governed. Compensation runs in the opposite direction."* (Jason, CAA 1982 s.44(6)).
 - **Subordinate legislation** (Jason, 2026-10-07). The Interpretation Act 1978 s.21(1) defines it as "Orders in Council, orders, rules, regulations, schemes, warrants, byelaws and other instruments made or to be made under any Act"; our laws head these provisions "Subordinate legislation", "Regulations", "Powers to make regulations", "Orders and regulations", "Byelaws" and (EU) "Delegated and implementing acts".
   - **Covers:**
     - a power or duty to make regulations, orders, rules, schemes or byelaws ("The Secretary of State may by regulations make provision…");
