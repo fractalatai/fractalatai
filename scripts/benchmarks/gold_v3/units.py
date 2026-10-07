@@ -29,8 +29,9 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 from drrp_prompt import ancestors  # noqa: E402
 
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
-DASH = re.compile(r"\s*[—–]\s*")
-COLON_END = re.compile(r":\s*$")
+DASH = re.compile(r"\s*[—–]+\s*")
+COLON = re.compile(r":\s*")
+PLACEHOLDER = re.compile(r"[\s.…]+")  # repealed rows are dots
 MODAL = re.compile(r"\b(?:shall|must|may|is to|are to)\b", re.I)
 # an item that opens with its own subject before a modal ("the Secretary of State shall …")
 OWN_SUBJECT = re.compile(r"^(?:the|a|an|any|every|each|no|such|that|this|where|if)\b[^;—]{0,120}?\b(?:shall|must|may)\b", re.I)
@@ -56,16 +57,18 @@ class Units:
         t = self.text(sid)
         # a stem introduces list items; a section whose children are all numbered subsections isn't one, even when
         # its own text has a dash (Water Act 2003 s.3 holds the s.3(12) definitions after legal's 2026-10-07 repair)
+        # list items always continue their parent's words, so a lead-in that lost its dash in the source ("the
+        # diving project plan shall;", "In Scotland") is still a stem; the dash only marks where closing words start
         items = any(self.rows[k][3] in ("paragraph", "sub_paragraph") for k in self.kids.get(sid, []))
-        return items and bool(t) and (bool(DASH.search(t)) or bool(COLON_END.search(t)))
+        return items and bool(PLACEHOLDER.sub("", t))
 
     def root(self, sid: str) -> str:
+        # the outermost stem above a row; a stem's unit is its whole subtree (members), so an item row under a
+        # non-stem item ((b) "that is to say" with no dash, then (b)(i)) still belongs to the stem's sentence
         r = sid
         for a in ancestors(sid):
             if a in self.rows and self.is_stem(a):
                 r = a
-            else:
-                break
         return r
 
     def members(self, root: str) -> list[str]:
@@ -89,17 +92,41 @@ class Units:
         pad = "    " * depth
         if not self.is_stem(sid):
             lines = [pad + label + t] if t else []
-            for k in self.kids.get(sid, []):
+            # an item without a dash still carries its sub-items ((b) "that is to say" (i) (ii)); a root that isn't
+            # a stem is one row, so its subsections (their own units) aren't printed under it
+            for k in self.kids.get(sid, []) if depth else []:
                 lines += self.render(k, depth + 1)
             return lines
-        m = DASH.search(t)
-        head, tail = (t[:m.start()] + "—", t[m.end():].strip()) if m else (t, "")
-        lines = [pad + label + head]
-        for k in self.kids[sid]:
-            lines += self.render(k, depth + 1)
-        if tail:
-            lines.append(pad + tail)
+        parts = DASH.split(t)
+        series = self._series(self.kids[sid])
+        if len(parts) - 1 != len(series):
+            # one list: the head up to the first dash, the items, then everything after it
+            m = DASH.search(t) or COLON.search(t)  # no dash: a colon opens the list ("direct in writing that: shall …")
+            parts = [t[:m.start()], t[m.end():]] if m else [t, ""]
+            series = [self.kids[sid]]
+        # "X— (a) (b) then Y— (i) (ii) Z": each dash opens the next run of items (Civil Aviation Act 1982 s.94(2))
+        mark = "—" if DASH.search(t) else ":" if COLON.search(t) else ""
+        lines = [pad + label + parts[0].strip() + mark]
+        for i, run in enumerate(series):
+            for k in run:
+                lines += self.render(k, depth + 1)
+            nxt = parts[i + 1].strip()
+            if nxt:
+                lines.append(pad + nxt + ("—" if i + 1 < len(series) else ""))
         return lines
+
+    def _series(self, kids: list[str]) -> list[list[str]]:
+        """Split a stem's items into runs where the numbering restarts ((a) (b) then (i) (ii), or (a) again)."""
+        runs: list[list[str]] = []
+        prev = None
+        for k in kids:
+            lab = k[k.rfind("("):]
+            restart = prev is not None and (lab == "(a)" or (lab == "(i)" and prev != "(h)"))
+            if not runs or restart:
+                runs.append([])
+            runs[-1].append(k)
+            prev = lab
+        return runs
 
     def unit(self, root: str) -> dict:
         mem = self.members(root)
@@ -107,7 +134,7 @@ class Units:
         items = mem[1:]
         flags = []
         if len(mem) > 1:
-            m = DASH.search(self.text(root))
+            m = DASH.search(self.text(root)) or COLON.search(self.text(root))
             if m and self.text(root)[m.end():].strip():
                 flags.append("closing_words")
             if any(self.is_stem(s) for s in items):
@@ -119,7 +146,9 @@ class Units:
         if len(text) > LONG:
             flags.append("long")
         if PROVISO.search(self.text(root)):
-            flags.append("proviso_row")
+            flags.append("proviso_row")  # a sibling "But …" qualifying the row before it: not joined (yet)
+        if self.rows[root][3] in ("section", "article") and self.kids.get(root) and not self.is_stem(root):
+            flags.append("section_text")  # text on a section row with subsections: often a stray fragment of one
         if "sch" in root.split(":", 1)[1][:4]:
             flags.append("schedule")
         return {"unit_id": root, "law_name": self.rows[root][0], "members": mem, "n_rows": len(mem),
