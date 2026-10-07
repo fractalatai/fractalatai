@@ -23,6 +23,7 @@ Labels attached to the source's rows, and a sentence split into a stem and items
 - ⬜ **Assembler QA** (Gemini): a stratified sample of assembled units (nested, long, schedule, proviso) checked by an agent and spot-checked by Jason before phase C labels anything
 - ⬜ Counts on the 61 test laws and the selection, written below; the selection re-keyed to units for phase C
 - ⬜ Note for phase E: the same assembler in `fractalaw-core` so the pipeline labels sentences
+- ⬜ **Disambiguate `Operator`** (Jason, 2026-10-07): one label covers an individual who operates (a machine, a vehicle) and an organisation that runs an installation, airport, well or regulated activity; split it (see below)
 
 ## Dependencies
 
@@ -59,3 +60,19 @@ Selection unit text: median 302 characters, p90 807. The long units (21 over 4,0
 **For Jason:** gas regs reg.40(2) purpose: his current row decision approves Requirements (he changed it to Application in the pilot, then reverted), but PURPOSE-CLASSIFICATION.md cites reg.40(2) as the Application example.
 
 **Resolved (Jason, 2026-10-06):** gas regs reg.40(2) purpose is **Application, exemption and transition**. *"The section is titled Exemption certificates."* Recorded on the sentence page and in both gold versions; the purpose doc's example stands. The title decided it: more evidence that section titles (P1group/Title, on the legal-side list) are the cheapest purpose signal, and that purpose belongs to the section.
+
+## Operator is two actors (Jason, 2026-10-07)
+
+*"We need to disambiguate Operator. It can mean an individual who operates, or something much larger."*
+
+The dictionary has a single `Operator` label (governed, category `other`). Its regex matches any "operator", with only Economic Operator excluded. In the sentence gold it labels 13 units, and those span both meanings:
+- **Organisations:** the ELD "relevant operator" (whoever runs an occupational activity), airport and aircraft operators, the well-operator, the operator of a permitted facility, a "digitally excluded operator";
+- **Individuals:** a person working a machine or plant, as in PUWER reg.17(3).
+
+The holder shape differs. An operator-organisation carries duty-holder obligations, permits and reporting. An operator-individual is a worker-like actor at the point of use.
+
+Options, to settle from the data and not now:
+- split into `Org: Operator` and `Ind: Operator`, using the `Ind`/`Org` prefixes that already exist;
+- or tell them apart by context ("operator of a <installation/facility/airport>" → Org; operating "work equipment", a "machine" or a "vehicle" → Ind).
+
+Most "the operator" mentions rely on a defined term, so the law's definitions (already in the evidence context) usually decide. For now, flag it in the review comments and don't add rules. It goes to the phase B recurrence check and the dictionary-gap list.
