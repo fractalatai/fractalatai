@@ -14,8 +14,17 @@ its items indented, then the stem's closing words. `members` lists the source ro
   REL-30, REL-45, HOLD-02, TYPE-06, POS-17, POS-18, the item half of REL-28, and the 10-06 refinements about items
   (items picking the holder, item laying duties, stem beneficiaries on items, "continues" on items).
 - Two holders in one sentence ("the operator must …, and the regulator may …") are two `active` actors, each with
-  its own `holds`. One entry per label still stands (POS-15): if the same label has two roles, keep the strongest
-  and say what was dropped (#78).
+  its own `holds`.
+- **One entry per label per role** (POS-15, revised 2026-10-07 for #78):
+  - one party with a duty **and** a power ("X may prescribe …; X must publish …") → one entry, `"holds": "both"`;
+  - one label standing for parties in **different** roles ("a person who carries out a search of a relevant
+    person") → one entry per role: list the label twice, each with its own `position`;
+  - parties sharing a label **and** a role (two authorities, both beneficiaries) → one entry;
+  - a `mentioned` role next to a substantive role for the same label is dropped (the strongest wins);
+  - `act` is a **list** (`[]` when none): one party can have several acts ("workers are provided with … ; workers
+    do not eat or drink …").
+- If you think a generic label (`Ind: Person`, `Gvt: Authority`) hides two recurring parties that deserve their own
+  labels, say so in a policy note as a **dictionary candidate**, quoting the law's own term.
 - **Relation:**
   - `yes`: the sentence creates an obligation or liberty;
   - `continues`: the **whole sentence** only sets the detail, condition or timing of a duty or power created in

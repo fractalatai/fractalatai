@@ -26,7 +26,7 @@ The evidence is **evidence, not truth**. The models followed an older prompt (`d
 - **An applying provision's own row** (REL-26): "X shall comply with / ensure compliance with the requirements of SCOPE" is a pointer, so relation `no`, with X `mentioned`. The supervisory form (HOLD-07) and the prohibition form (HOLD-09) are still duties.
 - **`serve` is folded into `notify`** (ACT-03, ACT-12). The acts are: `notify`, `supply`, `consult`, `pay`, `give_access`, `charge`, `answer_request`, `other`. Map the verb using the synonym table (spec layer 1b).
 - **#67 access rights** (INF-01) also apply when the access duty's holder is unknown ("open to inspection by the public" → the public is `active`, holds `Liberty`, `inferred: true`).
-- **One entry per label, strongest role** (POS-15) is still in force. If a second role or a second same-label person is dropped, say what was dropped in the reason. That feeds #78.
+- **POS-15 revised 2026-10-07 (#78):** one entry per label per role, `holds: both` for one party with a duty and a power, `act` as a list. See `JUSTIFY_UNITS.md`.
 - **Stems and list items are counted once** (REL-45, REL-28, POS-17; Jason 2026-10-06). A stem that begins a duty or power ("X shall—", "X may … requiring the person to—") is `yes` with its holder active. An item that only completes it is relation **`continues`**: no holder, no raw_type, and the stem's holder is **not** listed. The item's own actors keep their role in the stem's relation (counterparty with its act, beneficiary, or mentioned). An item with its own duty or power is `yes`; criterion and class-definition items stay `no` (REL-15). The source puts a stem's closing words ("… as it may reasonably require …") on the stem row; they belong to the stem.
 - **Detail of a duty continues it** (REL-28, 2026-10-06): a provision that only sets the content, form, manner, timing or discharge of a duty created elsewhere is `continues`, not `no` (it replaces the old `no` for REL-11/12/13 and the detail half of REL-16). `no` means the provision touches no duty or power at all. Conditions on **a power** (REL-14) stay `no`.
 - **"No person shall be engaged/employed/permitted"** (HOLD-17): the engager holds it, from the applying provision (`inferred: true`); the person engaged is `mentioned`.
@@ -58,7 +58,7 @@ The evidence is **evidence, not truth**. The models followed an older prompt (`d
 | `relation` | `"yes"` / `"no"` / `"continues"` (an item completing its stem's relation, REL-28) | REL-* |
 | `raw_type` | `"Obligation"` / `"Liberty"` / `null`; set only when relation is yes and no actor is active | HOLD-15, DEF-02, TYPE-* |
 | `purpose` | one of the 11 coarse classes, exactly as written in PURPOSE-CLASSIFICATION.md, or `"inherit"` for a snippet (escape rule) | `P:<class>` plus the deciding cue, e.g. `P:Interpretation` |
-| `actor` (one per label) | `{"position", "holds", "inferred", "act"}` | POS-*, HOLD-*, TYPE-*, INF-*, ACT-*, LBL-* |
+| `actor` (one per label per role) | `{"position", "holds" (Obligation, Liberty, both, none), "inferred", "act": [..]}` | POS-*, HOLD-*, TYPE-*, INF-*, ACT-*, LBL-* |
 
 Purpose detail (Substantive vs Procedure/Detail under Requirements) is **not** proposed: it is derived from purpose plus relation when the gold set is frozen (Jason, 2026-10-06). Purpose is always proposed, including for relation `no` rows. There are no purpose rule IDs yet (the purpose catalogue comes with phase 2), so cite `P:<class>` and quote the deciding words in the reason.
 

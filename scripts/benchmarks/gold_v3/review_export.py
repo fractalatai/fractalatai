@@ -35,8 +35,10 @@ def doc_id(section_id: str) -> str:
     return "p-" + hashlib.md5(section_id.encode()).hexdigest()[:16]
 
 
-def row_key(section_id: str, field: str, actor: str) -> str:
-    return doc_id(section_id) + "~" + field + ("~" + hashlib.md5(actor.encode()).hexdigest()[:10] if actor else "")
+def row_key(section_id: str, field: str, actor: str, position: str = "") -> str:
+    """Page key for a gold row; a second entry for a label in another role (#78) appends that role."""
+    return (doc_id(section_id) + "~" + field + ("~" + hashlib.md5(actor.encode()).hexdigest()[:10] if actor else "")
+            + ("~" + position if position else ""))
 
 
 def stems(context: str) -> list[dict]:

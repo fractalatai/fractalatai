@@ -128,6 +128,9 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
 .ev.diff { border-color: color-mix(in srgb, var(--bad) 55%, var(--line)); background: var(--bad-soft); }
 .act { display: grid; gap: 6px; align-content: start; }
 .act .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.editor fieldset.acts { border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 0; }
+.editor fieldset.acts legend { font-size: 12px; padding: 0 4px; }
+.editor fieldset.acts label { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
 .status { font-size: 12px; color: var(--ink-2); }
 .status b { color: var(--ink); }
 .editor { grid-column: 1 / -1; display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: 6px; background: var(--paper); }
@@ -193,8 +196,10 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
     purpose_fine: ["Substantive", "Procedure/Detail"],
   };
   const POSITIONS = ["active", "counterparty", "beneficiary", "mentioned", "(not an actor here)"];
-  const HOLDS = ["none", "Obligation", "Liberty"];
-  const ACTS = ["", "notify", "supply", "consult", "pay", "give_access", "charge", "answer_request", "other"];
+  const HOLDS = ["none", "Obligation", "Liberty", "both"];
+  const ACTS = ["notify", "supply", "consult", "pay", "give_access", "charge", "answer_request", "other"];
+  // #78: an actor's act is a list; a label can have a second entry in another role (its key ends "~<role>")
+  const acts = (v) => Array.isArray(v) ? v : (v ? [v] : []);
   const FIELD_NAME = { relation: "Creates an obligation or liberty?", raw_type: "Type when no holder is named", purpose: "Purpose", purpose_fine: "Purpose detail", actor: "Actor" };
   const HOLDER_SOURCE = { "HOLD-02": "Holder taken from the stem", "HOLD-04": "Holder taken from a referenced provision",
     "HOLD-05": "Holder taken from an applying provision", "HOLD-06": "Holder taken from an applying provision",
@@ -202,7 +207,7 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
     "HOLD-09": "Holder taken from an applying provision", "HOLD-14": "Holder taken from the parent Act", "INF-01": "Implied right of access (inferred)" };
   const EV_NAME = { gemini: "Gemini", referee: "Referee", mini: "GPT-mini", gpt55: "GPT-5.5", pipeline: "Pipeline", cue: "Cue" };
 
-  const state = { provisions: [], decisions: {}, decDocs: {}, diff: "all", status: "open", field: "all", editing: null, canWrite: true, confirmBulk: false, busy: false };
+  const state = { provisions: [], decisions: {}, decDocs: {}, diff: "all", status: "open", field: "all", editing: null, adding: null, canWrite: true, confirmBulk: false, busy: false };
   let db = null;
 
   const $ = (id) => document.getElementById(id);
@@ -217,7 +222,7 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
         const parts = ["role: " + (v.position || "?")];
         if (v.holds && v.holds !== "none") parts.push("holds " + v.holds);
         if (v.inferred) parts.push("inferred");
-        if (v.act) parts.push("act: " + v.act);
+        if (acts(v.act).length) parts.push("act: " + acts(v.act).join(", "));
         return parts.join(" · ");
       }
       if (v.final) {
@@ -234,7 +239,8 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
       if (!a || !b || typeof b !== "object") return false;
       if (a.listed === false || b.listed === false) return (a.listed === false) === (b.listed === false);
       if (b.final) return b.final[0] === a.position;
-      return ["position", "holds", "act"].every((k) => (a[k] || null) === (b[k] || null)) && !!a.inferred === !!b.inferred;
+      return ["position", "holds"].every((k) => (a[k] || null) === (b[k] || null)) && !!a.inferred === !!b.inferred
+        && acts(a.act).slice().sort().join() === acts(b.act).slice().sort().join();
     }
     if (Array.isArray(b)) return b.includes(a);
     return (a ?? null) === (b ?? null);
@@ -299,11 +305,26 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
     }
   }
 
-  function editorFor(p, r) {
+  const baseKey = (r) => r.actor_position ? r.key.slice(0, -(r.actor_position.length + 1)) : r.key;
+  function rolesHeld(p, label) {
+    const out = new Set();
+    for (const x of rowsOf(p)) if (x.field === "actor" && x.actor_label === label) {
+      const d = decisionOf(x); const v = d && d.decision === "change" && d.decided ? d.decided : x.proposed;
+      if (v && v.position) out.add(v.position);
+    }
+    for (const [k, d] of Object.entries(state.decisions)) if (d.decision === "add" && d.actor_label === label && d.decided && pidOf(k) === pidOf(rowsOf(p)[0].key)) out.add(d.decided.position);
+    return out;
+  }
+  function addedFor(r) {
+    const b = baseKey(r) + "~";
+    return Object.values(state.decisions).filter((d) => d.decision === "add" && d.key.startsWith(b) && !r.actor_position);
+  }
+  function editorFor(p, r, adding) {
     const box = el("div", "editor");
     const fields = el("div", "fields");
-    const d = decisionOf(r);
-    const start = d && d.decision === "change" && d.decided != null ? d.decided : r.proposed;
+    const d = adding ? null : decisionOf(r);
+    const start = adding ? {} : d && d.decision === "change" && d.decided != null ? d.decided : r.proposed;
+    if (adding) box.append(el("p", "note", "A second entry for " + r.actor_label + " in a different role: use it when the label stands for two parties, or one party in two roles, in this sentence."));
     const inputs = {};
     const sel = (name, opts, cur, id) => {
       const lab = el("label", null, name); const s = el("select"); s.id = id;
@@ -313,9 +334,14 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
     const base = "ed-" + r.key.replace(/[^a-zA-Z0-9]/g, "-");
     if (r.field === "actor") {
       const v = start && typeof start === "object" ? start : {};
-      inputs.position = sel("Role", POSITIONS, v.listed === false ? "(not an actor here)" : (v.position || "mentioned"), base + "-pos");
+      inputs.position = sel("Role", adding ? POSITIONS.slice(0, 4) : POSITIONS, v.listed === false ? "(not an actor here)" : (v.position || "mentioned"), base + "-pos");
       inputs.holds = sel("Holds", HOLDS, v.holds || "none", base + "-holds");
-      inputs.act = sel("Act", ACTS, v.act || "", base + "-act");
+      const ag = el("fieldset", "acts"); ag.append(el("legend", null, "Act (any that apply)"));
+      inputs.acts = ACTS.map((a) => {
+        const l = el("label"); const c = document.createElement("input"); c.type = "checkbox"; c.value = a; c.checked = acts(v.act).includes(a);
+        l.append(c, document.createTextNode(" " + a)); ag.append(l); return c;
+      });
+      fields.append(ag);
       const lab = el("label", null, "Inferred"); const cb = document.createElement("input"); cb.type = "checkbox"; cb.id = base + "-inf"; cb.checked = !!v.inferred; lab.append(cb); fields.append(lab); inputs.inferred = cb;
     } else {
       inputs.value = sel("Value", CHOICES[r.field] || [], start ?? "", base + "-val");
@@ -328,18 +354,21 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
       let val;
       if (r.field === "actor") {
         val = inputs.position.value === "(not an actor here)" ? { listed: false }
-          : { position: inputs.position.value, holds: inputs.holds.value, inferred: inputs.inferred.checked, act: inputs.act.value || null };
-        if (val.position === "active" && val.holds === "none") { showNotice("An active actor holds an Obligation or a Liberty: choose one under Holds."); return; }
+          : { position: inputs.position.value, holds: inputs.holds.value, inferred: inputs.inferred.checked, act: inputs.acts.filter((c) => c.checked).map((c) => c.value) };
+        if (val.position === "active" && val.holds === "none") { showNotice("An active actor holds an Obligation, a Liberty or both: choose under Holds."); return; }
+        if (adding && rolesHeld(p, r.actor_label).has(val.position)) { showNotice(r.actor_label + " already has an entry as " + val.position + ": choose another role, or change that entry."); return; }
         if (val.position && val.position !== "active" && val.holds !== "none") { showNotice("Only an active actor holds an Obligation or a Liberty: set Holds to none, or the role to active."); return; }
       } else {
         val = inputs.value.value === "" ? null : inputs.value.value;
       }
-      await save1(r, "change", val, ta.value.trim());
-      state.editing = null; render();
+      if (adding) await saveAdd(p, r, val, ta.value.trim());
+      else await save1(r, "change", val, ta.value.trim());
+      state.editing = null; state.adding = null; render();
     };
-    const q = el("button", "btn", "Save as query"); q.type = "button";
+    if (adding) save.textContent = "Add this entry";
+    const q = el("button", "btn", "Save as query"); q.type = "button"; if (adding) q.hidden = true;
     q.onclick = async () => { await save1(r, "query", null, ta.value.trim()); state.editing = null; render(); };
-    const cancel = el("button", "btn", "Cancel"); cancel.type = "button"; cancel.onclick = () => { state.editing = null; render(); };
+    const cancel = el("button", "btn", "Cancel"); cancel.type = "button"; cancel.onclick = () => { state.editing = null; state.adding = null; render(); };
     btns.append(save, q, cancel);
     box.append(fields, cl, btns);
     return box;
@@ -350,7 +379,7 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
     const row = el("div", "row"); row.dataset.d = r.difficulty; if (d) row.dataset.s = d.decision;
     const left = el("div");
     const fn = el("div", "fname", FIELD_NAME[r.field] || r.field);
-    if (r.actor_label) fn.append(el("span", "actor", r.actor_label));
+    if (r.actor_label) fn.append(el("span", "actor", r.actor_label + (r.actor_position ? " · second entry (" + r.actor_position + ")" : "")));
     left.append(fn, el("div", "value", fmt(r.field, r.proposed)));
     if (r.field === "actor") {
       const src = (r.rules || []).map((x) => HOLDER_SOURCE[x.id]).find(Boolean);
@@ -395,10 +424,20 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
       const c = el("button", "btn", "Change…"); c.type = "button"; c.onclick = () => { state.editing = r.key; render(); };
       btns.append(a, c);
       if (d) { const u = el("button", "btn danger", "Undo"); u.type = "button"; u.onclick = async () => { await undo(r); render(); }; btns.append(u); }
+      if (r.field === "actor" && !r.actor_position) {
+        const ad = el("button", "btn", "Add a role…"); ad.type = "button"; ad.title = "A second entry for this label in another role";
+        ad.onclick = () => { state.adding = r.key; state.editing = null; render(); }; btns.append(ad);
+      }
       act.append(btns);
+    }
+    for (const x of addedFor(r)) {
+      const st = el("div", "status"); st.append(el("b", null, "Added: "), document.createTextNode(fmt("actor", x.decided) + (x.comment ? " · " + x.comment : "")));
+      if (state.canWrite && db) { const u = el("button", "btn danger", "Remove"); u.type = "button"; u.onclick = async () => { await undoKey(x.key); render(); }; st.append(document.createTextNode(" "), u); }
+      act.append(st);
     }
     row.append(left, mid, act);
     if (state.editing === r.key) row.append(editorFor(p, r));
+    if (state.adding === r.key) row.append(editorFor(p, r, true));
     return row;
   }
 
@@ -479,9 +518,15 @@ details.ctx pre { font: 12.5px/1.5 var(--mono); white-space: pre-wrap; color: va
     for (const [r, dec, val, cmt] of items) { const pid = pidOf(r.key); (by[pid] = by[pid] || {})[slotOf(r.key)] = body(r, dec, val, cmt); }
     for (const pid of Object.keys(by)) { const ok = await writeSlots(pid, sectionOf(pid), by[pid]); if (!ok) break; }
   }
-  async function undo(r) {
-    const pid = pidOf(r.key);
-    await writeSlots(pid, sectionOf(pid), { [slotOf(r.key)]: null });
+  async function undo(r) { await undoKey(r.key); }
+  async function undoKey(key) {
+    const pid = pidOf(key);
+    await writeSlots(pid, sectionOf(pid), { [slotOf(key)]: null });
+  }
+  async function saveAdd(p, r, val, comment) {
+    if (!db) return;
+    const key = baseKey(r) + "~" + val.position, pid = pidOf(key);
+    await writeSlots(pid, p.section_id, { [slotOf(key)]: { ...body(r, "add", val, comment), key } });
   }
   function showNotice(msg) { const n = $("notice"); n.textContent = msg; n.hidden = false; }
 

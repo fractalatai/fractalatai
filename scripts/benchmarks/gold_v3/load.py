@@ -156,7 +156,7 @@ def main() -> None:
             """INSERT INTO drrp_gold (gold_version, section_id, text_md5, field, actor_label, proposed, rule_ids, reason,
                                       evidence, agree, difficulty, catalogue_ver)
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-               ON CONFLICT (gold_version, section_id, field, actor_label) DO UPDATE SET
+               ON CONFLICT (gold_version, section_id, field, actor_label, actor_position) DO UPDATE SET
                  text_md5 = EXCLUDED.text_md5, proposed = EXCLUDED.proposed, rule_ids = EXCLUDED.rule_ids,
                  reason = EXCLUDED.reason, evidence = EXCLUDED.evidence, agree = EXCLUDED.agree,
                  difficulty = EXCLUDED.difficulty, catalogue_ver = EXCLUDED.catalogue_ver, created_at = now()

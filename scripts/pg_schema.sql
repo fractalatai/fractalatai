@@ -144,7 +144,8 @@ CREATE TABLE IF NOT EXISTS drrp_gold (
     text_md5       TEXT NOT NULL,             -- the text the label was made for (a LAT re-pull makes it stale)
     field          TEXT NOT NULL,             -- relation | raw_type | purpose | purpose_fine | actor
     actor_label    TEXT NOT NULL DEFAULT '',  -- field = actor only ('' otherwise)
-    proposed       JSONB NOT NULL,            -- value; actor: {position, holds, inferred, act}
+    actor_position TEXT NOT NULL DEFAULT '',  -- '' for a label's entry; a second entry for the same label in another role carries that position (#78)
+    proposed       JSONB NOT NULL,            -- value; actor: {position, holds (Obligation|Liberty|both|none), inferred, act: [..]}
     rule_ids       TEXT[] NOT NULL,           -- catalogue IDs, e.g. {REL-01,HOLD-05}; '{NEW}' = no rule fits
     reason         TEXT NOT NULL,             -- one sentence linking the rule to this text
     evidence       JSONB,                     -- {tier: value} for regex, cls, slm, gemini, mini, referee, adjudicated
@@ -156,5 +157,5 @@ CREATE TABLE IF NOT EXISTS drrp_gold (
     comment        TEXT,
     decided_at     TIMESTAMPTZ,
     created_at     TIMESTAMPTZ DEFAULT now(),
-    PRIMARY KEY (gold_version, section_id, field, actor_label)
+    PRIMARY KEY (gold_version, section_id, field, actor_label, actor_position)
 );
