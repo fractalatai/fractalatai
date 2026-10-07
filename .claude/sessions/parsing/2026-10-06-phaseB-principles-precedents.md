@@ -22,9 +22,9 @@ related: ["parsing/2026-10-06-meta-plan-sentence-units.md", "docs/architecture/D
 - ⬜ Spec (`DRRP-CLASSIFICATION.md`) trimmed to match: special-case rows that are precedents move to an appendix or the precedent store
 - ⬜ The justifier brief rewritten for sentence units and principles (input to phase C)
 
-- ⬜ (run: 58 conflicts in 35 sentences, grouped G1–G10 in `data/gold/v4/consistency_review.md`; Jason to answer) **Consistency check:** run v2 against the 222 gold sentences. List the rows v2 would decide differently (REL-20 enforcing authority, REL-28/REL-33 tie-break, REL-07 commencement and parliamentary procedure, a holder in a `continues` sentence as `mentioned`) for Jason
-- ⬜ **Exclude amending text from gold** (Q5): find amending-text sentences in gold and the selection and add them to `excluded_units.csv`
-- ⬜ **Enforcing authority and purpose:** the dated-regulator case (GHG ETS reg.13(2), Application) may be a REL-20 designation (Requirements). Ask Jason with the sentence
+- ✅ (58 conflicts in 35 sentences; Jason accepted G1–G6, G8, G9; G7 kept; G10 deferred; applied and synced to the page) **Consistency check:** run v2 against the 222 gold sentences. List the rows v2 would decide differently (REL-20 enforcing authority, REL-28/REL-33 tie-break, REL-07 commencement and parliamentary procedure, a holder in a `continues` sentence as `mentioned`) for Jason
+- ✅ (NIA 2013/10 s.40(1) and CAA 1982 s.69A(7) excluded; the selection's remaining amending text to be filtered in phase C) **Exclude amending text from gold** (Q5): find amending-text sentences in gold and the selection and add them to `excluded_units.csv`
+- ✅ (Jason: date transfer only → Application, relation `no`) **Enforcing authority and purpose:** the dated-regulator case (GHG ETS reg.13(2), Application) may be a REL-20 designation (Requirements). Ask Jason with the sentence
 
 ## Dependencies
 
@@ -150,3 +150,14 @@ Two Opus agents read the 222 gold sentences against v2 (`data/gold/v4/consistenc
 - 10 actor rows with a null value were treated as removed actors.
 - Definitions of holder terms are not deeming.
 - HW Wales reg.72(2) cites v1 REL-20; the value is unaffected, but under v2 the citation is stale.
+
+**Jason's answers (2026-10-07):** accept G1–G5, G8, G9; G6 both. G7: *"tough to call but its only about date transfer so the purpose is Application … Therefore, relation = no"*. Gold unchanged; the purpose doc's open note is resolved. G10 stays deferred to the Authorised Person dictionary task.
+
+**Applied** (`scripts/benchmarks/gold_v3/apply_consistency.py`; backup at `data/gold/v4/backup_v4_pre_consistency_20261007.copy`):
+- 56 operations: changes commented "v2 consistency (Jason 2026-10-07, G…)", new actor rows and second entries (rule `CONSISTENCY`), 2 removed duplicates/holders as `listed: false`, 2 `deemed-holder` tags;
+- informal labels mapped to dictionary labels: HSE, `Aviation: Crew`, and `OTHER: Partner of a support panel (CTSA 2015 s.38)`;
+- 2 amending-text units added to `excluded_units.csv` and their rows deleted.
+
+**Gold now:** 220 sentences, 1,117 rows, all decided (approve 1,080, change 26, query 11).
+
+**Review page synced:** the 31 changed sentences were rewritten (provisions + decisions) and the 2 excluded removed. A pull-back compared against gold: 1,117 page rows = 1,117 gold rows, **0 mismatches**, 0 unknown keys, so a stale page import can't overwrite these changes.
