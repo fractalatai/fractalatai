@@ -102,3 +102,37 @@ So the same kind of sentence lands in three classes, and Permissions mixes a min
 - **Page:** the 14 decision slots were written with pinned versions; a pull-back shows 1,532 = 1,532 decided rows, 0 mismatches.
 - **Legal told** (#172 vocabulary) and warned that ConfersPower is unreliable.
 - Precedents rebuilt.
+
+## Purpose as the law's anatomy (2026-10-07)
+
+**Jason:**
+- *"Purpose = topic = property, Requirement/Permission = mode = method"*.
+- Drop Requirements/Permissions from Purpose; consumers reach duty and power through DRRP.
+- The substantive requirements member is the general filler when no other member applies (precedence).
+- Permits/licences/certificates, notification/reporting and records/registers are "paperwork": the Administration child of Substantive requirements, left to later.
+- Fold functions of public bodies into Constitution as "Bodies and their functions".
+- Capture the literature and the anatomy metaphor, because they explain how Purpose was made.
+
+**Written to PURPOSE-CLASSIFICATION.md:**
+- "Purpose is the law's anatomy": faceted classification (Ranganathan), residual n.e.c. class with a table of precedence (Dewey, UDC/Bliss citation order, ISIC/NACE/ICD), decision lists (Rivest 1987), and the anatomy of an Act (the duck test);
+- the ordered members and the default;
+- the old class rules re-mapped. Two are flagged to re-decide: the enforcing-authority designation (now Enforcement by topic), and the power to authorise others (Bodies and their functions).
+
+**Gemini challenge** (2.5 Pro, raw: `data/code-review/purpose-anatomy-precedence.md`):
+- **Valid:**
+  - Subordinate legislation must beat Application (a regulation power with a scope limit is a power);
+  - Enforcement must beat Bodies and their functions (an enforcing-authority designation);
+  - Appeals and defences must beat Offences (a due-diligence defence).
+- **Correct as proposed:** Interpretation over Application (deeming), Citation over Subordinate legislation (commencement orders), Appeals over Enforcement, Enforcement over Fees (fixed penalties).
+- **Self-contradiction:** Gemini's own corrected list puts Enforcement above Appeals, against its verdict that an appeal against an improvement notice is Appeals. Not adopted.
+- **Amendment vs Subordinate legislation:** Gemini says "may by regulations amend Schedule 1" is Amendment. Rejected: the Amendment duck test is text that itself changes other law (excluded from gold); a power to amend is Subordinate legislation.
+- **Suggested a new member:** Financial provisions.
+
+**Evidence from legal's headings extract** (`/var/home/jason/Desktop/sertantai-legal/backend/data/reports/clml-headings-2026-10-07.csv`: 37,980 section titles from 1,056 laws, read-only):
+- Mapping titles to members by duck-test words leaves **53.6% to the default**. That is the substantive bulk of a regulatory corpus, and the default works as n.e.c.: the top default titles are substantive (health surveillance, monitoring, records, provision of information, risk assessment, obligations of manufacturers/importers/distributors).
+- **Structural parts falling through, with no member:**
+  - **Review** (126 laws, the 3rd most common title in the corpus);
+  - **Financial provisions / Expenses** (36 + 23 laws);
+  - **Compensation** (23 laws; Jason earlier: compensation runs opposite to offences);
+  - **Service of documents** (42 laws; proposed: Administration, the paperwork).
+  - Also EU "Subject matter" (Application), "Urgency procedure" (Subordinate legislation), "Final provisions" and "Transposition" (Citation and commencement): duck-test wording to add, not members.

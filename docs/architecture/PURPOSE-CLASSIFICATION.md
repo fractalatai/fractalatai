@@ -5,36 +5,59 @@
 
 **Revision in progress (2026-10-06, phase 0b):** a layered scheme replaces the single 18-value label (section below). The 18 values stay the published field until the migration with legal. Legal reports that #172's profile isn't built yet, so nothing depends on the 18 values.
 
-## Layered purpose (decided 2026-10-06)
+## Purpose is the law's anatomy (decided 2026-10-07)
 
-Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds a finer, more complex one only when needed. The class names are the terms legislation itself uses in its headings, not invented categories.
+**Purpose says which constituent part of the law a provision belongs to.** It doesn't say whether the provision creates a duty or a power: that is the DRRP facet (relation, holder, `holds`). Jason (2026-10-07): *"Purpose = topic = property; Requirement/Permission = mode = method."* A fees clause that creates a duty is still a fees clause. Its duty is recorded in DRRP, not in Purpose.
 
-**Coarse layer: 12 classes** (Subordinate legislation added 2026-10-07). Class names avoid the DRRP vocabulary (Obligation, Liberty, Duty, Right, Responsibility, Power): `Duties` → **Requirements** and `Powers` → **Permissions** (Jason, 2026-10-06), and the fine split is **Substantive** vs Procedure/Detail.
+### How Purpose was made: the method and its sources
 
-| Class | Replaces (of the 18) |
-|---|---|
-| Citation and commencement | Enactment+Citation+Commencement, Extent |
-| Interpretation | Interpretation+Definition |
-| Application, exemption and transition | Application+Scope, Exemption, Transitional Arrangement |
-| Requirements | Requirement, Procedure+Detail |
-| Permissions | Power Conferred |
-| Enforcement | Enforcement+Prosecution (its own class, not split under Permissions: compliance users look for it directly) |
-| Offences and penalties | Offence, Liability |
-| Appeals and defences | Defence+Appeal |
-| Fees and charges | Charge+Fee |
-| Amendment and revocation | Amendment, Repeal+Revocation |
-| Constitution | Establishment+Constitution ("there shall be a body called X" is neither a duty nor a power) |
-| Subordinate legislation | new (2026-10-07): powers to make further law. Was split across Permissions, Requirements and Application |
+Three established classification methods, plus the law's own anatomy:
+
+1. **Faceted classification** (S. R. Ranganathan, *Colon Classification*, 1933; *Prolegomena to Library Classification*, 1937). A subject is analysed into independent **facets**, each on its own axis, instead of one tree that mixes them. Purpose (which part of the law) and DRRP (duty or power) are two facets. The 2026-10-06 coarse scheme mixed them: `Requirements`/`Permissions` restated the DRRP mode, and the other classes were topics. So a provision with both a topic and a duty forced a false choice (SI 2001/486 reg.4(1), "he shall vary its exemption certificate"). Separating the facets removes it.
+2. **A residual class with a table of precedence.**
+   - Library classifications settle which class wins when a work has several aspects: Dewey's *table of preference*, and UDC's and Bliss's *citation order*.
+   - Statistical classifications (ISIC, NACE, ICD) classify top-down and end each level with an explicit residual, *"not elsewhere classified" (n.e.c.)*.
+   - Here, **Substantive requirements** is the n.e.c. class: the general filler that takes whatever no specific member claims. **Precedence** decides the rest: the specific members are tested in a fixed order, and the first that applies wins.
+3. **Decision lists** (R. L. Rivest, "Learning decision lists", *Machine Learning* 2(3), 1987): an ordered list of if-then rules, first match wins, ending in a default rule. The coarse cue tagger (`coarse_purpose.py`) is a decision list, so the tiers learn the same structure the labellers apply.
+4. **The anatomy of an Act** (the duck test). Legislation is drafted to a recognisable anatomy: preliminary provisions, then main provisions, then supplementary and general provisions (regulations and orders, interpretation, offences), then final provisions (commencement, extent, citation). Each Purpose member is a pattern of clauses that passes the duck test for one of those parts: it looks like, reads like and sits like that part. **Class names are the terms legislation itself uses in its headings** (Jason, 2026-10-06), checked against heading frequencies across the corpus.
+
+### The members, in precedence order (first match wins)
+
+| # | Purpose | The duck test | Was (2026-10-06) |
+|---|---|---|---|
+| 1 | Citation and commencement | title, commencement, extent | same |
+| 2 | Amendment and revocation | changes the text of other law (excluded from gold, catalogue REL-07) | same |
+| 3 | Interpretation | meanings, deeming, "references to" | same |
+| 4 | Application, exemption and transition | who, what, where and when the law reaches or leaves out, including exemption certificates | same |
+| 5 | Subordinate legislation | powers to make further law, what it may contain, how it is made (Interpretation Act 1978 s.21) | added 2026-10-07 |
+| 6 | Bodies and their functions | setting up bodies, their make-up and proceedings, their functions, guidance, codes of practice, reviews | Constitution, renamed and widened |
+| 7 | Offences and penalties | offences, penalties, civil liability | same |
+| 8 | Appeals and defences | appeals, reviews of decisions, statutory defences | same |
+| 9 | Enforcement | enforcement powers, inspectors, notices, enforcing authorities | same |
+| 10 | Fees and charges | fees, charges, payments to or by the regime | same |
+| 11 | **Substantive requirements** (the default, n.e.c.) | what the law requires to be done: everything no member above claims | replaces Requirements and Permissions |
+
+**Children of Substantive requirements** (a later, finer layer; not labelled in the gold yet, Jason 2026-10-07):
+- **Administration** ("the paperwork"): permits, licences, authorisations, certificates and registration; notification and reporting; records and registers;
+- **General**: the rest (control measures, assessment and planning, information and training, inspection and monitoring by the duty holder, and so on).
+
+**Precedence notes:**
+- Subordinate legislation comes before Bodies and their functions: a minister's power to make regulations is Subordinate legislation, though it is a ministerial function.
+- Offences come before Enforcement.
+- Application comes before the default: an exemption certificate is Application, not Administration (gas regs 1998 reg.40(2); SI 2001/486 reg.4(1)).
+- Gemini challenged this order on 2026-10-07; see the review section below.
+
+**Not a member:** `Requirements` and `Permissions` (retired 2026-10-07; the DRRP facet carries duty and power). `inherit` stays as the escape value for snippets.
 
 **Class rules from the gold review** (Jason, 2026-10-06):
-- **Requirements** is for provisions about obligations. A condition on an exemption, or on how a power applies ("shall not grant any such exemption unless satisfied", "application of the exercise of a power"), is **Application and exemption**.
+- A condition on an exemption, or on how a power applies ("shall not grant any such exemption unless satisfied", "application of the exercise of a power"), is **Application, exemption and transition**.
 - **Transitional is merged into Application** (Jason, 2026-10-06): transition is application in time, as scope is application to persons, things and places. So the coarse class is **Application, exemption and transition**, with a detail level **Scope / Exemption / Transitional and saving**. The detail is filled only when a consumer needs it, and isn't labelled in the gold set.
 - **Interpretation is for meanings only** (Jason, 2026-10-06): a provision on "the application of" a power or rule (how, when or to whom it applies) is **Application**, even under an interpretation heading (Companies Act 1989 s.112(2)(b)).
-- **Designating the enforcing authority or regulator** ("The HSE shall be the enforcing authority for these Regulations") is **Requirements**: the body is required to be that authority, and later provisions expand its duties (Jason 2026-10-07; catalogue v2 REL-27).
-- **Who is the regulator from a date** ("S is the regulator of B from 1st January 2026") is **Application** (transition in time), with relation **`no`**: the sentence is only about the date transfer (Jason 2026-10-07, GHG ETS 2020 reg.13(2)). It is not a REL-27 designation. Constitution is for setting up a body and its make-up.
+- **Designating the enforcing authority or regulator** ("The HSE shall be the enforcing authority for these Regulations") was ruled **Requirements** (Jason 2026-10-07; catalogue v2 REL-27). **To re-decide under the anatomy scheme:** its topic is Enforcement (an enforcing-authority designation); the Obligation stays in DRRP.
+- **Who is the regulator from a date** ("S is the regulator of B from 1st January 2026") is **Application** (transition in time), with relation **`no`**: the sentence is only about the date transfer (Jason 2026-10-07, GHG ETS 2020 reg.13(2)). It is not a REL-27 designation. Bodies and their functions is for setting up a body, its make-up and its functions.
 - **Purpose `inherit`: the escape rule** (Jason, 2026-10-06, batch 2). Purpose was being forced onto snippets; laws give purpose to whole sections. So a provision takes its **own** purpose only when its own words carry one: it creates or confers something, defines a term, applies or disapplies the law, sets an offence, penalty, fee, appeal, amendment or citation. A snippet that only makes sense with the provision above it takes **`inherit`**: its purpose is that of the nearest ancestor (stem, then subsection, then section). Snippets include list items completing a stem, conditions and provisos ("if the person under restraint agrees…"), criterion items, and fragments that set the detail of a duty in the same section. Prefer `inherit` to forcing a class onto a snippet. A provision with no ancestor never inherits.
-- **Who, when, what, where vs how** (Jason, batch 2): Application is about who, when, what and where the law applies. A procedural condition on exercising a power ("SEPA must not grant an application for transfer … unless it is satisfied that—", SSI 2018/219 reg.27(6)) is **Requirements**. A condition on granting an exemption, or on whom a power reaches (reg.44A(8)(a)), stays Application.
-- **A power to authorise others** to act for a body ("may authorise in writing any person … to carry out any of its functions", SI 2012/3032 reg.35(2)) is **Permissions**, even under an Enforcement heading.
+- **Who, when, what, where vs how** (Jason, batch 2): Application is about who, when, what and where the law applies. A procedural condition on exercising a power ("SEPA must not grant an application for transfer … unless it is satisfied that—", SSI 2018/219 reg.27(6)) is **Substantive requirements** (child: Administration, a permit transfer). A condition on granting an exemption, or on whom a power reaches (reg.44A(8)(a)), stays Application.
+- **A power to authorise others** to act for a body ("may authorise in writing any person … to carry out any of its functions", SI 2012/3032 reg.35(2)) was ruled Permissions. Under the anatomy scheme it is **Bodies and their functions**, or Enforcement when the functions are enforcement ones (to confirm).
 - **"An offence will not be committed … provided that"** (SI 2019/156 reg.4(8)) is **Offences and penalties**.
 - **Subordinate legislation** (Jason, 2026-10-07). The Interpretation Act 1978 s.21(1) defines it as "Orders in Council, orders, rules, regulations, schemes, warrants, byelaws and other instruments made or to be made under any Act"; our laws head these provisions "Subordinate legislation", "Regulations", "Powers to make regulations", "Orders and regulations", "Byelaws" and (EU) "Delegated and implementing acts".
   - **Covers:**
@@ -46,21 +69,22 @@ Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds 
   - **Not this class:**
     - commencement by order ("comes into force on such day as X may by regulations appoint"): Citation and commencement;
     - the duties the regulations later create;
-    - reports laid before Parliament: Requirements.
+    - reports laid before Parliament: Substantive requirements.
   - **Relation is unchanged:** a minister's power to make regulations is still `yes`, Minister active Liberty.
   - **Replaces** the batch-1 ruling that parliamentary procedure is Requirements.
-- **A permitted way of discharging a duty** ("the hirer may inform … by a general announcement") is **Permissions**.
+- **A permitted way of discharging a duty** ("the hirer may inform … by a general announcement") takes the duty's own topic: here **Substantive requirements**. Its Liberty is in DRRP.
 - Class-definition and criterion items **stay Application** (confirmed in batch 1, GHG ETS reg.70(2)(db)); conditions and limits on a power stay Application (reg.44A(8)(a)).
 - **A condition on an exemption power** is Application (gas regs 1998 reg.40(2)).
 - Purpose stays **single-select**: one class per provision, the dominant one. That's more useful as a data model than multi-select, even where a provision mixes application and transition.
 
-**How the coarse layer decides:**
+**How the coarse layer decides** (a decision list):
+- the members' duck tests in precedence order, first match wins, default Substantive requirements;
 - high-precision text cues;
 - a list item inherits its stem's class;
 - section titles once legal serves them, then cross-headings;
 - otherwise `undetermined`, which escalates to the fine layer.
 
-**Fine layer:** classifier or LLM, only where a consumer needs the split. The first is **Requirements → Substantive vs Procedure/Detail**, which feeds the DRRP gate.
+**Fine layer:** classifier or LLM, only where a consumer needs the split. The first candidates are the children of Substantive requirements (Administration vs General).
 
 **Evidence:** first cue pass (phase 0b session, 2026-10-06), on 6,959 labelled provisions. Precision when a cue fires:
 
