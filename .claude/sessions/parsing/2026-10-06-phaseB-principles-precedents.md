@@ -1,11 +1,98 @@
 ---
 session: "Phase B: Principles and precedents"
-status: active
+status: closed
 opened: 2026-10-06
-related: ["parsing/2026-10-06-meta-plan-sentence-units.md", "docs/architecture/DRRP-RULE-CATALOGUE.md", "docs/architecture/DRRP-CLASSIFICATION.md"]
+closed: 2026-10-07
+outcome: success
+
+summary: >
+  The 123-rule catalogue became catalogue v2: 31 principles, 5 precedent patterns, 12 retired, 8 dictionary decisions
+  and a crosswalk for every v1 ID, settled with Jason in plain terms and stress-tested by Gemini. A consistency check
+  brought the 220-sentence gold in line (56 changes, 2 exclusions, page synced with 0 mismatches), and the precedent
+  store, brief v2 and a trimmed spec make phase C labelling run on principles plus retrieved examples.
+
+decisions:
+  - what: "Catalogue v2: 31 principles; the rest precedents, retired, dictionary or merged; v1 kept as history"
+    why: "123 rules from row-level labelling did not converge; promotion needs ~3 provisions from 2+ laws and Jason's approval"
+    result: "docs/architecture/DRRP-RULE-CATALOGUE.md v2; all 123 v1 IDs resolve through the crosswalk"
+  - what: "Own-power test by the modal's named subject (REL-33); agentless manner or content is continues (REL-28); a holder named in a continues sentence is mentioned"
+    why: "Gemini found REL-28 vs REL-33 had no tie-break; a grammatical test is learnable by small models (Q1-Q3)"
+    result: "11 G2 and 9 G3 gold changes; the hirer reg.13(4) ruling kept"
+  - what: "Commencement and parliamentary procedure are machinery (no); amending text excluded from gold"
+    why: "Jason B, Q5, Q6 (Claude changed its Q6 answer after Gemini)"
+    result: "asp 2019/15 s.32(2) changed; NIA s.40(1) and CAA s.69A(7) excluded"
+  - what: "Designating an enforcing authority is that body's Obligation, purpose Requirements (REL-27); a dated regulator transfer is Application, relation no"
+    why: "Jason: the HSE is literally required to be this thing; GHG ETS reg.13(2) is only about a date transfer"
+    result: "New principle REL-27 reversing v1 REL-27; purpose doc updated"
+  - what: "Exemptions and defences stay no; deeming that moves holders is no plus a deemed-holder tag; implied access right also takes a counterparty give_access entry"
+    why: "Purpose carries exemptions and defences; the holder-linking step uses deemed-holder; one entry per role (#78)"
+    result: "2 deemed-holder tags in gold; precedent patterns updated"
+  - what: "Gvt: Authorised Person approved but not yet added"
+    why: "598 provisions in 33 Families clear the rule, but electrical/mines/rail use a duty-holder specialist; 543 hub rows, prompt and aliases need migrating"
+    result: "Dictionary task on the meta-plan list; the YAML edit was tried and reverted"
+  - what: "Precedent retrieval: pattern tag, same section, then embedding similarity"
+    why: "tf-idf over 220 short sentences gave unrelated neighbours"
+    result: "reg.13(4) retrieves CAA s.56(6), its REL-33/REL-28 contrast pair"
+  - what: "LAT pulls held until legal finishes the whole parse repair, then one pull after a NAS backup"
+    why: "Jason: each row should change once; the pull also archives ~47K scoped rows"
+    result: "Batch 3 (80 laws) not pulled; none of the 60 test laws affected"
+
+metrics:
+  catalogue: { v1_rules: 123, principles: 31, merged: 66, retired: 12, dictionary: 8, precedents: 6, crosswalk_ids_resolving: 123 }
+  recurrence: { above_threshold: 67, below_threshold: 33, never_cited: 23 }
+  consistency_check: { conflicts: 58, sentences: 35, applied_operations: 56, excluded: 2, page_mismatches_after_sync: 0 }
+  gold_after: { sentences: 220, rows: 1117, approve: 1080, change: 26, query: 11 }
+  precedents: { sentences: 220, with_jason_notes: 41, embedded: 197, principles_exercised: 31 }
+  spec: { size_before_kb: 49.5, size_after_kb: 35.5 }
+
+lessons:
+  - title: "Explain vocabulary before asking for rulings"
+    detail: "Jason couldn't decide A/B/C until 'machinery' was explained and each tension put as one sentence with both readings. His earlier 'rulings' were guesses on snippets; ask with whole sentences and plain words."
+    tag: methodology
+  - title: "Reusing a rule ID silently rewrites history"
+    detail: "Giving the new enforcing-authority principle ID REL-20 made 5 gold rows citing v1 REL-20 (savings) display the wrong rule. When a principle reverses an old rule, take that rule's ID; never recycle an unrelated one. Check old citations resolve after any ID change."
+    tag: data
+  - title: "A dictionary label change is a cross-system migration"
+    detail: "Adding Gvt: Authorised Person looked like a YAML edit, but it touched family semantics (duty-holder specialists in mines/rail), 543 hub rows, the LLM prompt, aliases and the controls generator. Survey every consumer before editing the dictionary."
+    tag: architecture
+  - title: "Keep the review page and the gold in lockstep after bulk edits"
+    detail: "The importer applies every page decision, so editing the gold without rewriting the page docs would let a stale page export undo the change. After any bulk gold edit, rewrite the affected page docs and verify a pull-back with 0 mismatches."
+    tag: tooling
+  - title: "Use stored embeddings for retrieval over small corpora"
+    detail: "Lexical tf-idf on 220 short legal sentences surfaced unrelated precedents; the hub's existing 384-d embeddings (mean of member rows) found the right contrast cases at no extra cost."
+    tag: models
+  - title: "A second reviewer earns its keep on schema and rules"
+    detail: "Gemini rejected the free-text referent key (#78) for position, and found the REL-28/REL-33 tie-break gap and the deeming precedence. Claude changed its Q6 answer. Harsh reviews before adoption were cheap and changed outcomes."
+    tag: methodology
+
+artifacts:
+  - docs/architecture/DRRP-RULE-CATALOGUE.md
+  - docs/architecture/DRRP-RULE-CATALOGUE-V1.md
+  - docs/architecture/DRRP-CLASSIFICATION.md
+  - docs/architecture/PURPOSE-CLASSIFICATION.md
+  - scripts/benchmarks/gold_v3/JUSTIFY_V2.md
+  - scripts/benchmarks/gold_v3/precedents.py
+  - scripts/benchmarks/gold_v3/apply_consistency.py
+  - scripts/benchmarks/gold_v3/unit_evidence.py
+  - scripts/benchmarks/gold_v3/load_units.py
+  - scripts/benchmarks/gold_v3/review_units_export.py
+  - data/gold/v4/rule_classification.csv
+  - data/gold/v4/rule_recurrence.csv
+  - data/gold/v4/consistency_review.md
+  - data/gold/v4/precedents.jsonl
+  - data/code-review/drrp-catalogue-v2-principles.md
+
+depends_on:
+  - 2026-10-06-phaseA-sentence-units
+  - 2026-10-06-meta-plan-sentence-units
+
+enables:
+  - "Phase C: gold at sentence level on catalogue v2, brief v2 and precedents"
+  - "Phase D: tier scoring with context principles (HOLD-05, INF-03) scored apart"
+  - "Dictionary task: Gvt: Authorised Person with Family gating"
 ---
 
-# Session: Phase B: Principles and precedents (ACTIVE)
+# Session: Phase B: Principles and precedents (CLOSED)
 
 ## Problem
 
