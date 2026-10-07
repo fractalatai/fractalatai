@@ -16,11 +16,11 @@ related: ["parsing/2026-10-06-meta-plan-sentence-units.md", "docs/architecture/D
 - ✅ (agent draft 2026-10-07: 30 principles, 66 merged, 12 retired, 8 dictionary, 7 precedents; `data/gold/v4/rule_classification.csv`) Classify every rule: **principle** (general, recurs, a model can learn it), **precedent** (one provision or a narrow pattern), **retired by sentence units** (stems, items, continuation: REL-02, REL-13, REL-15, REL-16, REL-30, REL-45, HOLD-02, TYPE-06, POS-17, POS-18, INF-04's stem clause, the item half of REL-28), or **merge** (overlapping rules)
 - ✅ (`data/gold/v4/rule_recurrence.csv`; used in the classification) Recurrence check: for each candidate principle, count the provisions it decides in the 240 reviewed and the silver labels; under about 3 provisions, or all from one law → precedent
 - ✅ (adopted 2026-10-07: `docs/architecture/DRRP-RULE-CATALOGUE.md` is v2, 31 principles, with a crosswalk for all 123 v1 IDs; v1 kept as `DRRP-RULE-CATALOGUE-V1.md`) Draft catalogue v2 (principles only, one line plus one example each), for Jason's review
-- ⬜ Precedent store: precedents live as reviewed rows in `drrp_gold` (section_id, decision, comment), tagged with a short pattern name, and are shown to the justifier as examples, not cited as rules
-- ⬜ Promotion rule written into the brief: a new pattern becomes a principle only after about 3 provisions from at least 2 laws, **and Jason approves the promotion**; the justifier reports candidate patterns, it doesn't make rules
-- ⬜ Precedent retrieval (Gemini): the justifier finds precedents by pattern tag, then same law and section, then text similarity; shown with Jason's comment
-- ⬜ Spec (`DRRP-CLASSIFICATION.md`) trimmed to match: special-case rows that are precedents move to an appendix or the precedent store
-- ⬜ The justifier brief rewritten for sentence units and principles (input to phase C)
+- ✅ (`scripts/benchmarks/gold_v3/precedents.py` → `data/gold/v4/precedents.jsonl`: 220 sentences, 41 with Jason's notes, all 31 principles exercised) Precedent store: precedents live as reviewed rows in `drrp_gold` (section_id, decision, comment), tagged with a short pattern name, and are shown to the justifier as examples, not cited as rules
+- ✅ (JUSTIFY_V2.md "Notes: report, don't legislate"; catalogue v2 header) Promotion rule written into the brief: a new pattern becomes a principle only after about 3 provisions from at least 2 laws, **and Jason approves the promotion**; the justifier reports candidate patterns, it doesn't make rules
+- ✅ (pattern tag, then same section, then embedding similarity on mean member-row embeddings; tf-idf fallback; wired into unit_evidence.py) Precedent retrieval (Gemini): the justifier finds precedents by pattern tag, then same law and section, then text similarity; shown with Jason's comment
+- ⬜ (agent trimming, Claude to review the diff) Spec (`DRRP-CLASSIFICATION.md`) trimmed to match: special-case rows that are precedents move to an appendix or the precedent store
+- ✅ (`scripts/benchmarks/gold_v3/JUSTIFY_V2.md`; old briefs marked superseded) The justifier brief rewritten for sentence units and principles (input to phase C)
 
 - ✅ (58 conflicts in 35 sentences; Jason accepted G1–G6, G8, G9; G7 kept; G10 deferred; applied and synced to the page) **Consistency check:** run v2 against the 222 gold sentences. List the rows v2 would decide differently (REL-20 enforcing authority, REL-28/REL-33 tie-break, REL-07 commencement and parliamentary procedure, a holder in a `continues` sentence as `mentioned`) for Jason
 - ✅ (NIA 2013/10 s.40(1) and CAA 1982 s.69A(7) excluded; the selection's remaining amending text to be filtered in phase C) **Exclude amending text from gold** (Q5): find amending-text sentences in gold and the selection and add them to `excluded_units.csv`
@@ -161,3 +161,24 @@ Two Opus agents read the 222 gold sentences against v2 (`data/gold/v4/consistenc
 **Gold now:** 220 sentences, 1,117 rows, all decided (approve 1,080, change 26, query 11).
 
 **Review page synced:** the 31 changed sentences were rewritten (provisions + decisions) and the 2 excluded removed. A pull-back compared against gold: 1,117 page rows = 1,117 gold rows, **0 mismatches**, 0 unknown keys, so a stale page import can't overwrite these changes.
+
+## Precedent store and brief v2 (2026-10-07)
+
+**Precedent store** (`precedents.py`, `dc2c41c`):
+- Every gold sentence is a precedent: final labels, Jason's notes and changes, the v2 principles it exercises (v1 citations mapped through the catalogue crosswalk; carried sentences take their member rows' row-level citations; consistency changes add the principle they cite), and pattern tags (cue regexes for the 5 v2 patterns, or a tag in rule_ids).
+- 220 precedents, 41 with Jason's notes, 16 changed. Patterns found: 2 functions-list, 2 no-person-shall-be-engaged, 2 deemed-holder, 1 participation-right, 1 implied-access-right. All 31 principles are exercised; the thinnest are TYPE-03 (1) and REL-20 (3).
+- **Retrieval:** pattern tag (+3), then same section (+1), then similarity. Law and Jason's notes only break near-ties.
+- Lexical tf-idf on 220 short sentences was weak (the hirer's reg.13(4) pulled unrelated sentences). The hub's stored embeddings fixed it: the cosine of mean member-row embeddings (197 of 220 embedded), with tf-idf as the fallback.
+  - reg.13(4) → CAA s.56(6) "service … may be effected by sending" (the REL-33/REL-28 contrast pair);
+  - RIDDOR reg.11(1) → PUWER reg.34(1) (the other notify + supply case).
+- `unit_evidence.py` adds the 5 nearest precedents to every evidence pack.
+
+**Brief v2** (`JUSTIFY_V2.md`, `168eccd`) replaces `JUSTIFY_GOLD.md` and `JUSTIFY_UNITS.md`:
+- binding order: catalogue v2, then purpose, then dictionary; cite v2 IDs only;
+- the key tests in short form;
+- precedents as examples ("as precedent X"; only patterns may be cited, as `PREC:<pattern>`);
+- difficulty redefined;
+- notes by kind (candidate_pattern, dictionary_candidate, source_fault, question), with the promotion and dictionary rules;
+- exclusions (`{"unit_id", "exclude"}`).
+
+`load_units.py` reads v2 notes and lists proposed exclusions without loading them; the export labels `PREC:` citations.
