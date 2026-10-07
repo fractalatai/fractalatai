@@ -19,7 +19,7 @@ related: ["parsing/2026-10-06-meta-plan-sentence-units.md", "docs/architecture/D
 - ✅ (`scripts/benchmarks/gold_v3/precedents.py` → `data/gold/v4/precedents.jsonl`: 220 sentences, 41 with Jason's notes, all 31 principles exercised) Precedent store: precedents live as reviewed rows in `drrp_gold` (section_id, decision, comment), tagged with a short pattern name, and are shown to the justifier as examples, not cited as rules
 - ✅ (JUSTIFY_V2.md "Notes: report, don't legislate"; catalogue v2 header) Promotion rule written into the brief: a new pattern becomes a principle only after about 3 provisions from at least 2 laws, **and Jason approves the promotion**; the justifier reports candidate patterns, it doesn't make rules
 - ✅ (pattern tag, then same section, then embedding similarity on mean member-row embeddings; tf-idf fallback; wired into unit_evidence.py) Precedent retrieval (Gemini): the justifier finds precedents by pattern tag, then same law and section, then text similarity; shown with Jason's comment
-- ⬜ (agent trimming, Claude to review the diff) Spec (`DRRP-CLASSIFICATION.md`) trimmed to match: special-case rows that are precedents move to an appendix or the precedent store
+- ✅ (agent trim reviewed; 1 question left for Jason, the payload question moved to legal) Spec (`DRRP-CLASSIFICATION.md`) trimmed to match: special-case rows that are precedents move to an appendix or the precedent store
 - ✅ (`scripts/benchmarks/gold_v3/JUSTIFY_V2.md`; old briefs marked superseded) The justifier brief rewritten for sentence units and principles (input to phase C)
 
 - ✅ (58 conflicts in 35 sentences; Jason accepted G1–G6, G8, G9; G7 kept; G10 deferred; applied and synced to the page) **Consistency check:** run v2 against the 222 gold sentences. List the rows v2 would decide differently (REL-20 enforcing authority, REL-28/REL-33 tie-break, REL-07 commencement and parliamentary procedure, a holder in a `continues` sentence as `mentioned`) for Jason
@@ -182,3 +182,22 @@ Two Opus agents read the 222 gold sentences against v2 (`data/gold/v4/consistenc
 - exclusions (`{"unit_id", "exclude"}`).
 
 `load_units.py` reads v2 notes and lists proposed exclusions without loading them; the export labels `PREC:` citations.
+
+**ID fix (2026-10-07):** the new enforcing-authority principle first took ID REL-20, but v1 REL-20 was *savings and continuity* (5 gold rows cite it in that sense), and v1 REL-27 was the designation rule it reverses. The principle is now **REL-27**, and REL-20 is back in the crosswalk as merged into REL-07. Earlier mentions of "REL-20" in this doc for designation mean REL-27. Also removed "powers to commence" from REL-41 (decision B: commencement is machinery).
+
+## Spec trimmed (2026-10-07)
+
+An agent trimmed `DRRP-CLASSIFICATION.md` to catalogue v2, from 49.5 KB to 35.5 KB:
+- a sentence-unit note and the #78 schema section;
+- layers cut to principle pointers;
+- special cases split into pipeline/scope, v2-covered, and "Retired with sentence units";
+- a "Precedents (examples, not rules)" appendix; all 8 of Jason's 10-07 decisions applied.
+
+Claude reviewed it and resolved the open markers:
+- HOLD-07 to HOLD-09 are forms of HOLD-05, kept as its examples (Q4);
+- REL-41 drops "powers to commence";
+- the payload schema for #78 goes to legal (meta-plan legal-side list).
+
+**One left for Jason:** under #67, does a party with an implied access right (active, inferred Liberty) also take a counterparty entry with `give_access` on the government's duty, now that POS-15 allows one entry per role?
+
+The trim also caught the REL-20/REL-27 ID collision (fixed above).

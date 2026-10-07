@@ -72,6 +72,7 @@ The regex-end meta-plan (closed 2026-10-06) planned around the pipeline's tiers 
 - the published `purposes` field migration;
 - tell legal that items carry no DRRP of their own (the sentence holds it) but still send their actors;
 - actor label renames already queued (`mix actors.rename_labels`).
+- **payload schema for #78:** whether the published payload carries `both`, a second entry per role and list `act` (spec Layer payload, open since 2026-10-07). Agree with legal before the single run.
 - **trailing text on section rows** (legal's BlockText after a subsection, e.g. CAA 1982 s.44's "shall pay such compensation …" belongs to s.44(6)): 17 rows in the 60 test laws. Attach it to the subsection at source.
 - **LAT parser list-text corruption** (legal, 2026-10-07, `lat_parser.ex extract_element_text`):
   - What goes wrong: a row's text is all the list items followed by all the Text, de-duplicated. So the chapeau lands at the end, nested items appear twice, and items are joined without a space.
