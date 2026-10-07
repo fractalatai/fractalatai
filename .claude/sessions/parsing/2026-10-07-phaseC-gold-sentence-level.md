@@ -49,3 +49,40 @@ The gold set has 220 reviewed sentences. The rest of the selection (848 sentence
   - `thing-subject-may-relaxation`; `references-do-not-include`; `mandatory-sentence` (a court "must impose" a minimum sentence: REL-04 against REL-33).
 - **Dictionary candidates:** air traffic controller, judgment creditor, partner (in a partnership), training provider, a government nominee.
 - **Recurring question:** three laws that look outside EHS&HR (Foreign Judgments Act 1933, CTSA 2015, VCRA 2006); the LLP accounts regs are similar.
+
+## Research: powers to make further law, a missing purpose class? (2026-10-07)
+
+**Jason, reviewing batch 1:** *"stuck on law that gives powers to a minister to make further law - does our purpose have a missing category?"*
+
+**How the 11 classes handle it now:**
+- "The Secretary of State may by regulations make provision requiring…" → Permissions (Minister active Liberty).
+- "Regulations under this section may include provision about—" → Permissions or Requirements: the gold is split (CTSA s.46(3) Permissions, CAA s.83(6) Requirements).
+- Parliamentary procedure → Requirements (batch-1 ruling, "the procedure is the how").
+- Commencement by regulations → Citation and commencement.
+
+So the same kind of sentence lands in three classes, and Permissions mixes a minister's law-making powers with permissions people act on.
+
+**How much:**
+- hub: 3,878 rows in 241 laws (1.1% of rows) match enabling-power wording;
+- the gold selection: 17 of 825 sentences; the reviewed gold: 7 of 319.
+
+**What the law calls it:**
+- **Interpretation Act 1978 s.21(1):** "subordinate legislation" means *"Orders in Council, orders, rules, regulations, schemes, warrants, byelaws and other instruments made or to be made under any Act"*.
+- **Headings in our corpus:** "Subordinate legislation" (4 laws), "Regulations" (5), "Powers to make regulations" (3), "Orders and regulations" / "Regulations and orders" (5), "Byelaws" (6), and EU "Delegated and implementing acts" (2). The class name meets Jason's rule that classes use the terms laws use in their headings.
+
+**legislation.gov.uk `ConfersPower` is not usable for this.** On HSWA 1974 it is `true` on s.7 (employees' duties, no power) and absent on s.21 (improvement notices, a real power). It doesn't mark enabling powers, or powers generally. Tell legal before it is treated as an authoritative power flag.
+
+**Proposal: a 12th coarse class, "Subordinate legislation".**
+- **Covers:**
+  - a power or duty to make regulations, orders, rules, schemes or byelaws;
+  - what such instruments may or must contain ("Regulations under this section may include…");
+  - their making procedure: consultation, laying, affirmative and negative resolution;
+  - EU delegated and implementing acts.
+- **Not:**
+  - administrative orders or notices addressed to a person (enforcement and improvement notices, compliance notices);
+  - commencement by order, which stays Citation and commencement;
+  - the duties the regulations later create.
+- **Relation is unchanged:** a minister's power to make regulations is still `yes`, with the Minister active Liberty. Purpose is orthogonal.
+- **What it resolves:** the gold split above, and the batch-1 ruling that parliamentary procedure is Requirements (it would move here).
+- **Cost:** about 7 gold sentences and the batch-1 open rows re-checked; PURPOSE-CLASSIFICATION.md, the brief and the review page choices updated; legal's purpose vocabulary (#172) told.
+- **Boundary case:** local instruments made under an Act that bind a place or class (tree preservation orders, development orders) fit s.21, but they read as administrative. Proposed: include them only when they are made generally, not addressed to a named person. To confirm with Jason.
