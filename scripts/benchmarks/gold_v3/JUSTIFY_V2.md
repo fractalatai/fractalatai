@@ -49,6 +49,7 @@ Label each sentence **once**: one `relation`, one `raw_type`, one `purpose`, and
   - One party with a duty and a power is one entry with `"holds": "both"`.
   - One label for parties in **different** roles: list the label twice, each with its own `position`.
   - Parties sharing a label and a role are one entry. A `mentioned` role next to a substantive role is dropped.
+  - An implied access right (precedent `implied-access-right`): the party is `active` with an inferred Liberty **and** has a second entry as `counterparty` of the government's duty, with act `["give_access"]`.
   - `act` is a **list**: `[]` when none, and only for the counterparty of an Obligation (ACT-01). Use the ACT-12 classes.
 - **Holders from elsewhere** (HOLD-05, INF-03, the context principles): a holder supplied by an applying provision or by the parent Act is `active` with `inferred: true`. Never guess a holder (HOLD-15).
 - **Purpose:** the sentence's own class, or `inherit` when its words carry none.

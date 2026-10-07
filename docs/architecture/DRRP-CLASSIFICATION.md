@@ -94,7 +94,7 @@ There is **no `Rule` type** (removed 2026-09-30; REL-42). Every "shall"/"must" t
   - `answer_request`: the duty answers its request;
   - `other`.
   - Item shape: `{type, to, act}`; `act` is a list (#78); absent means unknown.
-  - **Only an Obligation's counterparty carries an act** (ACT-01). A right doesn't: it mirrors the duty's act. Under the #67 access rule the governed party stays active with the inferred Liberty and its `claim_right`. **Open (Jason):** #78 now allows a second entry per role (POS-15); whether that party also takes a counterparty entry with `give_access` isn't decided (precedent `implied-access-right`, no gold case yet).
+  - **Only an Obligation's counterparty carries an act** (ACT-01). A right doesn't: it mirrors the duty's act. Under the #67 access rule the governed party stays active with the inferred Liberty and its `claim_right`. With #78 (one entry per role, POS-15) that party **also** takes a counterparty entry with act `give_access` on the government's duty (Jason 2026-10-07; precedent `implied-access-right`).
   - **Synonym mapping** (ACT-12): the text's verb maps onto the fixed classes; new verbs never create new classes. The duty's main verb decides ("serve a notice on X informing it" → `notify`).
 
     | Act | Verbs in the text |

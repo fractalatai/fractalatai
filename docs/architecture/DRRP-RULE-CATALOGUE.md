@@ -94,7 +94,7 @@ These stay as reviewed examples in `drrp_gold`, retrieved by tag, never cited as
 | Pattern | Old IDs | One line |
 |---|---|---|
 | `functions-list` | REL-44 | "The functions of X shall be—": a government body's functions are an Obligation, a governed party's a Liberty (CAA 1982 s.3, CTSA 2015 s.36(4)). Promotion candidate after the phase C top-up. |
-| `implied-access-right` | INF-01, INF-02 | A government duty to make registers or copies available to a named governed party gives that party an inferred Liberty. Enforcement and notice service never do. No gold provision yet (pilot: EPA 1990 s.20(7)). |
+| `implied-access-right` | INF-01, INF-02 | A government duty to make registers or copies available to a named governed party gives that party an inferred Liberty. With #78 the party also takes a counterparty entry, act `give_access`, on the government's duty (Jason 2026-10-07). Enforcement and notice service never do. No gold provision yet (pilot: EPA 1990 s.20(7)). |
 | `no-person-shall-be-engaged` | HOLD-17 | "No person shall be engaged…": every applying holder who can engage someone holds it, and the person engaged is mentioned (EAW 1989 reg.14, reg.16). |
 | `deemed-holder` | REL-06 | "A person who … shall be treated as the employer …": `no` here, but it decides who holds duties elsewhere; the holder-linking step uses it (Jason 2026-10-07). |
 | `participation-right` | TYPE-07 | "shall take part in … or shall be consulted" gives the participants a Liberty despite "shall" (Directive 89/391 Art.11(2)). |
