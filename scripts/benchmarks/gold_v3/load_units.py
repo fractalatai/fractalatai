@@ -107,7 +107,7 @@ def main() -> None:
         cur.execute("""INSERT INTO drrp_gold (gold_version, section_id, text_md5, field, actor_label, actor_position, proposed,
                                               rule_ids, reason, evidence, agree, difficulty, catalogue_ver, decision, comment, decided_at)
                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,%s,%s,%s,%s, CASE WHEN %s::text IS NULL THEN NULL ELSE now() END)
-                       ON CONFLICT (gold_version, section_id, field, actor_label) DO UPDATE SET
+                       ON CONFLICT (gold_version, section_id, field, actor_label, actor_position) DO UPDATE SET
                          text_md5 = EXCLUDED.text_md5, proposed = EXCLUDED.proposed, rule_ids = EXCLUDED.rule_ids,
                          reason = EXCLUDED.reason, difficulty = EXCLUDED.difficulty, catalogue_ver = EXCLUDED.catalogue_ver,
                          decision = EXCLUDED.decision, comment = EXCLUDED.comment, decided_at = EXCLUDED.decided_at""",
