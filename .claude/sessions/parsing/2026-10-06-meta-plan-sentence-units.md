@@ -59,6 +59,13 @@ The regex-end meta-plan (closed 2026-10-06) planned around the pipeline's tiers 
 - the published `purposes` field migration;
 - tell legal that items carry no DRRP of their own (the sentence holds it) but still send their actors;
 - actor label renames already queued (`mix actors.rename_labels`).
+- **LAT parser list-text corruption** (legal, 2026-10-07, `lat_parser.ex extract_element_text`):
+  - What goes wrong: a row's text is all the list items followed by all the Text, de-duplicated. So the chapeau lands at the end, nested items appear twice, and items are joined without a space.
+  - Reach: about 1,672 rows in 543 laws have a moved chapeau; about 403 rows in 224 laws have a missing space.
+  - This explains our "source text faults" (the Biological Agents Art.8(1)(d) lead-in at the end of the item). It also bears on the assembler and on gold text.
+  - Plan: legal will send the affected section_ids. Gold units touched by them get re-assembled and their text re-checked. If the meaning changed, they are re-reviewed.
+  - The fix, the P1group/Title titles, the free `@ConfersPower` flag (a power signal for relation and Liberty) and the #166 scoping go into **one re-parse wave before the single run**.
+- The **SLM is not retrained before phase D** of this plan. Gold text is checked against the corrected parse first.
 - **store only the EHS&HR-relevant parts of massive Acts** (legal has an open issue for this). Today we hold the whole of the Companies Act 1989 (1,062 rows, 23 of the gold selection, 4 sentences already in the gold set); the Civil Aviation Act 1982 (1,385 rows) and Water Act 2003 (847) are similar. Drawing from the whole Act takes us into domains outside EHS&HR. That drifts the dictionary (company-law actors) and brings in patterns of legal drafting our target domains don't use (Jason, 2026-10-07).
 
 ## Gemini stress test (2026-10-06)
