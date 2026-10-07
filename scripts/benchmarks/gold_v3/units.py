@@ -31,6 +31,10 @@ from drrp_prompt import ancestors  # noqa: E402
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 DASH = re.compile(r"\s*[—–]+\s*")
 COLON = re.compile(r":\s*")
+QUOTE_START = re.compile(r"^[“\"‘']")
+INTERP = re.compile(r"^In (?:this|these|the|subsections?|paragraphs?)\b", re.I)
+DASH_END = re.compile(r"[—–]\s*$")
+DEF_SPLIT = re.compile(r"(?<=;)\s*(?=[“\"‘'])")
 PLACEHOLDER = re.compile(r"[\s.…]+")  # repealed rows are dots
 MODAL = re.compile(r"\b(?:shall|must|may|is to|are to)\b", re.I)
 # an item that opens with its own subject before a modal ("the Secretary of State shall …")
@@ -49,6 +53,17 @@ class Units:
                 self.kids[anc[0]].append(sid)
         for k in self.kids.values():
             k.sort(key=lambda s: self.rows[s][2])
+        # legal's parse puts a subsection's definitions on the section row ("5.—(1) In these Regulations—" with
+        # "“the 1990 Act” means …" on reg.5): they go back to the one child that ends in a dash and has no items
+        self.defs: dict[str, str] = {}     # child → section row holding its definitions
+        self.adopted: dict[str, str] = {}  # section row → child
+        for sid, kids in self.kids.items():
+            if self.rows[sid][3] in ("section", "article") and QUOTE_START.match(self.text(sid)) and not self.is_stem(sid):
+                open_ = [k for k in kids if not self.kids.get(k) and DASH_END.search(self.text(k))]
+                if len(open_) > 1:  # "In this section—" over "… there is inserted—"
+                    open_ = [k for k in open_ if INTERP.match(self.text(k))]
+                if len(open_) == 1:
+                    self.defs[open_[0]], self.adopted[sid] = sid, open_[0]
 
     def text(self, sid: str) -> str:
         return (self.rows.get(sid, (None, ""))[1] or "").strip()
@@ -63,6 +78,8 @@ class Units:
         return items and bool(PLACEHOLDER.sub("", t))
 
     def root(self, sid: str) -> str:
+        if sid in self.adopted:
+            return self.root(self.adopted[sid])
         # the outermost stem above a row; a stem's unit is its whole subtree (members), so an item row under a
         # non-stem item ((b) "that is to say" with no dash, then (b)(i)) still belongs to the stem's sentence
         r = sid
@@ -73,7 +90,7 @@ class Units:
 
     def members(self, root: str) -> list[str]:
         if not self.is_stem(root):
-            return [root]
+            return [root] + ([self.defs[root]] if root in self.defs else [])
         out = [root]
         for k in self.kids[root]:
             out += self.members(k) if self.is_stem(k) else self._subtree(k)
@@ -92,6 +109,8 @@ class Units:
         pad = "    " * depth
         if not self.is_stem(sid):
             lines = [pad + label + t] if t else []
+            if sid in self.defs:  # its definitions, one per line
+                lines += [pad + "    " + d.strip() for d in DEF_SPLIT.split(self.text(self.defs[sid])) if d.strip()]
             # an item without a dash still carries its sub-items ((b) "that is to say" (i) (ii)); a root that isn't
             # a stem is one row, so its subsections (their own units) aren't printed under it
             for k in self.kids.get(sid, []) if depth else []:
@@ -148,7 +167,9 @@ class Units:
         if PROVISO.search(self.text(root)):
             flags.append("proviso_row")  # a sibling "But …" qualifying the row before it: not joined (yet)
         if self.rows[root][3] in ("section", "article") and self.kids.get(root) and not self.is_stem(root):
-            flags.append("section_text")  # text on a section row with subsections: often a stray fragment of one
+            flags.append("section_text")
+        if root in self.defs:
+            flags.append("definitions_moved")  # definitions taken back from the section row (source fault)  # text on a section row with subsections: often a stray fragment of one
         if "sch" in root.split(":", 1)[1][:4]:
             flags.append("schedule")
         return {"unit_id": root, "law_name": self.rows[root][0], "members": mem, "n_rows": len(mem),
