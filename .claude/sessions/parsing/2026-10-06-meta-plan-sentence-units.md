@@ -55,7 +55,7 @@ The regex-end meta-plan (closed 2026-10-06) planned around the pipeline's tiers 
 - dictionary queries from the first sentence review (2026-10-07):
   - add Gvt: Agency: Scottish Natural Heritage, a `Patient` label and Gvt: Judiciary: Employment Tribunal;
   - check whether `Ind: Licensee` is really an individual;
-  - review `Authorised Person`;
+  - **add `Gvt: Authorised Person`** (Jason approved 2026-10-07: 598 provisions, 88 laws, 33 Families). Gate it by Family against the duty-holder `Spc: Authorised Person` (electrical, mines, rail), and migrate 543 hub rows, the prompt rule, the aliases and the controls generator;
   - split `SC: T&L:` into Supply Chain and Transport & Logistics;
   - **disambiguate `Operator`** into an individual who operates and an organisation that runs an installation, airport, well or activity (phase A doc);
 - **Dictionary enrichment rule** (Jason, 2026-10-07, to stop dictionary drift):

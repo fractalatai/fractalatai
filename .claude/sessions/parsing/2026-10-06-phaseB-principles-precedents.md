@@ -15,12 +15,16 @@ related: ["parsing/2026-10-06-meta-plan-sentence-units.md", "docs/architecture/D
 
 - ✅ (agent draft 2026-10-07: 30 principles, 66 merged, 12 retired, 8 dictionary, 7 precedents; `data/gold/v4/rule_classification.csv`) Classify every rule: **principle** (general, recurs, a model can learn it), **precedent** (one provision or a narrow pattern), **retired by sentence units** (stems, items, continuation: REL-02, REL-13, REL-15, REL-16, REL-30, REL-45, HOLD-02, TYPE-06, POS-17, POS-18, INF-04's stem clause, the item half of REL-28), or **merge** (overlapping rules)
 - ✅ (`data/gold/v4/rule_recurrence.csv`; used in the classification) Recurrence check: for each candidate principle, count the provisions it decides in the 240 reviewed and the silver labels; under about 3 provisions, or all from one law → precedent
-- ⬜ (draft at `data/gold/v4/catalogue_v2_draft.md`; with Jason for review, 7 questions) Draft catalogue v2 (principles only, one line plus one example each), for Jason's review
+- ✅ (adopted 2026-10-07: `docs/architecture/DRRP-RULE-CATALOGUE.md` is v2, 31 principles, with a crosswalk for all 123 v1 IDs; v1 kept as `DRRP-RULE-CATALOGUE-V1.md`) Draft catalogue v2 (principles only, one line plus one example each), for Jason's review
 - ⬜ Precedent store: precedents live as reviewed rows in `drrp_gold` (section_id, decision, comment), tagged with a short pattern name, and are shown to the justifier as examples, not cited as rules
 - ⬜ Promotion rule written into the brief: a new pattern becomes a principle only after about 3 provisions from at least 2 laws, **and Jason approves the promotion**; the justifier reports candidate patterns, it doesn't make rules
 - ⬜ Precedent retrieval (Gemini): the justifier finds precedents by pattern tag, then same law and section, then text similarity; shown with Jason's comment
 - ⬜ Spec (`DRRP-CLASSIFICATION.md`) trimmed to match: special-case rows that are precedents move to an appendix or the precedent store
 - ⬜ The justifier brief rewritten for sentence units and principles (input to phase C)
+
+- ⬜ **Consistency check:** run v2 against the 222 gold sentences. List the rows v2 would decide differently (REL-20 enforcing authority, REL-28/REL-33 tie-break, REL-07 commencement and parliamentary procedure, a holder in a `continues` sentence as `mentioned`) for Jason
+- ⬜ **Exclude amending text from gold** (Q5): find amending-text sentences in gold and the selection and add them to `excluded_units.csv`
+- ⬜ **Enforcing authority and purpose:** the dated-regulator case (GHG ETS reg.13(2), Application) may be a REL-20 designation (Requirements). Ask Jason with the sentence
 
 ## Dependencies
 
@@ -95,3 +99,28 @@ Gemini 2.5 Pro, harsh review of the draft plus Claude's recommended answers. Raw
 - Appeals ("a person aggrieved may appeal") are already Liberty under HOLD-01/TYPE-02; add one as a v2 example.
 
 **Agreed by Gemini:** Q1 (retire HOLD-04/HOLD-12 into REL-28), Q2 (a holder in a `continues` sentence is `mentioned`), Q4 (rare rules stay precedents until the top-up), Q5 (exclude amending text), Q7 (add `Gvt: Authorised Person`).
+
+## Decisions on catalogue v2 (Jason, 2026-10-07)
+
+Jason: *"my so called rulings are drafts based on my best guess looking at snippets of law (not sentences)"*. Earlier rulings are evidence, not law. Explained in plain terms: "machinery" means sentences that make the law work as a law rather than tell anyone to do anything.
+
+- **Q1** Retire HOLD-04 and HOLD-12 into REL-28; a content sentence that names no holder is `continues`.
+- **Q2** A holder named in a `continues` sentence is `mentioned`.
+- **Q3** Own-power test: the modal's **subject** is a named party → own relation (the hirer may inform…). Passive or agentless manner ("may be served by post") → `continues`.
+- **Q4** Rare general rules (INF-01, REL-44, HOLD-07 to HOLD-09) stay precedents until the phase C top-up; target the top-up at them.
+- **Q5** Exclude amending text from gold.
+- **Q6** Parliamentary procedure → `no` (machinery). Claude changed its recommendation after Gemini; the purpose ruling (Requirements) stands separately.
+- **Q7** Add `Gvt: Authorised Person`. **Dictionary task pending:** the 10-05 reconciliation found duty-holder specialists in electrical, mines and rail law (`Spc: Authorised Person`). The new label needs Family gating, plus migration of 543 hub rows, the LLM prompt rule (`drrp_prompt.py`), `actor_aliases.py` and the controls generator. A dictionary edit was tried and reverted.
+- **A** Exemptions and defences stay `no`; purpose carries them and the actors are `mentioned`.
+  - **Enforcing-authority designation is `yes`:** the designated body is `active`, Obligation, purpose **Requirements**. *"'HSE shall be the enforcing authority' is an Obligation that later clauses expand. It's not 'Application' Purpose. It's a Requirement - the HSE is literally required to be this thing and not eg a local authority."* New principle REL-20.
+- **B** Commencement by order → `no` (machinery).
+- **C** A deeming sentence that changes who holds duties → `no`, tagged as the `deemed-holder` precedent; the holder-linking step uses it later.
+
+**Also adopted from Gemini:**
+- REL-06 beats REL-42 (deeming cues);
+- HOLD-05 and INF-03 are context principles, scored apart from the sentence tiers;
+- POS-19 drops its consistency clause.
+
+**Written:**
+- `docs/architecture/DRRP-RULE-CATALOGUE.md` (v2: 31 principles, 5 precedent patterns, retired, dictionary, crosswalk); `rule_texts()` resolves all 123 v1 IDs;
+- `PURPOSE-CLASSIFICATION.md` (designation → Requirements; the dated-regulator case flagged open).
