@@ -3,7 +3,8 @@
 
 One JSONL row per unit (units.py): the assembled sentence, law title and headings, the labelling context (referenced
 and applying provisions, the law's definitions of terms used), the silver labels on its member rows (Gemini,
-GPT-mini, GPT-5.5, referee) and Jason's earlier row-level decisions on its members (gold-v3-draft), as precedent.
+GPT-mini, GPT-5.5, referee), Jason's earlier row-level decisions on its members (gold-v3-draft), and the 5 nearest
+reviewed sentences from the precedent store (precedents.py: pattern tag, same section, embedding similarity).
 
   unit_evidence.py --reviewed            # units with at least one reviewed member row
   unit_evidence.py --selection           # every unit of the gold selection
@@ -28,6 +29,11 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from drrp_prompt import applying, applying_index, references, user_prompt  # noqa: E402
 from evidence import DEFINES  # noqa: E402
 from units import Units  # noqa: E402
+
+try:  # precedents (phase B): reviewed gold sentences shown as examples; absent until precedents.py has run
+    from precedents import retrieve as precedents_for  # noqa: E402
+except Exception:  # pragma: no cover
+    precedents_for = None
 
 PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractalaw"
 DUCK = os.path.join(ROOT, "data/fractalaw.duckdb")
@@ -113,6 +119,9 @@ def main() -> None:
                 "text": u["text"], "members": u["members"], "n_rows": u["n_rows"], "flags": u["flags"],
                 "sampled_rows": sampled, "kind": kind, "context": context,
                 "silver": labels, "row_decisions": decided.get(uid, []),
+                "precedents": [{k: p[k] for k in ("unit_id", "why", "patterns", "principles", "labels", "jason")}
+                               | {"text": p["text"][:700]}
+                               for p in (precedents_for(u["text"], uid, 5, u["members"]) if precedents_for else [])],
             }, ensure_ascii=False) + "\n")
     print(f"{len(units)} units → {args.out}: " + ", ".join(f"{k} {v}" for k, v in n.most_common()))
 
