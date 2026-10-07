@@ -20,11 +20,13 @@ Labels attached to the source's rows, and a sentence split into a stem and items
 - ✅ (keep `continues`) (from the app) a whole sentence that only details a duty or power in another sentence ("A notice of appeal shall be accompanied by…"): keep relation `continues` for it, or `no` with a pointer
 - ✅ (own class or `inherit`) (from the app) purpose for a unit: its own class, or `inherit` from the section when it has no purpose of its own
 - ✅ (built; PUWER reg.11(2) and Flood Risk s.43(5) read with closing words after the items) The assembler: `scripts/benchmarks/gold_v3/units.py` (unit id = root row id; ordered member rows; assembled text), tested on the known cases (PUWER reg.11(2), Flood Risk s.43(5), EAW reg.16, the 77 units whose items were reviewed)
-- ⬜ (agent QA done, 5 fixes built; Jason's spot-check open: `data/gold/v4/assembler_spotcheck.md`) **Assembler QA** (Gemini): a stratified sample of assembled units (nested, long, schedule, proviso) checked by an agent and spot-checked by Jason before phase C labels anything
+- ✅ (agent QA, 5 fixes; Jason's spot-check queried only WSI 2005/1806 reg.5(1), fixed with the definitions move-back) **Assembler QA** (Gemini): a stratified sample of assembled units (nested, long, schedule, proviso) checked by an agent and spot-checked by Jason before phase C labels anything
 - ✅ (60 laws: 7,340 sentences, 2,362 multi-row; selection 848 units) Counts on the 61 test laws and the selection, written below; the selection re-keyed to units for phase C
 - ⏸️ (moved to the meta-plan, phase E) Note for phase E: the same assembler in `fractalaw-core` so the pipeline labels sentences
 - ⏸️ (moved to the dictionary-gap list in the meta-plan) **Disambiguate `Operator`** (Jason, 2026-10-07): one label covers an individual who operates (a machine, a vehicle) and an organisation that runs an installation, airport, well or regulated activity; split it (see below)
 - ✅ (listed below; 21 Companies Act units, all three Parts out of domain) **Out-of-domain Parts of massive Acts** (Jason, 2026-10-07): the full Companies Act 1989 is held, so units from its company-law Parts bring dictionary drift and unfamiliar drafting. List the selection's units by Part, mark the out-of-domain ones and carry them to phase C's scope filter (legal's fix is on the legal-side list)
+
+- ✅ (`5c7644b`; page version 2) **#78 schema, option (c)** (Jason, 2026-10-07): the gold key adds `actor_position`, `holds: both`, `act` as a list; a dictionary enrichment rule handles recurring parties
 
 ## Dependencies
 
@@ -251,3 +253,19 @@ Gemini 2.5 Pro was asked for a harsh review of option (c) and an answer to quest
   - `act` as a list;
   - the position key, kept as a safety net for clashes the dictionary doesn't resolve.
 - **Enrichment rule:** a new label requires use across 2 or more Families, or repeated use in one Family; never one-off (meta-plan).
+
+## #78 schema change built (2026-10-07)
+
+- **`drrp_gold`** (backup in `data/gold/v4/backup_drrp_gold_pre78_20261007.copy`):
+  - the PK gains `actor_position`: '' for a label's entry, the role for a second entry of the same label;
+  - existing keys and page decisions are unchanged;
+  - 414 sentence-gold actor values migrated to list `act`. v3 keeps scalars as the closed row-level record.
+- **Scripts:**
+  - `row_key` appends the role for a second entry;
+  - `review_import.py` inserts review-added roles (decision `add`, rule `ADDED`) and rejects a role the label already holds. Tested dry: one valid add accepted, one duplicate role rejected;
+  - `load_units.py` keys a justifier's repeated label by its position;
+  - `review_units_export.py` carries `actor_position`;
+  - `load.py`'s conflict target is updated.
+- **Sentence page (version 2):** Holds offers `both`, Act is multi-select, and each actor row has "Add a role…" for a second entry; added roles show under the row with Remove.
+- **Rules:** POS-15 revised (one entry per label per role; `both`; act list; same label and same role merge), and G1 resolved. The brief (`JUSTIFY_UNITS.md`) asks for dictionary candidates as policy notes.
+- **Not yet done:** the existing 222 sentences aren't re-justified under the new rule. The 3 known cases (reg.53(5), s.50(8) as designed, Art.8(1)) can be fixed in review with "Add a role…" / multi-act, or picked up in phase C.
