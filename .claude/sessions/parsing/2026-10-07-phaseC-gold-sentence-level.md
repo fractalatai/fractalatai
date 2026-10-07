@@ -157,3 +157,15 @@ So the same kind of sentence lands in three classes, and Permissions mixes a min
   - batch-1 decisions imported (31 rows still open, 13 of them purpose);
   - an agent is re-sorting all 319 gold purposes under the new order, with section/Part/Chapter titles from legal's headings extract (315 of 319 matched);
   - only the cases that differ from the mechanical rename (Requirements/Permissions → Substantive requirements, Constitution → Bodies and their functions, Appeals and defences → Appeals, compensation and defences) go to Jason.
+
+**Gold migrated to the anatomy scheme (2026-10-07).**
+- **The re-sort:** an Opus agent re-sorted all 319 gold purposes with section/Part/Chapter titles: 292 moved mechanically and 27 differed (`data/gold/v4/purpose_resort_review.md`).
+- **Blind second opinion:** Gemini 2.5 Flash classified the 27 without seeing the agent's answers (raw: `data/code-review/purpose-resort-27-gemini-flash.md`) and agreed on 25. The two disagreements, decided by Jason on Claude's leans:
+  - CTSA s.23(1) → **Citation and commencement** (Gemini; entry into force of a scheme made under the Act; the agent had said Subordinate legislation);
+  - Water Act s.74(2) → **Application** (the agent; a transitional handover; Gemini had said Enforcement from the section title).
+- **Duck tests sharpened** (`d9e8b27`): Review vs review of decisions, directions to the governed vs to public bodies, guidance issuing, levies and tariffs in Fees.
+- **Applied:** 171 decided rows recorded as `change` ("Purpose anatomy (Jason 2026-10-07): old → new", earlier comments kept), plus 7 open rows re-proposed. Backup: `data/gold/v4/backup_v4_pre_anatomy_20261007.copy`.
+- **Page:** 171 decision slots written with pinned versions; 7 cards re-exported; page republished (version 4) with the 13-member dropdown. Pull-back: 1,552 = 1,552 decided rows, **0 mismatches**.
+- **Final gold purpose counts:** Substantive requirements 129, Application 58, Appeals/compensation/defences 25, Interpretation 19, Fees 18, Subordinate legislation 16, Enforcement 15, Offences 13, Bodies 10, Citation 7, Review 5, inherit 4 (Financial provisions 0; Amendment 0 because it is excluded).
+- Precedents rebuilt.
+- **Legal:** its Phoenix server (:7447) is stopped for the day, so the LAT pull waits until Jason restarts it (`mix phx.server`). Rounds 1 and 2 are in legal's database.
