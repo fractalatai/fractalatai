@@ -120,3 +120,9 @@ The selection has 21 units (23 rows) from the Act, in three Parts:
 - **Part VII**, Financial Markets and Insolvency: 16 units, including s.155A(4) and s.164(1).
 
 None is EHS&HR. Proposal for phase C: drop all 21 from the gold selection (4 are already in `gold-v4-sentence`) and replace them in the top-up from in-domain laws. The dictionary drops their actors too.
+
+**Dropped (Jason, 2026-10-07): all 21 Companies Act units are out of the gold set.**
+- They are listed in `data/gold/v4/excluded_units.csv`. `unit_evidence.py` skips that list, so they never come back.
+- The 4 reviewed units are gone from `gold-v4-sentence` (19 rows deleted, backup at `data/gold/v4/backup_companies_act_rows_20261007.json`), from the sentence page and from `evidence.jsonl`.
+- `gold-v3-draft` keeps its rows as the record of the row scheme.
+- The gold set is now 222 sentences (1,097 rows). The selection's 851 units drop to 830; phase C's top-up replaces them from in-domain laws.
