@@ -46,7 +46,8 @@ def main() -> None:
         by.setdefault(uid, []).append({
             "key": row_key(uid, field, actor, pos), "field": field, "actor_label": actor, "actor_position": pos,
             "proposed": proposed,
-            "rules": [{"id": r, "text": SPECIAL.get(r) or rules.get(r) or ("Purpose class" if r.startswith("P:") else "")}
+            "rules": [{"id": r, "text": SPECIAL.get(r) or rules.get(r) or ("Purpose class" if r.startswith("P:") else
+                                                                       "Precedent pattern (catalogue v2)" if r.startswith("PREC:") else "")}
                       for r in rule_ids],
             "reason": reason, "evidence": {}, "agree": None, "difficulty": diff, "catalogue": cat})
     os.makedirs(args.out, exist_ok=True)

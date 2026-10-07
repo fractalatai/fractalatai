@@ -46,7 +46,7 @@ def main() -> None:
 
     ev = {e["unit_id"]: e for e in map(json.loads, open(args.evidence))}
     md5 = {u: hashlib.md5(e["text"].encode()).hexdigest() for u, e in ev.items()}
-    rows, notes = [], {}
+    rows, notes, excludes = [], {}, []
     c = collections.Counter()
 
     if args.carry_singles:
@@ -65,8 +65,14 @@ def main() -> None:
             uid = j["unit_id"]
             if uid not in ev:  # dropped from gold (excluded_units.csv)
                 continue
+            if j.get("exclude"):  # JUSTIFY_V2: amending text, out of domain → excluded_units.csv after Jason agrees
+                c["exclude proposed"] += 1
+                excludes.append((uid, j["exclude"]))
+                continue
             e = ev[uid]
-            notes[uid] = j.get("policy_notes") or []
+            # JUSTIFY_V2 notes {kind, note}; phase A policy_notes {default, note}
+            notes[uid] = [({"default": None, "note": f"{n['kind']}: {n['note']}"} if "kind" in n else n)
+                          for n in (j.get("notes") or j.get("policy_notes") or [])]
             stem = {(d["field"], d["actor_label"]): d for d in e["row_decisions"] if d["row"] == uid and d["decision"] != "query"}
             seen: set = set()
             for f in j["fields"]:
@@ -84,6 +90,8 @@ def main() -> None:
                 c[("carried" if same else "open") + " " + f["difficulty"]] += 1
 
     print(f"{len(rows)} rows for {len({r[0] for r in rows})} units: " + ", ".join(f"{k} {v}" for k, v in sorted(c.items())))
+    for uid, why in excludes:
+        print(f"  exclusion proposed (not loaded; add to excluded_units.csv when Jason agrees): {uid}: {why}")
     if not args.write:
         print("dry run: --write to load")
         return

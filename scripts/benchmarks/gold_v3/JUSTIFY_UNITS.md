@@ -1,5 +1,7 @@
 # Justifier brief: sentence units (meta-plan phase A, first load)
 
+> **Superseded 2026-10-07** by `JUSTIFY_V2.md` (sentence units on catalogue v2). Kept as the phase 0a/A record.
+
 You label **whole legal sentences**, not the source's rows. Read `JUSTIFY_GOLD.md` first for the fields, the
 output format, difficulty grades and the binding documents. This brief **overrides** it where they differ.
 

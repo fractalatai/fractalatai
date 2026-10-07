@@ -1,5 +1,7 @@
 # Justifier brief: gold v3 labels with rule citations (phase 0a)
 
+> **Superseded 2026-10-07** by `JUSTIFY_V2.md` (sentence units on catalogue v2). Kept as the phase 0a/A record.
+
 You are proposing the **gold** label for each provision and justifying every field with rule IDs from the rule catalogue. Jason will review your table and approve or correct each row. He is not an expert on hard provisions, so your job is to make each decision checkable: name the rule, quote the deciding words, and grade how hard it was.
 
 ## Input
