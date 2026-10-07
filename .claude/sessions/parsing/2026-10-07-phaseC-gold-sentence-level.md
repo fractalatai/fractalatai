@@ -13,7 +13,7 @@ The gold set has 220 reviewed sentences. The rest of the selection (848 sentence
 
 ## Todo
 
-- ⬜ **Batch 1** (about 100 sentences): evidence packs (`unit_evidence.py --selection`, the not-yet-gold units), two Opus justifier agents on `JUSTIFY_V2.md`, load (`load_units.py`), export and sync to the sentence page; Jason reviews
+- ⬜ (loaded 2026-10-07: 99 sentences + 1 proposed exclusion, 466 open rows; Jason reviewing) **Batch 1** (about 100 sentences): evidence packs (`unit_evidence.py --selection`, the not-yet-gold units), two Opus justifier agents on `JUSTIFY_V2.md`, load (`load_units.py`), export and sync to the sentence page; Jason reviews
 - ⬜ Convergence after each batch: approve-unchanged rate, new candidate patterns and dictionary candidates (notes), new principles promoted (target: none without Jason, ~3 provisions from 2+ laws)
 - ⬜ Batches 2 to 6 until the 605 are reviewed; stop early if the approve rate holds and no new patterns appear (meta-plan stop signals)
 - ⬜ Amending text and out-of-domain sentences that justifiers propose for exclusion → `excluded_units.csv` once Jason agrees
@@ -29,3 +29,23 @@ The gold set has 220 reviewed sentences. The rest of the selection (848 sentence
 - ✅ Phase B: catalogue v2, the precedent store, `JUSTIFY_V2.md`, the trimmed spec, gold made consistent with v2
 - ✅ The 60 test laws repaired by legal (list-text fix pulled 2026-10-07)
 - ⬜ Legal's remaining parse repair (batches 4–11, #174 definitions/BlockText). It doesn't touch the 60 test laws' text except for the #174 section-row fix; pull once after it lands (NAS backup first). Top-up laws may change, so take top-up sentences after the pull, or re-check their text
+
+## Batch 1 (2026-10-07)
+
+**The batch:** 100 of the 605, drawn round-robin across laws (58 laws, 39 multi-row; median 298 characters). Evidence packs for all 825 selection sentences (`unit_evidence.py --selection`), each with 5 precedents. Two Opus justifiers on `JUSTIFY_V2.md` (`data/gold/v4/justified/c1a.jsonl`, `c1b.jsonl`); every rule ID cited is a v2 principle, `P:`, `PREC:` or `NEW`.
+
+**Loaded:** 466 open rows for 99 sentences (357 easy, 106 hard, 3 new_edge). Synced to the sentence page as 99 new cards; the page now holds 319 sentences.
+
+**Proposed exclusion (not loaded):** SI 2008/1911 reg.58(1), which revokes the LLP Regulations 2001 (amending text). Needs Jason's agreement.
+
+**Bug fixed:** `load_units.py` still had the pre-#78 conflict target. The first insert failed inside its transaction, so nothing was written; fixed and reloaded.
+
+**Notes: {'question': 33, 'candidate_pattern': 7, 'dictionary_candidate': 7, 'source_fault': 3}.**
+- **Candidate patterns:**
+  - `establishment-of-body`;
+  - `amount-computation` (fees owed under another provision);
+  - `passive-with-agent` ("shall be made by the operator": REL-33 or REL-28?);
+  - `agentless-power` ("A reasonable charge may be made");
+  - `thing-subject-may-relaxation`; `references-do-not-include`; `mandatory-sentence` (a court "must impose" a minimum sentence: REL-04 against REL-33).
+- **Dictionary candidates:** air traffic controller, judgment creditor, partner (in a partnership), training provider, a government nominee.
+- **Recurring question:** three laws that look outside EHS&HR (Foreign Judgments Act 1933, CTSA 2015, VCRA 2006); the LLP accounts regs are similar.
