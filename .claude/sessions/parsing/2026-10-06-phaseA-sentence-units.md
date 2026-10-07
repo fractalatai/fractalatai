@@ -1,11 +1,101 @@
 ---
 session: "Phase A: Sentence units"
-status: active
+status: closed
 opened: 2026-10-06
-related: ["parsing/2026-10-06-meta-plan-sentence-units.md", "parsing/2026-10-06-phase0a-gold-set-scaffolding.md"]
+closed: 2026-10-07
+outcome: success
+
+summary: >
+  The legal sentence (a stem joined with its items and closing words) replaced the source row as the gold unit. The
+  assembler was built, QA'd and fixed against legal's repaired text, and Jason's first sentence review approved 98%
+  of agent labels unchanged with no new labelling rulings. #78 was sized and resolved in the schema (option c), and a
+  dictionary enrichment rule was set to stop drift.
+
+decisions:
+  - what: "The legal sentence is the gold unit; items are never labelled separately"
+    why: "Row-level labelling produced about 6 rulings per batch and a 123-rule rulebook that didn't converge; 86 of 240 reviewed relations were `continues`"
+    result: "First sentence review needed 0 new labelling rulings; 447 of 456 open rows (98.0%) approved unchanged"
+  - what: "The four provisional defaults stand (proviso joins, full-sentence item stays, whole-sentence detail is `continues`, own purpose or `inherit`)"
+    why: "Settled from the data in the app, as Jason asked; no review decision contradicted them"
+    result: "Mixed purposes in one sentence (PHA s.82(5)) moved to the purpose scheme, not the unit"
+  - what: "Companies Act 1989 dropped from gold (21 units); legal excluded it from LAT"
+    why: "Out of the EHS&HR domain; full massive Acts cause dictionary drift and unfamiliar drafting (Jason)"
+    result: "Gold 226 → 222 sentences; test laws 61 → 60; `excluded_units.csv` keeps them out"
+  - what: "Pulled legal's list-text parser repair for the 60 test laws before continuing"
+    why: "Legal's parser moved chapeaux to the end of rows, duplicated nested items and dropped spaces"
+    result: "202 rows changed and 2 grown in 55 laws; 5 gold sentences reordered with their labels intact; no gate failures"
+  - what: "Assembler fixes from agent QA and Jason's spot-check: two-dash stems, dashless lead-ins, one unit per row, non-stem roots print one row, stray dashes, definitions moved back from section rows"
+    why: "QA of 32 sampled units plus a full scan of the 60 laws; Jason queried WSI 2005/1806 reg.5(1)"
+    result: "0 rows in two units (was 9); 6 two-dash stems read correctly; 25 dashless stems joined; 6 definition lists restored; no gold sentence changed"
+  - what: "#78 option (c): the gold key adds actor_position (a second entry per role), holds both, act as a list"
+    why: "One entry per label lost a role in up to 14% of multi-row sentences; Gemini 2.5 Pro rejected a free-text referent key in favour of position, and recommended act as a list"
+    result: "drrp_gold PK migrated with no key changes; 414 act values became lists; page version 2 has both, multi-act and \"Add a role…\""
+  - what: "Dictionary enrichment rule: a new actor label needs use across 2+ Families or repeated use in one Family; never one-off"
+    why: "About half the two-role clashes are generic labels (Ind: Person 54) that richer labels would split, but enrichment must not drift (Jason)"
+    result: "Recorded in the meta-plan and in memory; each addition needs Jason's approval"
+
+metrics:
+  units_60_laws: { sentences: 7340, multi_row: 2362, flags_nested: 403, flags_closing_words: 390, flags_full_sentence_item: 165, flags_sibling_but: 33, flags_section_text: 17 }
+  selection: { provisions: 1000, units: 848, after_companies_act_drop: 827 }
+  first_sentence_review: { sentences: 226, rows: 1116, open_rows: 456, approved_unchanged: 447, changed: 1, queried: 8, new_rulings: 0 }
+  holder_shape: { multi_row_with_actors: 1413, lossy_clashes_upper_bound: 198, two_positions: 165, active_obligation_and_liberty: 60, gold_more_than_one_active: "23/191" }
+  assembler_qa: { sampled: 32, ok: 26, rows_in_two_units_before: 9, rows_in_two_units_after: 0 }
+  legal_repair: { laws_applied: 55, rows_text_changed: 202, rows_grown: 2, gold_sentences_reordered: 5 }
+
+lessons:
+  - title: "Labelling the source's rows breeds rules; labelling the legal sentence doesn't"
+    detail: "Row units needed stem/item rules (REL-02, REL-13, POS-17 …) and about 6 rulings per batch. At sentence level the first review produced none and 98% of agent labels were approved unchanged. Choose the unit a lawyer reads before writing rules."
+    tag: methodology
+  - title: "Row-level pipeline labels overstate sentence-level clashes"
+    detail: "198 lossy same-label clashes came from merging row labels, but many were row noise (\"shall be final\" read as a duty, notice content read as a power). Gold showed 3 genuine cases in 191. Treat merged row labels as an upper bound and inspect examples before sizing a schema change."
+    tag: data
+  - title: "Upstream text repairs can change unit boundaries, not just text"
+    detail: "Legal filled an empty Water Act s.3 row with misplaced definitions, and its dash made the whole section a stem of 22 subsections. Re-run the unit diff (roots, members, selection mapping) after every LAT pull, not just a text diff."
+    tag: data
+  - title: "A stem is defined by list-item children, not by the dash"
+    detail: "List items always continue their parent's words. Many lead-ins lost their dash in the source (\"shall;\", \"In Scotland\", a colon). The dash or colon only marks where closing words start, and a two-dash stem interleaves two item runs."
+    tag: architecture
+  - title: "Keep the extra key empty for the common case"
+    detail: "Adding actor_position to the PK as '' for a label's normal entry meant no existing key, page decision or slot changed. Only a second entry carries the role. A schema migration with zero re-keying."
+    tag: architecture
+  - title: "Scope the corpus to the domain before mining patterns"
+    detail: "The full Companies Act 1989 entered the gold selection and brought company-law actors and drafting. Jason caught it and legal scoped 14 massive Acts (58,507 → 10,679 rows). Check a law's Parts are in domain before sampling from it."
+    tag: data
+  - title: "Give a reviewer the spot-check as a readable file, and act on a single query"
+    detail: "Jason read data/gold/v4/assembler_spotcheck.md and queried one unit with a legislation.gov.uk screenshot. That one query generalised into a rule fixing 6 cases and a source-fault report to legal."
+    tag: tooling
+
+artifacts:
+  - scripts/benchmarks/gold_v3/units.py
+  - scripts/benchmarks/gold_v3/unit_evidence.py
+  - scripts/benchmarks/gold_v3/load_units.py
+  - scripts/benchmarks/gold_v3/review_units_export.py
+  - scripts/benchmarks/gold_v3/review_import.py
+  - scripts/benchmarks/gold_v3/review_export.py
+  - scripts/benchmarks/gold_v3/load.py
+  - scripts/benchmarks/gold_v3/sentence_review_page.html
+  - scripts/benchmarks/gold_v3/JUSTIFY_UNITS.md
+  - scripts/benchmarks/gold_v3/JUSTIFY_GOLD.md
+  - scripts/pg_schema.sql
+  - docs/architecture/DRRP-RULE-CATALOGUE.md
+  - crates/fractalaw-core/data/actor-dictionary.yaml
+  - data/gold/v4/excluded_units.csv
+  - data/gold/v4/assembler_spotcheck.md
+  - data/code-review/drrp-issue78-option-c.md
+  - https://claude.ai/artifact/3gViKiNKKikKepNBJft7dk
+
+depends_on:
+  - 2026-10-06-meta-plan-sentence-units
+  - 2026-10-06-phase0a-gold-set-scaffolding
+
+enables:
+  - "Phase B: principles and precedents (prune the 123-rule catalogue)"
+  - "Phase C: gold at sentence level (about 600 remaining sentences, with the #78 schema)"
+  - "Phase E: the sentence assembler ported to fractalaw-core"
+  - "Dictionary enrichment under the 2+ Families rule"
 ---
 
-# Session: Phase A: Sentence units (ACTIVE)
+# Session: Phase A: Sentence units (CLOSED)
 
 ## Problem
 
