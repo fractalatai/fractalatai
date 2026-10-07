@@ -43,7 +43,7 @@ Label each sentence **once**: one `relation`, one `raw_type`, one `purpose`, and
   - With no named subject, a sentence that only sets the content, manner, timing or conditions of a duty or power in **another** sentence is `continues` (REL-28). Examples: "may be served by post", "The scheme must include—". A `continues` sentence has no holder and no `raw_type`. If the holder of the continued duty is named, it is `mentioned`.
   - Machinery is `no` (REL-07): application, extent, savings, citation, commencement, parliamentary procedure.
   - Definitions and deeming are `no` (REL-06), and they beat a passive "shall" ("shall be treated as"). Deeming that moves who holds duties gets the `deemed-holder` pattern.
-  - Designating an enforcing authority is that body's Obligation, with purpose Requirements (REL-20).
+  - Designating an enforcing authority is that body's Obligation, with purpose Requirements (REL-27).
   - Offences, penalties and defences are `no` (REL-04). An exemption is `no` (REL-08).
 - **Actors** (POS-15, revised): one entry per label **per role**.
   - One party with a duty and a power is one entry with `"holds": "both"`.
