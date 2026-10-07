@@ -1,11 +1,11 @@
 ---
 session: "Phase B: Principles and precedents"
-status: pending
+status: active
 opened: 2026-10-06
 related: ["parsing/2026-10-06-meta-plan-sentence-units.md", "docs/architecture/DRRP-RULE-CATALOGUE.md", "docs/architecture/DRRP-CLASSIFICATION.md"]
 ---
 
-# Session: Phase B: Principles and precedents (PENDING)
+# Session: Phase B: Principles and precedents (ACTIVE)
 
 ## Problem
 
@@ -25,4 +25,33 @@ related: ["parsing/2026-10-06-meta-plan-sentence-units.md", "docs/architecture/D
 ## Dependencies
 
 - ✅ Catalogue, spec and 240 reviewed provisions with Jason's comments
-- ⬜ Phase A's unit definition (for the retired rules); classification starts before it, the catalogue v2 is finalised after it
+- ✅ Phase A closed 2026-10-07: sentence units, the #78 schema (POS-15 revised), the dictionary enrichment rule
+
+## Started 2026-10-07: what phase B changes in the gold and the review app
+
+**Jason asked:** do the rules change the data in the sentence review app (hard/easy/edge, policy notes)?
+
+- **Gold values: no.** All 1,097 sentence-gold rows are decided: 1,000 easy, 84 hard and 2 new_edge approved, 11 queried. Those values are Jason's labels, not the rules'.
+  - **Exception:** if a v2 principle contradicts an earlier ruling, a **consistency check** flags the gold rows it would decide differently, for Jason to look at. Nothing is changed silently.
+- **Rule citations (`rule_ids`, `reason`): kept as history.** `catalogue_ver` already records which catalogue they cite.
+  - 53 rows cite rules that sentence units retire: REL-45 26, POS-17 12, REL-16 7, REL-15 6, POS-18 1, REL-30 1.
+  - 502 carried rows cite `CARRIED`.
+  - A crosswalk (old ID → principle, precedent, retired or merged) lets the page show what an old citation became.
+- **Difficulty: redefined against v2 for future loads only.**
+  - **easy:** a principle decides it;
+  - **hard:** a principle applies, but it needs judgment or a precedent;
+  - **new_edge:** nothing fits, so it's a candidate pattern.
+  - On existing rows difficulty was review triage, and they are all decided.
+- **Policy notes: historical.** The four provisional defaults they tested are settled and become principles in v2. From phase C, notes become **candidate-pattern reports** that feed the promotion rule.
+
+## Recurrence evidence (2026-10-07)
+
+`data/gold/v4/rule_recurrence.csv` lists, per rule, the reviewed provisions citing it (v3 decided rows plus sentence gold, Companies Act excluded), with laws, Families, and changed and queried rows.
+
+| | Rules |
+|---|---|
+| ≥3 provisions from ≥2 laws | 67 |
+| cited, below threshold | 33 |
+| never cited | 23 |
+
+Citations are an imperfect proxy: a rule can decide a case without being cited, and a citation can be decorative. The classification reads each rule's text as well as its counts.
