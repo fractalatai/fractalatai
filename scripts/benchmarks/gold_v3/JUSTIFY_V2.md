@@ -10,7 +10,7 @@ This brief replaces `JUSTIFY_GOLD.md` and `JUSTIFY_UNITS.md` (phase 0a/A history
 
 1. `docs/architecture/DRRP-RULE-CATALOGUE.md`: **catalogue v2, read it first.** Cite v2 principle IDs only. A v1 ID
    appears there only in the crosswalk; never cite a merged, retired, precedent or dictionary ID.
-2. `docs/architecture/PURPOSE-CLASSIFICATION.md`: the 11 coarse purpose classes, plus `inherit`.
+2. `docs/architecture/PURPOSE-CLASSIFICATION.md`: the 12 coarse purpose classes, plus `inherit`. **Subordinate legislation** (added 2026-10-07) takes every power or duty to make regulations, orders, rules, schemes or byelaws, what they may contain, and how they are made (laying, annulment, consultation); commencement by order stays Citation and commencement.
 3. Actor labels only from `crates/fractalaw-core/data/actor-dictionary.yaml`, or `OTHER: <short description>` when
    none fits (a `new_edge`, and a dictionary candidate).
 
@@ -52,7 +52,7 @@ Label each sentence **once**: one `relation`, one `raw_type`, one `purpose`, and
   - An implied access right (precedent `implied-access-right`): the party is `active` with an inferred Liberty **and** has a second entry as `counterparty` of the government's duty, with act `["give_access"]`.
   - `act` is a **list**: `[]` when none, and only for the counterparty of an Obligation (ACT-01). Use the ACT-12 classes.
 - **Holders from elsewhere** (HOLD-05, INF-03, the context principles): a holder supplied by an applying provision or by the parent Act is `active` with `inferred: true`. Never guess a holder (HOLD-15).
-- **Purpose:** the sentence's own class, or `inherit` when its words carry none.
+- **Purpose:** the sentence's own class, or `inherit` when its words carry none. A power to make further law is **Subordinate legislation**, not Permissions.
 - **Exclusions:** amending text (words inserted into, substituted in or repealed from other laws) and text outside EHS&HR are not labelled. Emit an exclusion instead (see Output).
 
 ## Precedents

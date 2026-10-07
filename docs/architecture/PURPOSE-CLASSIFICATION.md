@@ -9,7 +9,7 @@
 
 Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds a finer, more complex one only when needed. The class names are the terms legislation itself uses in its headings, not invented categories.
 
-**Coarse layer: 11 classes.** Class names avoid the DRRP vocabulary (Obligation, Liberty, Duty, Right, Responsibility, Power): `Duties` → **Requirements** and `Powers` → **Permissions** (Jason, 2026-10-06), and the fine split is **Substantive** vs Procedure/Detail.
+**Coarse layer: 12 classes** (Subordinate legislation added 2026-10-07). Class names avoid the DRRP vocabulary (Obligation, Liberty, Duty, Right, Responsibility, Power): `Duties` → **Requirements** and `Powers` → **Permissions** (Jason, 2026-10-06), and the fine split is **Substantive** vs Procedure/Detail.
 
 | Class | Replaces (of the 18) |
 |---|---|
@@ -24,6 +24,7 @@ Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds 
 | Fees and charges | Charge+Fee |
 | Amendment and revocation | Amendment, Repeal+Revocation |
 | Constitution | Establishment+Constitution ("there shall be a body called X" is neither a duty nor a power) |
+| Subordinate legislation | new (2026-10-07): powers to make further law. Was split across Permissions, Requirements and Application |
 
 **Class rules from the gold review** (Jason, 2026-10-06):
 - **Requirements** is for provisions about obligations. A condition on an exemption, or on how a power applies ("shall not grant any such exemption unless satisfied", "application of the exercise of a power"), is **Application and exemption**.
@@ -35,7 +36,19 @@ Jason (2026-10-06): use more than one method: a coarse, simple layer that feeds 
 - **Who, when, what, where vs how** (Jason, batch 2): Application is about who, when, what and where the law applies. A procedural condition on exercising a power ("SEPA must not grant an application for transfer … unless it is satisfied that—", SSI 2018/219 reg.27(6)) is **Requirements**. A condition on granting an exemption, or on whom a power reaches (reg.44A(8)(a)), stays Application.
 - **A power to authorise others** to act for a body ("may authorise in writing any person … to carry out any of its functions", SI 2012/3032 reg.35(2)) is **Permissions**, even under an Enforcement heading.
 - **"An offence will not be committed … provided that"** (SI 2019/156 reg.4(8)) is **Offences and penalties**.
-- **Parliamentary procedure** (annulment and affirmative clauses) is **Requirements**: the procedure is the "how" (Jason, batch 1). Application says when, who, where and what.
+- **Subordinate legislation** (Jason, 2026-10-07). The Interpretation Act 1978 s.21(1) defines it as "Orders in Council, orders, rules, regulations, schemes, warrants, byelaws and other instruments made or to be made under any Act"; our laws head these provisions "Subordinate legislation", "Regulations", "Powers to make regulations", "Orders and regulations", "Byelaws" and (EU) "Delegated and implementing acts".
+  - **Covers:**
+    - a power or duty to make regulations, orders, rules, schemes or byelaws ("The Secretary of State may by regulations make provision…");
+    - what such instruments may or must contain ("Regulations under this section may include provision about—");
+    - their making procedure: consultation, drafts, laying, affirmative and negative resolution, "exercisable by statutory instrument";
+    - EU delegated and implementing acts.
+  - **Includes** instruments made generally under an Act that bind a place or class (development orders, tree preservation orders). **Excludes** notices, orders or decisions addressed to a named person (improvement, enforcement and compliance notices).
+  - **Not this class:**
+    - commencement by order ("comes into force on such day as X may by regulations appoint"): Citation and commencement;
+    - the duties the regulations later create;
+    - reports laid before Parliament: Requirements.
+  - **Relation is unchanged:** a minister's power to make regulations is still `yes`, Minister active Liberty.
+  - **Replaces** the batch-1 ruling that parliamentary procedure is Requirements.
 - **A permitted way of discharging a duty** ("the hirer may inform … by a general announcement") is **Permissions**.
 - Class-definition and criterion items **stay Application** (confirmed in batch 1, GHG ETS reg.70(2)(db)); conditions and limits on a power stay Application (reg.44A(8)(a)).
 - **A condition on an exemption power** is Application (gas regs 1998 reg.40(2)).

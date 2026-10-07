@@ -25,7 +25,7 @@ PG = "host=localhost port=5433 dbname=fractalaw user=fractalaw password=fractala
 CLASSES = [
     "Citation and commencement", "Interpretation", "Application, exemption and transition", "Requirements", "Permissions",
     "Enforcement", "Offences and penalties", "Appeals and defences", "Fees and charges",
-    "Amendment and revocation", "Constitution",
+    "Amendment and revocation", "Constitution", "Subordinate legislation",
 ]
 # cue labels finer than the coarse classes (Transitional merged into Application, 2026-10-06); the cue keeps the
 # finer label so the gold selection's targets stay reproducible
@@ -53,6 +53,13 @@ FROM_18 = {
 CUES = [
     ("Citation and commencement", r"\bmay be cited as\b|\bcomes? into (?:force|operation)\b|\bshall come into (?:force|operation)\b"
                                   r"|\bextends? (?:only )?to (?:England|Wales|Scotland|Northern Ireland|Great Britain|the United Kingdom)"),
+    # powers to make further law (Interpretation Act 1978 s.21; Jason 2026-10-07). After commencement, so "comes into
+    # force on such day as X may by regulations appoint" stays Citation and commencement; before Requirements/Permissions
+    ("Subordinate legislation", r"\b(?:may|shall|must) by (?:regulations|order|rules|scheme|byelaws|statutory instrument)\b"
+                                r"|\bpower to make (?:regulations|an order|orders|rules|byelaws)\b|\bmay make (?:regulations|rules|byelaws|an order)\b"
+                                r"|\b(?:regulations|orders?|rules|byelaws|schemes?) (?:under|made under) (?:this|subsection|section|paragraph|article|regulation)\b[^.;]{0,80}\b(?:may|shall|must)\b"
+                                r"|\b(?:delegated|implementing) acts?\b|\bstatutory instrument containing\b|\bexercisable by statutory instrument\b"
+                                r"|\bsubject to annulment\b|\bresolution of (?:each|either) House\b|\bdraft of (?:the )?(?:regulations|order|instrument)\b"),
     ("Amendment and revocation", r"\b(?:is|are) hereby (?:revoked|repealed)\b|\b(?:Regulations|Order|Act|Rules|Directive|provisions?)\b[^.;]{0,60}\b(?:is|are) (?:revoked|repealed)\b|\bfor .{1,80} substitute\b|\bthere (?:is|are|shall be) inserted\b"
                                  r"|\b(?:is|are) amended as follows\b|\bomit\b"),
     ("Transitional and saving", r"\bcontinues? to have effect\b|\bas if (?:this|these|that) .{0,40}had not\b|\btransitional\b|\bsaving\b"),
