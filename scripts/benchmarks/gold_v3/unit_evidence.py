@@ -48,7 +48,10 @@ def main() -> None:
     ap.add_argument("--out", default=os.path.join(ROOT, "data/gold/v4/evidence.jsonl"))
     args = ap.parse_args()
 
-    sel = {r["section_id"]: r["unit_id"] for r in csv.DictReader(open(os.path.join(V3, "selection_units.csv")))}
+    # units Jason dropped from gold (e.g. out-of-domain Parts of massive Acts) never come back
+    excluded = {r["unit_id"] for r in csv.DictReader(open(os.path.join(ROOT, "data/gold/v4/excluded_units.csv")))}
+    sel = {r["section_id"]: r["unit_id"] for r in csv.DictReader(open(os.path.join(V3, "selection_units.csv")))
+           if r["unit_id"] not in excluded}
     v3 = {json.loads(l)["section_id"]: json.loads(l) for l in open(os.path.join(V3, "evidence.jsonl"))}
     laws = sorted({s.split(":", 1)[0] for s in sel})
     cur = psycopg2.connect(PG).cursor()
@@ -75,7 +78,7 @@ def main() -> None:
                                          "value": dec if decision == "change" else proposed,
                                          "decision": decision, "comment": comment})
 
-    units = sorted(set(decided) if args.reviewed else set(sel.values()))
+    units = sorted((set(decided) - excluded) if args.reviewed else set(sel.values()))
     duck = duckdb.connect(DUCK, read_only=True)
     law_title = dict(duck.execute("SELECT name, title FROM legislation WHERE name IN (SELECT unnest(?))", [laws]).fetchall())
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
