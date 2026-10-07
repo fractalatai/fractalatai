@@ -124,3 +124,5 @@ Jason: *"my so called rulings are drafts based on my best guess looking at snipp
 **Written:**
 - `docs/architecture/DRRP-RULE-CATALOGUE.md` (v2: 31 principles, 5 precedent patterns, retired, dictionary, crosswalk); `rule_texts()` resolves all 123 v1 IDs;
 - `PURPOSE-CLASSIFICATION.md` (designation → Requirements; the dated-regulator case flagged open).
+
+**LAT pulls on hold (Jason, 2026-10-07):** wait for legal to finish the whole parse repair (batches 4–11 from its local legislation.gov.uk copy, plus the #174 definitions/BlockText fix), **even if legal says a phase is complete**. Then do one pull, after a NAS backup, because the pull also archives about 47K rows from the 14 scoped Acts. A dry run on 10-07 showed batch 3 (80 laws, 1,579 rows changed) touches none of the 60 test laws.
