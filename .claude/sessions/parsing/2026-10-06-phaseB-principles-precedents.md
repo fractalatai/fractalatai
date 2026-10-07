@@ -13,9 +13,9 @@ related: ["parsing/2026-10-06-meta-plan-sentence-units.md", "docs/architecture/D
 
 ## Todo
 
-- ⬜ Classify every rule: **principle** (general, recurs, a model can learn it), **precedent** (one provision or a narrow pattern), **retired by sentence units** (stems, items, continuation: REL-02, REL-13, REL-15, REL-16, REL-30, REL-45, HOLD-02, TYPE-06, POS-17, POS-18, INF-04's stem clause, the item half of REL-28), or **merge** (overlapping rules)
-- ⬜ Recurrence check: for each candidate principle, count the provisions it decides in the 240 reviewed and the silver labels; under about 3 provisions, or all from one law → precedent
-- ⬜ Draft catalogue v2 (principles only, one line plus one example each), for Jason's review
+- ✅ (agent draft 2026-10-07: 30 principles, 66 merged, 12 retired, 8 dictionary, 7 precedents; `data/gold/v4/rule_classification.csv`) Classify every rule: **principle** (general, recurs, a model can learn it), **precedent** (one provision or a narrow pattern), **retired by sentence units** (stems, items, continuation: REL-02, REL-13, REL-15, REL-16, REL-30, REL-45, HOLD-02, TYPE-06, POS-17, POS-18, INF-04's stem clause, the item half of REL-28), or **merge** (overlapping rules)
+- ✅ (`data/gold/v4/rule_recurrence.csv`; used in the classification) Recurrence check: for each candidate principle, count the provisions it decides in the 240 reviewed and the silver labels; under about 3 provisions, or all from one law → precedent
+- ⬜ (draft at `data/gold/v4/catalogue_v2_draft.md`; with Jason for review, 7 questions) Draft catalogue v2 (principles only, one line plus one example each), for Jason's review
 - ⬜ Precedent store: precedents live as reviewed rows in `drrp_gold` (section_id, decision, comment), tagged with a short pattern name, and are shown to the justifier as examples, not cited as rules
 - ⬜ Promotion rule written into the brief: a new pattern becomes a principle only after about 3 provisions from at least 2 laws, **and Jason approves the promotion**; the justifier reports candidate patterns, it doesn't make rules
 - ⬜ Precedent retrieval (Gemini): the justifier finds precedents by pattern tag, then same law and section, then text similarity; shown with Jason's comment
@@ -55,3 +55,19 @@ related: ["parsing/2026-10-06-meta-plan-sentence-units.md", "docs/architecture/D
 | never cited | 23 |
 
 Citations are an imperfect proxy: a rule can decide a case without being cited, and a citation can be decorative. The classification reads each rule's text as well as its counts.
+
+## Classification draft (2026-10-07)
+
+An Opus agent sorted all 123 rules using the catalogue, the spec, the purpose scheme, the recurrence table, Jason's 47 comments (`data/gold/v4/jason_comments.json`) and the phase A decisions. Checked: all 123 present, one category each, every merge targets a principle.
+
+**Result:** 30 principles, 66 merged into them, 12 retired, 8 dictionary, 7 precedents.
+- Two principles sit below the recurrence threshold by design, as schema invariants: TYPE-03 (only active actors hold) and ACT-01 (act only for an Obligation's counterparty).
+- Ten merged rules clear the threshold and could be split back out: REL-17, REL-20, REL-38, POS-04, POS-11, ACT-03, ACT-04, ACT-11, LBL-13, HOLD-06.
+
+**Consequential calls:**
+- REL-28 is the single `continues` principle at sentence level, and REL-10 is retired (its `no` outcome was overturned on 10-06).
+- "Own duty or power wins" splits into REL-33 (detail-looking sentences, including REL-46's permitted discharge) and REL-41 (machinery-looking sentences, including laying duties and transitional powers).
+- **To precedents:** HOLD-04 and HOLD-12 (both reversed on CC(S)A s.31(2)), INF-01 (0 gold provisions), REL-44 (2), HOLD-17 (2 provisions, 1 law).
+- POS-19 is the single beneficiary test, absorbing POS-06, POS-07 and POS-11. The eight act-class rules fold into ACT-12.
+
+**7 questions for Jason** are at the end of the draft.
