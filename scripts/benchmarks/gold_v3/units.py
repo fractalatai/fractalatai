@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 """Sentence units (meta-plan phase A): join a stem with its items and closing words into one legal sentence.
 
-A **stem** is a row with child rows whose text holds a dash ("X shall—", "shall consist of— and the provision of …")
+A **stem** is a row with list-item children (paragraphs, sub-paragraphs) whose text holds a dash ("X shall—", "shall consist of— and the provision of …")
 or ends in a colon. The source puts a stem's closing words after the dash on the stem row; here they go after the
 items, where the law reads them. A unit's **root** is the outermost row in an unbroken chain of stems above a row
 (nested stems (2)— (a)— (i) are one sentence). A row with no stem above it is its own unit.
@@ -54,7 +54,10 @@ class Units:
 
     def is_stem(self, sid: str) -> bool:
         t = self.text(sid)
-        return bool(self.kids.get(sid)) and bool(t) and (bool(DASH.search(t)) or bool(COLON_END.search(t)))
+        # a stem introduces list items; a section whose children are all numbered subsections isn't one, even when
+        # its own text has a dash (Water Act 2003 s.3 holds the s.3(12) definitions after legal's 2026-10-07 repair)
+        items = any(self.rows[k][3] in ("paragraph", "sub_paragraph") for k in self.kids.get(sid, []))
+        return items and bool(t) and (bool(DASH.search(t)) or bool(COLON_END.search(t)))
 
     def root(self, sid: str) -> str:
         r = sid

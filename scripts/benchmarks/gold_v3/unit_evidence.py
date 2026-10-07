@@ -73,7 +73,7 @@ def main() -> None:
                    FROM drrp_gold WHERE gold_version = 'gold-v3-draft' AND field <> 'purpose_fine'""")
     decided: dict[str, list] = collections.defaultdict(list)
     for sid, field, actor, proposed, decision, dec, comment in cur.fetchall():
-        if decision:
+        if decision and sid in U.rows:  # rows of dropped laws (e.g. Companies Act 1989) aren't loaded
             decided[U.root(sid)].append({"row": sid, "field": field, "actor_label": actor,
                                          "value": dec if decision == "change" else proposed,
                                          "decision": decision, "comment": comment})
