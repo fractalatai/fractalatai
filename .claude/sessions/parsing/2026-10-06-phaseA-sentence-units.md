@@ -24,7 +24,7 @@ Labels attached to the source's rows, and a sentence split into a stem and items
 - ⬜ Counts on the 61 test laws and the selection, written below; the selection re-keyed to units for phase C
 - ⬜ Note for phase E: the same assembler in `fractalaw-core` so the pipeline labels sentences
 - ⬜ **Disambiguate `Operator`** (Jason, 2026-10-07): one label covers an individual who operates (a machine, a vehicle) and an organisation that runs an installation, airport, well or regulated activity; split it (see below)
-- ⬜ **Out-of-domain Parts of massive Acts** (Jason, 2026-10-07): the full Companies Act 1989 is held, so units from its company-law Parts bring dictionary drift and unfamiliar drafting. List the selection's units by Part, mark the out-of-domain ones and carry them to phase C's scope filter (legal's fix is on the legal-side list)
+- ✅ (listed below; 21 Companies Act units, all three Parts out of domain) **Out-of-domain Parts of massive Acts** (Jason, 2026-10-07): the full Companies Act 1989 is held, so units from its company-law Parts bring dictionary drift and unfamiliar drafting. List the selection's units by Part, mark the out-of-domain ones and carry them to phase C's scope filter (legal's fix is on the legal-side list)
 
 ## Dependencies
 
@@ -77,3 +77,46 @@ Options, to settle from the data and not now:
 - or tell them apart by context ("operator of a <installation/facility/airport>" → Org; operating "work equipment", a "machine" or a "vehicle" → Ind).
 
 Most "the operator" mentions rely on a defined term, so the law's definitions (already in the evidence context) usually decide. For now, flag it in the review comments and don't add rules. It goes to the phase B recurrence check and the dictionary-gap list.
+
+## First sentence review (Jason, 2026-10-07)
+
+All 226 sentences reviewed (1,116 rows; pull `data/gold/v4/review_decisions/pull_20261007a`, imported to `gold-v4-sentence`). *"The quality appeared to be high."*
+
+| | rows | approved | changed | queried |
+|---|---|---|---|---|
+| carried (singles, matching stem) | 660 | 656 | 0 | 4 (old batch-2 queries, carried) |
+| open (sentence labels) | 456 | 447 | 1 | 8 |
+
+Of the open rows, **98.0% were approved unchanged.** The row-level batches had 1,073 of 1,106 (97.0%) approved, but they needed about 6 rulings each. This review needed **no new labelling rulings**: every comment is about the dictionary, the domain or purpose.
+
+**Queries and comments:**
+- **Dictionary:**
+  - Gvt: Agency: Scottish Natural Heritage (Flood Risk s.50(8));
+  - a `Patient` label (Biological Agents Art.15(1));
+  - Gvt: Judiciary: Employment Tribunal (CAW reg.18(8), useful for HR);
+  - `Ind: Licensee` is possibly not an individual (SSI 2018/219 reg.30(1));
+  - review `Authorised Person` (also the batch-2 query on SI 2012/3032 reg.2);
+  - split `SC: T&L:` into Supply Chain and Transport & Logistics, e.g. Transport & Logistics: Gas Transporter (SI 2013/1471 reg.11(1)).
+  - CAA and Registrar General: queries carried from batch 2, already added to the dictionary on 10-06.
+- **Purpose:**
+  - PHA s.82(5): daughter clauses carry different purposes (the single-select limit);
+  - CAA s.44(6): compensation isn't Offences and penalties. *"Offences and penalties run from government to governed. Compensation runs in the opposite direction."* (The old Liability mapping is wrong.)
+  - SI 1998/3111 reg.4(2): deemed compliance, purpose still open (carried).
+- **Out of domain:** Companies Act s.155A(4) and s.164(1): *"remove from Gold standard"*. Only the EHS-relevant Parts will be stored, so the client of a clearing member doesn't need a dictionary entry.
+
+**What it says about the provisional defaults:** the sentence unit holds. All four defaults stand for now:
+- proviso;
+- full-sentence item;
+- whole-sentence `continues`;
+- own purpose or `inherit`.
+
+The one live issue is purpose on a mixed sentence (PHA s.82(5)). That is a purpose-model question (multi-select or section-level purpose), not a unit question.
+
+## Companies Act 1989 in the selection (2026-10-07)
+
+The selection has 21 units (23 rows) from the Act, in three Parts:
+- **Part III**, Investigations and Powers to Obtain Information: s.83(1), s.83(8), s.87(5);
+- **Part V**, Other amendments of Company Law: s.112(2), s.112(6);
+- **Part VII**, Financial Markets and Insolvency: 16 units, including s.155A(4) and s.164(1).
+
+None is EHS&HR. Proposal for phase C: drop all 21 from the gold selection (4 are already in `gold-v4-sentence`) and replace them in the top-up from in-domain laws. The dictionary drops their actors too.
