@@ -29,6 +29,7 @@ The gold set has 220 reviewed sentences. The rest of the selection (848 sentence
 - ✅ Phase B: catalogue v2, the precedent store, `JUSTIFY_V2.md`, the trimmed spec, gold made consistent with v2
 - ✅ The 60 test laws repaired by legal (list-text fix pulled 2026-10-07)
 - ⬜ Legal's remaining parse repair (batches 4–11, #174 definitions/BlockText). It doesn't touch the 60 test laws' text except for the #174 section-row fix; pull once after it lands (NAS backup first). Top-up laws may change, so take top-up sentences after the pull, or re-check their text
+- ⬜ Legal's LAT `title` column + manifest `title_hash` (proposed 2026-10-08; fractalaw replied technically OK, no `updated_at` bump). **Build nothing until legal's contract settles** (Jason 2026-10-08): its ongoing fixes may change the contract, the data or both. Later: a `title` column on legislation_text and a title-only apply path like the status-only one. Legal will also warn before a `correction` round for 623 scrambled headings in 218 docs; check the list against the test laws
 
 ## Batch 1 (2026-10-07)
 
