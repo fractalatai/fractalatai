@@ -79,6 +79,46 @@ BODY_KEYWORDS = [  # first match wins, checked per comma/slash-separated token
 ]
 
 
+# High-energy bands: Hallowell (2024) Energy-Based Safety, STKY list, strict reading (Jason, 2026-10-29).
+# Per-energy thresholds: fall >= 1.8 m, electrical >= 50 V, any vehicle near a worker on foot,
+# suspended/heavy loads, heavy rotating machinery, >= 30 psi releases, steam/molten, sustained fire,
+# explosive atmosphere, trench/structural collapse, IDLH/toxic, ionising above limits, Class 3B/4 laser.
+# Borderline bands are NOT flagged. Fall "low" (1-3 m) straddles 1.8 m: high only when the
+# narrative states sif_height_m >= 1.8 (STRADDLE_RULES).
+HIGH_ENERGY_BANDS = {
+    "fall": {"medium", "high", "very_high", "extreme"},
+    "electrical": {"low", "medium", "high", "very_high"},
+    "transport": {"yard_speed", "road_speed", "highway_speed"},
+    "struck": {"heavy_dropped", "swinging_projectile", "heavy_object_fall"},
+    "caught_in": {"medium_machinery", "heavy_machinery", "caught_between"},
+    "pressure": {"tyre_inflation", "hydraulic_injection", "high_pressure_gas", "high_pressure_water_jet"},
+    "structural_collapse": {"trench_excavation", "scaffold_formwork", "building_structure"},
+    "explosion": {"significant_industrial", "major_catastrophic"},
+    "fire": {"clothing_ignition", "structural_fire", "explosion_fireball"},
+    "thermal": {"high_temp_surface", "molten_material"},
+    "breathing": {"toxic_gas_acute", "oxygen_deficient", "drowning_submersion", "confined_space_combined"},
+    "chemical": {"corrosive_large_area", "acute_toxic_dermal", "acute_toxic_ingestion", "hf_special"},
+    "radiation_noise": {"acute_high", "acute_lethal", "laser_high_power"},
+}
+STRADDLE_RULES = {("fall", "low"): ("sif_height_m", 1.8)}
+
+
+def band_high_energy(mechanism, band):
+    return band in HIGH_ENERGY_BANDS.get(mechanism, set())
+
+
+def row_high_energy(rec):
+    """Per-report flag: band flag, upgraded by a stated magnitude for straddling bands."""
+    mech, band = rec.get("sif_mechanism"), rec.get("sif_band")
+    if not mech or not band:
+        return None
+    rule = STRADDLE_RULES.get((mech, band))
+    if rule:
+        value = rec.get(rule[0])
+        return value is not None and value >= rule[1]
+    return band_high_energy(mech, band)
+
+
 def norm_energy_types(values):
     out = set()
     for v in values if isinstance(values, list) else [values]:
@@ -285,6 +325,7 @@ def build_joined_records():
             rec["sif_cal_p50"] = None
             rec["sif_cal_p90"] = None
 
+        rec["sif_high_energy"] = row_high_energy(rec)
         records.append(rec)
 
     return records
@@ -305,8 +346,10 @@ CSV_COLUMNS = [
     "sif_source_properties", "sif_body_vulnerability", "sif_qwen_p50",
     # Calibration detail
     "sif_cal_p10", "sif_cal_p50", "sif_cal_p90",
-    # Reasoning (for audit — long text last)
+    # Reasoning (for audit — long text)
     "sif_reasoning_pass1", "sif_reasoning_pass2",
+    # Added 2026-10-29, appended last to keep earlier columns stable
+    "sif_high_energy",
 ]
 
 
@@ -320,6 +363,8 @@ def export_csv(records, output_path):
             for k, v in rec.items():
                 if v is None:
                     row[k] = ""
+                elif isinstance(v, bool):
+                    row[k] = "true" if v else "false"
                 elif isinstance(v, str):
                     row[k] = v.replace("\n", " ").replace("\r", " ")
                 else:
@@ -342,7 +387,7 @@ def export_csv(records, output_path):
 def export_bands(output_path):
     """Band lookup for the dashboard: sort order + calibrated quantiles per (mechanism, band)."""
     cols = ["mechanism", "band", "band_order", "band_description",
-            "cal_p10", "cal_p50", "cal_p90", "p_sif", "sif_classification"]
+            "cal_p10", "cal_p50", "cal_p90", "p_sif", "sif_classification", "high_energy"]
     rows = []
     for mech, cal in sorted(load_calibrations().items()):
         for i, b in enumerate(cal["magnitude_bands"], start=1):
@@ -350,7 +395,8 @@ def export_bands(output_path):
             rows.append({"mechanism": mech, "band": b["band"], "band_order": i,
                          "band_description": " ".join(b.get("description", "").split()),
                          "cal_p10": b["p10"], "cal_p50": b["p50"], "cal_p90": b["p90"],
-                         "p_sif": psif, "sif_classification": sif_label(psif)})
+                         "p_sif": psif, "sif_classification": sif_label(psif),
+                         "high_energy": "true" if band_high_energy(mech, b["band"]) else "false"})
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=cols)
         writer.writeheader()

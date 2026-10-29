@@ -21,7 +21,7 @@ Text with commas/quotes uses standard CSV quoting. Fixed file name every run.
 ## Band lookup — `sif-bands.csv`
 
 Written next to every export. One row per calibration band (87): `mechanism, band, band_order`
-(1 = least severe), `band_description, cal_p10, cal_p50, cal_p90, p_sif, sif_classification`.
+(1 = least severe), `band_description, cal_p10, cal_p50, cal_p90, p_sif, sif_classification, high_energy` (true/false, added 2026-10-29 as the last column).
 Join on (`sif_mechanism`, `sif_band`) and sort by `band_order`.
 
 **Stability contract (ECO_ETL v0.20 consumes both files):** keep `sif-bands.csv` column names and order
@@ -39,7 +39,7 @@ The file carries **only the keys and the SIF analysis**. Every source column (da
 report types, hazards, human SIFp labels, narrative, action) comes from ECO_ETL via the join, so no
 redacted text travels in this file.
 
-## Columns (21)
+## Columns (22)
 
 | Column | Type | Definition |
 |---|---|---|
@@ -74,6 +74,19 @@ engineered controls, regardless of the actual outcome.
 | `sif_cal_p10`, `sif_cal_p50`, `sif_cal_p90` | decimal 0–1 | The chosen band's calibrated severity quantiles in P(death) — the inputs to `sif_p_sif` (audit) |
 | `sif_reasoning_pass1` | text | Pass 1 one-sentence rationale |
 | `sif_reasoning_pass2` | text | Pass 2 band-choice rationale |
+| `sif_high_energy` | true / false | High-energy event (STKY strict, below). The band's `high_energy` flag, except fall `low` (1–3 m), which is true only when `sif_height_m` ≥ 1.8 is stated. Blank when no analysis. Added 2026-10-29 as the last column |
+
+### High-energy definition
+
+Source: Hallowell (2024) *Energy-Based Safety*, STKY list (13 high-energy hazards, ~75% of SIFs), strict
+reading chosen by Jason 2026-10-29. Per-energy thresholds: fall ≥ 1.8 m, electrical ≥ 50 V, any vehicle
+near a worker on foot, suspended/heavy loads, heavy rotating machinery, ≥ 30 psi releases, steam/molten,
+sustained fire, explosive atmosphere, trench/structural collapse, IDLH/toxic, ionising above limits,
+Class 3B/4 laser. Context: Hallowell et al. (2017) > 1,500 J high; EEI SCL ~680 J. A per-row joule line isn't
+computable (magnitudes stated in ~3–5% of narratives), so the flag is per band. 42 of 87 bands are flagged
+(`HIGH_ENERGY_BANDS` in `generate_sif_export.py`). Borderline bands are not flagged: fall low (rule above),
+light machinery, low-pressure pneumatic, minor collapse/explosion, hot surface, cold contact, extreme
+hot/cold environments, localised corrosive, moderate radiation, impulse noise, assault weapons, large animals.
 
 ## Notes for the dashboard
 
@@ -85,6 +98,7 @@ engineered controls, regardless of the actual outcome.
 
 ## History
 
+- v3.1 (2026-10-29): `sif_high_energy` (results) and `high_energy` (bands) appended as last columns.
 - v3 (2026-10-29): slimmed to keys + `sif_*` (21 columns); source columns come from ECO_ETL via the join.
 - v2 (2026-10-29): `event_id` → `row_sig`, added `id`. All report types.
 - v1 (2026-08-20): 34 columns keyed on the legacy RowSignatureII hash, Injury/Near Miss only.
