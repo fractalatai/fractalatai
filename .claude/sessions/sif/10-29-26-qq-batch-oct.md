@@ -9,9 +9,9 @@ summary: >
   Processed the second QQ SIF batch (316 reports, events 2026-06-29 → 2026-10-29) and moved the
   workflow onto files agreed with the QQ Dashboards session (dashboards-be): one SIF-only import file
   exported from ECO_ETL, and a slim results file (keys + sif_*) plus a band lookup that ECO_ETL
-  v0.20 reads directly. RowSignatureII changed meaning in ECO_ETL (2026-10-07), so the 2,747 August
-  events were re-keyed by inverting the legacy hash. sif.duckdb now holds 3,007 reports; the export
-  carries 3,006 (one merged away in ECO_ETL).
+  v0.20 reads directly, including a high-energy flag (STKY strict). RowSignatureII changed meaning in
+  ECO_ETL (2026-10-07), so the 2,747 August events were re-keyed by inverting the legacy hash; sif.duckdb
+  now holds 3,007 reports and the export carries 3,006 (one merged away in ECO_ETL).
 
 decisions:
   - what: One joined, SIF-only import file instead of SIF.csv + the cultural graph's Redactor CSVs
@@ -91,6 +91,25 @@ lessons:
       — never committed, so the repo version silently fell back to 100-char previews without DuckDB.
       Paths and narrative sources are now CLI options; batches upload the repo version into their own folder.
     tag: tooling
+  - title: Check a remembered methodology decision against the code before confirming it
+    detail: >
+      The dashboard side relayed that "4 High = ELEVATED" had been decided in the analysis. The record
+      (evaluate_calibrated.qq_is_sif and the 14.3% human rate) shows SIFP was always binary (1–4 = SIF
+      potential). Grepping the scripts and session metrics settled it in a minute and kept a wrong
+      mapping out of the dashboard.
+    tag: methodology
+  - title: Zero-shot enumerations drift — normalise before handing to BI
+    detail: >
+      The Pass 1 prompt lists 10 energy types and 6 body regions, yet Qwen returned kinetic,
+      radiation_noise, light, social, and 45 body strings ("torso, limbs", "respiratory tract (nose,
+      throat)"). Fine for analysis, fatal for slicers. Map to a fixed vocabulary at export, not in the model.
+    tag: models
+  - title: Validate an import file before touching the database
+    detail: >
+      The first SIF_20261029.csv landed as a 173-byte header-only file (export ran against an empty
+      table). A size/row-count check caught it before the backup–re-key–ingest chain started; the ingest
+      now rejects files that break the contract.
+    tag: data
 
 artifacts:
   - .claude/plans/sif/SIF-IMPORT-SCHEMA.md
@@ -112,6 +131,11 @@ depends_on:
   - 08-20-26-sif-export.md
   - 08-20-26-band-selection.md
   - 08-20-26-zero-shot-single-model.md
+
+enables:
+  - Monthly QQ SIF refresh: land SIF_<date>.csv → ingest → RunPod batch → merge → export (steps in Results and hand-off)
+  - ECO_ETL v0.20 SIF dashboard (dashboards-be) on sif-powerbi.csv + sif-bands.csv, incl. high-energy view
+  - A --build-batch script to replace the inline batch-input snippet before the next run
 ---
 
 # Session: QQ SIF batch (Oct 2026) (CLOSED)
