@@ -26,7 +26,6 @@ DUCKDB_PATH = Path("data/sif.duckdb")
 QWEN_FILE = Path("data/sif/benchmarks/qq_zeroshot_full.json")
 BAND_FILE = Path("data/sif/benchmarks/band_selection_full.json")
 CAL_DIR = Path("data/sif/calibration")
-SIF_CSV = Path("data/qq/sif/SIF.csv")
 OUTPUT_DIR = Path("data/qq/sif")
 REPORT_DIR = OUTPUT_DIR / "reports"
 
@@ -122,37 +121,23 @@ def load_calibrations():
 def load_events():
     con = duckdb.connect(str(DUCKDB_PATH), read_only=True)
     rows = con.execute("""
-        SELECT event_id, site, narrative, action, report_type, fy, sector, sub_sector,
-               event_date, hazard_category, event_type_class, qq_sifp,
+        SELECT event_id, site, narrative, action, report_type, ed_report_type, fy, sector,
+               sub_sector, event_date, hazard_category, event_type_class, qq_sifp,
                qq_ed_sifp, qq_t_sifp, qq_i_sifp, qq_i_sifa
         FROM events
+        WHERE vanished_at IS NULL
     """).fetchall()
-    cols = ["event_id", "site", "narrative", "action", "report_type", "fy", "sector",
-            "sub_sector", "event_date", "hazard_category", "event_type_class", "qq_sifp",
+    cols = ["event_id", "site", "narrative", "action", "report_type", "ed_report_type", "fy",
+            "sector", "sub_sector", "event_date", "hazard_category", "event_type_class", "qq_sifp",
             "qq_ed_sifp", "qq_t_sifp", "qq_i_sifp", "qq_i_sifa"]
     con.close()
     return {str(r[0]): dict(zip(cols, r)) for r in rows}
-
-
-def load_ed_report_types():
-    """Load triager (ED) report types from SIF.csv source."""
-    ed_map = {}
-    if SIF_CSV.exists():
-        with open(SIF_CSV, encoding="latin-1") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                eid = row.get("RowSignatureII", "").strip()
-                ed_rt = row.get("ED_ReportType", "").strip()
-                if eid and ed_rt:
-                    ed_map[eid] = ed_rt
-    return ed_map
 
 
 def build_joined_records():
     """Join DuckDB events + Qwen Pass 1 + Band Selection + Calibrated P(SIF)."""
     events = load_events()
     cal_cache = load_calibrations()
-    ed_report_types = load_ed_report_types()
 
     # Load Qwen zero-shot
     with open(QWEN_FILE) as f:
@@ -173,7 +158,7 @@ def build_joined_records():
             "sector": evt["sector"],
             "sub_sector": evt["sub_sector"],
             "report_type": evt["report_type"],
-            "ed_report_type": ed_report_types.get(str(evt["event_id"]), evt["report_type"]),
+            "ed_report_type": evt["ed_report_type"] or evt["report_type"],
             "hazard_category": evt["hazard_category"],
             "event_type_class": evt["event_type_class"],
             "narrative": evt["narrative"],

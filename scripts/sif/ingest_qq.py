@@ -1,242 +1,165 @@
 #!/usr/bin/env python3
-"""Ingest QQ SIF data into data/sif.duckdb.
+"""Ingest a QQ SIF import file (ECO_ETL export) into data/sif.duckdb.
 
-Joins SIF.csv (SIFp labels, hazard categories) with Redactor CSVs (narratives)
-via RowSignatureII, and stores in the events table.
+File contract: .claude/plans/sif/SIF-IMPORT-SCHEMA.md — one UTF-8 CSV, 19 columns, one row per
+report, keyed on row_sig (Id x 100 + report-type code). Files land in data/qq/sif/incoming/.
 
-SIF.csv columns:
-  RowSignatureII  — join key to Redactor data
-  RE_When         — date of event (reporter)
-  ED_SIFP         — SIFp assessment (triager adjusted)
-  T_SIFP          — SIFp assessment (triager assigned)
-  T_SIFP2         — SIFp secondary (triager)
-  I_SIFA          — SIF actual (investigator)
-  I_SIFP          — SIF potential (investigator)
-  SIFP            — consensus label: I > T > ED cascade. USE THIS.
-  RE_ReportType   — report type (reporter)
-  ED_ReportType   — report type (triager adjusted)
-  IsAtWork        — at work flag
-  ED_EventTypeClass — event type classification
-  ED_Hazards      — hazard category
-
-Redactor CSV columns (headerless):
-  Id, Site, What, Type, AtWork, Action, FY, AP, Sector, SubSector
+Behaviour (delta or cumulative files both work):
+  - new row_sig                      → insert
+  - known row_sig, date_updated newer → update all fields; if narrative/action changed, set
+                                        narrative_changed_at (model results are stale)
+  - known row_sig, not newer          → leave alone
+  - stored row dated inside the file's event_date range but absent from the file
+                                      → set vanished_at (ECO_ETL merged it, ETL-020); never deleted
 
 Usage:
-    /usr/bin/python3 scripts/sif/ingest_qq.py [--dry-run]
+    /usr/bin/python3 scripts/sif/ingest_qq.py data/qq/sif/incoming/SIF_20261029.csv [--dry-run]
 """
 
 import argparse
 import csv
+import re
 import sys
+from collections import Counter
+from datetime import datetime
 from pathlib import Path
 
 import duckdb
 
-SIF_CSV = Path("data/qq/sif/SIF.csv")
-REDACTOR_DIR = Path("data/qq/cultural-graph/qq-data")
 DUCKDB_PATH = Path("data/sif.duckdb")
+SCHEMA_SQL = Path("scripts/sif/sif_schema.sql")
 
-REDACTOR_COLS = ["Id", "Site", "What", "Type", "AtWork", "Action", "FY", "AP", "Sector", "SubSector"]
+FILE_COLUMNS = [
+    "row_sig", "id", "event_date", "date_updated", "fy", "site", "sector", "sub_sector",
+    "report_type", "ed_report_type", "event_type_class", "hazard_category",
+    "sifp", "ed_sifp", "t_sifp", "i_sifp", "i_sifa", "narrative", "action",
+]
+REQUIRED = ["row_sig", "id", "event_date", "date_updated", "fy", "site", "sector",
+            "report_type", "ed_report_type", "sifp", "narrative"]
+# file column → events column (where the name differs)
+RENAME = {"row_sig": "event_id", "id": "case_id", "sifp": "qq_sifp", "ed_sifp": "qq_ed_sifp",
+          "t_sifp": "qq_t_sifp", "i_sifp": "qq_i_sifp", "i_sifa": "qq_i_sifa"}
+DB_COLUMNS = [RENAME.get(c, c) for c in FILE_COLUMNS]
 
 
-def load_sif_labels() -> dict:
-    """Load SIF.csv into a dict keyed by RowSignatureII."""
-    records = {}
-    with open(SIF_CSV, encoding="cp1252") as f:
+def norm(s):
+    return " ".join((s or "").split())
+
+
+def parse_ts(s):
+    return datetime.fromisoformat(s.strip()) if s and s.strip() else None
+
+
+def load_file(path):
+    """Read and validate the import file. Exits on contract errors; returns (rows, warnings)."""
+    with open(path, encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
-        for row in reader:
-            rid = row["RowSignatureII"].strip()
-            records[rid] = {
-                "event_date": row.get("RE_When", "").strip(),
-                "qq_sifp": row.get("SIFP", "").strip().rstrip("\r"),
-                "ed_sifp": row.get("ED_SIFP", "").strip(),
-                "t_sifp": row.get("T_SIFP", "").strip(),
-                "i_sifp": row.get("I_SIFP", "").strip(),
-                "i_sifa": row.get("I_SIFA", "").strip(),
-                "report_type": row.get("RE_ReportType", "").strip(),
-                "ed_report_type": row.get("ED_ReportType", "").strip(),
-                "event_type_class": row.get("ED_EventTypeClass", "").strip(),
-                "hazard_category": row.get("ED_Hazards", "").strip().rstrip("\r"),
-            }
-    return records
+        if reader.fieldnames != FILE_COLUMNS:
+            sys.exit(f"header mismatch:\n  got      {reader.fieldnames}\n  expected {FILE_COLUMNS}")
+        rows = list(reader)
 
-
-def load_redactor_narratives(sif_ids: set) -> dict:
-    """Load narratives from Redactor CSVs for matching IDs."""
-    narratives = {}
-    for path in sorted(REDACTOR_DIR.glob("Redactor_*.csv")):
-        with open(path, encoding="cp1252") as f:
-            reader = csv.reader(f)
-            for row in reader:
-                if len(row) < 7:
-                    continue
-                rid = row[0].strip()
-                if rid in sif_ids:
-                    narratives[rid] = {
-                        "site": row[1].strip() if len(row) > 1 else "",
-                        "narrative": row[2].strip() if len(row) > 2 else "",
-                        "action": row[5].strip() if len(row) > 5 else "",
-                        "fy": row[6].strip() if len(row) > 6 else "",
-                        "sector": row[8].strip() if len(row) > 8 else "",
-                        "sub_sector": row[9].strip().rstrip("\r") if len(row) > 9 else "",
-                    }
-    return narratives
-
-
-def create_schema(con):
-    """Create the SIF events table if it doesn't exist."""
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS events (
-            event_id          VARCHAR PRIMARY KEY,
-            site              VARCHAR,
-            narrative         VARCHAR,
-            action            VARCHAR,
-            report_type       VARCHAR,
-            fy                VARCHAR,
-            sector            VARCHAR,
-            sub_sector        VARCHAR,
-            event_date        VARCHAR,
-            hazard_category   VARCHAR,
-            event_type_class  VARCHAR,
-            -- QQ SIFp labels (benchmark, not training)
-            qq_sifp           VARCHAR,
-            qq_ed_sifp        VARCHAR,
-            qq_t_sifp         VARCHAR,
-            qq_i_sifp         VARCHAR,
-            qq_i_sifa         VARCHAR,
-            ingested_at       TIMESTAMP DEFAULT current_timestamp
-        )
-    """)
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS classifications (
-            event_id          VARCHAR PRIMARY KEY REFERENCES events(event_id),
-            mechanism_codes   VARCHAR[],
-            mechanism_labels  VARCHAR[],
-            object_codes      VARCHAR[],
-            object_labels     VARCHAR[],
-            sif_gate          VARCHAR,
-            stage1_confidence FLOAT,
-            energy_types      VARCHAR[],
-            source_cues       VARCHAR[],
-            carrier_cues      VARCHAR[],
-            environment_cues  VARCHAR[],
-            body_vulnerability VARCHAR,
-            severity_p10      VARCHAR,
-            severity_p50      VARCHAR,
-            severity_p90      VARCHAR,
-            energy_reasoning  VARCHAR,
-            stage2_confidence FLOAT,
-            p_sif             FLOAT,
-            sif_class         VARCHAR,
-            review_flag       BOOLEAN,
-            classified_at     TIMESTAMP DEFAULT current_timestamp,
-            model_version     VARCHAR
-        )
-    """)
-    con.execute("""
-        CREATE TABLE IF NOT EXISTS reviews (
-            event_id          VARCHAR REFERENCES events(event_id),
-            reviewer          VARCHAR,
-            decision          VARCHAR,
-            notes             VARCHAR,
-            reviewed_at       TIMESTAMP DEFAULT current_timestamp,
-            PRIMARY KEY (event_id, reviewer)
-        )
-    """)
+    errors, warnings = [], []
+    if any(None in r or None in r.values() for r in rows):
+        errors.append("ragged rows (wrong field count)")
+    dupes = [k for k, n in Counter(r["row_sig"] for r in rows).items() if n > 1]
+    if dupes:
+        errors.append(f"{len(dupes)} duplicate row_sig, e.g. {dupes[:5]}")
+    for r in rows:
+        rs, cid = r["row_sig"], r["id"]
+        if not (rs.isdigit() and cid.isdigit() and int(rs) // 100 == int(cid) and 1 <= int(rs) % 100 <= 9):
+            errors.append(f"row_sig {rs} is not id {cid} x 100 + type code")
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", r["event_date"]):
+            errors.append(f"row_sig {rs}: event_date {r['event_date']!r} not YYYY-MM-DD")
+        try:
+            parse_ts(r["date_updated"])
+        except ValueError:
+            errors.append(f"row_sig {rs}: date_updated {r['date_updated']!r} not ISO")
+        empty = [k for k in REQUIRED if not r[k].strip()]
+        if empty:
+            warnings.append(f"row_sig {rs}: empty required {empty}")
+    if errors:
+        sys.exit("import file rejected:\n  " + "\n  ".join(errors[:20]))
+    return rows, warnings
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Ingest QQ SIF data into DuckDB")
-    parser.add_argument("--dry-run", action="store_true", help="Don't write to DuckDB")
+    parser = argparse.ArgumentParser(description="Ingest a QQ SIF import file into DuckDB")
+    parser.add_argument("file", type=Path)
+    parser.add_argument("--dry-run", action="store_true", help="Report what would change; write nothing")
     args = parser.parse_args()
 
-    print("Loading SIF labels...")
-    sif_records = load_sif_labels()
-    print(f"  {len(sif_records):,} SIF records")
+    rows, warnings = load_file(args.file)
+    print(f"{args.file}: {len(rows):,} rows, valid")
+    for w in warnings:
+        print(f"  WARN {w}")
 
-    print("Loading Redactor narratives...")
-    narratives = load_redactor_narratives(set(sif_records.keys()))
-    print(f"  {len(narratives):,} narratives matched")
+    con = duckdb.connect(str(DUCKDB_PATH), read_only=args.dry_run)
+    if not args.dry_run:
+        con.execute(SCHEMA_SQL.read_text())
+    stored = {
+        r[0]: {"date_updated": r[1], "narrative": r[2], "action": r[3], "vanished_at": r[4]}
+        for r in con.execute(
+            "SELECT event_id, date_updated, narrative, action, vanished_at FROM events").fetchall()
+    }
 
-    # Join
-    rows = []
-    unmatched = 0
-    for rid, sif in sif_records.items():
-        narr = narratives.get(rid)
-        if not narr:
-            unmatched += 1
-            continue
-        rows.append((
-            rid,
-            narr["site"],
-            narr["narrative"],
-            narr["action"],
-            sif["report_type"],
-            narr["fy"],
-            narr["sector"],
-            narr["sub_sector"],
-            sif["event_date"],
-            sif["hazard_category"],
-            sif["event_type_class"],
-            sif["qq_sifp"],
-            sif["ed_sifp"],
-            sif["t_sifp"],
-            sif["i_sifp"],
-            sif["i_sifa"],
-        ))
+    inserts, updates, text_changed, unchanged = [], [], [], 0
+    for r in rows:
+        values = [r[c] for c in FILE_COLUMNS]
+        values[FILE_COLUMNS.index("id")] = int(r["id"])
+        values[FILE_COLUMNS.index("date_updated")] = parse_ts(r["date_updated"])
+        old = stored.get(r["row_sig"])
+        if old is None:
+            inserts.append(values)
+        elif old["date_updated"] is None or parse_ts(r["date_updated"]) > old["date_updated"]:
+            changed = (norm(old["narrative"]) != norm(r["narrative"])
+                       or norm(old["action"]) != norm(r["action"]))
+            updates.append((values, changed))
+            if changed:
+                text_changed.append(r["row_sig"])
+        else:
+            unchanged += 1
 
-    print(f"  {len(rows):,} joined rows, {unmatched} unmatched SIF records")
+    lo, hi = min(r["event_date"] for r in rows), max(r["event_date"] for r in rows)
+    in_file = {r["row_sig"] for r in rows}
+    vanished = [eid for (eid,) in con.execute(
+        "SELECT event_id FROM events WHERE event_date BETWEEN ? AND ? AND vanished_at IS NULL",
+        [lo, hi]).fetchall() if eid not in in_file]
+    reappeared = [k for k in in_file if stored.get(k, {}).get("vanished_at")]
+
+    print(f"  event_date range {lo} → {hi}")
+    print(f"  insert {len(inserts):,} | update {len(updates):,} (text changed {len(text_changed)}) "
+          f"| unchanged {unchanged:,} | vanished {len(vanished)} | reappeared {len(reappeared)}")
+    by_type = Counter(v[FILE_COLUMNS.index("ed_report_type")] for v in inserts)
+    print("  new by ed_report_type: " + ", ".join(f"{k} {n}" for k, n in by_type.most_common()))
+    if vanished:
+        print(f"  vanished (merged in ECO_ETL?): {vanished[:20]}{' …' if len(vanished) > 20 else ''}")
 
     if args.dry_run:
-        print("\nDRY RUN — would insert:")
-        print(f"  Events: {len(rows)}")
-        # Show SIFP distribution
-        from collections import Counter
-        dist = Counter(r[11] for r in rows)
-        print(f"  SIFP distribution:")
-        for k, v in dist.most_common():
-            print(f"    {k:30s} {v:>5,}")
+        print("DRY RUN — no changes written")
         return
 
-    con = duckdb.connect(str(DUCKDB_PATH))
-    create_schema(con)
+    src = args.file.name
+    placeholders = ", ".join("?" for _ in DB_COLUMNS)
+    con.execute("BEGIN")
+    con.executemany(
+        f"INSERT INTO events ({', '.join(DB_COLUMNS)}, source_file) VALUES ({placeholders}, ?)",
+        [v + [src] for v in inserts])
+    set_clause = ", ".join(f"{c} = ?" for c in DB_COLUMNS[1:])
+    for values, changed in updates:
+        con.execute(
+            f"UPDATE events SET {set_clause}, source_file = ?, vanished_at = NULL"
+            + (", narrative_changed_at = current_timestamp" if changed else "")
+            + " WHERE event_id = ?",
+            values[1:] + [src, values[0]])
+    if reappeared:
+        con.executemany("UPDATE events SET vanished_at = NULL WHERE event_id = ?", [[k] for k in reappeared])
+    if vanished:
+        con.executemany("UPDATE events SET vanished_at = current_timestamp WHERE event_id = ?",
+                        [[k] for k in vanished])
+    con.execute("COMMIT")
 
-    # Check for duplicates
-    existing = set(r[0] for r in con.execute("SELECT event_id FROM events").fetchall())
-    new_rows = [r for r in rows if r[0] not in existing]
-    dupes = len(rows) - len(new_rows)
-
-    if dupes:
-        print(f"  {dupes} duplicates skipped")
-
-    if not new_rows:
-        print("  No new rows to insert")
-        con.close()
-        return
-
-    con.executemany("""
-        INSERT INTO events (
-            event_id, site, narrative, action, report_type, fy,
-            sector, sub_sector, event_date, hazard_category, event_type_class,
-            qq_sifp, qq_ed_sifp, qq_t_sifp, qq_i_sifp, qq_i_sifa
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, new_rows)
-
-    count = con.execute("SELECT count(*) FROM events").fetchone()[0]
-    print(f"\nDuckDB updated: {count:,} events in data/sif.duckdb")
-
-    # Summary
-    dist = con.execute("""
-        SELECT qq_sifp, count(*) as n
-        FROM events
-        GROUP BY qq_sifp
-        ORDER BY n DESC
-    """).fetchall()
-    print(f"SIFP distribution:")
-    for label, n in dist:
-        print(f"  {label:30s} {n:>5,}")
-
+    total = con.execute("SELECT count(*) FROM events").fetchone()[0]
+    print(f"\nDuckDB updated: {total:,} events in {DUCKDB_PATH}")
     con.close()
 
 
