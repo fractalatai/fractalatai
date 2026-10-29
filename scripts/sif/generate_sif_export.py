@@ -16,6 +16,7 @@ import argparse
 import csv
 import json
 import math
+import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -55,6 +56,50 @@ MECHANISM_MAP = {
     "biological": "animal_insect", "respiratory": "breathing",
     "inhalation": "breathing", "exposure": "chemical",
 }
+
+
+# --- Controlled vocabularies for the dashboard ---
+# Pass 1 is free generation; normalise to fixed value lists so PowerBI slicers stay stable.
+
+ENERGY_TYPES = ["gravity", "motion", "mechanical", "electrical", "pressure", "thermal",
+                "chemical", "radiation", "sound", "biological"]
+ENERGY_ALIASES = {"kinetic": ["motion"], "radiation_noise": ["radiation", "sound"],
+                  "noise": ["sound"], "light": ["radiation"]}
+
+BODY_REGIONS = ["head", "neck", "spine", "torso", "limbs", "respiratory", "skin"]
+BODY_KEYWORDS = [  # first match wins, checked per comma/slash-separated token
+    ("respiratory", "respiratory"), ("lung", "respiratory"), ("throat", "respiratory"),
+    ("nose", "respiratory"), ("skin", "skin"),
+    ("neck", "neck"), ("spine", "spine"), ("back", "spine"),
+    ("head", "head"), ("face", "head"), ("eye", "head"), ("ear", "head"), ("scalp", "head"),
+    ("hair", "head"), ("torso", "torso"), ("chest", "torso"), ("abdomen", "torso"), ("hip", "torso"),
+    ("limb", "limbs"), ("arm", "limbs"), ("hand", "limbs"), ("finger", "limbs"), ("shoulder", "limbs"),
+    ("elbow", "limbs"), ("wrist", "limbs"), ("leg", "limbs"), ("knee", "limbs"), ("foot", "limbs"),
+    ("feet", "limbs"), ("ankle", "limbs"), ("toe", "limbs"),
+]
+
+
+def norm_energy_types(values):
+    out = set()
+    for v in values if isinstance(values, list) else [values]:
+        v = str(v).strip().lower()
+        out.update(ENERGY_ALIASES.get(v, [v] if v in ENERGY_TYPES else []))
+    return "|".join(t for t in ENERGY_TYPES if t in out)
+
+
+def norm_body(value):
+    out = set()
+    for token in re.split(r"[,/;&]| and ", str(value or "").lower()):
+        for kw, region in BODY_KEYWORDS:
+            if kw in token:
+                out.add(region)
+                break
+    return "|".join(r for r in BODY_REGIONS if r in out) or "unknown"
+
+
+def num(value):
+    """Extracted magnitudes: keep numbers only (the model sometimes returns text)."""
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
 
 
 # --- Metalog P(SIF) computation ---
@@ -121,13 +166,13 @@ def load_calibrations():
 def load_events():
     con = duckdb.connect(str(DUCKDB_PATH), read_only=True)
     rows = con.execute("""
-        SELECT event_id, site, narrative, action, report_type, ed_report_type, fy, sector,
+        SELECT event_id, case_id, site, narrative, action, report_type, ed_report_type, fy, sector,
                sub_sector, event_date, hazard_category, event_type_class, qq_sifp,
                qq_ed_sifp, qq_t_sifp, qq_i_sifp, qq_i_sifa
         FROM events
         WHERE vanished_at IS NULL
     """).fetchall()
-    cols = ["event_id", "site", "narrative", "action", "report_type", "ed_report_type", "fy",
+    cols = ["event_id", "case_id", "site", "narrative", "action", "report_type", "ed_report_type", "fy",
             "sector", "sub_sector", "event_date", "hazard_category", "event_type_class", "qq_sifp",
             "qq_ed_sifp", "qq_t_sifp", "qq_i_sifp", "qq_i_sifa"]
     con.close()
@@ -151,7 +196,8 @@ def build_joined_records():
     for event_id, evt in events.items():
         rec = {
             # Original QQ fields
-            "event_id": evt["event_id"],
+            "row_sig": evt["event_id"],
+            "id": evt["case_id"],
             "event_date": evt["event_date"],
             "fy": evt["fy"],
             "site": evt["site"],
@@ -179,9 +225,9 @@ def build_joined_records():
             mapped_mech = MECHANISM_MAP.get(raw_mech, "")
             rec["sif_mechanism_raw"] = raw_mech
             rec["sif_mechanism"] = mapped_mech
-            rec["sif_energy_types"] = "|".join(pred.get("energy_types", []))
+            rec["sif_energy_types"] = norm_energy_types(pred.get("energy_types", []))
             rec["sif_source_properties"] = pred.get("source_properties", "")
-            rec["sif_body_vulnerability"] = pred.get("body_vulnerability", "")
+            rec["sif_body_vulnerability"] = norm_body(pred.get("body_vulnerability", ""))
             rec["sif_qwen_p50"] = pred.get("severity_p50", "")
             rec["sif_reasoning_pass1"] = pred.get("reasoning", "")
         else:
@@ -199,11 +245,11 @@ def build_joined_records():
             rec["sif_band_confidence"] = bs.get("band_confidence", "")
             rec["sif_reasoning_pass2"] = bs.get("reasoning", "")
             ev = bs.get("extracted_values", {})
-            rec["sif_height_m"] = ev.get("height_m")
-            rec["sif_voltage_v"] = ev.get("voltage_v")
-            rec["sif_speed_kmh"] = ev.get("speed_kmh")
-            rec["sif_temperature_c"] = ev.get("temperature_c")
-            rec["sif_mass_kg"] = ev.get("mass_kg")
+            rec["sif_height_m"] = num(ev.get("height_m"))
+            rec["sif_voltage_v"] = num(ev.get("voltage_v"))
+            rec["sif_speed_kmh"] = num(ev.get("speed_kmh"))
+            rec["sif_temperature_c"] = num(ev.get("temperature_c"))
+            rec["sif_mass_kg"] = num(ev.get("mass_kg"))
         else:
             rec.update({
                 "sif_band": "", "sif_band_confidence": "",
@@ -247,11 +293,9 @@ def build_joined_records():
 # --- CSV export ---
 
 CSV_COLUMNS = [
-    # Original QQ
-    "event_id", "event_date", "fy", "site", "sector", "sub_sector",
-    "report_type", "ed_report_type", "hazard_category", "event_type_class",
-    # QQ human SIF
-    "qq_sifp", "qq_ed_sifp", "qq_t_sifp",
+    # Keys — join to ECO_ETL ReportTable (row_sig = RowSignatureII, id = EcoOnline case Id).
+    # Source columns stay in ECO_ETL; this file carries only the SIF analysis.
+    "row_sig", "id",
     # SIF analysis
     "sif_mechanism", "sif_energy_types", "sif_band", "sif_band_confidence",
     "sif_p_sif", "sif_classification",
@@ -261,10 +305,8 @@ CSV_COLUMNS = [
     "sif_source_properties", "sif_body_vulnerability", "sif_qwen_p50",
     # Calibration detail
     "sif_cal_p10", "sif_cal_p50", "sif_cal_p90",
-    # Reasoning (for audit)
+    # Reasoning (for audit — long text last)
     "sif_reasoning_pass1", "sif_reasoning_pass2",
-    # Full text (last — long columns at end for PowerBI usability)
-    "narrative", "action",
 ]
 
 
@@ -295,6 +337,25 @@ def export_csv(records, output_path):
     gz_size = gz_path.stat().st_size
     ratio = 100 * (1 - gz_size / csv_size)
     print(f"  gz: {gz_size/1024:.0f} KB ({ratio:.0f}% smaller) → {gz_path}")
+
+
+def export_bands(output_path):
+    """Band lookup for the dashboard: sort order + calibrated quantiles per (mechanism, band)."""
+    cols = ["mechanism", "band", "band_order", "band_description",
+            "cal_p10", "cal_p50", "cal_p90", "p_sif", "sif_classification"]
+    rows = []
+    for mech, cal in sorted(load_calibrations().items()):
+        for i, b in enumerate(cal["magnitude_bands"], start=1):
+            psif = round(p_sif_bounded(b["p10"], b["p50"], b["p90"]), 3)
+            rows.append({"mechanism": mech, "band": b["band"], "band_order": i,
+                         "band_description": " ".join(b.get("description", "").split()),
+                         "cal_p10": b["p10"], "cal_p50": b["p50"], "cal_p90": b["p90"],
+                         "p_sif": psif, "sif_classification": sif_label(psif)})
+    with open(output_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=cols)
+        writer.writeheader()
+        writer.writerows(rows)
+    print(f"Bands: {len(rows)} rows → {output_path}")
 
 
 # --- Report generation ---
@@ -450,6 +511,7 @@ def main():
     if args.csv:
         csv_path = Path(args.output_csv) if args.output_csv else OUTPUT_DIR / "sif-powerbi.csv"
         export_csv(records, csv_path)
+        export_bands(csv_path.with_name("sif-bands.csv"))
 
     if args.report:
         report_path = Path(args.output_report) if args.output_report else REPORT_DIR / "sif-report.md"

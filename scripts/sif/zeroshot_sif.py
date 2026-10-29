@@ -89,10 +89,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="qwen3:8b")
     parser.add_argument("--input", default=DATA_FILE)
+    parser.add_argument("--output-dir", type=Path,
+                        help="Defaults to /workspace/sif/output/zeroshot-<model>")
     args = parser.parse_args()
 
     run_name = args.model.replace(":", "-")
-    output_dir = OUTPUT_BASE / f"zeroshot-{run_name}"
+    output_dir = args.output_dir or OUTPUT_BASE / f"zeroshot-{run_name}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     with open(args.input) as f:

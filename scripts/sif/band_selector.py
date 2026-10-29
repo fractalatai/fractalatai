@@ -13,6 +13,11 @@ Usage:
 
     # Full run (when Qwen/RunPod available)
     /usr/bin/python3 scripts/sif/band_selector.py --model qwen
+
+    # RunPod batch (no DuckDB on the pod: narratives come from a JSON {event_id: narrative})
+    python3 band_selector.py --model qwen --qwen-file <batch>/output/predictions.json \
+        --narratives <batch>/data/narratives.json --cal-dir /workspace/sif/data/calibration \
+        --output-dir <batch>/output --output band_selection.json
 """
 
 import argparse
@@ -175,8 +180,13 @@ def call_qwen(prompt, ollama_url="http://localhost:11434/api/chat", model="qwen3
         return {"error": "invalid_json", "raw": content[:500]}
 
 
+NARRATIVES = {}  # event_id -> narrative, from --narratives (RunPod has no DuckDB)
+
+
 def get_narrative(event_id, qwen_events, qq_data=None):
-    """Get the full narrative for an event. Try QQ DuckDB first, fall back to preview."""
+    """Get the full narrative for an event: --narratives JSON, then DuckDB, then preview."""
+    if str(event_id) in NARRATIVES:
+        return NARRATIVES[str(event_id)]
     # Try DuckDB
     try:
         import duckdb
@@ -198,6 +208,7 @@ def get_narrative(event_id, qwen_events, qq_data=None):
 
 
 def main():
+    global QWEN_FILE, CAL_DIR, OUTPUT_DIR
     parser = argparse.ArgumentParser()
     parser.add_argument("--sample", type=int, default=0, help="Number of events to process (0 = all)")
     parser.add_argument("--model", default="gemini", choices=["gemini", "qwen"])
@@ -205,7 +216,17 @@ def main():
     parser.add_argument("--ollama-url", default="http://localhost:11434/api/chat")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--output", default="band_selection_results.json")
+    parser.add_argument("--qwen-file", type=Path, default=QWEN_FILE, help="Pass 1 (zero-shot) results")
+    parser.add_argument("--cal-dir", type=Path, default=CAL_DIR)
+    parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
+    parser.add_argument("--narratives", type=Path, help="JSON {event_id: narrative}")
     args = parser.parse_args()
+
+    QWEN_FILE, CAL_DIR, OUTPUT_DIR = args.qwen_file, args.cal_dir, args.output_dir
+    if args.narratives:
+        with open(args.narratives) as f:
+            NARRATIVES.update(json.load(f))
+        print(f"Narratives: {len(NARRATIVES):,} from {args.narratives}")
 
     # Load Qwen results
     with open(QWEN_FILE) as f:
