@@ -36,6 +36,17 @@ decisions:
     why: Pass 1 free generation produced out-of-list values (kinetic, radiation_noise, light, "torso, limbs",
       eyes, …) — unstable for PowerBI slicers.
     result: energy 10 values, body 7 regions + unknown, "|"-joined in fixed order
+  - what: Human SIFP stays binary in comparisons — no "4 High = ELEVATED" mapping
+    why: The August analysis treated SIFP 1–4 as SIF potential and 9 as not (evaluate_calibrated.qq_is_sif,
+      the 14.3% vs 10.4% comparison). The levels don't separate in the model's classes (4 High splits
+      14/23/63% SIF/ELEVATED/NON_SIF, close to 9 Not SIFp's 10/19/71%).
+    result: dashboard headline = human SIFp (1–4) vs model SIF (p_sif ≥ slicer, default 0.50); 5×3 matrix as detail
+  - what: High energy = STKY strict, per band, with a fall straddle rule
+    why: Jason. Sources give per-energy thresholds (Hallowell 2024 STKY; Hallowell 2017 >1,500 J; EEI ~680 J),
+      not a per-row joule line, and magnitudes are stated in only ~3–5% of narratives. Strict reading
+      flags only clear bands; fall "low" (1–3 m) counts only when sif_height_m ≥ 1.8 is stated.
+    result: 42/87 bands flagged; sif_high_energy per row computed in our export (thresholds in one place,
+      not duplicated in the dashboard); 411 high-energy reports
   - what: Add sif-bands.csv (band_order + calibrated quantiles) and keep it stable
     why: dashboards-be asked for least→most severe band sorting; ECO_ETL flags mechanism/band pairs
       missing from it, so band names and columns are now a contract.
@@ -47,6 +58,7 @@ metrics:
   runpod_batch: { gpu: "RTX 4090", model: "qwen3:8b", pass1_events: 268, pass1_errors: 0, pass2_events: 264, speed_s_per_event: 1.0, wall_min: 10 }
   results: { events: 3007, exported: 3006, non_sif: 2090, elevated: 589, sif: 319, no_score: 8 }
   batch_classes: { reports: 316, sif: 39, elevated: 79, non_sif: 194, no_score: 4 }
+  high_energy: { bands_flagged: 42, bands_total: 87, reports_true: 411, reports_false: 2587, blank: 8, sif_true: 317, sif_false: 2, elevated_true: 94, non_sif_true: 0 }
 
 lessons:
   - title: A hash key with small inputs is reversible by brute force
@@ -127,6 +139,8 @@ PowerBI dashboard on.
 - [x] Results schema to dashboards-be: v2 (35 cols) → v3 slim (keys + sif_*, 21 cols); answer their 6 questions
 - [x] sif-bands.csv band lookup; vocab normalisation; synthetic sample; bands stability contract
 - [x] Commit code (`bd36607`); confirm pod artefacts are on /workspace before stop
+- [x] Answer dashboards-be: SIFP mapping (binary, no 4 High = ELEVATED); headline SIF = p_sif ≥ 0.50
+- [x] High-energy flag, STKY strict + fall 1.8 m rule (Jason): sif-bands `high_energy`, results `sif_high_energy` (`a739bf6`)
 
 ## Import file and re-key
 
@@ -162,10 +176,15 @@ PowerBI dashboard on.
 
 ## Results and hand-off
 
-- `sif-powerbi.csv`: 3,006 rows × 21 columns (row_sig, id, 19 sif_*). NON_SIF 2,090 / ELEVATED 589 /
+- `sif-powerbi.csv`: 3,006 rows × 22 columns (row_sig, id, 20 sif_*). NON_SIF 2,090 / ELEVATED 589 /
   SIF 319 / no score 8. New batch: SIF 39, ELEVATED 79, NON_SIF 194, no score 4.
 - `sif-bands.csv`: 87 rows (mechanism, band, band_order, band_description, cal_p10/p50/p90, p_sif,
   sif_classification).
+- `sif_high_energy` (22nd column, appended) and `high_energy` in sif-bands.csv — see SIF-RESULTS-SCHEMA.md
+  v3.1 for the definition. The 2 SIF reports not flagged are thermal/hot_environment_extreme (borderline,
+  excluded by the strict reading).
+- Dashboard comparison: human SIFp (SIFP 1–4) vs model SIF; on the 3,006 rows, Fatal 89 → 25% SIF /
+  18% ELEVATED / 56% NON_SIF; 4 High 265 → 14/23/63%; 9 Not SIFp 2,600 → 10/19/71%.
 - ECO_ETL v0.20 (dashboards-be) reads both fixed-name files from its inputs and joins on row_sig.
   ETL Status reports unmatched row_sigs, rows without analysis, and band pairs missing from sif-bands.csv.
 - Next batch: land `SIF_<YYYYMMDD>.csv` in `data/qq/sif/incoming/` → `ingest_qq.py` → build batch input
