@@ -1,6 +1,6 @@
 # SIF definitions and coding rules
 
-Status: v1.0, 2026-11-16. This document states the definitions; the reasoning behind them is in [sif-definition-discussion.md](sif-definition-discussion.md).
+Status: v1.3, 2026-11-16. This document states the definitions; the reasoning behind them is in [sif-definition-discussion.md](sif-definition-discussion.md).
 
 ## Contents
 
@@ -8,6 +8,7 @@ Status: v1.0, 2026-11-16. This document states the definitions; the reasoning be
 - [2. Terms](#2-terms)
 - [3. The fractalaw definition](#3-the-fractalaw-definition)
 - [4. Other published definitions](#4-other-published-definitions)
+  - [4.8 Event in the literature](#48-event-in-the-literature)
 - [5. Crosswalk](#5-crosswalk)
 - [6. Coding rules: determining PSIF](#6-coding-rules-determining-psif)
 - [Annex A. Mechanisms](#annex-a-mechanisms)
@@ -40,30 +41,65 @@ Status: v1.0, 2026-11-16. This document states the definitions; the reasoning be
 |---|---|
 | **Exposure** | A condition: energy present and a person within its reach, together in time and space, **assessed without regard to controls**. Reach is judged as if guards and barriers were absent, so an operator using a guarded machine is exposed for the whole time of use. As a quantity, exposure is measured in context units (person-hours, lifts, entries) |
 | **Exposure stratum** | A part of total exposure with one control state: e.g. guards in place (the guard in continuous demand), isolated under LOTO, or guard open while energised. Risk sums over strata |
-| **Excursion** | Energy going beyond its envelope: outside its space (L), beyond its magnitude (M), or present where its intended state is zero (T) |
-| **Incursion** | A person entering a danger zone while the energy is live (e.g. opening a guard on a running machine). The entry is an event; remaining there counts towards exposure, in the stratum where that control is absent. Entry under isolation is not an incursion |
-| **Event** | Something that happens at a moment. It is one of three things: **(a)** the energy changes state and goes outside its envelope in space; **(b)** a person makes an incursion, or the energy changes state while a person is exposed; or **(c)** the energy builds beyond its magnitude, or appears where its intended state is zero |
-| **Near miss** | An event in which nobody was hurt. Exposure alone is not a near miss |
+| **Excursion** | Energy going beyond its envelope: outside its space (where), beyond its magnitude (how much), or live when its intended state is zero (when) |
+| **Target envelope** | Where people are, when they are there, and how many (one person, a team, a public crowd). The counterpart of the energy's envelope |
+| **Incursion** | People entering the energy's envelope: where the energy is (opening a guard on a running machine), when it is live (on the range during the firing window), or in greater numbers than planned. The entry is an event; remaining there counts towards exposure, in the stratum where that control is absent. Entry under isolation, or at a time when the energy is not live, is not an incursion |
+| **Event** | The moment the preventive side of risk materialises: energy and people come together in where, when or how much. Either the energy changes (it is released, moves, becomes live or builds up: an *excursion*) or the people do (they enter where the energy is, are there when it is live, or are more than planned: an *incursion*). An event is defined before any outcome is known; what follows is the consequence side, assessed as SIF potential. See 2.3 |
+| **Near miss** | An event in which nobody was hurt. As ICAO puts it for accidents and serious incidents, the difference "lies only in the result". Exposure alone is not a near miss |
 | **Cycle** | One energy source taken once through event, potential and control state. Cycles are bounded per source by default |
 | **Bridge condition** | A control failure or event in one cycle that sets the starting state of another, often by energy conversion (fuel → fire, motion → heat) |
 | **Evidential cycle** | A cycle the facts show happened |
 | **Counterfactual cycle** | A cycle the facts do not show (a what-if). It is examined only by an analyst and is always labelled `counterfactual` |
 | **Scoping statement** | What an assessment covers: the sources in scope, the bridges followed, and whether counterfactual cycles are included |
 
-### 2.3 Outcomes and potential
+### 2.3 Events
+
+In the risk equation (risk = exposure × chance per unit of exposure × consequence), the event is where the **chance** term materialises. It is the bowtie's top event: the preventive side has not kept energy and people apart. SIF potential then assesses the **consequence** term, with chance P = 1.
+
+**Two envelopes.** The energy and the people (the target) each have an envelope in the same three dimensions:
+
+| | **Energy** | **People (the target)** |
+|---|---|---|
+| **Where** | Where the energy is, or can reach | Where the people are |
+| **When** | When the energy is live: energised, operating, the firing window | When the people are there: the shift, the schedule, an entry |
+| **How much** | The magnitude of the energy | How many people: one person, a team, a public crowd |
+
+**Table 1. What makes an event.** An event is a change, on either side, that brings the two envelopes together.
+
+| Dimension | **The energy changes** (excursion) | **The people change** (incursion) |
+|---|---|---|
+| **Where** | It is released or moves beyond its envelope: flyrock beyond the zone; a load swings off its path; a vehicle leaves its route; a person at height falls | People enter where the energy is: walking into a segregated route; reaching into a running machine |
+| **When** | It becomes live when it should not be: a back-fed isolated circuit; a machine restarts; firing starts early | People are present when the energy is live: entering the range during the firing window; still in the blast zone at firing |
+| **How much** | It builds up beyond its design: overpressure; overload; overspeed; a runaway reaction | More people than planned: a crowd gathers in the drop zone; a team works where one person was planned |
+
+An event can involve both sides at once: a person climbs past the edge protection and falls; an isolated system is re-energised while a fitter is inside the guard.
+
+**Not events**
+
+- **Exposure:** the envelopes overlap but nothing changes (standing under a suspended load; working dead behind an isolator). This is a condition.
+- **No overlap:** the envelopes are kept apart in where (distance, barriers) or in when (scheduling, permits, firing windows). Entering the range tomorrow, when no firing is planned, is separation in time, not an incursion.
+- **A planned release** that stays inside its envelope with nobody in it.
+- **A control failing on its own** (a relief valve sticks). The event is what the energy does next, such as the overpressure; the failed valve is its control state.
+
+**Notes**
+
+- **The moment** is when the envelopes come together, even if the change was slow (snow load, rising pressure, a crowd gathering).
+- **The number of people does not change SIF potential**, which is judged per person. It multiplies the exposure (person-hours) and the number of people who could be harmed in one event (the multiple-casualty, societal-risk view; ICMM's material unwanted event).
+
+### 2.4 Outcomes and potential
 
 | Term | Definition |
 |---|---|
 | **Serious outcome** | A life-ending, life-threatening or life-altering injury (LIFE model; Bayona et al., 2023) |
 | **P(serious)** | The probability that the outcome is serious or worse, read from the outcome distribution of the chosen energy band |
 | **Chance P** | The probability that the energy reaches a person. Set to 1 when assessing potential |
-| **Inherent SIF potential** | The outcome distribution if the energy had reached a person with no protective control between them |
+| **SIF potential (distribution)** | The outcome distribution if the energy had reached a person with no protective control between them. Compare *residual SIF potential* |
 | **Residual SIF potential** | The outcome distribution with the controls as they were, or as designed, each including its degraded and absent states. It is produced by the simulator |
 | **SIF (class)** | P(serious) ≥ 0.50: the most likely outcome is serious |
 | **Elevated (class)** | 0.10 ≤ P(serious) < 0.50: a serious outcome is credible |
 | **Not SIF (class)** | P(serious) < 0.10 |
 
-### 2.4 Controls
+### 2.5 Controls
 
 | Term | Definition |
 |---|---|
@@ -78,15 +114,18 @@ Status: v1.0, 2026-11-16. This document states the definitions; the reasoning be
 
 ### 3.1 Definitions
 
-> **SIF potential.** An event has SIF potential when, had the energy reached a person with no protective control between the energy and the person, a life-ending, life-threatening or life-altering injury would be more likely than not: P(serious) ≥ 0.50.
+> **SIF potential.** An event has SIF potential when the energy involved, had it reached a person with no protective control between them, would more likely than not have caused a life-ending, life-threatening or life-altering injury.
 
-> **Elevated potential.** As above, with 0.10 ≤ P(serious) < 0.50.
+> **Elevated potential.** An event has elevated potential when the energy involved, had it reached a person with no protective control between them, would credibly (but not more likely than not) have caused a life-ending, life-threatening or life-altering injury.
 
 > **SIF actual.** An event in which a serious injury or fatality occurred.
 
-> **PSIF (potential SIF).** An event with SIF potential, no serious injury, and no effective direct control. If the control state is not stated, it is recorded as *PSIF (controls unverified)*.
+> **PSIF (potential SIF).** An event with SIF potential and no serious injury. It always carries a control-state qualifier:
+>
+> - **PSIF (unprotected)**: no effective protective control stood between the energy and the person; it was absent or it failed (EEI: *PSIF*).
+> - **PSIF (protected)**: an effective direct control stood between the energy and the person, and worked (EEI: *Capacity*).
+> - **PSIF (unverified)**: the report does not state the control state.
 
-> **Control held.** An event with SIF potential, no serious injury, and an effective direct control that worked (EEI: *Capacity*).
 
 > **SIF exposure.** Exposure to energy that would have SIF potential if an event occurred. It is a condition, not an event. With an effective direct control it is EEI's *Success*; without one, EEI's *Exposure*.
 
@@ -108,14 +147,14 @@ Status: v1.0, 2026-11-16. This document states the definitions; the reasoning be
 - It is calibrated to injury data for each mechanism and band, and gives a continuous probability with a company-set threshold.
 - One method covers every energy type, including chemical, thermal and breathing.
 - Exposure is control-blind, so it is a valid denominator for rates (risk = exposure × chance per unit × consequence).
-- It separates inherent potential (how bad the energy is) from residual potential (how bad it is with these controls, failure states included).
+- It separates SIF potential (how bad the energy is) from residual potential (how bad it is with these controls, failure states included).
 - It maps onto EEI, Campbell and BST categories (section 5).
 
 **Cons**
 
 - It depends on how much detail the narrative gives. The lowest-band default can under-call thin reports.
 - The scale measures threat to life. Life-altering injuries with low mortality (amputation, sight loss) are under-counted.
-- Narratives rarely state controls, so most PSIFs are "controls unverified".
+- Narratives rarely state controls, so most PSIFs are "unverified".
 - Build-up limits and bridge conditions need an analyst's judgement.
 - The strength of the calibration evidence varies between bands.
 
@@ -206,14 +245,32 @@ ICMM (2015).
 
 **Cons:** the threshold is not standardised, so results can't be compared across companies; "potential" is undefined.
 
+### 4.8 Event in the literature
+
+None of these contradicts the fractalaw event. ISO 31000 and ISO 45001 are broader: any change of circumstances, or any work occurrence. EEI's energy release and process safety's loss of containment are special cases of it.
+
+| Source | Definition | Relation to the fractalaw event |
+|---|---|---|
+| ISO 31000:2018, 3.5 | Event: "occurrence or change of a particular set of circumstances" | The general class. The fractalaw event makes the change specific to energy |
+| ISO 12100:2010 | Hazardous event: "event that can cause harm". Hazardous situation: "circumstance in which a person is exposed to at least one hazard" | The same split as fractalaw *event* vs *exposure* |
+| ISO 45001:2018, 3.35 | Incident: "occurrence arising out of, or in the course of, work that could or does result in injury and ill health" | Includes the outcome. The fractalaw event is defined before the outcome |
+| EEI SCL | Energy release: "a temporary loss of control of the high-energy, or the high-energy changes state while exposed to the work environment" | Precedent for "the energy changes". The four verbs spell it out |
+| Bowtie top event (UK CAA; CCPS/EI) | "the point in time which describes the release or loss of control over a Hazard" | Precedent for "at a moment" |
+| CCPS / API RP 754 | Loss of primary containment: "an unplanned or uncontrolled release of material from primary containment" | A special case: an excursion in where |
+| ICAO Annex 13 | Serious incident vs accident: "The difference … lies only in the result" | The same relation as near miss vs SIF actual |
+| Haddon | Pre-event, event and post-event phases; injury is energy transfer beyond the body's tolerance | Pre-event ≈ exposure; event ≈ event |
+
+**Incursion** has no direct precedent. It extends EEI's "contact or proximity" and the ISO 12100 hazard zone.
+
 ## 5. Crosswalk
 
 | fractalaw | EEI SCL | Campbell | BST / DEKRA | ASTM E2920 |
 |---|---|---|---|---|
 | SIF actual | HSIF | SIF | SIF | aSIF |
-| PSIF | PSIF | SIF potential | SIF exposure | pSIF |
-| PSIF (controls unverified) | (no category) | SIF potential | SIF exposure | pSIF |
-| Control held | Capacity | SIF potential | (not stated) | pSIF |
+| PSIF (all three below) | PSIF + Capacity | SIF potential | SIF exposure | pSIF |
+| PSIF (unprotected) | PSIF | SIF potential | SIF exposure | pSIF |
+| PSIF (protected) | Capacity | SIF potential | (not stated) | pSIF |
+| PSIF (unverified) | (no category) | SIF potential | SIF exposure | pSIF |
 | SIF exposure, direct control absent | Exposure | Precursor | Precursor | SIFRisk |
 | SIF exposure, direct control effective | Success | (none) | (none) | (none) |
 | Elevated potential | (no category) | (judgement) | (judgement) | pSIF (possible) |
@@ -241,16 +298,17 @@ Work through steps 1–7 once **for each energy source** the report shows was in
 **Step 2. Check the energy was present.** Was the energy held, stored or available? Isolated or immobilised energy counts as present.
 - If it had been eliminated (removed, drained, discharged), **stop: no exposure.**
 
-**Step 3. Decide whether an event occurred.** Did any of these happen?
-- (a) The energy changed state and went outside its envelope in space (flyrock beyond the zone, a dropped load, steam discharging onto a walkway).
-- (b) A person entered a danger zone while the energy was live (an incursion: reaching past a guard on a running machine, walking into a segregated route), or the energy changed state while a person was within reach (a fall, a load swinging toward a rigger, a vehicle reversing toward a pedestrian).
-- (c) The energy built up beyond its design level, or appeared where it should have been zero (overpressure, overload, overspeed, a re-energised isolated circuit).
+**Step 3. Decide whether an event occurred.** Use Table 1 (section 2.3). Ask: **did the energy or the people change, so that the two came together in where, when or how much?**
+- **The energy changed (excursion):** it was released, moved, became live or built up. Examples: a dropped load, flyrock beyond the zone, a fall from height, a re-energised isolated circuit, overpressure.
+- **The people changed (incursion):** they entered where the energy was, were there when it was live, or were more than planned. Examples: reaching past a guard on a running machine, walking into a segregated route, being in the range during firing.
 
-If none of these happened:
-- With a person within reach, record **SIF exposure** if the energy would have SIF potential (assess it with steps 4–5). **Stop: not an event, not a PSIF.**
-- Otherwise, **stop: no event.**
+If yes, it is an **event**. Record excursion, incursion or both, and the dimension (where, when, how much), then go to step 4.
 
-A planned release that stayed inside its envelope with nobody inside it (a blast fired with the zone clear) is **not an event**.
+If no:
+- **The envelopes overlap with nothing changing:** record **SIF exposure** if the energy would have SIF potential (assess it with steps 4–5). **Stop: not an event, not a PSIF.**
+- **Otherwise: stop, no event.**
+
+These are **not events**: a planned release that stayed inside its envelope with nobody in it (a blast fired with the zone clear); entry under isolation, or when the energy was not live; a control failing with nothing else happening.
 
 **Step 4. Choose the mechanism and band.**
 - Choose the mechanism from Annex A: the physical process that caused, or could have caused, harm.
@@ -279,14 +337,14 @@ Training, rules, signs, generic PPE, evasive action and luck are **not** direct 
 | Step 5 potential | Step 6 serious injury? | Step 7 control state | Determination |
 |---|---|---|---|
 | any | Yes | any | **SIF actual** (record the potential as well) |
-| SIF | No | failed or absent | **PSIF** |
-| SIF | No | not stated | **PSIF (controls unverified)** |
-| SIF | No | effective | **Control held** |
+| SIF | No | failed or absent | **PSIF (unprotected)** |
+| SIF | No | effective | **PSIF (protected)** |
+| SIF | No | not stated | **PSIF (unverified)** |
 | Elevated | No | any | **Elevated**, not PSIF |
 | Not SIF | No | any | **Not SIF** |
 | Not SIF or Elevated | Yes | any | **SIF actual, low energy**: check the band choice |
 
-**More than one energy source.** Record each source separately. The event's determination is the most serious, in this order: SIF actual, PSIF, PSIF (controls unverified), control held, Elevated, Not SIF.
+**More than one energy source.** Record each source separately. The event's determination is the most serious, in this order: SIF actual, PSIF (unprotected), PSIF (unverified), PSIF (protected), Elevated, Not SIF.
 
 **Counterfactuals.** If you want to examine a source or bridge the report does *not* show (e.g. "the fuel could have ignited"), record it separately, labelled `counterfactual`. It never changes the determination.
 
@@ -295,7 +353,7 @@ Training, rules, signs, generic PPE, evasive action and luck are **not** direct 
 | Field | Content |
 |---|---|
 | Source | Energy source and type |
-| Event clause | a, b or c; or *exposure only*; or *no event* |
+| Event type | Excursion, incursion or both, with the dimension (where, when, how much); or *exposure only*; or *no event* |
 | Mechanism / band | From Annexes A and B |
 | Stated magnitude | Height, voltage, speed, mass or temperature, if given |
 | P(serious) and class | From Annex B |
@@ -308,13 +366,13 @@ Training, rules, signs, generic PPE, evasive action and luck are **not** direct 
 
 | Report | Steps | Determination |
 |---|---|---|
-| "Scaffold board fell from the 4th lift (about 8 m) into the barriered area below. Nobody hurt." | Gravity; present; event (a). `struck/heavy_dropped` (5–50 kg from 3–15 m): SIF. No injury. The barrier is an exclusion zone, a procedural/passive control. Its effectiveness isn't stated | **PSIF (controls unverified)** |
-| "Operative slipped at the edge of a 5 m platform. Harness and lanyard arrested the fall. No injury." | Gravity; event (b). `fall/medium`: SIF. No injury. Fall arrest = effective direct control | **Control held** |
-| "Electrician found the circuit live while working on it; it had been back-fed from a generator. No shock." | Electrical, 230 V; event (c), present where it should be zero. `electrical/low`: Elevated. No injury | **Elevated** |
-| "Pedestrian walked into the segregated forklift route; the forklift braked. No contact." | Motion; incursion, event (b). `transport/yard_speed`: SIF (0.50). No injury. Segregation (direct control) failed | **PSIF** |
-| "Worker strained back lifting a box." | Overexertion; event (b). `overexertion/manual_handling`: Not SIF | **Not SIF** |
+| "Scaffold board fell from the 4th lift (about 8 m) into the barriered area below. Nobody hurt." | Gravity; present; event: excursion, where (released). `struck/heavy_dropped` (5–50 kg from 3–15 m): SIF. No injury. The barrier is an exclusion zone, a procedural/passive control. Its effectiveness isn't stated | **PSIF (unverified)** |
+| "Operative slipped at the edge of a 5 m platform. Harness and lanyard arrested the fall. No injury." | Gravity; event: excursion, where (a person at height falls). `fall/medium`: SIF. No injury. Fall arrest = effective direct control | **PSIF (protected)** |
+| "Electrician found the circuit live while working on it; it had been back-fed from a generator. No shock." | Electrical, 230 V; event: excursion, when (live when it should be isolated). `electrical/low`: Elevated. No injury | **Elevated** |
+| "Pedestrian walked into the segregated forklift route; the forklift braked. No contact." | Motion; event: incursion, where. `transport/yard_speed`: SIF (0.50). No injury. Segregation (direct control) failed | **PSIF (unprotected)** |
+| "Worker strained back lifting a box." | Overexertion; event: the load acts on the body. `overexertion/manual_handling`: Not SIF | **Not SIF** |
 | "Rigger standing under a suspended load; nothing happened." | Gravity; present; no event | **SIF exposure** (not a PSIF) |
-| "Operator cleared a jam on the conveyor with the guard open and the belt running; no injury." | Mechanical; incursion while energised, event (b). `caught_in/medium_machinery`: SIF (0.50). No injury. Guard removed; no isolation | **PSIF** |
+| "Operator cleared a jam on the conveyor with the guard open and the belt running; no injury." | Mechanical; event: incursion, where (guard opened while energised). `caught_in/medium_machinery`: SIF (0.50). No injury. Guard removed; no isolation | **PSIF (unprotected)** |
 | "Jam cleared with the guard open after LOTO was applied and verified." | Mechanical; energy present behind the isolator; no incursion and no event | **SIF exposure** with isolation effective (EEI: Success) |
 
 ## Annex A. Mechanisms
@@ -529,9 +587,14 @@ Bands are ordered from least to most severe within each mechanism. P(serious) co
 - Campbell Institute (2020). *Designing Strategy for Serious Injury and Fatality Prevention*. National Safety Council.
 - Edison Electric Institute (2020, rev. 2024). *Safety Classification and Learning (SCL) Model*.
 - Hallowell, M.R. & Spencer, C. (2024). Safety Classification & Learning Model. *Professional Safety*, 69(2).
+- CCPS (2018). *Process Safety Metrics: Guide for Selecting Leading and Lagging Indicators*, v3.2. AIChE.
 - Hendershot, D.C. (2012). Inherently safer design: the fundamentals. *Chemical Engineering Progress*, January 2012.
+- ICAO (2010). *Annex 13 to the Convention on International Civil Aviation: Aircraft Accident and Incident Investigation*, 10th ed.
 - ICMM (2015). *Critical Control Management: Implementation Guide*.
+- Haddon, W. Jr. (1980). Advances in the epidemiology of injuries as a basis for public policy. *Public Health Reports*, 95(5).
 - ISO 12100:2010. *Safety of machinery – General principles for design – Risk assessment and risk reduction*.
+- ISO 31000:2018. *Risk management – Guidelines*.
+- ISO 45001:2018. *Occupational health and safety management systems*.
 - Krause, T.R. (2010). *New Findings on Serious Injuries and Fatalities*. BST.
 - Martin, D.K. & Black, A.A. (2015). Preventing serious injuries & fatalities: study reveals precursors & paradigms. *Professional Safety*, 60(9).
 - OSHA, 29 CFR 1904.39.
