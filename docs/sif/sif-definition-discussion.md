@@ -1,6 +1,6 @@
 # Defining SIF: a discussion draft
 
-Status: draft v0.2, 2026-11-16. A starting point to polish, not a settled position.
+Status: draft v0.3, 2026-11-16. A starting point to polish, not a settled position.
 
 ## Contents
 
@@ -220,7 +220,7 @@ The envelope then needs **three dimensions**, not one:
 | **How much** (magnitude, M) | How much energy the containment or system is designed for | Overpressure, overtemperature, overspeed, overload, reactivity excursion |
 | **When** (state, T) | When the energy should be present at all | Unexpected energisation of an isolated circuit; stored energy left after isolation; a vehicle moving while it should be immobilised |
 
-The "when" dimension covers isolation. An isolated system has an intended envelope of **zero energy**. Unexpected energisation while someone works on it is an excursion in time, even though the energy is exactly where and as large as it would be in normal operation.
+The "when" dimension covers isolation. The isolated part of a system has an intended envelope of **zero energy**. The energy is still present behind the isolator, so a person working dead is exposed (see the event/exposure refinement below). Unexpected energisation while someone works on it is an excursion in time, even though the energy is exactly where and as large as it would be in normal operation.
 
 ### Refinement: over-energy states (build-up without release)
 
@@ -310,34 +310,46 @@ Earlier drafts called any departure from the envelope a "breach" and treated eve
 
 **It hid an inconsistency.** Clause (b) said "a person inside an envelope while the energy in it is live". A suspended load is live (stored gravitational energy), so a person standing under it would be an *event*. Yet the cases (Appendix A, and HECA's "Exposure") treat that as a *condition*: nothing has happened yet. The same goes for a person inside the approach distance of a live conductor without contact, or a missing guardrail with nobody falling.
 
-The fix separates two things that "breach" ran together: **the relation between energy and envelope**, and **whether anything happened**.
+The fix separates two things that "breach" ran together: **whether energy and a person are together**, and **whether anything happened**.
 
-| Term | Meaning | Examples |
-|---|---|---|
-| **Excursion** | Energy goes beyond its envelope in L (outside its space), M (beyond its magnitude) or T (present when it should be zero) | Flyrock beyond the zone; overpressure; a re-energised isolated circuit |
-| **Incursion** | A person enters an envelope | Walking into a segregated vehicle route; standing in a drop zone; entering a blast zone |
-| **Exposure** (a condition) | An excursion or incursion that persists with **stored** energy and no change of state. It has a duration, not a moment | A person under a suspended load; trapped pressure after isolation; a missing guardrail at height |
-| **Event** | A **change of energy state** at a point in time (release, transfer, build-up, energisation) that produces an excursion, or that happens with **active** energy while there is an incursion | The load drops; the vehicle passes the pedestrian; the blast fires with someone in the zone; the reactor power rises |
+**Exposure is the presence of energy and a person in the same time and space, with the person within the energy's reach, assessed without regard to controls.** Exposure is a condition: it has a duration, not a moment.
 
-The distinction between **stored** and **active** energy echoes potential and kinetic energy in physics:
+- **Energy counts as present if it is held, stored or available to be released.** That includes the fuel in a parked vehicle that could move, the supply held behind an isolator, a person's own height on a platform, and a suspended load.
+- **Only elimination removes it**: the supply disconnected and removed, the vessel drained and vented, the load landed, the vehicle removed.
+- **Isolation, immobilisation, guarding and guardrails are controls.** They have failure modes, by the test in the build-up refinement above. They don't end the exposure; they are its control state.
 
-- **Stored** energy (held, contained, suspended, energised but not flowing) creates an exposure when a person is within reach.
-- **Active** energy (moving, flowing, being released) creates an event when a person is within reach.
+| Term | Meaning | Examples | Not this |
+|---|---|---|---|
+| **Exposure** (a condition) | Energy and a person present together in time and space, the person within reach, controls disregarded | Working on a platform at height, guarded or not; working dead behind an isolator; a pedestrian in a lane with parked, fuelled vehicles; standing under a suspended load | A missing handrail with nobody on the platform: that is a *control state*, not an exposure. A circuit whose supply has been removed: eliminated |
+| **Excursion** | Energy goes beyond its envelope in L (outside its space), M (beyond its magnitude) or T (present where it should be zero) | Flyrock beyond the zone; overpressure; a re-energised isolated circuit | |
+| **Incursion** | An exposure inside an area the plan keeps clear of people (exclusion zone, segregated route, drop zone). A kind of exposure that means a separation (L) control was meant to prevent it | Entering a blast zone; walking into a segregated vehicle route | Planned exposure, e.g. a rigger at height doing the task |
+| **Event** | Something happens at a moment: the energy **changes state** (release, transfer, build-up, energisation), producing an excursion, or the energy and an exposed person **converge** (contact or near-contact) | The load drops; the vehicle reverses toward the pedestrian; the blast fires with someone in the zone; the reactor power rises | Vehicles moving past a pedestrian at a steady, safe clearance: continued exposure |
 
-So a pedestrian in a vehicle route *while vehicles move* is an event (active energy); a pedestrian in the same route with every vehicle parked and immobilised is not even an exposure, since the T bound is met.
+**Exposure is control-blind**, like layer 2 and chance P = 1. Controls decide how an exposure is *classified*, not whether it exists. That gives the condition-side counterpart of PSIF and Capacity:
 
-Both words are already in use in neighbouring fields:
+| Exposure + control state | EEI/HECA term |
+|---|---|
+| Direct control effective (guardrail intact, isolation verified) | **Success** |
+| Direct control absent or failed (no guardrail, isolation unverified) | **Exposure** (EEI's sense) |
+
+**Terminology clash.** EEI uses "Exposure" for the narrower case: a high-energy hazard *without* a direct control. Our exposure is the wider, control-blind condition, and EEI's Exposure is our exposure plus an absent or failed control. Either keep "exposure" and always qualify EEI's term ("uncontrolled exposure"), or choose another word for ours (e.g. "co-presence"). Q1f.
+
+**Stored and active energy** still describe the energy usefully (held, contained, suspended or isolated; or moving, flowing, being released), echoing potential and kinetic energy. They no longer separate exposure from event, though. A person near a moving vehicle is exposed; it becomes an event when something happens (the vehicle swerves, reverses or converges).
+
+**Correction to v0.2.** v0.2 said a pedestrian in a route with every vehicle parked and immobilised "is not even an exposure". That was wrong: the fuel is available energy and immobilisation is a control, so it is an exposure with an effective control. The same reasoning reverses v0.2's treatment of successful isolation in 4.1. Working dead is an exposure, and isolation is its control.
+
+Both "excursion" and "incursion" are already in use in neighbouring fields:
 
 - **Excursion** is the process-safety term for leaving the safe operating envelope or limits (CCPS usage, to check).
 - **Incursion** is the aviation term for an unauthorised entry into a protected area (runway incursion, ICAO usage, to check).
 
 **Event clauses restated:**
 
-- (a) energy changes state and goes **outside its envelope in space** (excursion in L),
-- (b) energy is **active while a person is inside its envelope** (incursion),
-- (c) energy **builds beyond its magnitude, or appears when it should be zero** (excursion in M or T).
+- (a) energy changes state and goes **outside its envelope in space** (excursion in L), whether or not anyone is exposed,
+- (b) energy changes state, or its path **converges on a person**, while that person is exposed (release, contact or near-contact),
+- (c) energy **builds beyond its magnitude, or appears where it should be zero** (excursion in M or T).
 
-An excursion or incursion without a change of state is an **exposure**. That matches HECA's "Exposure", BST's precursor "if allowed to continue", and Appendix A's line-of-fire condition. Exposures are observable before anything happens; events are what the classifier reads in incident narratives.
+Exposures are observable before anything happens (HECA, BST's precursor "if allowed to continue", Appendix A's line-of-fire condition). Events are what the classifier reads in incident narratives.
 
 The earlier refinements above are kept as the argument trail. Section 4 onwards uses these terms.
 
@@ -347,7 +359,7 @@ Treat SIF as three separate questions, each answerable on its own:
 
 | Layer | Question | Source–path–target | Who answers |
 |---|---|---|---|
-| **1. Event** | Did the energy change state so that (a) it went outside its envelope in space, (b) it was active while a person was inside the envelope, or (c) it went beyond its magnitude, or appeared when it should be zero? An excursion or incursion without a change of state is an *exposure* (a condition), not an event | Source changes state, builds up, or target enters the path | Narrative (classifier Pass 1: mechanism, energy type). The envelope gate is not yet implemented |
+| **1. Event** | Did something happen: did the energy change state so that (a) it went outside its envelope in space, (b) it changed state or converged on a person who was exposed, or (c) it went beyond its magnitude, or appeared where it should be zero? Energy and a person together with nothing happening is an *exposure* (a condition), not an event | Source changes state, builds up, or target enters the path | Narrative (classifier Pass 1: mechanism, energy type). The envelope gate is not yet implemented |
 | **2. Inherent SIF potential** | If that energy had reached a person with nothing protective between them, what is the outcome distribution, and is a serious outcome more likely than not? For a build-up, assess the energy it would reach with no control acting, up to the source's inherent limit | Source (incl. inherent features) + carrier + default environment + target; **controls set aside** | Classifier (bands → P(serious)) |
 | **3. Control state** | Which controls acted on the source, the build-up or the path, and did they work? (effective / present but failed / absent / not stated). Upstream causes are recorded here | Source isolation, build-up controls (trips, relief, rods), path | Separate extraction; often "not stated" |
 
@@ -361,6 +373,14 @@ Combining layers 2 and 3 recovers the vocabulary of the literature without chang
 | SIF | not stated | No serious injury | **PSIF (unverified controls)**: our current SIF flag |
 | not SIF | any | any | Low-severity (or LSIF if seriously injured) |
 
+The same split applies to **exposures**, where nothing has happened. That is how HECA observes work:
+
+| Exposure (no event), SIF-level energy | Control state | Category (EEI/HECA term) |
+|---|---|---|
+| Person within reach | Effective direct control | **Success** |
+| Person within reach | Absent / failed | **Exposure** (EEI's narrower sense) |
+| Person within reach | Not stated | Unverified exposure |
+
 What this buys us:
 
 - **The classifier stays control-blind.** That is intended, and it matches the narratives, which rarely say much about controls.
@@ -373,7 +393,7 @@ What this buys us:
 The current test ("was this put there to prevent harm?") works for most cases but leaves three ambiguous:
 
 - **Containment.** A pipe wall, cable insulation or a vehicle body is part of the source system. *Proposal:* containment defines the energy's intended state, and the release is the escape from it. Containment is never counted as a "control" that excludes the event.
-- **Isolation (LOTO, de-energisation).** If isolation worked, there was no energy present to release. *Proposal:* assess the energy **actually present at the time**. Failed isolation, residual or stored energy counts; successful isolation means no event. This is a source-state rule, not crediting a path control.
+- **Isolation (LOTO, de-energisation).** Isolation is a **control**: it has a failure mode (wrong isolator, back-feed, an isolator switched back on). The energy behind it is still present, so working dead is an *exposure* whose control state is "isolation effective". Only **elimination** (supply disconnected and removed, system drained and vented, stored energy discharged) changes the source and ends the exposure. *(v0.2 treated successful isolation as "no energy present". That is withdrawn.)*
 - **Evasive action, luck, "nobody there".** These are not controls; EEI excludes acts and relies on error-tolerant barriers. *Proposal:* they leave potential unchanged. This is the "one draw from the distribution" reasoning already in the design.
 
 Worked boundary cases:
@@ -381,10 +401,10 @@ Worked boundary cases:
 | Case | Layer 1 event? | Layer 2 potential | Layer 3 control state |
 |---|---|---|---|
 | Fall from 6 m arrested by a harness | Yes (fall started) | SIF | Effective direct control → Capacity |
-| Worker at 6 m behind an intact guardrail, no slip | No release | n/a | n/a (HECA "Success" if observed) |
-| Guardrail missing, worker at 6 m, no fall | No release | n/a | n/a (HECA "Exposure"; BST precursor) |
+| Worker at 6 m behind an intact guardrail, no slip | No event; **exposure** (person at height) | SIF (if a fall occurred) | Guardrail effective → EEI "Success" |
+| Guardrail missing, worker at 6 m, no fall | No event; **exposure** | SIF (if a fall occurred) | Control absent → EEI "Exposure"; BST precursor |
 | Scaffold board falls 20 m into an empty exclusion zone | Yes | SIF (chance P = 1) | Exclusion zone effective? → Capacity or PSIF |
-| Electrician touches a conductor that LOTO had de-energised | No energy present | n/a | Isolation worked |
+| Electrician works on a conductor that LOTO has de-energised | No event; **exposure** (energy held behind the isolator) | Per voltage band | Isolation effective → EEI "Success" |
 | LOTO applied but stored hydraulic pressure releases | Yes | per band | Isolation failed → PSIF |
 | Struck on the hard hat by a 2 kg tool from 10 m | Yes | per band (head) | Hard hat is generic PPE, not a direct control (EEI) |
 | Near miss with a reversing vehicle; worker jumped clear | Yes | per band | Evasive action is not a control → PSIF |
@@ -398,10 +418,10 @@ Using the envelope wording from section 3:
 | Quarry blast fired as planned; zone clear; no flyrock outside the zone | No: release stayed inside the envelope, nobody inside | n/a | n/a (HECA "Success" if observed) |
 | Quarry blast; flyrock lands beyond the exclusion zone, nobody there | Yes (a): energy outside the envelope | SIF (fragment mass × velocity) | Zone sizing or blast design failed → PSIF |
 | Controlled demolition; a person is found inside the exclusion zone after firing, unhurt | Yes (b): incursion into an active envelope | SIF | Zone clearance and sentries failed → PSIF |
-| Blast halted at the countdown because a person was seen in the zone | No release | n/a | The clearance check worked; a condition, not an event (HECA "Success") |
+| Blast halted at the countdown because a person was seen in the zone | No event; **exposure** (incursion into a charged blast zone) | SIF | The clearance check worked; the zone control had failed → an incursion caught before firing |
 | Live test firing; a range user enters the danger area during firing | Yes (b) | SIF | Range control failed → PSIF |
 | Live test firing; a round or ricochet lands outside the danger area | Yes (a) | SIF | Danger-area design or weapon/ammunition failure → PSIF |
-| Misfire: an unexploded charge or round remains after firing | Stored energy left where it was not meant to be. A condition, like a missing guardrail | n/a until disturbed | Misfire procedure is the control; handling the misfire is high-energy work |
+| Misfire: an unexploded charge or round remains after firing | Stored energy left where it was not meant to be (excursion in T). An **exposure** for anyone within reach; an event if it fires or is disturbed | Per charge / round | Misfire procedure is the control; handling the misfire is high-energy work |
 | Dust explosion in a silo; the explosion vent opens and discharges to a safe area | Yes: the deflagration itself is unwanted (it escaped containment) | SIF | Vent = effective mitigating control → **Capacity** |
 | Dust explosion; the vent discharges into an occupied area or walkway | Yes | SIF | Vent worked on the vessel but its discharge was outside a safe envelope → PSIF |
 | Boiler overpressure; the relief valve lifts and discharges to a safe point | Yes: the overpressure is an upset, the containment envelope was challenged | SIF (vessel rupture energy) | Relief valve = effective direct control → **Capacity**. API RP 754 would call this a demand on a safety system |
@@ -429,9 +449,9 @@ Clause (c) of the event, with build-ups assessed at their uncontrolled limit:
 | Crane overload with the LMI overridden; no collapse | Yes (c) | Collapse of crane and load | Control defeated → PSIF |
 | Turbine overspeed; the overspeed trip works | Yes (c) | Disc burst at the inherent limit (steam supply) | Trip = effective control → **Capacity** |
 | Electrician working on an isolated circuit; it is re-energised from another feed | Yes (c), "when": energy present when the intended state was zero | Per voltage band | Isolation failed (back-feed not identified) → PSIF |
-| Hydraulic system isolated; trapped pressure remains in an accumulator | No: an exposure (excursion in T, stored energy). An event (c) if the pressure releases | Per pressure band | Isolation incomplete → PSIF |
+| Hydraulic system isolated; trapped pressure remains in an accumulator | No event; an **exposure** for anyone working on it (energy held in the accumulator). An event (c) if the pressure releases | Per pressure band | Isolation incomplete → PSIF |
 | Vehicle moving within its designated route, no pedestrian present | No: inside the envelope | n/a | n/a |
-| Pedestrian walks into a segregated vehicle route while vehicles move | Yes (b) | Per speed and mass band | Segregation failed → PSIF |
+| Pedestrian walks into a segregated vehicle route while vehicles move | **Exposure** (incursion). An event (b) if a vehicle converges on them (near miss or contact) | Per speed and mass band | Segregation failed → PSIF |
 | Battery store; one cell starts thermal runaway, detected and isolated | Yes (c) | Store inventory (cascade to adjacent cells) | Detection and isolation = effective → **Capacity** |
 | Roof snow load beyond design; no collapse | Yes (c), slow build | Collapse | No control acting (snow clearing not done) → PSIF |
 
@@ -447,7 +467,8 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 
 > **SIF potential (inherent).** An event has SIF potential when energy changes state with an excursion from its envelope or an incursion into it, and that energy, had it reached a person with no protective control between the energy and the person, would more likely than not have caused a life-ending, life-threatening or life-altering injury.
 >
-> - *Event*: a change of energy state at a point in time (release, transfer, build-up, energisation) that produces (a) an excursion in space, (b) active energy with a person inside the envelope (incursion), or (c) an excursion in magnitude or time. The same excursion or incursion with stored energy and no change of state is an *exposure*, a condition, not an event.
+> - *Event*: something that happens at a point in time. Either the energy changes state (release, transfer, build-up, energisation) and so produces (a) an excursion in space or (c) an excursion in magnitude or time, or (b) the energy changes state or converges on a person who is exposed.
+> - *Exposure*: a condition, not an event. Energy (held, stored or available) and a person are together in time and space, the person within reach, assessed without regard to controls.
 > - *Intended envelope*: bounds on the energy in magnitude (M: how much there may be), length (L: where it may be, and its required separation from people; for an intentional release, the release zone such as a blast exclusion zone, range danger area or relief discharge area) and time (T: when it may be present). An *excursion* is energy going beyond any one of them; an *incursion* is a person entering the envelope.
 > - *Energy state*: potential is assessed on the energy present at the time, whatever its history. For a build-up, on the energy it would reach with no control acting, up to the source's inherent physical limit.
 > - *Protective control*: anything that must act, and can fail, to prevent, limit or redirect the energy or to keep it from a person. Containment of the source, inherent features of the source that need no demand (e.g. a negative temperature coefficient), the default environment and the person's own body are not controls.
@@ -471,11 +492,13 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 
 ## 7. Open questions
 
-- **Q1.** Is the three-clause event (excursion in space; incursion into an active envelope; excursion in magnitude or time) the right wording? It replaces "unwanted release", which fails for blasting, test firing and relief devices. Should "unexpected" be dropped entirely? Are *excursion*, *incursion* and *exposure* the right terms (replacing the earlier "breach")?
+- **Q1.** Is the three-clause event (excursion in space; change of state or convergence while a person is exposed; excursion in magnitude or time) the right wording? It replaces "unwanted release", which fails for blasting, test firing and relief devices. Should "unexpected" be dropped entirely? Are *excursion*, *incursion* and *exposure* the right terms (replacing the earlier "breach")?
 - **Q1a.** Who defines the envelope? The design (blast plan, range danger-area template, relief discharge design), the permit, or the regulator? What happens when there is no documented envelope?
 - **Q1b.** Is it right to put all upstream steps (how the energy came to be present) out of scope for potential, and into layer 3 only?
 - **Q1c.** Should build-ups be assessed at the uncontrolled limit (consistent with control-blind layer 2) or at the peak actually reached (EEI facts-only)? The uncontrolled limit can be very large (reactor, runaway reaction); is a physical-inventory bound enough of a restraint?
 - **Q1d.** Is "no failure mode, no demand" the right test for an inherent feature (part of the source) versus a control?
+- **Q1f.** Our *exposure* is control-blind; EEI's "Exposure" means a hazard *without* a direct control. Keep our word and always qualify EEI's, or rename ours (e.g. "co-presence")?
+- **Q1g.** Is "convergence (contact or near-contact)" the right trigger for an event when the energy is already moving (vehicles, conveyors), and how close is "near"?
 - **Q1e.** Should the M, L, T envelope be made operational? For example: dimensionless margins (m, l, t) as fields, and control-state classified as M, L or T controls. Or does it stay as a framing device in the definition?
 - **Q2.** Credit working controls (EEI Capacity), or count barrier-saved events as PSIF (Campbell)? The layered model allows both views; which one is the headline?
 - **Q3.** Should the probability anchor be "more likely than not" (0.50) or "credible" (0.10)? Should validation against human coders use SIF alone or SIF + ELEVATED?
@@ -556,8 +579,8 @@ Hallowell's energy-based approach does not use LoF as an organising idea. Hallow
 | Envelope, L dimension | Being *in* the line of fire means l < 1: separation less than the energy's reach | LoF is L only |
 | Envelope, T dimension | "Not always obvious or constant and can be introduced as the task progresses" | IOGP's guidance recognises that the envelope changes over time |
 | Envelope, M dimension | Absent. ESC's "a force your body cannot endure" is the only hint of a threshold | No magnitude threshold, which is Hallowell's criticism |
-| Layer 1, clause (b) | Incursion into an active envelope = "in the line of fire" when the energy is released | Clause (b) *is* the LoF event |
-| A condition, not an event | Standing under a suspended load with no release | HECA "Exposure" / BST precursor; no event yet |
+| Layer 1, clause (b) | Energy released, or converging, while a person is "in the line of fire" | Clause (b) *is* the LoF event |
+| Exposure (a condition) | "In the line of fire" with nothing happening: standing under a suspended load | Our exposure, control-blind. With no direct control it is also EEI "Exposure" |
 | Layer 2, inherent potential | **Chance P = 1 is the LoF question**: "if you had been in the line of fire, how bad would it be?" | LoF positioning changes chance P, not potential |
 | Layer 3, control state | Positioning, barriers, exclusion zones, securing loose objects | All **L controls**. M controls (isolation, relief) and T controls (permits, interlocks) sit in other rules, e.g. Energy Isolation |
 | EEI direct control | Barriers and engineered exclusion zones *may* qualify | Positioning by behaviour does not: it fails with unintentional human error. Feeds Q4 |
@@ -598,7 +621,7 @@ The mapping is many-to-many, so a crosswalk needs the mechanism *and* the energy
 
 **Adds:**
 - **Communication.** Its everyday phrase explains chance P = 1 well: "SIF potential asks how bad it would have been if you had been in the line of fire."
-- **Incursion in a word.** "In the line of fire" is the incursion: as an event when the energy is active, as an exposure (condition) when it is stored.
+- **Exposure in a word.** "In the line of fire" is exposure, often an incursion. It becomes an event when the energy releases or converges.
 - **The T dimension in practice.** IOGP's "introduced as the task progresses" puts the time-varying envelope in shop-floor terms.
 - **A reporting crosswalk** (A.5) that IOGP members already use.
 
@@ -624,7 +647,7 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 
 | Term | Meaning |
 |---|---|
-| **Active energy** | Energy that is moving, flowing or being released (a moving vehicle, a falling load, a blast). With a person inside its envelope it makes an *event*. Compare *stored energy* |
+| **Active energy** | Energy that is moving, flowing or being released (a moving vehicle, a falling load, a blast). Descriptive; it does not by itself make an event. Compare *stored energy* |
 | **Capacity** | (EEI SCL) A high-energy release with an effective direct control present and no serious injury: the control did its job. Not a PSIF under EEI |
 | **Chance P** | The probability that the energy reaches a person at all. SIF potential sets chance P = 1 |
 | **Containment** | What holds energy in its intended state (pipe wall, cable insulation, vessel). Part of the source, not a control; release is escape from it |
@@ -632,12 +655,14 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Direct control** | (EEI) A control targeted to the high-energy source, effective when installed, verified and used properly, and effective even with unintentional human error. Training, rules, signs and generic PPE are excluded |
 | **Elevated** | Classifier class: P(serious outcome) ≥ 0.10 and < 0.50; "credibly serious" |
 | **Envelope (intended energy envelope)** | The designed bounds on an energy in magnitude (M), space and separation (L) and time (T): containment and designed path for contained energy; the release zone for an intentional release |
-| **Event** | A change of energy state at a point in time (release, transfer, build-up, energisation) that produces an excursion, or happens with active energy during an incursion. Layer 1 |
+| **Event** | Something that happens at a moment: a change of energy state (release, transfer, build-up, energisation) producing an excursion, or energy changing state or converging (contact or near-contact) on an exposed person. Layer 1 |
 | **Excursion** | Energy going beyond its envelope in L, M or T |
-| **Exposure** | A condition: an excursion or incursion that persists with stored energy and no change of state (EEI/HECA use the same word in a close sense) |
+| **Elimination** | Removing the energy from the source (supply disconnected and removed, system drained and vented, stored energy discharged). Changes the source and ends exposure. Compare *isolation* |
+| **Exposure** | A condition: energy (held, stored or available) and a person together in time and space, the person within reach, assessed **without regard to controls**. Not the same as EEI's "Exposure", which is a high-energy hazard *without* a direct control (our exposure + control absent) |
 | **HECA** | (EEI/CSRA) High-Energy Control Assessment: the share of observed high-energy hazards with a direct control in place, Success / (Success + Exposure) |
 | **High energy** | (EEI) Over 500 ft-lbs (about 680 J); Hallowell et al. (2017) use > 1,500 J for "most likely a SIF". Not the same threshold |
-| **Incursion** | A person entering an energy envelope |
+| **Incursion** | An exposure inside an area the plan keeps clear of people (exclusion zone, segregated route, drop zone): a separation (L) control was meant to prevent it |
+| **Isolation** | A control that holds energy away from the work (isolator, LOTO, immobilisation). It has failure modes, so the energy is still present and the person still exposed. Compare *elimination* |
 | **Inherent feature** | A property of the source with no failure mode that needs no demand (e.g. a negative temperature coefficient, pump dead-head pressure, reduced inventory). Part of the source; changes the potential |
 | **Inherent SIF potential** | Layer 2: the outcome distribution if the energy reached a person with no protective control between them, assessed on the energy state at the time (or the uncontrolled limit of a build-up) |
 | **Layer 1, 2, 3** | Event; inherent SIF potential; control state |
@@ -652,7 +677,7 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **SIF actual (HSIF)** | An event in which a serious injury or fatality occurred |
 | **Source–path–target** | The energy-damage model (Gibson, Haddon): energy leaves a source, travels a path, reaches a target. Controls act at the source or on the path |
 | **STKY** | (Hallowell/CSRA) "Stuff That Kills You": high-energy hazard categories |
-| **Stored energy** | Energy held, contained, suspended or energised but not flowing (a suspended load, a pressurised vessel, a live conductor). With a person within reach it makes an *exposure*. Compare *active energy* |
+| **Stored energy** | Energy held, contained, suspended, isolated or available but not flowing (a suspended load, a pressurised vessel, a live conductor, the supply behind an isolator, fuel in a parked vehicle). Still counts as present for exposure. Compare *active energy* |
 | **Success** | (EEI/HECA) A high-energy hazard with a corresponding direct control in place |
 | **Uncontrolled limit** | For a build-up, the energy it would reach with no control acting, up to the source's physical limit (inventory, failure pressure, maximum speed) |
 
