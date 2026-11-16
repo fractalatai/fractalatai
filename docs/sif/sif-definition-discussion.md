@@ -1,6 +1,6 @@
 # Defining SIF: a discussion draft
 
-Status: draft v0.8, 2026-11-16. A starting point to polish, not a settled position.
+Status: draft v1.0, 2026-11-16. All open questions answered or parked. A starting point to polish, not a settled position.
 
 ## Contents
 
@@ -50,7 +50,7 @@ Status: draft v0.8, 2026-11-16. A starting point to polish, not a settled positi
 
 ## Why we need this
 
-The SIF classifier already holds a definition of SIF potential. That definition is spread across a prompt, calibration files and design notes, and has never been written down in one place. Validation against human coders makes this urgent: we can't say whether a disagreement is the AI's error or a difference in definition until both sides' definitions are explicit (see the validation work in `data/qq/sif/validation/`).
+The SIF classifier already holds a definition of SIF potential. That definition is spread across a prompt, calibration files and design notes, and has never been written down in one place. Validation against human coders makes this urgent: we can't say whether a disagreement is the AI's error or a difference in definition until both sides' definitions are explicit.
 
 The hardest part is **controls**. Is SIF potential judged:
 
@@ -154,6 +154,8 @@ Reconstructed from `scripts/sif/zeroshot_sif.py`, `scripts/sif/band_selector.py`
 - **Energy types: broader than EEI.** EEI's threshold is in physical units (ft-lbs). We also cover chemical, thermal, breathing and electrical energy, each with its own calibration curve. That breadth is a strength, but it needs saying.
 
 ## 3. The wording problem: unwanted, unexpected or uncontrolled?
+
+This section is the argument trail. It shows why "unwanted", "unexpected" and "uncontrolled" were dropped: they are imprecise, and the refinements below replace them with exposure, excursion, incursion, event and near miss (see the Glossary). The definition in section 5 uses only the replacement terms.
 
 ### "Uncontrolled"
 
@@ -531,7 +533,7 @@ Using the envelope wording from section 3:
 | Live test firing; a range user enters the danger area during firing | Yes (b) | SIF | Range control failed → PSIF |
 | Live test firing; a round or ricochet lands outside the danger area | Yes (a) | SIF | Danger-area design or weapon/ammunition failure → PSIF |
 | Misfire: an unexploded charge or round remains after firing | Stored energy left where it was not meant to be (excursion in T). An **exposure** for anyone within reach; an event if it fires or is disturbed | Per charge / round | Misfire procedure is the control; handling the misfire is high-energy work |
-| Dust explosion in a silo; the explosion vent opens and discharges to a safe area | Yes: the deflagration itself is unwanted (it escaped containment) | SIF | Vent = effective mitigating control → **control held** |
+| Dust explosion in a silo; the explosion vent opens and discharges to a safe area | Yes: the deflagration is an excursion (it escaped containment) | SIF | Vent = effective mitigating control → **control held** |
 | Dust explosion; the vent discharges into an occupied area or walkway | Yes | SIF | Vent worked on the vessel but its discharge was outside a safe envelope → PSIF |
 | Boiler overpressure; the relief valve lifts and discharges to a safe point | Yes: the overpressure is an upset, the containment envelope was challenged | SIF (vessel rupture energy) | Relief valve = effective direct control → **control held**. API RP 754 would call this a demand on a safety system |
 | Relief valve lifts and discharges steam onto a walkway | Yes (a): the relief discharge is outside its intended envelope | per band (thermal / pressure at the discharge) | Relief design or discharge piping failed → PSIF |
@@ -633,35 +635,34 @@ The barrier-saved question is then answered by the CDF, not by a label. Take a f
 
 ## 6. Consequences for the classifier if we adopt this
 
-1. **Severity scale.** "Serious" is currently P(death) ≥ 0.10. Life-altering injuries (amputation, sight loss, permanent loss of function) need a route in: either a second scale, or a rule that certain mechanism × body-region bands count as serious whatever P(death) is.
-2. **Missing information.** Decide between least severe band (facts-only, EEI) and the population prior ([bayesian-priors.md](bayesian-priors.md)). This may explain some disagreement with human coders and should be tested before deciding.
-3. **Layer 3 extraction.** Add a control-state field (effective / failed / absent / not stated) and a direct-control flag (EEI's three criteria). This is new work; until then, report the classifier's SIF as "PSIF (unverified controls)".
-4. **Proximity.** Decide whether a person must plausibly have been exposed (EEI's contact or proximity rule) or whether chance P = 1 applies regardless. This changes the "empty zone" cases.
+1. **Severity scale.** "Serious" is currently P(death) ≥ 0.10. The outcome distribution already gives the chance of non-fatal serious outcomes, with seriousness measured as threat to life (Q6). Life-altering injuries with low mortality (amputation, sight loss, permanent loss of function) need a second axis or a body-region rule. That is parked for the design specification.
+2. **Missing information.** The classifier currently defaults to the least severe band (facts-only, as EEI). A population prior ([bayesian-priors.md](bayesian-priors.md)) is an *extension*, not an alternative. Parked for the design specification (Q7).
+3. **Layer 3 extraction.** Add a control-state field (effective / failed / absent / not stated). An EEI direct-control flag is needed only for the EEI crosswalk (Q4). This is new work; until then, report the classifier's SIF as "PSIF (unverified controls)".
+4. **Proximity.** Settled for reported events: chance P = 1 (Q5). A proactive use, measuring energy, exposure and exclusion zones and running the Monte Carlo as a risk assessment, is a future line of work.
 5. **Out-of-scope mechanisms.** Confirm that overexertion and abrasion are automatically NON_SIF. Decide how medical events (e.g. cardiac arrest at work) and chronic exposures are handled; they can be fatal without any energy transfer.
-6. **Envelope gate.** Pass 1 should recognise planned releases that stayed inside their envelope with nobody inside it, and record them as no event. It should also flag clause (b) events (incursions, and changes of state while a person is exposed) and clause (c) events (over-magnitude build-ups, unexpected energisation) even when nothing was released.
+6. **Envelope gate.** Pass 1 should recognise planned releases that stayed inside their envelope with nobody inside it, and record them as no event. It should also flag clause (b) events (incursions, and changes of state while a person is exposed) and clause (c) events (over-magnitude build-ups, energisation where the intended state is zero) even when nothing was released.
 7. **Build-up bands.** The calibration bands describe released energy (fall height, voltage, speed). Build-up events need a way to choose a band from the uncontrolled limit (e.g. vessel burst energy from inventory and failure pressure), not from what the narrative says was reached.
-8. **Threshold wording.** Rename the classes, or document them, so that SIF = "most likely outcome is serious" and ELEVATED = "credibly serious". This lets each reader map the classes onto their preferred tradition.
+8. **Threshold wording.** Keep both classes (Q3). Document them so that SIF = "most likely outcome is serious" (≥ 0.50) and ELEVATED = "credibly serious" (≥ 0.10). This lets each reader map the classes onto their preferred tradition.
 
 ## 7. Open questions
 
 ### Answered in this draft
 
+- **Q1** (event wording and terms). **Answered.** "Unwanted", "unexpected" and "uncontrolled" are imprecise, and the model no longer needs them. Section 3 keeps the discussion as the argument for that choice, but the definition does not use them. The terms it does use (*exposure*, *excursion*, *incursion*, *event*, *near miss*) are understood in the domain and defined in the Glossary.
 - **Q1b + Q1c** (upstream steps; build-up limits). One circular problem, broken by analysing in **cycles**: control-blind within a cycle, the starting state taken as found at its boundary, and the investigator scoping evidential versus counterfactual cycles. See the cycles refinement in section 3.
-- **Q2** (credit working controls, or count barrier-saved events as PSIF?). **Headline = inherent SIF potential** (classifier, company threshold). Credit for controls comes as the **residual outcome distribution** from the simulator, whose Monte Carlo includes degraded and absent control states, so the answer is in the CDF. EEI's "Capacity" is renamed **control held** to avoid confusion with Safety-II and HOP "capacity". See 4.4.
-- **Q1i** (how a cycle is bounded; how what-ifs are labelled). **Per source** by default. Scope is set by a **scoping statement**, as for a HAZID/HAZOP study (sources, bridges, counterfactuals in or out). What-ifs are labelled **counterfactual**. The classifier's implicit scope is per source, evidential only.
 - **Q1d** ("no failure mode, no demand" as the test for an inherent feature). Accepted as the working definition of inherent safety / safety by design, and restated after checking against Kletz, CCPS/Hendershot, IAEA-TECDOC-626 and ISO 12100. The feature is in effect throughout normal operation and can be lost only by changing the source; controls are active, passive or procedural. See "Inherent features versus controls" in section 3.
 - **Q1f** (exposure versus EEI's "Exposure"). Keep ours: it is the standard risk-formula meaning. Qualify EEI's as "Exposure (EEI)".
 - **Q1g** (convergence when the target moves). The **incursion** is the event: entry into a danger zone defined by the plan. This works for vehicles and machinery, and gives a definition of **near miss** (an event in which nobody was hurt). See the event/exposure refinement.
+- **Q1i** (how a cycle is bounded; how what-ifs are labelled). **Per source** by default. Scope is set by a **scoping statement**, as for a HAZID/HAZOP study (sources, bridges, counterfactuals in or out). What-ifs are labelled **counterfactual**. The classifier's implicit scope is per source, evidential only.
+- **Q2** (credit working controls, or count barrier-saved events as PSIF?). **Headline = inherent SIF potential** (classifier, company threshold). Credit for controls comes as the **residual outcome distribution** from the simulator, whose Monte Carlo includes degraded and absent control states, so the answer is in the CDF. EEI's "Capacity" is renamed **control held** to avoid confusion with Safety-II and HOP "capacity". See 4.4.
+- **Q3** (anchor at 0.50 "more likely than not" or 0.10 "credible"?). **Both stay in use**: SIF ≥ 0.50, ELEVATED ≥ 0.10, with the threshold set by the company. No change; revisit when the validation against human coders has been reconciled.
+- **Q4** (EEI's narrow direct control or a broader definition?). **No longer a definitional question.** EEI needs a narrow definition because its classification is yes/no: it must decide which controls "count". In our model every control (engineered, passive, procedural, training, PPE) enters the simulator through its effectiveness distribution. An error-tolerant engineered barrier has a high, narrow distribution; a rule or training has a low, wide one. EEI's three criteria are kept only for the EEI crosswalk ("control held" versus PSIF) and for HECA-style metrics.
+- **Q5** (proximity requirement?). **Chance P = 1.** The classifier codes *reported* events, so there is no proximity test. A proactive mode is parked below.
+- **Q6** (life-altering outcomes on a mortality-calibrated scale?). **Partly answered.** Layer 2's outcome is a distribution over the *seriousness of the injury*, measured as its probability of death on an AIS-derived scale (no injury, first aid, medical treatment, serious, fatal). So yes, it can be read as the chance *and* the seriousness of non-fatal outcomes: P(serious) counts non-fatal serious injuries as well as deaths, and the CDF gives the chance of each category. What it measures is **threat to life**, which covers life-ending and life-threatening outcomes. **Life-altering** injuries with low mortality (a finger amputation, sight loss, a crushed hand) score low on it. Adding them needs a second axis, e.g. an impairment scale such as the AAAM Injury Impairment Scale or the Functional Capacity Index (to check), or a body-region rule. Parked below.
 
 ### Still open
 
-- **Q1.** Is the three-clause event (excursion in space; incursion, or a change of state while a person is exposed; excursion in magnitude or time) the right wording? Are *excursion*, *incursion*, *exposure*, *event* and *near miss* the right terms? Should "unexpected" be dropped entirely? (The wording argument stays in section 3 as the case for the choice.)
-- **Q3.** Should the probability anchor be "more likely than not" (0.50) or "credible" (0.10)? Should validation against human coders use SIF alone or SIF + ELEVATED?
-- **Q4.** Which control definition: EEI's narrow direct control (targeted, effective, error-tolerant; no training, rules or generic PPE) or ICMM/BST's broader one?
-- **Q5.** Should there be a proximity requirement, or does chance P = 1 hold regardless?
-- **Q6.** How do we bring life-altering, non-fatal outcomes into a mortality-calibrated scale?
-- **Q7.** Should missing detail default to the least severe band or to the population prior?
-- **Q8.** Should the definition fit the QQ SIFp grades (1 Fatal … 4 High), or should the grades be mapped onto the definition?
+None in this draft.
 
 ### Parked: beyond this paper
 
@@ -670,6 +671,9 @@ These belong to a later design specification that wraps the model (risk-control 
 - **Q1a.** Who defines the envelope (the design, the permit, the regulator), and what happens when none is documented? A question about the design of risk controls.
 - **Q1e.** Making M, L, T operational: dimensionless margins (m, l, t) as fields, and controls classified as M, L or T. In this paper M, L, T is a framing device.
 - **Q1h.** Standard exposure units per energy type, and where client data can supply the denominators. The paper shows there are several ways to measure exposure. Some energy types already converge on established metrics: chemical exposure as a time-weighted average against a workplace exposure limit (concentration × time), electromagnetic fields and ionising radiation as field-strength reference levels and dose (references to check).
+- **Q5 (proactive mode).** Don't wait for reports. Measure where the energy is, where the exposure is, and where the exclusion zones are, then run the Monte Carlo as a forward-looking risk assessment. A future line of work.
+- **Q6 (life-altering axis).** An impairment axis or a body-region rule alongside threat-to-life, so that LIFE's "life-altering" outcomes are counted.
+- **Q7.** Missing detail. The classifier currently defaults to the least severe band. A population prior ([bayesian-priors.md](bayesian-priors.md)) would be an extension of the model, not an either/or choice.
 
 ## 8. Checks before polishing
 
@@ -680,6 +684,7 @@ These belong to a later design specification that wraps the model (risk-control 
 - Origin of the energy wheel graphic is unverified.
 - **Units:** EEI's "500 ft-lbs" is about 680 J, *not* 1,500 J. EEI's own documents use both figures, so they are not a unit conversion. Our docs should state which one we mean wherever we cite either.
 - Safety-II / resilience engineering (Hollnagel; Woods, "adaptive capacity") and HOP (Conklin) uses of "capacity" are cited from memory. Check them, and EEI's stated source for the term.
+- The AAAM Injury Impairment Scale and the Functional Capacity Index are named from memory as candidate impairment axes. Check them. Also check the AIS level that P(death) ≥ 0.10 corresponds to.
 - The NSC/OSHA near-miss definition ("a slight shift in time or position") are cited from memory. Check both.
 - Chemical exposure (TWA against workplace exposure limits) and EMF/ionising radiation metrics (reference levels, dose) are named as established exposure metrics without references.
 - Micromort figures (e.g. about 1 per 250 miles of UK driving), the FAR definition (per 10⁸ exposed hours) and *microlife* are cited from memory. Check them against Spiegelhalter & Blastland (2013) and Kletz before quoting.
