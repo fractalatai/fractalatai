@@ -1005,56 +1005,56 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 ## References
 
 - ANSI/ASSP Z16.1-2022. *Safety and Health Metrics and Performance Measures*. ASSP.
-- API RP 754 (3rd ed., 2021). *Process Safety Performance Indicators for the Refining and Petrochemical Industries*. American Petroleum Institute. (edition and wording to check)
-- ASTM E2920-26 (2026). *Standard Guide for Recording Priority Occupational Injuries and Illnesses and SIF-Related …* https://store.astm.org/e2920-26.html
+- API RP 754 (4th ed., 2026). *Process Safety Performance Indicators for the Refining and Petrochemical Industries*. American Petroleum Institute. [edition and wording to check](https://www.api.org/products-and-services/standards/important-standards-announcements/api-rp-754-4th) [3rd Edition](https://avadocuments2026.com/preview/ansi-api-rp-754-2021.pdf)
+- [ASTM E2920-26 (2026). *Standard Guide for Recording Priority Occupational Injuries and Illnesses and SIF-Related …*](https://store.astm.org/e2920-26.html)
 - Baker, S.P. & Haddon, W. Jr. (1974). Reducing injuries and their results: the scientific approach. *Milbank Memorial Fund Quarterly: Health and Society*, 52(4), 377–389.
-- Bayona, A., Bhandari, S., Hallowell, M., Sherratt, F., Bailey, J.M. & Upton, J. (2023). What is a serious injury? A model for defining serious injuries & fatalities. *Professional Safety*, 68(9). https://www.assp.org/docs/default-source/psj-articles/f1bayona_0923.pdf
+- [Bayona, A., Bhandari, S., Hallowell, M., Sherratt, F., Bailey, J.M. & Upton, J. (2023). What is a serious injury? A model for defining serious injuries & fatalities. *Professional Safety*, 68(9)](https://www.assp.org/docs/default-source/psj-articles/f1bayona_0923.pdf)
 - BSEE (2023). *Safety Alert 468: Red Zone Hazards Pose Increased Risk to Personnel During Lifting Operations*. Bureau of Safety and Environmental Enforcement.
 - Campbell Institute (2018). *Serious Injury and Fatality Prevention: Perspectives and Practices*. National Safety Council.
 - Campbell Institute (2020). *Designing Strategy for Serious Injury and Fatality Prevention*. National Safety Council.
 - Campbell Institute (2022). *SIF Prevention: Leading Indicators, Cumulative Risk, and Safety Networks*. National Safety Council.
 - CCPS (2001). *Layer of Protection Analysis: Simplified Process Risk Assessment*. Center for Chemical Process Safety / AIChE. (independent protection layer definition to check)
-- CCPS (2010). Passive safety devices. *Process Safety Beacon*, July 2010. https://www.aiche.org/sites/default/files/2010-07-Beacon-English.pdf
-- CCPS (2018). *Process Safety Metrics: Guide for Selecting Leading and Lagging Indicators*, v3.2. AIChE. https://www.aiche.org/sites/default/files/docs/pages/ccps_process_safety_metrics_-_v3.2.pdf
-- CDM 2015. *Construction (Design and Management) Regulations 2015*, regulation 9 (duties of designers). https://www.legislation.gov.uk/uksi/2015/51/regulation/9
-- ConocoPhillips (2025). *Life Saving Rules Standard*. https://static.conocophillips.com/files/resources/life-saving-rules-standard.pdf
+- [CCPS (2010). Passive safety devices. *Process Safety Beacon*, July 2010](https://www.aiche.org/sites/default/files/2010-07-Beacon-English.pdf)
+- [CCPS (2018). *Process Safety Metrics: Guide for Selecting Leading and Lagging Indicators*, v3.2 AIChE](https://www.aiche.org/sites/default/files/docs/pages/ccps_process_safety_metrics_-_v3.2.pdf)
+- [CDM 2015. *Construction (Design and Management) Regulations 2015*, regulation 9 (duties of designers)](https://www.legislation.gov.uk/uksi/2015/51/regulation/9)
+- [ConocoPhillips (2025). *Life Saving Rules Standard*](https://static.conocophillips.com/files/resources/life-saving-rules-standard.pdf)
 - DOE-HDBK-1208-2012. *Accident and Operational Safety Analysis*. US Department of Energy.
 - Edison Electric Institute (2025). *SIF Criteria* (SCL model, Appendix 9).
-- Energy Safety Canada. *Line of Fire Program*. https://www.energysafetycanada.com/resource/line-fire-program
+- [Energy Safety Canada. *Line of Fire Program*](https://www.energysafetycanada.com/resource/line-fire-program)
 - Haddon, W. Jr. (1973). Energy damage and the ten countermeasure strategies. *Journal of Trauma*, 13(4), 321–331. doi:10.1097/00005373-197304000-00011
-- Hallowell, M. & Oguz Erkal, E.D. (2024). *High-Energy Control Assessments (HECA)*. Edison Electric Institute. https://cms.eei.org/-/media/Project/EEI/Documents/Issues-and-Policy/Power-to-Prevent-SIF/EEI-HECA.pdf
-- Hallowell, M. (2020, rev. 2024). *Safety Classification and Learning (SCL) Model*. Edison Electric Institute. https://cms.eei.org/-/media/Project/EEI/Documents/Issues-and-Policy/Power-to-Prevent-SIF/eeiSCLmodel.pdf
-- Hallowell, M.R. & Spencer, C. (2024). Safety Classification & Learning Model: defining & classifying potential serious injuries & fatalities. *Professional Safety*, 69(2). https://assp.org/docs/default-source/psj-articles/f1hallowellspencer_0224.pdf
-- Hallowell, M.R., Alexander, D. & Gambatese, J.A. (2017). Energy-based safety risk assessment: does magnitude and intensity of energy predict injury severity? *Construction Management and Economics*, 35(1–2), 64–77. doi:10.1080/01446193.2016.1274418
-- Hendershot, D.C. (2012). Inherently safer design: the fundamentals. *Chemical Engineering Progress*, January 2012. AIChE/CCPS. https://www.aiche.org/sites/default/files/cep/20120140-1.pdf
+- [Hallowell, M. & Oguz Erkal, E.D. (2024). *High-Energy Control Assessments (HECA)*. Edison Electric Institute](https://cms.eei.org/-/media/Project/EEI/Documents/Issues-and-Policy/Power-to-Prevent-SIF/EEI-HECA.pdf)
+- [Hallowell, M. (2020, rev. 2024). *Safety Classification and Learning (SCL) Model*. Edison Electric Institute](https://cms.eei.org/-/media/Project/EEI/Documents/Issues-and-Policy/Power-to-Prevent-SIF/eeiSCLmodel.pdf)
+- [Hallowell, M.R. & Spencer, C. (2024). Safety Classification & Learning Model: defining & classifying potential serious injuries & fatalities. *Professional Safety*, 69(2)](https://assp.org/docs/default-source/psj-articles/f1hallowellspencer_0224.pdf)
+- [Hallowell, M.R., Alexander, D. & Gambatese, J.A. (2017). Energy-based safety risk assessment: does magnitude and intensity of energy predict injury severity? *Construction Management and Economics*, 35(1–2), 64–77. doi:10.1080/01446193.2016.1274418](https://www.tandfonline.com/doi/full/10.1080/01446193.2016.1274418)
+- [Hendershot, D.C. (2012). Inherently safer design: the fundamentals. *Chemical Engineering Progress*, January 2012. AIChE/CCPS](https://www.aiche.org/sites/default/files/cep/20120140-1.pdf)
 - Howard, R.A. (1980). On making life and death decisions. In R.C. Schwing & W.A. Albers (eds), *Societal Risk Assessment: How Safe Is Safe Enough?* Plenum. (micromort origin; to check)
 - HSE (2004). *HSG245: Investigating Accidents and Incidents*. Health and Safety Executive.
-- IAEA (1991). *IAEA-TECDOC-626: Safety Related Terms for Advanced Nuclear Plants*. https://www-pub.iaea.org/MTCD/Publications/PDF/te_626_web.pdf
-- IAEA (2018). *IAEA Safety Glossary*, 2018 ed. https://www-pub.iaea.org/MTCD/publications/PDF/PUB1830_web.pdf
-- ICAO (2010). *Annex 13: Aircraft Accident and Incident Investigation*, 10th ed.
-- ICMM (2015). *Critical Control Management: Implementation Guide*. International Council on Mining and Metals.
-- IOGP (2018). *Report 459: IOGP Life-Saving Rules*, v3.0. International Association of Oil & Gas Producers. https://www.iogp.org/life-savingrules/
-- IOGP (2025). *Life-Saving Rules: Line of Fire – Introduction to Supporting Materials*. https://www.iogp.org/wp-content/uploads/2025/10/IOGP-Life-Saving-Rules-Line-of-Fire-Introduction-to-Supporting-Materials.pdf
+- [IAEA (1991). *IAEA-TECDOC-626: Safety Related Terms for Advanced Nuclear Plants*](https://www-pub.iaea.org/MTCD/Publications/PDF/te_626_web.pdf)
+- [IAEA (2018). *IAEA Safety Glossary*, 2018 ed](https://www-pub.iaea.org/MTCD/publications/PDF/PUB1830_web.pdf)
+- [ICAO (2010). *Annex 13 to the Convention on International Civil Aviation: Aircraft Accident and Incident Investigation*, 10th ed](https://elibrary.icao.int/reader/475561/&returnUrl%3DaHR0cHM6Ly9lbGlicmFyeS5pY2FvLmludC9wcm9kdWN0LzQ3NTU2MQ%3D%3D)
+- [ICMM (2015). *Critical Control Management: Implementation Guide*](https://pimcore.icmm.com/website/publications/pdfs/health-and-safety/2015/guidance_ccm-implementation.pdf)
+- [IOGP (2018). *Report 459: IOGP Life-Saving Rules*, v3.0. International Association of Oil & Gas Producers](https://www.iogp.org/life-savingrules/)
+- [IOGP (2025). *Life-Saving Rules: Line of Fire – Introduction to Supporting Materials*](https://www.iogp.org/wp-content/uploads/2025/10/IOGP-Life-Saving-Rules-Line-of-Fire-Introduction-to-Supporting-Materials.pdf)
 - ISO 12100:2010. *Safety of machinery – General principles for design – Risk assessment and risk reduction*. ISO.
 - ISO 31000:2018. *Risk management – Guidelines*. ISO Guide 73:2009, *Risk management – Vocabulary*.
 - ISO 45001:2018. *Occupational health and safety management systems – Requirements with guidance for use*.
 - Johnson, W.G. (1980). *MORT Safety Assurance Systems*. Marcel Dekker.
 - Kletz, T. (1978). What you don't have, can't leak. *Chemistry & Industry*, 287–292.
-- Kletz, T. (1991). Inherently safer plants – recent progress. *IChemE Symposium Series* No. 124 (Hazards XI). https://www.icheme.org/media/10434/xi-paper-14.pdf
+- [Kletz, T. (1991). Inherently safer plants – recent progress. *IChemE Symposium Series* No. 124 (Hazards XI)](https://www.icheme.org/media/10434/xi-paper-14.pdf)
 - Kletz, T. (1991, 2nd ed. 2010 with Amyotte). *Process Plants: A Handbook for Inherently Safer Design*. (edition to check)
 - Kletz, T. (1999). *Hazop and Hazan: Identifying and Assessing Process Industry Hazards*, 4th ed. IChemE. (FAR; edition to check)
-- Krause, T.R. (2010). *New Findings on Serious Injuries and Fatalities*. BST.
+- [Krause, T.R. (2010). *New Findings on Serious Injuries and Fatalities*. BST](https://ppsa.memberclicks.net/assets/Webinars/Presentations/Krause%202010%20-%20New%20Findings%20on%20Serious%20Injury%20and%20Fatality%20Prevention.pdf)
 - La Duke, P. (2013). Working in the line of fire. *ISHN*, 22 August 2013.
-- Manuele, F.A. (2008). Serious injuries & fatalities: a call for a new focus on their prevention. *Professional Safety*, 53(12), 32–39.
-- Manuele, F.A. (2013). Preventing serious injuries & fatalities: time for a sociotechnical model for an operational risk management system. *Professional Safety*, 58(5).
-- Martin, D.K. & Black, A.A. (2015). Preventing serious injuries & fatalities: study reveals precursors & paradigms. *Professional Safety*, 60(9), 35–43.
-- National Academies (2012). *The Use and Storage of Methyl Isocyanate (MIC) at Bayer CropScience*, ch. on inherently safer processes. https://www.nationalacademies.org/read/13385/chapter/7
-- NIOSH. *Hierarchy of Controls*; *Prevention through Design*. https://www.cdc.gov/niosh/hierarchy-of-controls/about/index.html
-- Oguz Erkal, E.D. & Hallowell, M.R. (2023). Moving beyond TRIR: measuring & monitoring safety performance with high-energy control assessments. *Professional Safety*, 68(5), 26–35.
+- [Manuele, F.A. (2008). Serious injuries & fatalities: a call for a new focus on their prevention. *Professional Safety*, 53(12), 32–39](https://static1.squarespace.com/static/5d12affb6c48770001d49960/t/5ee27d177f2406082d5cfeda/1591901464599/fred+manuele+serious+injuries+asse.pdf)
+- [Manuele, F.A. (2013). Preventing serious injuries & fatalities: time for a sociotechnical model for an operational risk management system. *Professional Safety*, 58(5)](https://aeasseincludes.assp.org/professionalsafety/pastissues/058/05/F2Manu_0513.pdf)
+- [Martin, D.K. & Black, A.A. (2015). Preventing serious injuries & fatalities: study reveals precursors & paradigms. *Professional Safety*, 60(9)](https://safetyfocus.assp.org/docs/Don%20Martin_Preventing%20Serios%20Injuries%20and%20Fatalities_September%202015.pdf)
+- [National Academies (2012). *The Use and Storage of Methyl Isocyanate (MIC) at Bayer CropScience*, ch. on inherently safer processes](https://www.nationalacademies.org/read/13385/chapter/7)
+- [NIOSH. *Hierarchy of Controls*; *Prevention through Design*](https://www.cdc.gov/niosh/hierarchy-of-controls/about/index.html)
+- [Oguz Erkal, E.D. & Hallowell, M.R. (2023). Moving beyond TRIR: measuring & monitoring safety performance with high-energy control assessments. *Professional Safety*, 68(5), 26–35](https://www.assp.org/docs/default-source/psj-articles/f1hallowell_0523.pdf?sfvrsn=45416846_0)
 - OSHA, 29 CFR 1904.39. Reporting fatalities, hospitalizations, amputations, and losses of an eye.
-- OSHA. *Construction Focus Four: Struck-By Hazards*, instructor guide. https://www.osha.gov/sites/default/files/struckby_ig.pdf
-- OSHA. *Template for Near Miss Report Form*. https://www.osha.gov/sites/default/files/2021-07/Template%20for%20Near%20Miss%20Report%20Form.pdf
-- RIDDOR 2013, regulation 4 (specified injuries) and Schedule 2 (dangerous occurrences). https://www.legislation.gov.uk/uksi/2013/1471/regulation/4
+- [OSHA. *Construction Focus Four: Struck-By Hazards*, instructor guide](https://www.osha.gov/sites/default/files/struckby_ig.pdf)
+- [OSHA. *Template for Near Miss Report Form*](https://www.osha.gov/sites/default/files/2021-07/Template%20for%20Near%20Miss%20Report%20Form.pdf)
+- [RIDDOR 2013, regulation 4 (specified injuries) and Schedule 2 (dangerous occurrences)](https://www.legislation.gov.uk/uksi/2013/1471/regulation/4)
 - Spiegelhalter, D. & Blastland, M. (2013). *The Norm Chronicles: Stories and Numbers About Danger*. Profile Books.
-- UK CAA. *BowTie: Top events*. https://www.caa.co.uk/safety-initiatives/working-with-industry/bowtie/bowtie-elements/top-events/
+- [UK CAA. *BowTie: Top events*](https://www.caa.co.uk/safety-initiatives/working-with-industry/bowtie/bowtie-elements/top-events/)
 - Viner, D. (1991). *Accident Analysis and Risk Control*. (wording unverified)

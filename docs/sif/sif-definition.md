@@ -594,24 +594,25 @@ Bands run from least to most severe within each mechanism. P(serious) comes from
 
 ## References
 
-- API RP 754 (2021). *Process Safety Performance Indicators for the Refining and Petrochemical Industries*, 3rd ed. American Petroleum Institute.
-- ASTM E2920-26 (2026). *Standard Guide for Recording Priority Occupational Injuries and Illnesses and SIF-Related …* https://store.astm.org/e2920-26.html
-- Bayona, A., Bhandari, S., Hallowell, M., Sherratt, F., Bailey, J.M. & Upton, J. (2023). What is a serious injury? A model for defining serious injuries & fatalities. *Professional Safety*, 68(9).
-- Campbell Institute (2018). *Serious Injury and Fatality Prevention: Perspectives and Practices*. National Safety Council.
-- Campbell Institute (2020). *Designing Strategy for Serious Injury and Fatality Prevention*. National Safety Council.
-- CCPS (2018). *Process Safety Metrics: Guide for Selecting Leading and Lagging Indicators*, v3.2. AIChE.
-- Edison Electric Institute (2020, rev. 2024). *Safety Classification and Learning (SCL) Model*.
-- Hallowell, M.R. & Spencer, C. (2024). Safety Classification & Learning Model. *Professional Safety*, 69(2).
-- ICAO (2010). *Annex 13 to the Convention on International Civil Aviation: Aircraft Accident and Incident Investigation*, 10th ed.
-- ICMM (2015). *Critical Control Management: Implementation Guide*.
-- ISO 12100:2010. *Safety of machinery – General principles for design – Risk assessment and risk reduction*.
+- API RP 754 (2021). *Process Safety Performance Indicators for the Refining and Petrochemical Industries*, 3rd ed. American Petroleum Institute. PAYWALLED
+- [ASTM E2920-26 (2026). *Standard Guide for Recording Priority Occupational Injuries and Illnesses and SIF-Related …*](https://store.astm.org/e2920-26.html)
+- [Bayona, A., Bhandari, S., Hallowell, M., Sherratt, F., Bailey, J.M. & Upton, J. (2023). What is a serious injury? A model for defining serious injuries & fatalities. *Professional Safety*, 68(9)](https://www.assp.org/docs/default-source/psj-articles/f1bayona_0923.pdf?sfvrsn=2ab06946_0)
+- [Campbell Institute (2018). *Serious Injury and Fatality Prevention: Perspectives and Practices*. National Safety Council](https://www.nsc.org/getmedia/42c2d272-8ff3-48c8-ab03-e7ccd4b47806/campbell-wp-sif-prevention-perspectives-practices.pdf)
+- [Campbell Institute (2020). *Designing Strategy for Serious Injury and Fatality Prevention*. National Safety Council](https://www.nsc.org/getmedia/b3142573-730b-407f-9c63-611e50125b48/campbell-wp-designing-strategy-for-sif-prevention.pdf)
+- [CCPS (2018). *Process Safety Metrics: Guide for Selecting Leading and Lagging Indicators*, v3.2. AIChE](https://ccps.aiche.org/resources/tools/process-safety-metrics)
+- [Edison Electric Institute (2020, rev. 2024). *Safety Classification and Learning (SCL) Model*](https://www.eei.org/en/issues-and-policy/power-to-prevent-sif)
+- Hallowell, M.R. & Spencer, C. (2024). Safety Classification & Learning Model. *Professional Safety*, 69(2). PAYWALLED
+- [https://www.safetyfunction.com/scl-model](https://www.safetyfunction.com/scl-model)
+- [ICAO (2010). *Annex 13 to the Convention on International Civil Aviation: Aircraft Accident and Incident Investigation*, 10th ed](https://elibrary.icao.int/reader/475561/&returnUrl%3DaHR0cHM6Ly9lbGlicmFyeS5pY2FvLmludC9wcm9kdWN0LzQ3NTU2MQ%3D%3D)
+- [ICMM (2015). *Critical Control Management: Implementation Guide*](https://pimcore.icmm.com/website/publications/pdfs/health-and-safety/2015/guidance_ccm-implementation.pdf)
+- ISO 12100:2010. *Safety of machinery – General principles for design – Risk assessment and risk reduction*. PAYWALLED
 - ISO 31000:2018. *Risk management – Guidelines*.
 - ISO 45001:2018. *Occupational health and safety management systems*.
-- Krause, T.R. (2010). *New Findings on Serious Injuries and Fatalities*. BST.
-- Martin, D.K. & Black, A.A. (2015). Preventing serious injuries & fatalities: study reveals precursors & paradigms. *Professional Safety*, 60(9).
+- [Krause, T.R. (2010). *New Findings on Serious Injuries and Fatalities*. BST](https://ppsa.memberclicks.net/assets/Webinars/Presentations/Krause%202010%20-%20New%20Findings%20on%20Serious%20Injury%20and%20Fatality%20Prevention.pdf)
+- [Martin, D.K. & Black, A.A. (2015). Preventing serious injuries & fatalities: study reveals precursors & paradigms. *Professional Safety*, 60(9)](https://safetyfocus.assp.org/docs/Don%20Martin_Preventing%20Serios%20Injuries%20and%20Fatalities_September%202015.pdf)
 - OSHA, 29 CFR 1904.39.
 - OSHA. *Template for Near Miss Report Form*.
 - RIDDOR 2013, regulation 4 and Schedule 2.
-- UK Civil Aviation Authority. *BowTie: Top events*.
+- [UK Civil Aviation Authority. *BowTie: Top events*.](https://www.caa.co.uk/safety-initiatives/working-with-industry/bowtie/bowtie-elements/top-events/)
 
 [^ai]: The AI model is copyright © Spongl Ltd 2026.
