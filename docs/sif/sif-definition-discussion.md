@@ -1,6 +1,6 @@
 # Defining SIF: a discussion draft
 
-Status: draft v1.0, 2026-11-16. All open questions answered or parked. A starting point to polish, not a settled position.
+Status: draft v1.1, 2026-11-16. All open questions answered or parked. A starting point to polish, not a settled position.
 
 ## Contents
 
@@ -24,6 +24,7 @@ Status: draft v1.0, 2026-11-16. All open questions answered or parked. A startin
   - [Refinement: the envelope in Mass, Length, Time](#refinement-the-envelope-in-mass-length-time)
   - [Refinement: event, exposure, excursion and incursion](#refinement-event-exposure-excursion-and-incursion)
   - [Refinement: exposure as the denominator of risk](#refinement-exposure-as-the-denominator-of-risk)
+  - [Refinement: exposure strata, demand and incursion](#refinement-exposure-strata-demand-and-incursion)
   - [Refinement: cycles, breaking the circle](#refinement-cycles-breaking-the-circle)
 - [4. Proposal: three layers, not one definition](#4-proposal-three-layers-not-one-definition)
   - [4.1 Where does the source end and the path begin?](#41-where-does-the-source-end-and-the-path-begin)
@@ -349,7 +350,7 @@ The fix separates two things that "breach" ran together: **whether energy and a 
 |---|---|---|---|
 | **Exposure** (a condition) | Energy and a person present together in time and space, the person within reach, controls disregarded | Working on a platform at height, guarded or not; working dead behind an isolator; a pedestrian in a lane with parked, fuelled vehicles; standing under a suspended load | A missing handrail with nobody on the platform: that is a *control state*, not an exposure. A circuit whose supply has been removed: eliminated |
 | **Excursion** | Energy goes beyond its envelope in L (outside its space), M (beyond its magnitude) or T (present where it should be zero) | Flyrock beyond the zone; overpressure; a re-energised isolated circuit | |
-| **Incursion** (an event) | A person **enters a danger zone**: an area within reach of the energy that the plan keeps clear of people (exclusion zone, segregated route, drop zone, a machine's danger zone). The entry is the event; remaining there is exposure | Walking into a segregated vehicle route; reaching into a running conveyor's danger zone; entering a blast zone | Planned exposure, e.g. a rigger at height doing the task |
+| **Incursion** (an event) | A person **enters a danger zone** while the energy is live: an area within reach of the energy that the plan keeps clear of people (exclusion zone, segregated route, drop zone, a machine's danger zone). The entry is the event; remaining there counts towards exposure, in the stratum where that control is absent. Entry under isolation is not an incursion | Walking into a segregated vehicle route; reaching into a running conveyor's danger zone; entering a blast zone | Planned exposure, e.g. a rigger at height doing the task |
 | **Event** | Something happens at a moment: the energy **changes state** (release, transfer, build-up, energisation), producing an excursion or reaching an exposed person, or a person makes an **incursion** | The load drops; the vehicle reverses toward the pedestrian; the blast fires with someone in the zone; the reactor power rises; a hand goes into a running machine | Vehicles moving past a pedestrian at a steady clearance in a shared area: continued exposure |
 
 **Exposure is control-blind**, like layer 2 and chance P = 1. Controls decide how an exposure is *classified*, not whether it exists. That gives the condition-side counterpart of PSIF and Capacity:
@@ -419,6 +420,29 @@ Exposures are observable before anything happens (HECA, BST's precursor "if allo
 7. **Count-per-exposure data suits the Bayesian approach** in the validation work: event counts per unit of exposure are naturally modelled as Poisson with a Gamma prior on the rate.
 
 This also settles Q1f in favour of keeping "exposure". Ours is the standard risk-formula meaning; EEI's "Exposure" (a hazard without a direct control) is the specialised use, so it should be the one that gets qualified.
+
+### Refinement: exposure strata, demand and incursion
+
+**Is incursion time the same as exposure?** No. Take an operator using a guarded machine.
+
+- **Exposure is control-blind.** Without the guards, the moving parts would be within the operator's reach, so the whole time they use the machine is exposure. "Within reach" can be anchored in body-reach distances to a hazard zone (ISO 13857 safety distances, to check). Someone at the far end of the workshop is not exposed.
+- **The guard is under constant demand.** A fixed guard on a running machine is a passive control in *continuous* demand for as long as someone is within reach (IEC 61508 distinguishes low-demand, high-demand and continuous modes, to check). It reduces the chance of harm per hour of exposure; it does not reduce the exposure.
+- **Opening the guard while the machine is energised is an incursion.** The entry is the event, and each entry counts. The time spent inside counts towards exposure, in the stratum where the guard is absent. Running clean is the extreme case: the energy is active, the person is inside, and the main control is gone.
+- **Opening the guard under isolation is not an incursion.** A danger zone's envelope has a T condition: kept clear *while energised*. A planned entry under LOTO is exposure with isolation as the control in demand. The energy is still present behind the isolator.
+
+So **one control-blind exposure, split into strata by control state**:
+
+| Stratum | Example | Control in demand | Chance per unit exposure |
+|---|---|---|---|
+| Guards in place | Normal operation | Guard (continuous demand) | Lowest |
+| Isolated, guard open | Clearing a blockage under LOTO | Isolation | Low if verified |
+| Energised, guard open | Running clean; reaching in | None: an incursion | Highest |
+
+Risk then sums over the strata:
+
+> **Risk = Σ (exposureₛ × chance per unit of exposureₛ × consequence)**
+
+The total exposure is unchanged by the guard. The split shows *where* the risk sits: usually in the short, non-routine strata such as maintenance, clearing and cleaning, which Manuele identified as where SIFs concentrate. Incursion counts and incursion time are the measures of the highest stratum.
 
 The earlier refinements above are kept as the argument trail. Section 4 onwards uses these terms.
 
@@ -654,6 +678,7 @@ The barrier-saved question is then answered by the CDF, not by a label. Take a f
 - **Q1f** (exposure versus EEI's "Exposure"). Keep ours: it is the standard risk-formula meaning. Qualify EEI's as "Exposure (EEI)".
 - **Q1g** (convergence when the target moves). The **incursion** is the event: entry into a danger zone defined by the plan. This works for vehicles and machinery, and gives a definition of **near miss** (an event in which nobody was hurt). See the event/exposure refinement.
 - **Q1i** (how a cycle is bounded; how what-ifs are labelled). **Per source** by default. Scope is set by a **scoping statement**, as for a HAZID/HAZOP study (sources, bridges, counterfactuals in or out). What-ifs are labelled **counterfactual**. The classifier's implicit scope is per source, evidential only.
+- **Q1j** (is incursion time the same as exposure?). **No.** Exposure is control-blind: the operator at a guarded machine is exposed for the whole time they use it, and the guard is in continuous demand. Incursion is entry into the danger zone while the energy is live; time inside is the highest exposure stratum. Entry under isolation is not an incursion. See "Refinement: exposure strata, demand and incursion".
 - **Q2** (credit working controls, or count barrier-saved events as PSIF?). **Headline = inherent SIF potential** (classifier, company threshold). Credit for controls comes as the **residual outcome distribution** from the simulator, whose Monte Carlo includes degraded and absent control states, so the answer is in the CDF. EEI's "Capacity" is renamed **control held** to avoid confusion with Safety-II and HOP "capacity". See 4.4.
 - **Q3** (anchor at 0.50 "more likely than not" or 0.10 "credible"?). **Both stay in use**: SIF ≥ 0.50, ELEVATED ≥ 0.10, with the threshold set by the company. No change; revisit when the validation against human coders has been reconciled.
 - **Q4** (EEI's narrow direct control or a broader definition?). **No longer a definitional question.** EEI needs a narrow definition because its classification is yes/no: it must decide which controls "count". In our model every control (engineered, passive, procedural, training, PPE) enters the simulator through its effectiveness distribution. An error-tolerant engineered barrier has a high, narrow distribution; a rule or training has a low, wide one. EEI's three criteria are kept only for the EEI crosswalk ("control held" versus PSIF) and for HECA-style metrics.
@@ -685,6 +710,7 @@ These belong to a later design specification that wraps the model (risk-control 
 - **Units:** EEI's "500 ft-lbs" is about 680 J, *not* 1,500 J. EEI's own documents use both figures, so they are not a unit conversion. Our docs should state which one we mean wherever we cite either.
 - Safety-II / resilience engineering (Hollnagel; Woods, "adaptive capacity") and HOP (Conklin) uses of "capacity" are cited from memory. Check them, and EEI's stated source for the term.
 - The AAAM Injury Impairment Scale and the Functional Capacity Index are named from memory as candidate impairment axes. Check them. Also check the AIS level that P(death) ≥ 0.10 corresponds to.
+- ISO 13857 (safety distances / reach to hazard zones) and the IEC 61508 low-demand, high-demand and continuous modes are cited from memory. Check both.
 - The NSC/OSHA near-miss definition ("a slight shift in time or position") are cited from memory. Check both.
 - Chemical exposure (TWA against workplace exposure limits) and EMF/ionising radiation metrics (reference levels, dose) are named as established exposure metrics without references.
 - Micromort figures (e.g. about 1 per 250 miles of UK driving), the FAR definition (per 10⁸ exposed hours) and *microlife* are cited from memory. Check them against Spiegelhalter & Blastland (2013) and Kletz before quoting.
@@ -828,7 +854,7 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Counterfactual cycle** | A cycle the facts don't show happened, examined as a what-if (had the relief also failed). Legitimate in investigation and risk assessment; always labelled `counterfactual`. Compare *evidential cycle* |
 | **Cycle** | One energy source analysed through all three layers once (envelope, exposure, event, potential, control state). Bounded per source by default; cycles chain through bridge conditions; each is *evidential* or *counterfactual* |
 | **Danger zone** | An area within reach of an energy that the plan keeps clear of people. For machinery, ISO 12100 3.11: "any space within and/or around machinery in which a person can be exposed to a hazard". Entry is an incursion |
-| **Demand** | (LOPA, IEC 61511) A deviation that calls on a protection layer to act; even passive barriers (a bund) are demanded and have a probability of failure on demand. Not the test for an inherent feature |
+| **Demand** | (LOPA, IEC 61511) A deviation that calls on a protection layer to act; even passive barriers (a bund) are demanded and have a probability of failure on demand. A guard on a running machine is in *continuous* demand while someone is within reach (IEC 61508 modes). Not the test for an inherent feature |
 | **Direct control** | (EEI) A control targeted to the high-energy source, effective when installed, verified and used properly, and effective even with unintentional human error. Training, rules, signs and generic PPE are excluded |
 | **Elevated** | Classifier class: P(serious outcome) ≥ 0.10 and < 0.50; "credibly serious" |
 | **Elimination** | Removing the energy from the source (supply disconnected and removed, system drained and vented, stored energy discharged). Changes the source and ends exposure. Compare *isolation* |
@@ -837,10 +863,11 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Evidential cycle** | A cycle the facts show happened, with the bridge to it evidenced in the narrative. The classifier's default scope |
 | **Excursion** | Energy going beyond its envelope in L, M or T |
 | **Exposure** | As a condition: energy (held, stored or available) and a person together in time and space, the person within reach, assessed **without regard to controls**. As a quantity: that co-presence measured in context-specific units (person-hours, lifts, take-offs, km), the denominator of the risk formula. Not the same as EEI's "Exposure", which is a high-energy hazard *without* a direct control (our exposure + control absent) |
+| **Exposure stratum** | A part of total (control-blind) exposure with one control state, e.g. guards in place, isolated, or guard open while energised. Risk sums over strata |
 | **FAR (Fatal Accident Rate)** | Fatalities per 10⁸ exposed hours (Kletz, process safety): a chance-per-unit-exposure measure |
 | **HECA** | (EEI/CSRA) High-Energy Control Assessment: the share of observed high-energy hazards with a direct control in place, Success / (Success + Exposure) |
 | **High energy** | (EEI) Over 500 ft-lbs (about 680 J); Hallowell et al. (2017) use > 1,500 J for "most likely a SIF". Not the same threshold |
-| **Incursion** | An event: a person entering a danger zone, an area within reach of the energy that the plan keeps clear (exclusion zone, segregated route, drop zone, machine danger zone). Remaining there is exposure |
+| **Incursion** | An event: a person entering a danger zone while the energy is live. A danger zone is an area within reach of the energy that the plan keeps clear (exclusion zone, segregated route, drop zone, machine danger zone). Remaining there counts towards exposure, in the stratum where that control is absent; entry under isolation is not an incursion |
 | **Inherent feature** | A property of the source's own materials, quantity, operating conditions or physics. It is in effect throughout normal operation without detection, actuation, power or human action, and can be lost only by changing the source (e.g. a reduced inventory, pump dead-head pressure, a negative temperature coefficient). Part of the source; changes the potential. Judged for a named hazard within the operating envelope |
 | **Inherent safety** | "The achievement of safety through the elimination or exclusion of inherent hazards through the fundamental conceptual design choices" (IAEA-TECDOC-626). In process safety, "eliminate or greatly reduce the hazard by changing the process to use materials and conditions that are nonhazardous or much less hazardous" (Hendershot, 2012). Kletz: "what you don't have, can't leak" |
 | **Inherent SIF potential** | Layer 2: the outcome distribution if the energy reached a person with no protective control between them, assessed on the energy state at the time (or the uncontrolled limit of a build-up) |
