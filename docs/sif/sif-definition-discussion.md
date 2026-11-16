@@ -1,6 +1,6 @@
 # Defining SIF: a discussion draft
 
-Status: draft v1.4, 2026-11-16. All open questions answered or parked. A starting point to polish, not a settled position.
+Status: draft v1.5, 2026-11-16. All open questions answered or parked. A starting point to polish, not a settled position.
 
 ## Contents
 
@@ -27,6 +27,7 @@ Status: draft v1.4, 2026-11-16. All open questions answered or parked. A startin
   - [Refinement: exposure as the denominator of risk](#refinement-exposure-as-the-denominator-of-risk)
   - [Refinement: exposure strata, demand and incursion](#refinement-exposure-strata-demand-and-incursion)
   - [Refinement: the target has an envelope too](#refinement-the-target-has-an-envelope-too)
+  - [Refinement: the event as shrinking separation](#refinement-the-event-as-shrinking-separation)
   - [Refinement: cycles, breaking the circle](#refinement-cycles-breaking-the-circle)
 - [4. Proposal: three layers, not one definition](#4-proposal-three-layers-not-one-definition)
   - [4.1 Where does the source end and the path begin?](#41-where-does-the-source-end-and-the-path-begin)
@@ -500,6 +501,30 @@ The M, L, T envelope was first applied only to the energy. That left two problem
 
 This supersedes the event clauses (a)/(b)/(c) and the earlier event tables. They stay above as the argument trail.
 
+### Refinement: the event as shrinking separation
+
+The "energy and people come together" wording of v1.4 did not fit three cases that the event definition must cover:
+
+1. an excursion into **unoccupied** space, where someone could have been present (the counterfactual);
+2. an excursion when someone was **closer** in space and time: the near miss;
+3. the event **leading to harm or loss**, which is what risk usually wants to measure.
+
+A first attempt to fix this added a probability ("Contact P": the chance the energy reaches a person, given the event). Needing to adjust P was a sign that the event itself was not exact.
+
+**The fix: the event is a shrinking of the separation margin.** Energy and people are kept apart by a margin: distance (where), time (when) or headroom to the design limit (how much). An event is a *happening*, not a condition: that margin shrinks toward zero, because the energy changes (excursion) or the people do (incursion). It is in effect a separation (control) failure, whether or not a control was meant to provide the separation. When someone is struck by flyrock, the distance is literally zero.
+
+The three cases are then positions on one scale, the event's **closest approach**:
+
+| Closest approach | Case |
+|---|---|
+| **Wide**: nobody near | Excursion to unoccupied space (RIDDOR's dangerous occurrence is the regulatory analogue) |
+| **Close**: margin small, not zero | Near miss: "a slight shift in time or position" (OSHA) |
+| **Contact**: margin zero | The energy reached a person, with or without harm |
+
+**The counterfactual, restated.** "Chance P = 1" becomes **separation to zero**: assess SIF potential as if the margin had gone to zero. It is the same counterfactual, now expressed in the same terms as the event, and it no longer collides with the chance term of the risk equation.
+
+Closest approach is the margins idea (m, l, t) applied to a single event. Recording it qualitatively (wide, close, contact) is part of the definition; numeric margins stay parked for the design specification (Q1e).
+
 ### Refinement: cycles, breaking the circle
 
 Two questions from v0.4 turn out to be one problem.
@@ -696,8 +721,8 @@ The barrier-saved question is then answered by the CDF, not by a label. Take a f
 
 > **SIF potential.** An event has SIF potential when the energy involved, had it reached a person with no protective control between them, would more likely than not have caused a life-ending, life-threatening or life-altering injury.
 >
-> - *Event*: the moment the preventive side of risk materialises: energy and people come together in where, when or how much. Either the energy changes (it is released, moves, becomes live or builds up: an *excursion*) or the people do (they enter where the energy is, are there when it is live, or are more than planned: an *incursion*). An event is defined before any outcome is known; what follows is the consequence side. See "Refinement: the target has an envelope too" and the definitions document, section 2.3.
-> - *Near miss*: an event in which nobody was hurt; the difference from SIF actual "lies only in the result" (ICAO). Exposure alone is not a near miss.
+> - *Event*: a happening, not a condition: the separation margin between energy and people, in distance, time or headroom, shrinks toward zero because the energy changes (an *excursion*) or the people do (an *incursion*). An event is defined before any outcome is known; SIF potential is assessed as if the separation had gone to zero.
+> - *Near miss*: an event whose closest approach was *close* but not contact, or reached *contact* without harm: in OSHA's words, "given a slight shift in time or position" injury could have occurred. An excursion to unoccupied space is an event but not a near miss. As ICAO puts it, the difference from an accident "lies only in the result". Exposure alone is not a near miss.
 > - *Exposure*: a condition, not an event. Energy (held, stored or available) and a person are together in time and space, the person within reach, assessed without regard to controls.
 > - *Intended envelope*: bounds on the energy in magnitude (M: how much there may be), length (L: where it may be, and its required separation from people; for an intentional release, the release zone such as a blast exclusion zone, range danger area or relief discharge area) and time (T: when it may be present). An *excursion* is energy going beyond any one of them; an *incursion* is a person entering the envelope.
 > - *Energy state*: potential is assessed on the energy present at the time, whatever its history. For a build-up, on the energy it would reach with no control acting, up to the source's inherent physical limit.
@@ -733,6 +758,7 @@ The barrier-saved question is then answered by the CDF, not by a label. Take a f
 - **Q1i** (how a cycle is bounded; how what-ifs are labelled). **Per source** by default. Scope is set by a **scoping statement**, as for a HAZID/HAZOP study (sources, bridges, counterfactuals in or out). What-ifs are labelled **counterfactual**. The classifier's implicit scope is per source, evidential only.
 - **Q1j** (is incursion time the same as exposure?). **No.** Exposure is control-blind: the operator at a guarded machine is exposed for the whole time they use it, and the guard is in continuous demand. Incursion is entry into the danger zone while the energy is live; time inside is the highest exposure stratum. Entry under isolation is not an incursion. See "Refinement: exposure strata, demand and incursion".
 - **Q1k** (why did event tables keep coming out sparse?). The target needs an envelope too, in where, when and how much. An event is a change on either side (excursion or incursion) that brings the two envelopes together; it is the materialised chance term of the risk equation (the top event). See "Refinement: the target has an envelope too".
+- **Q1l** (does the event cover unoccupied excursions, near misses and harm events?). Yes, once the event is defined as a **shrinking of the separation margin**, a happening rather than a condition. Its closest approach (wide, close, contact) places it. "Chance P = 1" becomes **separation to zero**. See "Refinement: the event as shrinking separation".
 - **Q2** (credit working controls, or count barrier-saved events as PSIF?). **Headline = inherent SIF potential** (classifier, company threshold). Credit for controls comes as the **residual outcome distribution** from the simulator, whose Monte Carlo includes degraded and absent control states, so the answer is in the CDF. PSIF is the umbrella, qualified **protected / unprotected / unverified**; EEI's "Capacity" is PSIF (protected), avoiding confusion with Safety-II and HOP "capacity". See 4.4.
 - **Q3** (anchor at 0.50 "more likely than not" or 0.10 "credible"?). **Both stay in use**: SIF ≥ 0.50, ELEVATED ≥ 0.10, with the threshold set by the company. No change; revisit when the validation against human coders has been reconciled.
 - **Q4** (EEI's narrow direct control or a broader definition?). **No longer a definitional question.** EEI needs a narrow definition because its classification is yes/no: it must decide which controls "count". In our model every control (engineered, passive, procedural, training, PPE) enters the simulator through its effectiveness distribution. An error-tolerant engineered barrier has a high, narrow distribution; a rule or training has a low, wide one. EEI's three criteria are kept only for the EEI crosswalk (PSIF protected versus unprotected) and for HECA-style metrics.
@@ -900,8 +926,9 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Active energy** | Energy that is moving, flowing or being released (a moving vehicle, a falling load, a blast). Descriptive; it does not by itself make an event. Compare *stored energy* |
 | **Bridge condition** | A link from one cycle to the next: a control failure or event in one cycle that sets the starting state of another, often by energy conversion (fuel → motion, fuel or battery → fire, motion → heat) |
 | **Capacity** | (EEI SCL) A high-energy release with an effective direct control present and no serious injury. This draft says *PSIF (protected)*, because "capacity" means something broader in Safety-II, resilience engineering and HOP (the ability of people and systems to adapt and fail safely) |
-| **Chance P** | The probability that the energy reaches a person at all. SIF potential sets chance P = 1 |
+| **Chance P** | Earlier term: the probability that the energy reaches a person, "set to 1" for SIF potential. Replaced by *separation to zero*. It collided with the risk equation's chance term (the chance of the event per unit of exposure) |
 | **Chance per unit exposure** | In the risk formula, the probability (rate) of a harmful event per unit of exposure (per hour, per lift, per take-off). Driven by controls |
+| **Closest approach** | How far the separation margin shrank during an event: *wide* (excursion to unoccupied space), *close* (near miss) or *contact* |
 | **Containment** | What holds energy in its intended state (pipe wall, cable insulation, vessel). Part of the source, not a control; release is escape from it |
 | **Control (protective control)** | Anything added to act on the source or on the path to people that can degrade, be defeated or be overwhelmed while the source stays unchanged. Active, passive or procedural (CCPS); also classed as an M, L or T control. Compare *inherent feature* |
 | **Counterfactual cycle** | A cycle the facts don't show happened, examined as a what-if (had the relief also failed). Legitimate in investigation and risk assessment; always labelled `counterfactual`. Compare *evidential cycle* |
@@ -912,7 +939,7 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Elevated** | Classifier class: P(serious outcome) ≥ 0.10 and < 0.50; "credibly serious" |
 | **Elimination** | Removing the energy from the source (supply disconnected and removed, system drained and vented, stored energy discharged). Changes the source and ends exposure. Compare *isolation* |
 | **Envelope (intended energy envelope)** | The designed bounds on an energy in magnitude (M), space and separation (L) and time (T): containment and designed path for contained energy; the release zone for an intentional release |
-| **Event** | The moment the preventive side of risk materialises: energy and people come together in where, when or how much. Either the energy changes (it is released, moves, becomes live or builds up: an *excursion*) or the people do (they enter where the energy is, are there when it is live, or are more than planned: an *incursion*). An event is defined before any outcome is known; what follows is the consequence side. Layer 1; the bowtie top event |
+| **Event** | A happening, not a condition: the separation margin between energy and people, in distance, time or headroom, shrinks toward zero because the energy changes (an *excursion*) or the people do (an *incursion*). An event is defined before any outcome is known; SIF potential is assessed as if the separation had gone to zero. Layer 1; the bowtie top event |
 | **Evidential cycle** | A cycle the facts show happened, with the bridge to it evidenced in the narrative. The classifier's default scope |
 | **Excursion** | Energy going beyond its envelope in L, M or T |
 | **Exposure** | As a condition: energy (held, stored or available) and a person together in time and space, the person within reach, assessed **without regard to controls**. As a quantity: that co-presence measured in context-specific units (person-hours, lifts, take-offs, km), the denominator of the risk formula. Not the same as EEI's "Exposure", which is a high-energy hazard *without* a direct control (our exposure + control absent) |
@@ -933,7 +960,7 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **M, L, T** | Magnitude, length (space and separation), time: the three dimensions of the envelope |
 | **Margins m, l, t** | Dimensionless ratios of actual to design value: m = magnitude / design magnitude; l = separation / required separation; t = presence outside the intended window. Excursion or incursion when m > 1, l < 1 or t > 0 |
 | **Micromort** | A one-in-a-million chance of death, quoted per unit of an activity (Howard; Spiegelhalter). Layer 2's P(death) scale lets expected micromorts be computed as exposure × event rate × E[P(death) given the event] |
-| **Near miss** | An event in which nobody was hurt (ISO 45001 Note 2; HSG245). The difference from SIF actual "lies only in the result" (ICAO Annex 13). Exposure alone is not a near miss |
+| **Near miss** | An event whose closest approach was *close* but not contact, or reached *contact* without harm: in OSHA's words, "given a slight shift in time or position" injury could have occurred. An excursion to unoccupied space is an event but not a near miss. As ICAO puts it, the difference from an accident "lies only in the result". Exposure alone is not a near miss (ISO 45001 Note 2; HSG245) |
 | **Outcome P** | The distribution of severity given the energy reaches a person. Layer 2 models this |
 | **P(serious)** | Classifier output (`sif_p_sif`): probability that the outcome is serious or worse, from the calibrated band distribution |
 | **Passive control** | (CCPS; IAEA) A control that acts by its presence, "without the active functioning of any device" (Hendershot, 2012), but can still fail: bunds, guards, blast walls, fire insulation. Relief valves and bursting discs are passive with moving parts (IAEA category C). "Passive safety is not the same as inherent safety" (Kletz) |
@@ -943,6 +970,8 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Residual SIF potential** | The outcome distribution with controls as they were or as designed. Each control has an effectiveness distribution including degraded and absent states, combined by Monte Carlo (the simulator); P(serious \| controls) is read from its CDF. Compare *inherent SIF potential* |
 | **Risk** | Exposure × chance per unit of exposure × consequence |
 | **Scoping statement** | The statement that frames a SIF assessment before it starts, as for a HAZID/HAZOP study: the sources (cycles) in scope, the bridges to follow, and whether counterfactual cycles are included |
+| **Separation margin** | What keeps energy and people apart: distance, time, or headroom to the design limit. An event shrinks it toward zero |
+| **Separation to zero** | The SIF potential counterfactual: assess as if the separation margin had gone to zero, so the energy reached a person |
 | **SIF** | Serious injury or fatality. As a classifier class: P(serious) ≥ 0.50, "most likely outcome is serious" |
 | **SIF actual (HSIF)** | An event in which a serious injury or fatality occurred |
 | **Source–path–target** | The energy-damage model (Gibson, Haddon): energy leaves a source, travels a path, reaches a target. Controls act at the source or on the path |

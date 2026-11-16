@@ -1,6 +1,6 @@
 # SIF definitions and coding rules
 
-Status: v1.3, 2026-11-16. This document states the definitions; the reasoning behind them is in [sif-definition-discussion.md](sif-definition-discussion.md).
+Status: v1.4, 2026-11-16. This document states the definitions; the reasoning behind them is in [sif-definition-discussion.md](sif-definition-discussion.md).
 
 ## Contents
 
@@ -44,8 +44,10 @@ Status: v1.3, 2026-11-16. This document states the definitions; the reasoning be
 | **Excursion** | Energy going beyond its envelope: outside its space (where), beyond its magnitude (how much), or live when its intended state is zero (when) |
 | **Target envelope** | Where people are, when they are there, and how many (one person, a team, a public crowd). The counterpart of the energy's envelope |
 | **Incursion** | People entering the energy's envelope: where the energy is (opening a guard on a running machine), when it is live (on the range during the firing window), or in greater numbers than planned. The entry is an event; remaining there counts towards exposure, in the stratum where that control is absent. Entry under isolation, or at a time when the energy is not live, is not an incursion |
-| **Event** | The moment the preventive side of risk materialises: energy and people come together in where, when or how much. Either the energy changes (it is released, moves, becomes live or builds up: an *excursion*) or the people do (they enter where the energy is, are there when it is live, or are more than planned: an *incursion*). An event is defined before any outcome is known; what follows is the consequence side, assessed as SIF potential. See 2.3 |
-| **Near miss** | An event in which nobody was hurt. As ICAO puts it for accidents and serious incidents, the difference "lies only in the result". Exposure alone is not a near miss |
+| **Event** | A happening, not a condition: the separation margin between energy and people, in distance, time or headroom, shrinks toward zero because the energy changes (an *excursion*) or the people do (an *incursion*). An event is defined before any outcome is known; SIF potential is assessed as if the separation had gone to zero. See 2.3 |
+| **Near miss** | An event whose closest approach was *close* but not contact, or reached *contact* without harm: in OSHA's words, "given a slight shift in time or position" injury could have occurred. An excursion to unoccupied space is an event but not a near miss. As ICAO puts it, the difference from an accident "lies only in the result". Exposure alone is not a near miss |
+| **Separation margin** | What keeps energy and people apart: distance (where), time (when) or headroom to the design limit (how much). An event shrinks it toward zero |
+| **Closest approach** | How far the separation margin shrank during an event: *wide* (excursion to unoccupied space), *close* (near miss), or *contact* (the energy reached a person) |
 | **Cycle** | One energy source taken once through event, potential and control state. Cycles are bounded per source by default |
 | **Bridge condition** | A control failure or event in one cycle that sets the starting state of another, often by energy conversion (fuel → fire, motion → heat) |
 | **Evidential cycle** | A cycle the facts show happened |
@@ -54,7 +56,7 @@ Status: v1.3, 2026-11-16. This document states the definitions; the reasoning be
 
 ### 2.3 Events
 
-In the risk equation (risk = exposure × chance per unit of exposure × consequence), the event is where the **chance** term materialises. It is the bowtie's top event: the preventive side has not kept energy and people apart. SIF potential then assesses the **consequence** term, with chance P = 1.
+An event is a **happening**: the separation margin between energy and people shrinks toward zero. An exposure is a **condition**: the envelopes overlap and nothing changes. In the risk equation (risk = exposure × chance per unit of exposure × consequence), the event is where the **chance** term materialises. It is the bowtie's top event: the preventive side has not kept energy and people apart. SIF potential then assesses the **consequence** term, as if the separation had gone to zero.
 
 **Two envelopes.** The energy and the people (the target) each have an envelope in the same three dimensions:
 
@@ -64,7 +66,7 @@ In the risk equation (risk = exposure × chance per unit of exposure × conseque
 | **When** | When the energy is live: energised, operating, the firing window | When the people are there: the shift, the schedule, an entry |
 | **How much** | The magnitude of the energy | How many people: one person, a team, a public crowd |
 
-**Table 1. What makes an event.** An event is a change, on either side, that brings the two envelopes together.
+**Table 1. What makes an event.** An event is a change, on either side, that shrinks the separation between the two envelopes.
 
 | Dimension | **The energy changes** (excursion) | **The people change** (incursion) |
 |---|---|---|
@@ -73,6 +75,14 @@ In the risk equation (risk = exposure × chance per unit of exposure × conseque
 | **How much** | It builds up beyond its design: overpressure; overload; overspeed; a runaway reaction | More people than planned: a crowd gathers in the drop zone; a team works where one person was planned |
 
 An event can involve both sides at once: a person climbs past the edge protection and falls; an isolated system is re-energised while a fitter is inside the guard.
+
+**Table 2. Closest approach.** Every event has one. It places the event, but it does not change how SIF potential is assessed.
+
+| Closest approach | Case | Example |
+|---|---|---|
+| **Wide**: nobody near | Excursion to unoccupied space | Flyrock lands in an empty area; a load drops in a cleared drop zone |
+| **Close**: margin small, not zero | Near miss | Flyrock lands a metre from someone; the forklift stops short of the pedestrian |
+| **Contact**: margin zero | The energy reached a person, with or without harm. Risk usually measures this case | A person is struck by flyrock; the harness arrests a fall |
 
 **Not events**
 
@@ -83,7 +93,7 @@ An event can involve both sides at once: a person climbs past the edge protectio
 
 **Notes**
 
-- **The moment** is when the envelopes come together, even if the change was slow (snow load, rising pressure, a crowd gathering).
+- **The moment** is when the separation margin is lost, even if the change was slow (snow load, rising pressure, a crowd gathering).
 - **The number of people does not change SIF potential**, which is judged per person. It multiplies the exposure (person-hours) and the number of people who could be harmed in one event (the multiple-casualty, societal-risk view; ICMM's material unwanted event).
 
 ### 2.4 Outcomes and potential
@@ -92,7 +102,7 @@ An event can involve both sides at once: a person climbs past the edge protectio
 |---|---|
 | **Serious outcome** | A life-ending, life-threatening or life-altering injury (LIFE model; Bayona et al., 2023) |
 | **P(serious)** | The probability that the outcome is serious or worse, read from the outcome distribution of the chosen energy band |
-| **Chance P** | The probability that the energy reaches a person. Set to 1 when assessing potential |
+| **Separation to zero** | The counterfactual used to assess SIF potential: assume the separation margin went to zero, so the energy reached a person. (Earlier drafts called this "chance P = 1") |
 | **SIF potential (distribution)** | The outcome distribution if the energy had reached a person with no protective control between them. Compare *residual SIF potential* |
 | **Residual SIF potential** | The outcome distribution with the controls as they were, or as designed, each including its degraded and absent states. It is produced by the simulator |
 | **SIF (class)** | P(serious) ≥ 0.50: the most likely outcome is serious |
@@ -131,7 +141,7 @@ An event can involve both sides at once: a person climbs past the edge protectio
 
 ### 3.2 Assessment rules
 
-1. **Chance P = 1.** For a reported event, the energy is assumed to have reached a person.
+1. **Separation to zero.** For a reported event, assess as if the separation margin had gone to zero: the energy reached a person, whatever the closest approach was.
 2. **Controls are set aside** when assessing potential: active, passive, procedural and PPE alike. Credit for controls comes only through the residual distribution.
 3. **Not controls**: the source's containment, its inherent features, the default receiving environment (a concrete floor, rebar), and the person's own body.
 4. **Assess the energy state at the time**, whatever its history. For a build-up, assess the level the energy would reach with no control acting, up to the source's physical limit, starting from the state as found at the cycle's boundary.
@@ -282,7 +292,7 @@ None of these contradicts the fractalaw event. ISO 31000 and ISO 45001 are broad
 
 - **You need:** the event narrative, Annex A (mechanisms) and Annex B (bands).
 - **Apply these throughout:**
-  - **Chance P = 1.** Assume the energy reached a person, whether or not anyone was hit.
+  - **Separation to zero.** Assess as if the separation had gone to zero and the energy reached a person, whether or not anyone was hit.
   - **Ignore all controls when judging potential.** Guardrails, harnesses, PPE, LOTO, interlocks, exclusion zones, training, evasive action and luck all count for nothing at that step.
   - **Do count** the default environment (the surface someone would land on, nearby edges and rebar) and the body region at risk.
   - **Use only facts in the report.** Don't imagine controls that weren't there, or energy that wasn't there.
@@ -302,7 +312,12 @@ Work through steps 1–7 once **for each energy source** the report shows was in
 - **The energy changed (excursion):** it was released, moved, became live or built up. Examples: a dropped load, flyrock beyond the zone, a fall from height, a re-energised isolated circuit, overpressure.
 - **The people changed (incursion):** they entered where the energy was, were there when it was live, or were more than planned. Examples: reaching past a guard on a running machine, walking into a segregated route, being in the range during firing.
 
-If yes, it is an **event**. Record excursion, incursion or both, and the dimension (where, when, how much), then go to step 4.
+If yes, it is an **event**. Record:
+- excursion, incursion or both;
+- the dimension (where, when, how much);
+- the **closest approach** (wide, close, contact; Table 2).
+
+Then go to step 4. The closest approach is recorded for learning and reporting; it does not change the potential.
 
 If no:
 - **The envelopes overlap with nothing changing:** record **SIF exposure** if the energy would have SIF potential (assess it with steps 4–5). **Stop: not an event, not a PSIF.**
@@ -354,6 +369,7 @@ Training, rules, signs, generic PPE, evasive action and luck are **not** direct 
 |---|---|
 | Source | Energy source and type |
 | Event type | Excursion, incursion or both, with the dimension (where, when, how much); or *exposure only*; or *no event* |
+| Closest approach | Wide, close or contact |
 | Mechanism / band | From Annexes A and B |
 | Stated magnitude | Height, voltage, speed, mass or temperature, if given |
 | P(serious) and class | From Annex B |
