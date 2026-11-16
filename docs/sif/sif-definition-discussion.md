@@ -1,6 +1,6 @@
 # Defining SIF: a discussion draft
 
-Status: draft v0.5, 2026-11-16. A starting point to polish, not a settled position.
+Status: draft v0.6, 2026-11-16. A starting point to polish, not a settled position.
 
 ## Contents
 
@@ -251,12 +251,31 @@ These are excursions in the **magnitude** dimension: clause **(c)** of the event
 
 Consistency with the control-blind rule gives the answer. **Assess the energy the build-up would reach if no control acted, up to the source's inherent physical limit.** That limit is the inventory, fuel or reactant quantity, maximum pump head, failure pressure of the containment, or stored kinetic energy at the maximum possible speed. It is the build-up counterpart of chance P = 1. It is still bounded by physics, so it avoids EEI's concern about "creative" what-ifs: the analyst may not imagine energy that isn't there, only let the energy that is there run to its limit.
 
-**Inherent features versus controls.** Build-ups make it pressing to say where the source ends and the controls begin. Proposed rule, following Kletz's inherently safer design and the independent protection layers of LOPA (references to check):
+**Inherent features versus controls.** Build-ups make it pressing to say where the source ends and the controls begin. The first draft's test was "no failure mode, no demand". Checked against the inherent-safety literature, its two halves match two different categories:
 
-- A feature is **part of the source** if it has no failure mode and needs no demand or action: a negative temperature coefficient in a reactor, a pump's dead-head pressure, a reduced inventory, a weaker reagent. It changes the potential.
-- A feature is a **control** if it has to act, and can fail: control rods, trips, relief valves, bursting discs, quench and dump systems, load-moment cut-outs, overspeed trips. It is layer 3.
+- **"Needs no demand or action"** is how CCPS and the IAEA define **passive** safety: "without the active functioning of any device" (Hendershot, 2012); "does not need any external input to operate" (IAEA-TECDOC-626).
+- **"Has no failure mode"** is how the IAEA defines **inherent** safety: "an inherent safety characteristic is not subject to failure of any kind" (IAEA-TECDOC-626 §2.2).
 
-This matches the hierarchy of controls: elimination and substitution change the source, and so change the potential; everything below them is a control.
+Requiring both halves rightly puts bunds, blast walls, fire insulation and fixed guards on the *control* side. They need no demand, but they can fail. The sources agree on this:
+
+- Kletz (1991): "Passive safety is not the same as inherent safety … Fire insulation is passive, as it does not have to be commissioned, but it is not inherently safe as it can fall off or be removed for maintenance and not replaced."
+- Hendershot: a dike "can fail – dikes can crack, leak, be full of water".
+- ISO 12100 3.20 defines inherently safe design measures as working "without the use of guards or protective devices".
+
+The research also found two weaknesses in the wording:
+
+1. **"Demand" clashes with LOPA and IEC 61511 usage.** In LOPA a bund *is* demanded (by the spill) and has a probability of failure on demand. The distinction we want is that a source feature acts **all the time in normal operation**, while a passive control is called on only after a deviation.
+2. **"No failure mode" is too absolute.** A reactor's negative temperature coefficient is a property of the source, but it depends on the operating state (it can be near zero early in a fuel cycle, and the RBMK's positive void coefficient is the counter-example). Kletz's *limitation of effects* ("limiting the amount of energy available") covers it, and pump dead-head pressure, as magnitude limits rather than elimination. The better test is that the feature **can be lost only by changing the source itself**.
+
+**Revised test (Q1d, answered):**
+
+- A feature is **part of the energy source** when it is a property of the source's own materials, quantity, operating conditions or physics. It is in effect throughout normal operation, without detection, actuation, external power or human action, and it can be lost only by changing the source itself (a different material, a larger inventory, new operating conditions, a changed configuration). Its effect is judged for a named hazard within the stated operating envelope: "inherently *safer*", never absolutely safe (CCPS; IAEA-TECDOC-626). Examples: a reduced inventory, a weaker reagent, a pump's dead-head pressure, a reactor's negative temperature coefficient. It changes the potential (layer 2).
+- A feature is a **control** when it is added to act on the source or on the path to people, and it can degrade, be defeated or be overwhelmed while the source stays unchanged. It is layer 3. Controls come in three kinds (the CCPS strategy categories):
+  - **active**: they detect and respond. Trips, interlocks, safety instrumented functions, quench and dump systems, load-moment cut-outs.
+  - **passive**: they act by their presence once a deviation has occurred. Bunds, guards, blast walls, fire insulation. Relief valves and bursting discs are passive with moving parts (IAEA category C). Gravity-drop control rods on a fail-safe trip are passive execution with active initiation (IAEA category D).
+  - **procedural**: they depend on people following a procedure. LOTO, permits, exclusion-zone sentries.
+
+This matches the hierarchy of controls. NIOSH: "Elimination removes the hazard at the source. Substitution is using a safer alternative to the source of the hazard." These change the source and so change the potential; everything below them is a control. It also matches CDM 2015 reg. 9: designers "eliminate, so far as is reasonably practicable, foreseeable risks", and only then reduce or control.
 
 ### Refinement: the envelope in Mass, Length, Time
 
@@ -356,7 +375,7 @@ Both "excursion" and "incursion" are already in use in neighbouring fields:
 
 Exposures are observable before anything happens (HECA, BST's precursor "if allowed to continue", Appendix A's line-of-fire condition). Events are what the classifier reads in incident narratives.
 
-**When the target moves.** Earlier wording ("the energy converges on the person") was imprecise when it is the *person* who moves, toward a moving vehicle or into running machinery. "How near is near?" had no answer. Making the **incursion** the event gives one: the entry into the danger zone, whose boundary the plan defines (exclusion zone, segregated route, machine guarding perimeter; ISO 12100's "danger zone", wording to check). It works the same for vehicles and machinery. Where the plan defines no zone, only a change of energy state can make the event. Who should define zones is parked (Q1a).
+**When the target moves.** Earlier wording ("the energy converges on the person") was imprecise when it is the *person* who moves, toward a moving vehicle or into running machinery. "How near is near?" had no answer. Making the **incursion** the event gives one: the entry into the danger zone, whose boundary the plan defines (exclusion zone, segregated route, machine guarding perimeter; ISO 12100 3.11 "hazard zone / danger zone: any space within and/or around machinery in which a person can be exposed to a hazard"). It works the same for vehicles and machinery. Where the plan defines no zone, only a change of energy state can make the event. Who should define zones is parked (Q1a).
 
 **Near miss.** That gives a definition: **a near miss is an event (a change of energy state, an excursion or an incursion) in which nobody was hurt.** Exposure alone is not a near miss. Common definitions describe a near miss as an event where "given a slight shift in time or position" injury could have occurred (NSC/OSHA usage, to check). That is a statement about the T and L margins at the moment of the event. A **PSIF** is a near miss with SIF potential and no effective direct control.
 
@@ -555,7 +574,7 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 > - *Exposure*: a condition, not an event. Energy (held, stored or available) and a person are together in time and space, the person within reach, assessed without regard to controls.
 > - *Intended envelope*: bounds on the energy in magnitude (M: how much there may be), length (L: where it may be, and its required separation from people; for an intentional release, the release zone such as a blast exclusion zone, range danger area or relief discharge area) and time (T: when it may be present). An *excursion* is energy going beyond any one of them; an *incursion* is a person entering the envelope.
 > - *Energy state*: potential is assessed on the energy present at the time, whatever its history. For a build-up, on the energy it would reach with no control acting, up to the source's inherent physical limit.
-> - *Protective control*: anything that must act, and can fail, to prevent, limit or redirect the energy or to keep it from a person. Containment of the source, inherent features of the source that need no demand (e.g. a negative temperature coefficient), the default environment and the person's own body are not controls.
+> - *Protective control*: anything added to act on the source or on the path to people (actively, passively or procedurally) that can degrade, be defeated or be overwhelmed while the source stays unchanged. Containment of the source, inherent features of the source (properties in effect throughout normal operation that can be lost only by changing the source, e.g. a reduced inventory or a negative temperature coefficient), the default environment and the person's own body are not controls.
 > - *More likely than not*: P(serious outcome) ≥ 0.50, from the calibrated outcome distribution. A lower policy threshold (≥ 0.10) marks *elevated* potential.
 > - *Life-ending, life-threatening, life-altering*: as in the LIFE model (Bayona et al., 2023).
 >
@@ -579,7 +598,7 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 ### Answered in this draft
 
 - **Q1b + Q1c** (upstream steps; build-up limits). One circular problem, broken by analysing in **cycles**: control-blind within a cycle, the starting state taken as found at its boundary, and the investigator scoping evidential versus what-if cycles. See the cycles refinement in section 3.
-- **Q1d** ("no failure mode, no demand" as the test for an inherent feature). Accepted as the working definition of inherent safety / safety by design. Glossary wording to be anchored in the literature (CCPS, Kletz, IAEA, ISO 12100).
+- **Q1d** ("no failure mode, no demand" as the test for an inherent feature). Accepted as the working definition of inherent safety / safety by design, and restated after checking against Kletz, CCPS/Hendershot, IAEA-TECDOC-626 and ISO 12100. The feature is in effect throughout normal operation and can be lost only by changing the source; controls are active, passive or procedural. See "Inherent features versus controls" in section 3.
 - **Q1f** (exposure versus EEI's "Exposure"). Keep ours: it is the standard risk-formula meaning. Qualify EEI's as "Exposure (EEI)".
 - **Q1g** (convergence when the target moves). The **incursion** is the event: entry into a danger zone defined by the plan. This works for vehicles and machinery, and gives a definition of **near miss** (an event in which nobody was hurt). See the event/exposure refinement.
 
@@ -611,11 +630,11 @@ These belong to a later design specification that wraps the model (risk-control 
 - Viner (1991) "uncontrolled flow of energy" wording is unverified.
 - Origin of the energy wheel graphic is unverified.
 - **Units:** EEI's "500 ft-lbs" is about 680 J, *not* 1,500 J. EEI's own documents use both figures, so they are not a unit conversion. Our docs should state which one we mean wherever we cite either.
-- ISO 12100 "danger zone" / "hazard zone" wording and the NSC/OSHA near-miss definition ("a slight shift in time or position") are cited from memory. Check both.
+- The NSC/OSHA near-miss definition ("a slight shift in time or position") are cited from memory. Check both.
 - Chemical exposure (TWA against workplace exposure limits) and EMF/ionising radiation metrics (reference levels, dose) are named as established exposure metrics without references.
 - Micromort figures (e.g. about 1 per 250 miles of UK driving), the FAR definition (per 10⁸ exposed hours) and *microlife* are cited from memory. Check them against Spiegelhalter & Blastland (2013) and Kletz before quoting.
 - Hopkinson–Cranz cube-root scaling and the radiation-protection triad (time, distance, shielding) are cited as standard practice. Add a primary reference for each (e.g. Baker, *Explosions in Air*; ICRP).
-- Kletz (inherently safer design) and CCPS LOPA (independent protection layers) are cited from memory for the inherent-feature vs control test. Check the wording before relying on it.
+- Inherent-safety sources: quotes from Kletz (1991), Hendershot (2012), the CCPS Beacon (2010), IAEA-TECDOC-626, the IAEA Glossary (2018), ISO 12100 (preview), NIOSH and CDM 2015 were read verbatim. Not verified: the wording of the CCPS *Inherently Safer Chemical Processes* (2009) book, the text of Kletz (1978), and direct wording from Kletz & Amyotte (2010). Also unverified: the verbatim LOPA (2001) IPL definition, the IEC 61511/61508 demand-mode and SIF definitions, ISO 12100 clause 6.1 and the ANSI/ASSP Z590.3 definition. The NTC operating-state caveat is the research agent's own observation; check it with a nuclear source.
 - "Excursion" (CCPS safe operating limits) and "incursion" (ICAO runway incursion) are cited as established usage from memory. Check both before relying on the parallel.
 - API RP 754: check the exact Tier 1/2 treatment of pressure-relief discharges and the Tier 3 "demands on safety systems" wording (taken from memory, not yet checked in this review).
 - BST precursor wording: Krause (2010) says "could reasonably result … if allowed to continue or repeat". The firmer "will result" is Martin & Black (2015). Quote the right one.
@@ -742,15 +761,17 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 
 | Term | Meaning |
 |---|---|
+| **Active control** | (CCPS) A control that detects and responds: trips, interlocks, safety instrumented functions, sprinklers, quench and dump systems. Compare *passive control*, *procedural control* |
 | **Active energy** | Energy that is moving, flowing or being released (a moving vehicle, a falling load, a blast). Descriptive; it does not by itself make an event. Compare *stored energy* |
 | **Bridge condition** | A link from one cycle to the next: a control failure or event in one cycle that sets the starting state of another, often by energy conversion (fuel → motion, fuel or battery → fire, motion → heat) |
 | **Capacity** | (EEI SCL) A high-energy release with an effective direct control present and no serious injury: the control did its job. Not a PSIF under EEI |
 | **Chance P** | The probability that the energy reaches a person at all. SIF potential sets chance P = 1 |
 | **Chance per unit exposure** | In the risk formula, the probability (rate) of a harmful event per unit of exposure (per hour, per lift, per take-off). Driven by controls |
 | **Containment** | What holds energy in its intended state (pipe wall, cable insulation, vessel). Part of the source, not a control; release is escape from it |
-| **Control (protective control)** | Anything that must act, and can fail, to prevent, limit or redirect the energy or keep it from a person. Classified as an M, L or T control. Compare *inherent feature* |
+| **Control (protective control)** | Anything added to act on the source or on the path to people that can degrade, be defeated or be overwhelmed while the source stays unchanged. Active, passive or procedural (CCPS); also classed as an M, L or T control. Compare *inherent feature* |
 | **Cycle** | One energy source analysed through all three layers once (envelope, exposure, event, potential, control state). Cycles chain through bridge conditions; each is *evidential* (facts show it happened) or *what-if* (counterfactual, labelled) |
-| **Danger zone** | An area within reach of an energy that the plan keeps clear of people (ISO 12100 sense for machinery, to check). Entry is an incursion |
+| **Danger zone** | An area within reach of an energy that the plan keeps clear of people. For machinery, ISO 12100 3.11: "any space within and/or around machinery in which a person can be exposed to a hazard". Entry is an incursion |
+| **Demand** | (LOPA, IEC 61511) A deviation that calls on a protection layer to act; even passive barriers (a bund) are demanded and have a probability of failure on demand. Not the test for an inherent feature |
 | **Direct control** | (EEI) A control targeted to the high-energy source, effective when installed, verified and used properly, and effective even with unintentional human error. Training, rules, signs and generic PPE are excluded |
 | **Elevated** | Classifier class: P(serious outcome) ≥ 0.10 and < 0.50; "credibly serious" |
 | **Elimination** | Removing the energy from the source (supply disconnected and removed, system drained and vented, stored energy discharged). Changes the source and ends exposure. Compare *isolation* |
@@ -762,9 +783,12 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **HECA** | (EEI/CSRA) High-Energy Control Assessment: the share of observed high-energy hazards with a direct control in place, Success / (Success + Exposure) |
 | **High energy** | (EEI) Over 500 ft-lbs (about 680 J); Hallowell et al. (2017) use > 1,500 J for "most likely a SIF". Not the same threshold |
 | **Incursion** | An event: a person entering a danger zone, an area within reach of the energy that the plan keeps clear (exclusion zone, segregated route, drop zone, machine danger zone). Remaining there is exposure |
-| **Inherent feature** | A property of the source with no failure mode that needs no demand (e.g. a negative temperature coefficient, pump dead-head pressure, reduced inventory). Part of the source; changes the potential |
+| **Inherent feature** | A property of the source's own materials, quantity, operating conditions or physics. It is in effect throughout normal operation without detection, actuation, power or human action, and can be lost only by changing the source (e.g. a reduced inventory, pump dead-head pressure, a negative temperature coefficient). Part of the source; changes the potential. Judged for a named hazard within the operating envelope |
+| **Inherent safety** | "The achievement of safety through the elimination or exclusion of inherent hazards through the fundamental conceptual design choices" (IAEA-TECDOC-626). In process safety, "eliminate or greatly reduce the hazard by changing the process to use materials and conditions that are nonhazardous or much less hazardous" (Hendershot, 2012). Kletz: "what you don't have, can't leak" |
 | **Inherent SIF potential** | Layer 2: the outcome distribution if the energy reached a person with no protective control between them, assessed on the energy state at the time (or the uncontrolled limit of a build-up) |
-| **Isolation** | A control that holds energy away from the work (isolator, LOTO, immobilisation). It has failure modes, so the energy is still present and the person still exposed. Compare *elimination* |
+| **Inherently safe design measure** | (ISO 12100 3.20, machinery) "protective measure which either eliminates hazards or reduces the risks associated with hazards by changing the design or operating characteristics of the machine without the use of guards or protective devices" |
+| **Inherently safer design** | (CCPS) "The process of identifying and implementing inherent safety in a specific context". Always comparative: "A technology can only be described as inherently safer when compared to a different technology". Kletz's principles: intensification, substitution, attenuation, limitation of effects, simplification |
+| **Isolation** | A control that holds energy away from the work (isolator, LOTO, immobilisation). It has failure modes, so the energy is still present and the person still exposed. A procedural control in CCPS terms. Compare *elimination* |
 | **Layer 1, 2, 3** | Event; inherent SIF potential; control state |
 | **LIFE** | (Bayona et al., 2023) Life-ending, life-threatening, life-altering: the three-part definition of a serious outcome |
 | **Line of Fire** | (IOGP and others) Shop-floor term for being in the path of energy; in our terms, an incursion. See Appendix A |
@@ -774,6 +798,9 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Near miss** | An event (change of energy state, excursion or incursion) in which nobody was hurt. Exposure alone is not a near miss |
 | **Outcome P** | The distribution of severity given the energy reaches a person. Layer 2 models this |
 | **P(serious)** | Classifier output (`sif_p_sif`): probability that the outcome is serious or worse, from the calibrated band distribution |
+| **Passive control** | (CCPS; IAEA) A control that acts by its presence, "without the active functioning of any device" (Hendershot, 2012), but can still fail: bunds, guards, blast walls, fire insulation. Relief valves and bursting discs are passive with moving parts (IAEA category C). "Passive safety is not the same as inherent safety" (Kletz) |
+| **Prevention through Design (PtD)** | (NIOSH) "addressing occupational safety and health needs in the design process to prevent or minimize the work-related hazards and risks associated with the construction, manufacture, use, maintenance, and disposal of facilities, materials, and equipment". US counterpart of the CDM 2015 designers' duty |
+| **Procedural control** | (CCPS) A control that depends on people following procedures: operating procedures, LOTO, permits, training, emergency response |
 | **PSIF (SIF precursor)** | An event with SIF potential, no serious injury, and no effective direct control (absent, failed or not stated). Close to EEI's PSIF and BST's precursor |
 | **Risk** | Exposure × chance per unit of exposure × consequence |
 | **SIF** | Serious injury or fatality. As a classifier class: P(serious) ≥ 0.50, "most likely outcome is serious" |
@@ -786,40 +813,50 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 
 ## References
 
+- ANSI/ASSP Z16.1-2022. *Safety and Health Metrics and Performance Measures*. ASSP.
 - API RP 754 (3rd ed., 2021). *Process Safety Performance Indicators for the Refining and Petrochemical Industries*. American Petroleum Institute. (edition and wording to check)
+- ASTM E2920-26 (2026). *Standard Guide for Recording Priority Occupational Injuries and Illnesses and SIF-Related …* https://store.astm.org/e2920-26.html
 - Baker, S.P. & Haddon, W. Jr. (1974). Reducing injuries and their results: the scientific approach. *Milbank Memorial Fund Quarterly: Health and Society*, 52(4), 377–389.
 - Bayona, A., Bhandari, S., Hallowell, M., Sherratt, F., Bailey, J.M. & Upton, J. (2023). What is a serious injury? A model for defining serious injuries & fatalities. *Professional Safety*, 68(9). https://www.assp.org/docs/default-source/psj-articles/f1bayona_0923.pdf
+- BSEE (2023). *Safety Alert 468: Red Zone Hazards Pose Increased Risk to Personnel During Lifting Operations*. Bureau of Safety and Environmental Enforcement.
 - Campbell Institute (2018). *Serious Injury and Fatality Prevention: Perspectives and Practices*. National Safety Council.
 - Campbell Institute (2020). *Designing Strategy for Serious Injury and Fatality Prevention*. National Safety Council.
 - Campbell Institute (2022). *SIF Prevention: Leading Indicators, Cumulative Risk, and Safety Networks*. National Safety Council.
-- BSEE (2023). *Safety Alert 468: Red Zone Hazards Pose Increased Risk to Personnel During Lifting Operations*. Bureau of Safety and Environmental Enforcement.
-- ConocoPhillips (2025). *Life Saving Rules Standard*. https://static.conocophillips.com/files/resources/life-saving-rules-standard.pdf
-- Energy Safety Canada. *Line of Fire Program*. https://www.energysafetycanada.com/resource/line-fire-program
-- ASTM E2920-26 (2026). *Standard Guide for Recording Priority Occupational Injuries and Illnesses and SIF-Related …* https://store.astm.org/e2920-26.html
-- ANSI/ASSP Z16.1-2022. *Safety and Health Metrics and Performance Measures*. ASSP.
 - CCPS (2001). *Layer of Protection Analysis: Simplified Process Risk Assessment*. Center for Chemical Process Safety / AIChE. (independent protection layer definition to check)
+- CCPS (2010). Passive safety devices. *Process Safety Beacon*, July 2010. https://www.aiche.org/sites/default/files/2010-07-Beacon-English.pdf
+- CDM 2015. *Construction (Design and Management) Regulations 2015*, regulation 9 (duties of designers). https://www.legislation.gov.uk/uksi/2015/51/regulation/9
+- ConocoPhillips (2025). *Life Saving Rules Standard*. https://static.conocophillips.com/files/resources/life-saving-rules-standard.pdf
 - DOE-HDBK-1208-2012. *Accident and Operational Safety Analysis*. US Department of Energy.
 - Edison Electric Institute (2025). *SIF Criteria* (SCL model, Appendix 9).
+- Energy Safety Canada. *Line of Fire Program*. https://www.energysafetycanada.com/resource/line-fire-program
 - Haddon, W. Jr. (1973). Energy damage and the ten countermeasure strategies. *Journal of Trauma*, 13(4), 321–331. doi:10.1097/00005373-197304000-00011
-- Hallowell, M.R., Alexander, D. & Gambatese, J.A. (2017). Energy-based safety risk assessment: does magnitude and intensity of energy predict injury severity? *Construction Management and Economics*, 35(1–2), 64–77. doi:10.1080/01446193.2016.1274418
+- Hallowell, M. & Oguz Erkal, E.D. (2024). *High-Energy Control Assessments (HECA)*. Edison Electric Institute. https://cms.eei.org/-/media/Project/EEI/Documents/Issues-and-Policy/Power-to-Prevent-SIF/EEI-HECA.pdf
 - Hallowell, M. (2020, rev. 2024). *Safety Classification and Learning (SCL) Model*. Edison Electric Institute. https://cms.eei.org/-/media/Project/EEI/Documents/Issues-and-Policy/Power-to-Prevent-SIF/eeiSCLmodel.pdf
 - Hallowell, M.R. & Spencer, C. (2024). Safety Classification & Learning Model: defining & classifying potential serious injuries & fatalities. *Professional Safety*, 69(2). https://assp.org/docs/default-source/psj-articles/f1hallowellspencer_0224.pdf
-- Hallowell, M. & Oguz Erkal, E.D. (2024). *High-Energy Control Assessments (HECA)*. Edison Electric Institute. https://cms.eei.org/-/media/Project/EEI/Documents/Issues-and-Policy/Power-to-Prevent-SIF/EEI-HECA.pdf
+- Hallowell, M.R., Alexander, D. & Gambatese, J.A. (2017). Energy-based safety risk assessment: does magnitude and intensity of energy predict injury severity? *Construction Management and Economics*, 35(1–2), 64–77. doi:10.1080/01446193.2016.1274418
+- Hendershot, D.C. (2012). Inherently safer design: the fundamentals. *Chemical Engineering Progress*, January 2012. AIChE/CCPS. https://www.aiche.org/sites/default/files/cep/20120140-1.pdf
+- Howard, R.A. (1980). On making life and death decisions. In R.C. Schwing & W.A. Albers (eds), *Societal Risk Assessment: How Safe Is Safe Enough?* Plenum. (micromort origin; to check)
+- IAEA (1991). *IAEA-TECDOC-626: Safety Related Terms for Advanced Nuclear Plants*. https://www-pub.iaea.org/MTCD/Publications/PDF/te_626_web.pdf
+- IAEA (2018). *IAEA Safety Glossary*, 2018 ed. https://www-pub.iaea.org/MTCD/publications/PDF/PUB1830_web.pdf
 - ICMM (2015). *Critical Control Management: Implementation Guide*. International Council on Mining and Metals.
 - IOGP (2018). *Report 459: IOGP Life-Saving Rules*, v3.0. International Association of Oil & Gas Producers. https://www.iogp.org/life-savingrules/
 - IOGP (2025). *Life-Saving Rules: Line of Fire – Introduction to Supporting Materials*. https://www.iogp.org/wp-content/uploads/2025/10/IOGP-Life-Saving-Rules-Line-of-Fire-Introduction-to-Supporting-Materials.pdf
+- ISO 12100:2010. *Safety of machinery – General principles for design – Risk assessment and risk reduction*. ISO.
 - Johnson, W.G. (1980). *MORT Safety Assurance Systems*. Marcel Dekker.
-- Howard, R.A. (1980). On making life and death decisions. In R.C. Schwing & W.A. Albers (eds), *Societal Risk Assessment: How Safe Is Safe Enough?* Plenum. (micromort origin; to check)
-- Kletz, T. (1999). *Hazop and Hazan: Identifying and Assessing Process Industry Hazards*, 4th ed. IChemE. (FAR; edition to check)
+- Kletz, T. (1978). What you don't have, can't leak. *Chemistry & Industry*, 287–292.
+- Kletz, T. (1991). Inherently safer plants – recent progress. *IChemE Symposium Series* No. 124 (Hazards XI). https://www.icheme.org/media/10434/xi-paper-14.pdf
 - Kletz, T. (1991, 2nd ed. 2010 with Amyotte). *Process Plants: A Handbook for Inherently Safer Design*. (edition to check)
+- Kletz, T. (1999). *Hazop and Hazan: Identifying and Assessing Process Industry Hazards*, 4th ed. IChemE. (FAR; edition to check)
 - Krause, T.R. (2010). *New Findings on Serious Injuries and Fatalities*. BST.
 - La Duke, P. (2013). Working in the line of fire. *ISHN*, 22 August 2013.
 - Manuele, F.A. (2008). Serious injuries & fatalities: a call for a new focus on their prevention. *Professional Safety*, 53(12), 32–39.
 - Manuele, F.A. (2013). Preventing serious injuries & fatalities: time for a sociotechnical model for an operational risk management system. *Professional Safety*, 58(5).
 - Martin, D.K. & Black, A.A. (2015). Preventing serious injuries & fatalities: study reveals precursors & paradigms. *Professional Safety*, 60(9), 35–43.
+- National Academies (2012). *The Use and Storage of Methyl Isocyanate (MIC) at Bayer CropScience*, ch. on inherently safer processes. https://www.nationalacademies.org/read/13385/chapter/7
+- NIOSH. *Hierarchy of Controls*; *Prevention through Design*. https://www.cdc.gov/niosh/hierarchy-of-controls/about/index.html
 - Oguz Erkal, E.D. & Hallowell, M.R. (2023). Moving beyond TRIR: measuring & monitoring safety performance with high-energy control assessments. *Professional Safety*, 68(5), 26–35.
-- OSHA. *Construction Focus Four: Struck-By Hazards*, instructor guide. https://www.osha.gov/sites/default/files/struckby_ig.pdf
 - OSHA, 29 CFR 1904.39. Reporting fatalities, hospitalizations, amputations, and losses of an eye.
+- OSHA. *Construction Focus Four: Struck-By Hazards*, instructor guide. https://www.osha.gov/sites/default/files/struckby_ig.pdf
 - RIDDOR 2013, regulation 4 (specified injuries) and Schedule 2 (dangerous occurrences). https://www.legislation.gov.uk/uksi/2013/1471/regulation/4
 - Spiegelhalter, D. & Blastland, M. (2013). *The Norm Chronicles: Stories and Numbers About Danger*. Profile Books.
 - Viner, D. (1991). *Accident Analysis and Risk Control*. (wording unverified)
