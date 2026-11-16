@@ -1,6 +1,6 @@
 # Defining SIF: a discussion draft
 
-Status: draft v0.6, 2026-11-16. A starting point to polish, not a settled position.
+Status: draft v0.8, 2026-11-16. A starting point to polish, not a settled position.
 
 ## Contents
 
@@ -29,6 +29,7 @@ Status: draft v0.6, 2026-11-16. A starting point to polish, not a settled positi
   - [4.1 Where does the source end and the path begin?](#41-where-does-the-source-end-and-the-path-begin)
   - [4.2 Intentional releases and relief devices](#42-intentional-releases-and-relief-devices)
   - [4.3 Energy state and build-up cases](#43-energy-state-and-build-up-cases)
+  - [4.4 Controls in the outcome distribution (answering Q2)](#44-controls-in-the-outcome-distribution-answering-q2)
 - [5. A draft definition](#5-a-draft-definition)
 - [6. Consequences for the classifier if we adopt this](#6-consequences-for-the-classifier-if-we-adopt-this)
 - [7. Open questions](#7-open-questions)
@@ -429,26 +430,32 @@ Two questions from v0.4 turn out to be one problem.
 
 **Proposal: analyse in cycles.**
 
-- A **cycle** is one energy source (one energy type at one location) taken through the three layers once: envelope, exposure, event, potential and control state.
+- A **cycle** is one energy **source** taken through the three layers once: envelope, exposure, event, potential and control state. Per source is the default boundary. A source with several energy types (a vehicle has motion and fuel) is one source with several cycles only where a bridge is in scope.
 - Cycles **chain** through **bridge conditions**. The control failure or event of cycle A sets the starting state of cycle B. Energy conversion links cycles of different energy types (chemical → motion, chemical → thermal, motion → thermal).
 - **Within a cycle, layer 2 is control-blind. At the cycle's boundary, the starting state is taken as found.** The upstream controls that set it (a feed control limiting inventory, a governor limiting speed) belong to the upstream cycle. They are not set aside unless that cycle is opened.
 
 That breaks the circle: no control is both set aside and relied on within the same cycle.
 
-**The build-up limit, restated.** The uncontrolled limit is the limit *within the cycle under examination*, starting from the state as found (the batch as charged, the speed as governed). Asking "what if the feed control had failed too?" opens a further cycle, which must be labelled as such.
+**The build-up limit, restated.** The uncontrolled limit is the limit *within the cycle under examination*, starting from the state as found (the batch as charged, the speed as governed). Asking "what if the feed control had failed too?" opens a further cycle, which must be labelled as a **counterfactual**.
 
-**Scope is the investigator's choice.** Which cycles to examine depends on where the investigator wants to go:
+**Scope is the investigator's choice, stated up front.** This works like the **scoping statement** of a HAZID or HAZOP study, which frames the enquiry before it starts: the study boundary, the nodes, what is in and out. For a SIF assessment the scoping statement names:
+
+- the sources (cycles) in scope,
+- the bridges to follow,
+- whether counterfactual cycles are included.
+
+There are two kinds of cycle:
 
 - **Evidential cycles**: those the facts show happened, where the narrative evidences the bridge (the cooling did fail; the battery did ignite). These are precursors chained by evidence.
-- **What-if cycles**: counterfactual extensions (had the relief also failed; had the fuel ignited). They are legitimate in investigation and risk assessment, but must be labelled.
+- **Counterfactual cycles** (what-ifs): extensions the facts don't show (had the relief also failed; had the fuel ignited). They are legitimate in investigation and risk assessment, and are always labelled *counterfactual*.
 
-**Default for the classifier: evidential cycles only.** Each is assessed separately and the most serious is kept (EEI's per-energy-source rule). A what-if cycle needs an analyst. This keeps EEI's "facts only" discipline at the cycle boundary while staying control-blind within each cycle.
+**Default for the classifier.** The implicit scoping statement is: per source, evidential cycles only, no counterfactuals. Each cycle is assessed separately and the most serious is kept (EEI's per-energy-source rule). A counterfactual cycle needs an analyst, and appears in output with the label `counterfactual`. This keeps EEI's "facts only" discipline at the cycle boundary while staying control-blind within each cycle.
 
 | Narrative | Cycle A | Bridge | Cycle B | Default scope |
 |---|---|---|---|---|
 | Cooling-water pump trips on a batch reactor; temperature rises; the quench works | Cooling system (mechanical): control fails | Loss of cooling → heat accumulates | Runaway reaction (chemical → thermal, pressure). Limit = reactant inventory *as charged* | A and B, both evidential |
-| The same, and the analyst asks what if the batch had been overcharged | — | — | Inventory beyond the charge | What-if: analyst only, labelled |
-| Forklift strikes racking; no fire | Motion | — | Fuel fire would be a what-if | A only |
+| The same, and the analyst asks what if the batch had been overcharged | — | — | Inventory beyond the charge | Counterfactual: analyst only, labelled |
+| Forklift strikes racking; no fire | Motion | — | A fuel fire would be counterfactual | A only |
 | Electric vehicle damaged in a collision; smoke, then thermal runaway in the yard | Motion | Damage → cell short circuit | Battery (chemical → thermal) | A and B, both evidential |
 | Isolated circuit back-fed from a portable generator | Generator running outside the plan | Back-feed path | Work circuit energised (excursion in T) | A and B, both evidential |
 
@@ -470,7 +477,7 @@ Combining layers 2 and 3 recovers the vocabulary of the literature without chang
 |---|---|---|---|
 | SIF | any | Serious injury | **SIF actual** (HSIF) |
 | SIF | absent / failed | No serious injury | **SIF precursor / PSIF** |
-| SIF | effective direct control | No serious injury | **Capacity**: the control did its job |
+| SIF | effective direct control | No serious injury | **Control held** (EEI: Capacity): the control did its job. See 4.4 |
 | SIF | not stated | No serious injury | **PSIF (unverified controls)**: our current SIF flag |
 | not SIF | any | any | Low-severity (or LSIF if seriously injured) |
 
@@ -485,7 +492,7 @@ The same split applies to **exposures**, where nothing has happened. That is how
 What this buys us:
 
 - **The classifier stays control-blind.** That is intended, and it matches the narratives, which rarely say much about controls.
-- **The Campbell/EEI split becomes a reporting choice**, not a definitional one. "PSIF incl. Capacity" and "PSIF excl. Capacity" are two views of the same data.
+- **The Campbell/EEI split becomes a reporting choice**, not a definitional one. "PSIF including control-held events" and "PSIF excluding them" are two views of the same data. Section 4.4 goes further: credit for controls belongs in a residual outcome distribution, not a binary label.
 - **It matches the simulator split**: Product 2 models layer 3 (outcome-P controls on the path).
 - **It gives a HECA-style measure** when controls are known: the share of SIF-potential events with an effective direct control.
 - **It slots into the risk formula** (see the exposure-as-denominator refinement): exposure × event rate per unit (layer 3 drives the rate) × P(serious | event) (layer 2).
@@ -502,10 +509,10 @@ Worked boundary cases:
 
 | Case | Layer 1 event? | Layer 2 potential | Layer 3 control state |
 |---|---|---|---|
-| Fall from 6 m arrested by a harness | Yes (fall started) | SIF | Effective direct control → Capacity |
+| Fall from 6 m arrested by a harness | Yes (fall started) | SIF | Effective direct control → control held |
 | Worker at 6 m behind an intact guardrail, no slip | No event; **exposure** (person at height) | SIF (if a fall occurred) | Guardrail effective → EEI "Success" |
 | Guardrail missing, worker at 6 m, no fall | No event; **exposure** | SIF (if a fall occurred) | Control absent → EEI "Exposure"; BST precursor |
-| Scaffold board falls 20 m into an empty exclusion zone | Yes | SIF (chance P = 1) | Exclusion zone effective? → Capacity or PSIF |
+| Scaffold board falls 20 m into an empty exclusion zone | Yes | SIF (chance P = 1) | Exclusion zone effective? → control held or PSIF |
 | Electrician works on a conductor that LOTO has de-energised | No event; **exposure** (energy held behind the isolator) | Per voltage band | Isolation effective → EEI "Success" |
 | LOTO applied but stored hydraulic pressure releases | Yes | per band | Isolation failed → PSIF |
 | Struck on the hard hat by a 2 kg tool from 10 m | Yes | per band (head) | Hard hat is generic PPE, not a direct control (EEI) |
@@ -524,16 +531,16 @@ Using the envelope wording from section 3:
 | Live test firing; a range user enters the danger area during firing | Yes (b) | SIF | Range control failed → PSIF |
 | Live test firing; a round or ricochet lands outside the danger area | Yes (a) | SIF | Danger-area design or weapon/ammunition failure → PSIF |
 | Misfire: an unexploded charge or round remains after firing | Stored energy left where it was not meant to be (excursion in T). An **exposure** for anyone within reach; an event if it fires or is disturbed | Per charge / round | Misfire procedure is the control; handling the misfire is high-energy work |
-| Dust explosion in a silo; the explosion vent opens and discharges to a safe area | Yes: the deflagration itself is unwanted (it escaped containment) | SIF | Vent = effective mitigating control → **Capacity** |
+| Dust explosion in a silo; the explosion vent opens and discharges to a safe area | Yes: the deflagration itself is unwanted (it escaped containment) | SIF | Vent = effective mitigating control → **control held** |
 | Dust explosion; the vent discharges into an occupied area or walkway | Yes | SIF | Vent worked on the vessel but its discharge was outside a safe envelope → PSIF |
-| Boiler overpressure; the relief valve lifts and discharges to a safe point | Yes: the overpressure is an upset, the containment envelope was challenged | SIF (vessel rupture energy) | Relief valve = effective direct control → **Capacity**. API RP 754 would call this a demand on a safety system |
+| Boiler overpressure; the relief valve lifts and discharges to a safe point | Yes: the overpressure is an upset, the containment envelope was challenged | SIF (vessel rupture energy) | Relief valve = effective direct control → **control held**. API RP 754 would call this a demand on a safety system |
 | Relief valve lifts and discharges steam onto a walkway | Yes (a): the relief discharge is outside its intended envelope | per band (thermal / pressure at the discharge) | Relief design or discharge piping failed → PSIF |
 | Relief valve fails to lift (blocked or gagged), but the vessel holds | Yes: overpressure beyond design | SIF | Direct control failed; the vessel margin held, which is luck rather than a control → PSIF |
 | Planned blowdown or venting under a permit | No: inside the envelope | n/a | n/a |
 
 These cases expose three points that the first table didn't:
 
-1. **Relief devices are controls, not the event.** The upset (overpressure, deflagration) is the event; the relief device is a mitigating control that redirects energy into a safe envelope. A relief that works is Capacity. A relief whose own discharge reaches people is a second excursion.
+1. **Relief devices are controls, not the event.** The upset (overpressure, deflagration) is the event; the relief device is a mitigating control that redirects energy into a safe envelope. A relief that works is control held (EEI: Capacity). A relief whose own discharge reaches people is a second excursion.
 2. **Exclusion zones are separation controls on the path.** Whether one counts as an EEI *direct control* is unsettled. It is targeted and can be effective, but it depends on people (sentries, clearance checks), and EEI excludes controls that fail with unintentional human error. This feeds Q4.
 3. **Planned high-energy work needs the envelope gate**, or chance P = 1 floods the SIF class. For the classifier this means Pass 1 must recognise "planned release, nobody inside the envelope" as no event, which it currently doesn't attempt.
 
@@ -543,27 +550,67 @@ Clause (c) of the event, with build-ups assessed at their uncontrolled limit:
 
 | Case | Layer 1 event? | Layer 2 potential | Layer 3 control state |
 |---|---|---|---|
-| Reactor power excursion; control rods insert (scram) and power falls | Yes (c): magnitude beyond design | Assessed at the excursion's uncontrolled limit, which for a reactor is set by inherent feedback and fuel inventory. The negative temperature coefficient is part of the source | Rods / scram = effective direct control → **Capacity** |
+| Reactor power excursion; control rods insert (scram) and power falls | Yes (c): magnitude beyond design | Assessed at the excursion's uncontrolled limit, which for a reactor is set by inherent feedback and fuel inventory. The negative temperature coefficient is part of the source | Rods / scram = effective direct control → **control held** |
 | Reactor excursion; rods fail to insert, but inherent feedback limits power | Yes (c) | As above: the inherent feedback is already in the potential | Direct control failed → PSIF |
-| Runaway reaction in a batch reactor; quench or dump system works | Yes (c) | Reactant inventory → vessel rupture energy | Quench = effective control → **Capacity** |
+| Runaway reaction in a batch reactor; quench or dump system works | Yes (c) | Reactant inventory → vessel rupture energy | Quench = effective control → **control held** |
 | Runaway reaction; relief undersized; vessel ruptures, nobody hurt | Yes (c), then (a) | SIF | Relief failed → PSIF |
-| Crane lift beyond rated load; the load-moment indicator cuts out the hoist | Yes (c): overload | Collapse of crane and load | LMI = effective control → **Capacity** |
+| Crane lift beyond rated load; the load-moment indicator cuts out the hoist | Yes (c): overload | Collapse of crane and load | LMI = effective control → **control held** |
 | Crane overload with the LMI overridden; no collapse | Yes (c) | Collapse of crane and load | Control defeated → PSIF |
-| Turbine overspeed; the overspeed trip works | Yes (c) | Disc burst at the inherent limit (steam supply) | Trip = effective control → **Capacity** |
+| Turbine overspeed; the overspeed trip works | Yes (c) | Disc burst at the inherent limit (steam supply) | Trip = effective control → **control held** |
 | Electrician working on an isolated circuit; it is re-energised from another feed | Yes (c), "when": energy present when the intended state was zero | Per voltage band | Isolation failed (back-feed not identified) → PSIF |
 | Hydraulic system isolated; trapped pressure remains in an accumulator | No event; an **exposure** for anyone working on it (energy held in the accumulator). An event (c) if the pressure releases | Per pressure band | Isolation incomplete → PSIF |
 | Vehicle moving within its designated route, no pedestrian present | No: inside the envelope | n/a | n/a |
 | Pedestrian walks into a segregated vehicle route while vehicles move | **Exposure** (incursion). The entry is itself an event (b): an incursion. With no contact it is a near miss | Per speed and mass band | Segregation failed → PSIF |
-| Battery store; one cell starts thermal runaway, detected and isolated | Yes (c) | Store inventory (cascade to adjacent cells) | Detection and isolation = effective → **Capacity** |
+| Battery store; one cell starts thermal runaway, detected and isolated | Yes (c) | Store inventory (cascade to adjacent cells) | Detection and isolation = effective → **control held** |
 | Roof snow load beyond design; no collapse | Yes (c), slow build | Collapse | No control acting (snow clearing not done) → PSIF |
 
 Three points from these cases:
 
 1. **Upstream causes never change the potential.** The re-energised circuit scores the same whether the back-feed came from a generator, a wrong label or a contractor. The cause goes into layer 3.
-2. **Most build-up controls are trips and relief devices**, so build-up events with working controls usually come out as **Capacity**. That is the process-safety idea of a "demand on a safety system".
+2. **Most build-up controls are trips and relief devices**, so build-up events with working controls usually come out as **control held** (EEI: Capacity). That is the process-safety idea of a "demand on a safety system".
 3. **Slow build-ups have lead time.** Lead time affects whether people can get away (chance P), not how bad the outcome is if they don't. By the chance P = 1 rule it stays out of the potential. Evacuation is a control (layer 3).
 
 The last three cases in 4.1 don't depend on the layer model. They depend on which control definition we adopt (EEI direct control, or something broader). Open question Q4.
+
+### 4.4 Controls in the outcome distribution (answering Q2)
+
+Q2 asked whether to credit working controls (EEI's "Capacity") or to count barrier-saved events as PSIF (Campbell), and which should be the headline. Two points change the question.
+
+**"Capacity" is a misleading word.** In Safety-II and resilience engineering (Hollnagel; Woods's "adaptive capacity"), and in Human and Organizational Performance (Conklin: the capacity to fail safely), capacity is a property of people and systems: the ability to adapt and to absorb surprise. EEI uses the word for a single barrier that worked in a single event. That is much narrower, and readers from either tradition will hear the other meaning. EEI's HECA does draw on HOP; the Safety-II and HOP wording is still to check. This draft therefore says **control held**, with "(EEI: Capacity)" as a crosswalk.
+
+**PSIF is a counterfactual.** Calling a barrier-saved event a PSIF means imagining it without the controls it actually had. What matters is how that counterfactual is built:
+
+- **Campbell and DEKRA** build it by judgement ("if one thing had changed"). EEI showed this is unreliable: about 65% agreement among practitioners.
+- **EEI** refuses it, and credits the control as a yes/no.
+- **Our model** builds it by rule, and then models the controls separately.
+
+**What the classifier and the simulator already do:**
+
+1. **The classifier (layer 2) ignores controls by rule.** It builds the outcome distribution from the energy, the amplification mechanisms (carrier, receiving environment, body region) and a range of outcomes, then tests P(serious) against a threshold the company sets. That is the counterfactual "all controls absent", fixed by physics rather than imagined, so it is reproducible. This is the **inherent SIF potential**.
+2. **The simulator (Product 2; see [monte-carlo-and-swiss-cheese.md](monte-carlo-and-swiss-cheese.md) and [controls-cost-benefit.md](controls-cost-benefit.md)) adds the controls.** Each control gets a metalog effectiveness distribution, drawn from the mitigation library (`data/sif/calibration/mitigations/`) or a job hazard analysis. Monte Carlo trials combine these with the inherent severity distribution to give a **residual** (controlled) outcome distribution. The trials include degraded and absent states: the trial where the escape route is blocked, and correlated degradation from a shared cause such as deferred maintenance. So the probability that the controls fail is *inside* the residual CDF.
+
+The barrier-saved question is then answered by the CDF, not by a label. Take a fall arrested by a harness:
+
+- Its **inherent** P(serious) is high.
+- Its **residual** P(serious) is low, but not zero. The residual tail is the share of trials in which the harness, the anchor or the rescue fails.
+
+**The counterfactual, sharpened.** In the residual distribution, degraded and absent control states are weighted by their probability. The counterfactual EEI warns against is different: **imagining controls that were not in the actual event** (or removing ones that were), with no probability attached. The model keeps three things apart:
+
+| | Controls | What it tells you | Where |
+|---|---|---|---|
+| **Inherent potential** | All set aside, by rule | How bad the energy can be | Classifier, layer 2: **the headline** |
+| **Residual potential** | As they were (or as designed), with failure states weighted by probability | How bad it is with these controls, including their unreliability | Simulator, using the layer 3 control state |
+| **Counterfactual cycle** | Imagined differently from the facts | What if other controls had existed, or had failed | Analyst only, labelled `counterfactual` |
+
+**Answer to Q2.**
+
+- **The headline is inherent SIF potential**: the classifier, against the company threshold.
+- **Credit for controls comes as the residual distribution**, not as a relabelling of the event.
+- **The EEI and Campbell yes/no categories are projections**, for crosswalk and reporting:
+  - Campbell's PSIF ≈ inherent P(serious) at or above the threshold, with no serious injury.
+  - EEI's PSIF versus Capacity ≈ the same, split by whether a direct control was effective. In our terms, that is the residual P(serious) given the observed control state.
+
+**Caveat.** The residual needs layer 3 information: which controls were present, and their effectiveness distributions. Narratives rarely give this, so the simulator gets it from the control library or a job hazard analysis, not from the incident report.
 
 ## 5. A draft definition
 
@@ -580,7 +627,9 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 >
 > **SIF precursor (PSIF).** An event with SIF potential, no serious injury, and no effective direct control on the path (absent, failed, or not stated).
 >
-> **Capacity.** An event with SIF potential, no serious injury, and an effective direct control that worked.
+> **Residual SIF potential.** The outcome distribution with the controls as they were, or as designed. Each control has an effectiveness distribution that includes its degraded and absent states, and P(serious | controls) is read from the resulting CDF (see 4.4).
+>
+> **Control held** (EEI: Capacity). An event with SIF potential, no serious injury, and an effective direct control that worked. Like PSIF, it is a reporting label: a projection of the two distributions, not a separate definition.
 
 ## 6. Consequences for the classifier if we adopt this
 
@@ -597,7 +646,9 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 
 ### Answered in this draft
 
-- **Q1b + Q1c** (upstream steps; build-up limits). One circular problem, broken by analysing in **cycles**: control-blind within a cycle, the starting state taken as found at its boundary, and the investigator scoping evidential versus what-if cycles. See the cycles refinement in section 3.
+- **Q1b + Q1c** (upstream steps; build-up limits). One circular problem, broken by analysing in **cycles**: control-blind within a cycle, the starting state taken as found at its boundary, and the investigator scoping evidential versus counterfactual cycles. See the cycles refinement in section 3.
+- **Q2** (credit working controls, or count barrier-saved events as PSIF?). **Headline = inherent SIF potential** (classifier, company threshold). Credit for controls comes as the **residual outcome distribution** from the simulator, whose Monte Carlo includes degraded and absent control states, so the answer is in the CDF. EEI's "Capacity" is renamed **control held** to avoid confusion with Safety-II and HOP "capacity". See 4.4.
+- **Q1i** (how a cycle is bounded; how what-ifs are labelled). **Per source** by default. Scope is set by a **scoping statement**, as for a HAZID/HAZOP study (sources, bridges, counterfactuals in or out). What-ifs are labelled **counterfactual**. The classifier's implicit scope is per source, evidential only.
 - **Q1d** ("no failure mode, no demand" as the test for an inherent feature). Accepted as the working definition of inherent safety / safety by design, and restated after checking against Kletz, CCPS/Hendershot, IAEA-TECDOC-626 and ISO 12100. The feature is in effect throughout normal operation and can be lost only by changing the source; controls are active, passive or procedural. See "Inherent features versus controls" in section 3.
 - **Q1f** (exposure versus EEI's "Exposure"). Keep ours: it is the standard risk-formula meaning. Qualify EEI's as "Exposure (EEI)".
 - **Q1g** (convergence when the target moves). The **incursion** is the event: entry into a danger zone defined by the plan. This works for vehicles and machinery, and gives a definition of **near miss** (an event in which nobody was hurt). See the event/exposure refinement.
@@ -605,8 +656,6 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 ### Still open
 
 - **Q1.** Is the three-clause event (excursion in space; incursion, or a change of state while a person is exposed; excursion in magnitude or time) the right wording? Are *excursion*, *incursion*, *exposure*, *event* and *near miss* the right terms? Should "unexpected" be dropped entirely? (The wording argument stays in section 3 as the case for the choice.)
-- **Q1i.** How is a cycle bounded in practice: per energy type, per source, or per location? How should what-if cycles be labelled in classifier output?
-- **Q2.** Credit working controls (EEI Capacity), or count barrier-saved events as PSIF (Campbell)? The layered model allows both views; which one is the headline?
 - **Q3.** Should the probability anchor be "more likely than not" (0.50) or "credible" (0.10)? Should validation against human coders use SIF alone or SIF + ELEVATED?
 - **Q4.** Which control definition: EEI's narrow direct control (targeted, effective, error-tolerant; no training, rules or generic PPE) or ICMM/BST's broader one?
 - **Q5.** Should there be a proximity requirement, or does chance P = 1 hold regardless?
@@ -630,6 +679,7 @@ These belong to a later design specification that wraps the model (risk-control 
 - Viner (1991) "uncontrolled flow of energy" wording is unverified.
 - Origin of the energy wheel graphic is unverified.
 - **Units:** EEI's "500 ft-lbs" is about 680 J, *not* 1,500 J. EEI's own documents use both figures, so they are not a unit conversion. Our docs should state which one we mean wherever we cite either.
+- Safety-II / resilience engineering (Hollnagel; Woods, "adaptive capacity") and HOP (Conklin) uses of "capacity" are cited from memory. Check them, and EEI's stated source for the term.
 - The NSC/OSHA near-miss definition ("a slight shift in time or position") are cited from memory. Check both.
 - Chemical exposure (TWA against workplace exposure limits) and EMF/ionising radiation metrics (reference levels, dose) are named as established exposure metrics without references.
 - Micromort figures (e.g. about 1 per 250 miles of UK driving), the FAR definition (per 10⁸ exposed hours) and *microlife* are cited from memory. Check them against Spiegelhalter & Blastland (2013) and Kletz before quoting.
@@ -764,12 +814,14 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Active control** | (CCPS) A control that detects and responds: trips, interlocks, safety instrumented functions, sprinklers, quench and dump systems. Compare *passive control*, *procedural control* |
 | **Active energy** | Energy that is moving, flowing or being released (a moving vehicle, a falling load, a blast). Descriptive; it does not by itself make an event. Compare *stored energy* |
 | **Bridge condition** | A link from one cycle to the next: a control failure or event in one cycle that sets the starting state of another, often by energy conversion (fuel → motion, fuel or battery → fire, motion → heat) |
-| **Capacity** | (EEI SCL) A high-energy release with an effective direct control present and no serious injury: the control did its job. Not a PSIF under EEI |
+| **Capacity** | (EEI SCL) A high-energy release with an effective direct control present and no serious injury. This draft says *control held*, because "capacity" means something broader in Safety-II, resilience engineering and HOP (the ability of people and systems to adapt and fail safely) |
 | **Chance P** | The probability that the energy reaches a person at all. SIF potential sets chance P = 1 |
 | **Chance per unit exposure** | In the risk formula, the probability (rate) of a harmful event per unit of exposure (per hour, per lift, per take-off). Driven by controls |
 | **Containment** | What holds energy in its intended state (pipe wall, cable insulation, vessel). Part of the source, not a control; release is escape from it |
 | **Control (protective control)** | Anything added to act on the source or on the path to people that can degrade, be defeated or be overwhelmed while the source stays unchanged. Active, passive or procedural (CCPS); also classed as an M, L or T control. Compare *inherent feature* |
-| **Cycle** | One energy source analysed through all three layers once (envelope, exposure, event, potential, control state). Cycles chain through bridge conditions; each is *evidential* (facts show it happened) or *what-if* (counterfactual, labelled) |
+| **Control held** | An event with SIF potential, no serious injury, and an effective direct control (EEI: Capacity). A reporting label; the substance is the residual distribution |
+| **Counterfactual cycle** | A cycle the facts don't show happened, examined as a what-if (had the relief also failed). Legitimate in investigation and risk assessment; always labelled `counterfactual`. Compare *evidential cycle* |
+| **Cycle** | One energy source analysed through all three layers once (envelope, exposure, event, potential, control state). Bounded per source by default; cycles chain through bridge conditions; each is *evidential* or *counterfactual* |
 | **Danger zone** | An area within reach of an energy that the plan keeps clear of people. For machinery, ISO 12100 3.11: "any space within and/or around machinery in which a person can be exposed to a hazard". Entry is an incursion |
 | **Demand** | (LOPA, IEC 61511) A deviation that calls on a protection layer to act; even passive barriers (a bund) are demanded and have a probability of failure on demand. Not the test for an inherent feature |
 | **Direct control** | (EEI) A control targeted to the high-energy source, effective when installed, verified and used properly, and effective even with unintentional human error. Training, rules, signs and generic PPE are excluded |
@@ -777,6 +829,7 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Elimination** | Removing the energy from the source (supply disconnected and removed, system drained and vented, stored energy discharged). Changes the source and ends exposure. Compare *isolation* |
 | **Envelope (intended energy envelope)** | The designed bounds on an energy in magnitude (M), space and separation (L) and time (T): containment and designed path for contained energy; the release zone for an intentional release |
 | **Event** | Something that happens at a moment: a change of energy state (release, transfer, build-up, energisation) producing an excursion or reaching an exposed person, or a person's incursion into a danger zone. Layer 1 |
+| **Evidential cycle** | A cycle the facts show happened, with the bridge to it evidenced in the narrative. The classifier's default scope |
 | **Excursion** | Energy going beyond its envelope in L, M or T |
 | **Exposure** | As a condition: energy (held, stored or available) and a person together in time and space, the person within reach, assessed **without regard to controls**. As a quantity: that co-presence measured in context-specific units (person-hours, lifts, take-offs, km), the denominator of the risk formula. Not the same as EEI's "Exposure", which is a high-energy hazard *without* a direct control (our exposure + control absent) |
 | **FAR (Fatal Accident Rate)** | Fatalities per 10⁸ exposed hours (Kletz, process safety): a chance-per-unit-exposure measure |
@@ -802,7 +855,9 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Prevention through Design (PtD)** | (NIOSH) "addressing occupational safety and health needs in the design process to prevent or minimize the work-related hazards and risks associated with the construction, manufacture, use, maintenance, and disposal of facilities, materials, and equipment". US counterpart of the CDM 2015 designers' duty |
 | **Procedural control** | (CCPS) A control that depends on people following procedures: operating procedures, LOTO, permits, training, emergency response |
 | **PSIF (SIF precursor)** | An event with SIF potential, no serious injury, and no effective direct control (absent, failed or not stated). Close to EEI's PSIF and BST's precursor |
+| **Residual SIF potential** | The outcome distribution with controls as they were or as designed. Each control has an effectiveness distribution including degraded and absent states, combined by Monte Carlo (the simulator); P(serious \| controls) is read from its CDF. Compare *inherent SIF potential* |
 | **Risk** | Exposure × chance per unit of exposure × consequence |
+| **Scoping statement** | The statement that frames a SIF assessment before it starts, as for a HAZID/HAZOP study: the sources (cycles) in scope, the bridges to follow, and whether counterfactual cycles are included |
 | **SIF** | Serious injury or fatality. As a classifier class: P(serious) ≥ 0.50, "most likely outcome is serious" |
 | **SIF actual (HSIF)** | An event in which a serious injury or fatality occurred |
 | **Source–path–target** | The energy-damage model (Gibson, Haddon): energy leaves a source, travels a path, reaches a target. Controls act at the source or on the path |
