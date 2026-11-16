@@ -13,3 +13,6 @@ data/sif/taxonomy/SimpleTabulation-*
 nohup.out
 backups/
 .claude/skills/drrp-qa/__pycache__/
+
+# SIF literature PDFs (copyrighted; local only)
+docs/sif/lit/
