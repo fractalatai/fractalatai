@@ -278,7 +278,7 @@ Energy itself has the dimensions **M L² T⁻²**, so magnitude, distance and ra
    | Clause | Dimension exceeded |
    |---|---|
    | (a) energy outside its envelope | L (energy moved) |
-   | (b) person inside an active envelope | L (target moved: incursion) |
+   | (b) energy released or converging on an exposed person | L (target within reach; incursion if the plan kept the area clear) |
    | (c) over-magnitude | M |
    | (c) unexpected presence, e.g. energisation of an isolated system | T |
 
@@ -417,7 +417,7 @@ Using the envelope wording from section 3:
 |---|---|---|---|
 | Quarry blast fired as planned; zone clear; no flyrock outside the zone | No: release stayed inside the envelope, nobody inside | n/a | n/a (HECA "Success" if observed) |
 | Quarry blast; flyrock lands beyond the exclusion zone, nobody there | Yes (a): energy outside the envelope | SIF (fragment mass × velocity) | Zone sizing or blast design failed → PSIF |
-| Controlled demolition; a person is found inside the exclusion zone after firing, unhurt | Yes (b): incursion into an active envelope | SIF | Zone clearance and sentries failed → PSIF |
+| Controlled demolition; a person is found inside the exclusion zone after firing, unhurt | Yes (b): blast fired while a person was exposed (incursion) | SIF | Zone clearance and sentries failed → PSIF |
 | Blast halted at the countdown because a person was seen in the zone | No event; **exposure** (incursion into a charged blast zone) | SIF | The clearance check worked; the zone control had failed → an incursion caught before firing |
 | Live test firing; a range user enters the danger area during firing | Yes (b) | SIF | Range control failed → PSIF |
 | Live test firing; a round or ricochet lands outside the danger area | Yes (a) | SIF | Danger-area design or weapon/ammunition failure → PSIF |
@@ -486,7 +486,7 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 3. **Layer 3 extraction.** Add a control-state field (effective / failed / absent / not stated) and a direct-control flag (EEI's three criteria). This is new work; until then, report the classifier's SIF as "PSIF (unverified controls)".
 4. **Proximity.** Decide whether a person must plausibly have been exposed (EEI's contact or proximity rule) or whether chance P = 1 applies regardless. This changes the "empty zone" cases.
 5. **Out-of-scope mechanisms.** Confirm that overexertion and abrasion are automatically NON_SIF. Decide how medical events (e.g. cardiac arrest at work) and chronic exposures are handled; they can be fatal without any energy transfer.
-6. **Envelope gate.** Pass 1 should recognise planned releases that stayed inside their envelope with nobody inside it, and record them as no event. It should also flag clause (b) events (incursion into an active envelope) and clause (c) events (over-magnitude build-ups, unexpected energisation) even when nothing was released.
+6. **Envelope gate.** Pass 1 should recognise planned releases that stayed inside their envelope with nobody inside it, and record them as no event. It should also flag clause (b) events (release or convergence while a person is exposed) and clause (c) events (over-magnitude build-ups, unexpected energisation) even when nothing was released.
 7. **Build-up bands.** The calibration bands describe released energy (fall height, voltage, speed). Build-up events need a way to choose a band from the uncontrolled limit (e.g. vessel burst energy from inventory and failure pressure), not from what the narrative says was reached.
 8. **Threshold wording.** Rename the classes, or document them, so that SIF = "most likely outcome is serious" and ELEVATED = "credibly serious". This lets each reader map the classes onto their preferred tradition.
 
