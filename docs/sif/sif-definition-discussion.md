@@ -1,6 +1,46 @@
 # Defining SIF: a discussion draft
 
-Status: draft v0.1, 2026-11-16. A starting point to polish, not a settled position.
+Status: draft v0.2, 2026-11-16. A starting point to polish, not a settled position.
+
+## Contents
+
+- [Why we need this](#why-we-need-this)
+- [1. What the literature says](#1-what-the-literature-says)
+  - [1.1 Severity: what counts as "serious"](#11-severity-what-counts-as-serious)
+  - [1.2 The "potential" counterfactual](#12-the-potential-counterfactual)
+  - [1.3 Controls: the sharpest split](#13-controls-the-sharpest-split)
+  - [1.4 Energy: harmful, unwanted or uncontrolled?](#14-energy-harmful-unwanted-or-uncontrolled)
+  - [1.5 Event or condition](#15-event-or-condition)
+- [2. The definition our classifier holds implicitly](#2-the-definition-our-classifier-holds-implicitly)
+  - [Where this sits against the literature](#where-this-sits-against-the-literature)
+- [3. The wording problem: unwanted, unexpected or uncontrolled?](#3-the-wording-problem-unwanted-unexpected-or-uncontrolled)
+  - ["Uncontrolled"](#uncontrolled)
+  - ["Unexpected" (unplanned)](#unexpected-unplanned)
+  - ["Unwanted" (unintended)](#unwanted-unintended)
+  - [Proposed position](#proposed-position)
+  - [Refinement: intentional releases and the energy envelope](#refinement-intentional-releases-and-the-energy-envelope)
+  - [Refinement: energy state, not its history](#refinement-energy-state-not-its-history)
+  - [Refinement: over-energy states (build-up without release)](#refinement-over-energy-states-build-up-without-release)
+  - [Refinement: the envelope in Mass, Length, Time](#refinement-the-envelope-in-mass-length-time)
+  - [Refinement: event, exposure, excursion and incursion](#refinement-event-exposure-excursion-and-incursion)
+- [4. Proposal: three layers, not one definition](#4-proposal-three-layers-not-one-definition)
+  - [4.1 Where does the source end and the path begin?](#41-where-does-the-source-end-and-the-path-begin)
+  - [4.2 Intentional releases and relief devices](#42-intentional-releases-and-relief-devices)
+  - [4.3 Energy state and build-up cases](#43-energy-state-and-build-up-cases)
+- [5. A draft definition](#5-a-draft-definition)
+- [6. Consequences for the classifier if we adopt this](#6-consequences-for-the-classifier-if-we-adopt-this)
+- [7. Open questions](#7-open-questions)
+- [8. Checks before polishing](#8-checks-before-polishing)
+- [Appendix A. Line of Fire](#appendix-a-line-of-fire)
+  - [A.1 Origin](#a1-origin)
+  - [A.2 What the authoritative versions say](#a2-what-the-authoritative-versions-say)
+  - [A.3 The underlying model](#a3-the-underlying-model)
+  - [A.4 Line of Fire in our definition](#a4-line-of-fire-in-our-definition)
+  - [A.5 Crosswalk: IOGP LoF categories to classifier mechanisms](#a5-crosswalk-iogp-lof-categories-to-classifier-mechanisms)
+  - [A.6 What LoF adds, and what it leaves out](#a6-what-lof-adds-and-what-it-leaves-out)
+  - [A.7 Checks](#a7-checks)
+- [Appendix B. Glossary](#appendix-b-glossary)
+- [References](#references)
 
 ## Why we need this
 
@@ -149,13 +189,13 @@ What is unwanted in all of these is not the release but **energy and people meet
 **Revised event wording (layer 1).** An event is either:
 
 - (a) energy outside its intended envelope, whether or not anyone was there, **or**
-- (b) a person inside an envelope while the energy in it is live or being released.
+- (b) a person inside an envelope while the energy in it is live or being released (refined to *active* below).
 
 Clause (b) is what catches the person in the exclusion zone during a blast. The release went to plan; the person was where the plan said nobody would be.
 
 Without a gate like this, chance P = 1 would make every routine blast a SIF potential event. That shows the gate is a necessary part of the definition, not a refinement.
 
-There is precedent for this framing in process safety. API RP 754 counts loss of primary containment as a process safety event, and treats a pressure-relief discharge as one only when it goes somewhere unsafe (e.g. liquid carryover, discharge to an unsafe location, shelter-in-place). A relief device lifting as designed counts as a *demand on a safety system* (Tier 3). That is the same distinction between "envelope breached" and "control called on" (wording to check against the standard).
+There is precedent for this framing in process safety. API RP 754 counts loss of primary containment as a process safety event, and treats a pressure-relief discharge as one only when it goes somewhere unsafe (e.g. liquid carryover, discharge to an unsafe location, shelter-in-place). A relief device lifting as designed counts as a *demand on a safety system* (Tier 3). That is the same distinction between "envelope exceeded" and "control called on" (wording to check against the standard).
 
 ### Refinement: energy state, not its history
 
@@ -174,13 +214,13 @@ So the history matters for **why** and for **which control failed**, never for *
 
 The envelope then needs **three dimensions**, not one:
 
-| Dimension | The envelope bounds… | Breach examples |
+| Dimension | The envelope bounds… | Excursion examples |
 |---|---|---|
 | **Where** (space, L) | Where the energy may be: containment, path, release zone | Flyrock outside the zone; vehicle off its route; steam discharge onto a walkway |
 | **How much** (magnitude, M) | How much energy the containment or system is designed for | Overpressure, overtemperature, overspeed, overload, reactivity excursion |
 | **When** (state, T) | When the energy should be present at all | Unexpected energisation of an isolated circuit; stored energy left after isolation; a vehicle moving while it should be immobilised |
 
-The "when" dimension covers isolation. An isolated system has an intended envelope of **zero energy**. Unexpected energisation while someone works on it is an envelope breach, even though the energy is exactly where and as large as it would be in normal operation.
+The "when" dimension covers isolation. An isolated system has an intended envelope of **zero energy**. Unexpected energisation while someone works on it is an excursion in time, even though the energy is exactly where and as large as it would be in normal operation.
 
 ### Refinement: over-energy states (build-up without release)
 
@@ -194,12 +234,12 @@ Some events involve no release at all: **energy builds up inside its containment
 - a battery starting thermal runaway,
 - snow load on a roof, or a dam level rising.
 
-These are breaches in the **magnitude** dimension: clause **(c)** of the event.
+These are excursions in the **magnitude** dimension: clause **(c)** of the event.
 
 **Revised event wording (layer 1).** An event is any of:
 
 - (a) energy outside its intended envelope in space,
-- (b) a person inside an envelope while the energy in it is live,
+- (b) a person inside an envelope while the energy in it is live (refined to *active* in the event/exposure refinement below),
 - (c) energy beyond its intended magnitude, or present when its intended state is zero, even if still contained.
 
 **How big is the potential of a build-up?** At the moment it was caught, a build-up may have reached only a modest level. If layer 2 is assessed on the peak actually reached, a reactor excursion stopped by the rods would look harmless. That would be crediting the control, which layer 2 doesn't do.
@@ -233,12 +273,12 @@ Energy itself has the dimensions **M L² T⁻²**, so magnitude, distance and ra
 
 1. **A completeness check.** An envelope is fully stated only when it has a bound in each of M, L and T. "Exclusion zone 500 m" is incomplete without the charge mass it was sized for (M) and the firing window (T). A narrative that gives only one dimension leaves the other two unknown, not satisfied.
 
-2. **Simpler event clauses.** L is the *relative* distance between energy and target, so clauses (a) and (b) are the same breach in L: it doesn't matter whether the energy moved out or the person moved in. Clause (c) is a breach in M (over-magnitude) or in T (present when it should be zero). So:
+2. **Simpler event clauses.** L is the *relative* distance between energy and target, so clauses (a) and (b) are the same loss of separation in L: an *excursion* if the energy moved out, an *incursion* if the person moved in. Clause (c) is an excursion in M (over-magnitude) or in T (present when it should be zero). So:
 
-   | Clause | Dimension breached |
+   | Clause | Dimension exceeded |
    |---|---|
    | (a) energy outside its envelope | L (energy moved) |
-   | (b) person inside a live envelope | L (target moved) |
+   | (b) person inside an active envelope | L (target moved: incursion) |
    | (c) over-magnitude | M |
    | (c) unexpected presence, e.g. energisation of an isolated system | T |
 
@@ -247,7 +287,7 @@ Energy itself has the dimensions **M L² T⁻²**, so magnitude, distance and ra
    - *l* = actual separation / required separation,
    - *t* = presence outside the intended time window (0 or 1, or a fraction of it).
    
-   The envelope is breached when m > 1, l < 1 or t > 0. The ratios also say *how far* it was breached: flyrock at 1.1 × the zone radius is not the same as at 3 ×. They work across energy types, as dimensionless groups do in physics. This is a possible future field for layer 3, or for control-state analytics.
+   An excursion or incursion has happened when m > 1, l < 1 or t > 0. The ratios also say *how far* it went: flyrock at 1.1 × the zone radius is not the same as at 3 ×. They work across energy types, as dimensionless groups do in physics. This is a possible future field for layer 3, or for control-state analytics.
 
 4. **Controls classified by dimension.**
    - **M controls** reduce or cap magnitude: smaller inventory, isolation (M → 0), relief valves, load cut-outs, speed limiters.
@@ -260,13 +300,54 @@ Energy itself has the dimensions **M L² T⁻²**, so magnitude, distance and ra
 
 **Limits of the metaphor.** Electrical, thermal and chemical energy need other SI base quantities (current, temperature, amount of substance). So "M" here means *magnitude in the energy's own units*, not literally mass. L also does two jobs: separation distance in the envelope, and contact area at the target (Hallowell's intensity, J/cm², is L⁻²). The first belongs to the envelope (layers 1 and 3); the second is a carrier property in layer 2.
 
+"Line of Fire", the shop-floor phrase for keeping out of the energy's path, is essentially the L dimension on its own. Appendix A sets it against this definition.
+
+### Refinement: event, exposure, excursion and incursion
+
+Earlier drafts called any departure from the envelope a "breach" and treated every breach as an event. That has two problems.
+
+**"Breach" has legal overtones.** It suggests breach of duty or statutory breach, and so fault. In a product that also handles legal registers, readers would take it that way. The SIF definition should describe what the energy did, not whether anyone was at fault.
+
+**It hid an inconsistency.** Clause (b) said "a person inside an envelope while the energy in it is live". A suspended load is live (stored gravitational energy), so a person standing under it would be an *event*. Yet the cases (Appendix A, and HECA's "Exposure") treat that as a *condition*: nothing has happened yet. The same goes for a person inside the approach distance of a live conductor without contact, or a missing guardrail with nobody falling.
+
+The fix separates two things that "breach" ran together: **the relation between energy and envelope**, and **whether anything happened**.
+
+| Term | Meaning | Examples |
+|---|---|---|
+| **Excursion** | Energy goes beyond its envelope in L (outside its space), M (beyond its magnitude) or T (present when it should be zero) | Flyrock beyond the zone; overpressure; a re-energised isolated circuit |
+| **Incursion** | A person enters an envelope | Walking into a segregated vehicle route; standing in a drop zone; entering a blast zone |
+| **Exposure** (a condition) | An excursion or incursion that persists with **stored** energy and no change of state. It has a duration, not a moment | A person under a suspended load; trapped pressure after isolation; a missing guardrail at height |
+| **Event** | A **change of energy state** at a point in time (release, transfer, build-up, energisation) that produces an excursion, or that happens with **active** energy while there is an incursion | The load drops; the vehicle passes the pedestrian; the blast fires with someone in the zone; the reactor power rises |
+
+The distinction between **stored** and **active** energy echoes potential and kinetic energy in physics:
+
+- **Stored** energy (held, contained, suspended, energised but not flowing) creates an exposure when a person is within reach.
+- **Active** energy (moving, flowing, being released) creates an event when a person is within reach.
+
+So a pedestrian in a vehicle route *while vehicles move* is an event (active energy); a pedestrian in the same route with every vehicle parked and immobilised is not even an exposure, since the T bound is met.
+
+Both words are already in use in neighbouring fields:
+
+- **Excursion** is the process-safety term for leaving the safe operating envelope or limits (CCPS usage, to check).
+- **Incursion** is the aviation term for an unauthorised entry into a protected area (runway incursion, ICAO usage, to check).
+
+**Event clauses restated:**
+
+- (a) energy changes state and goes **outside its envelope in space** (excursion in L),
+- (b) energy is **active while a person is inside its envelope** (incursion),
+- (c) energy **builds beyond its magnitude, or appears when it should be zero** (excursion in M or T).
+
+An excursion or incursion without a change of state is an **exposure**. That matches HECA's "Exposure", BST's precursor "if allowed to continue", and Appendix A's line-of-fire condition. Exposures are observable before anything happens; events are what the classifier reads in incident narratives.
+
+The earlier refinements above are kept as the argument trail. Section 4 onwards uses these terms.
+
 ## 4. Proposal: three layers, not one definition
 
 Treat SIF as three separate questions, each answerable on its own:
 
 | Layer | Question | Source–path–target | Who answers |
 |---|---|---|---|
-| **1. Event** | Was the energy envelope breached: (a) energy outside it in space, (b) a person inside it while live, or (c) energy beyond its magnitude, or present when it should be zero? | Source changes state, builds up, or target enters the path | Narrative (classifier Pass 1: mechanism, energy type). The envelope gate is not yet implemented |
+| **1. Event** | Did the energy change state so that (a) it went outside its envelope in space, (b) it was active while a person was inside the envelope, or (c) it went beyond its magnitude, or appeared when it should be zero? An excursion or incursion without a change of state is an *exposure* (a condition), not an event | Source changes state, builds up, or target enters the path | Narrative (classifier Pass 1: mechanism, energy type). The envelope gate is not yet implemented |
 | **2. Inherent SIF potential** | If that energy had reached a person with nothing protective between them, what is the outcome distribution, and is a serious outcome more likely than not? For a build-up, assess the energy it would reach with no control acting, up to the source's inherent limit | Source (incl. inherent features) + carrier + default environment + target; **controls set aside** | Classifier (bands → P(serious)) |
 | **3. Control state** | Which controls acted on the source, the build-up or the path, and did they work? (effective / present but failed / absent / not stated). Upstream causes are recorded here | Source isolation, build-up controls (trips, relief, rods), path | Separate extraction; often "not stated" |
 
@@ -316,12 +397,12 @@ Using the envelope wording from section 3:
 |---|---|---|---|
 | Quarry blast fired as planned; zone clear; no flyrock outside the zone | No: release stayed inside the envelope, nobody inside | n/a | n/a (HECA "Success" if observed) |
 | Quarry blast; flyrock lands beyond the exclusion zone, nobody there | Yes (a): energy outside the envelope | SIF (fragment mass × velocity) | Zone sizing or blast design failed → PSIF |
-| Controlled demolition; a person is found inside the exclusion zone after firing, unhurt | Yes (b): person inside a live envelope | SIF | Zone clearance and sentries failed → PSIF |
+| Controlled demolition; a person is found inside the exclusion zone after firing, unhurt | Yes (b): incursion into an active envelope | SIF | Zone clearance and sentries failed → PSIF |
 | Blast halted at the countdown because a person was seen in the zone | No release | n/a | The clearance check worked; a condition, not an event (HECA "Success") |
 | Live test firing; a range user enters the danger area during firing | Yes (b) | SIF | Range control failed → PSIF |
 | Live test firing; a round or ricochet lands outside the danger area | Yes (a) | SIF | Danger-area design or weapon/ammunition failure → PSIF |
 | Misfire: an unexploded charge or round remains after firing | Stored energy left where it was not meant to be. A condition, like a missing guardrail | n/a until disturbed | Misfire procedure is the control; handling the misfire is high-energy work |
-| Dust explosion in a silo; the explosion vent opens and discharges to a safe area | Yes: the deflagration itself is unwanted (it breached containment) | SIF | Vent = effective mitigating control → **Capacity** |
+| Dust explosion in a silo; the explosion vent opens and discharges to a safe area | Yes: the deflagration itself is unwanted (it escaped containment) | SIF | Vent = effective mitigating control → **Capacity** |
 | Dust explosion; the vent discharges into an occupied area or walkway | Yes | SIF | Vent worked on the vessel but its discharge was outside a safe envelope → PSIF |
 | Boiler overpressure; the relief valve lifts and discharges to a safe point | Yes: the overpressure is an upset, the containment envelope was challenged | SIF (vessel rupture energy) | Relief valve = effective direct control → **Capacity**. API RP 754 would call this a demand on a safety system |
 | Relief valve lifts and discharges steam onto a walkway | Yes (a): the relief discharge is outside its intended envelope | per band (thermal / pressure at the discharge) | Relief design or discharge piping failed → PSIF |
@@ -330,7 +411,7 @@ Using the envelope wording from section 3:
 
 These cases expose three points that the first table didn't:
 
-1. **Relief devices are controls, not the event.** The upset (overpressure, deflagration) is the event; the relief device is a mitigating control that redirects energy into a safe envelope. A relief that works is Capacity. A relief whose own discharge reaches people is a second envelope breach.
+1. **Relief devices are controls, not the event.** The upset (overpressure, deflagration) is the event; the relief device is a mitigating control that redirects energy into a safe envelope. A relief that works is Capacity. A relief whose own discharge reaches people is a second excursion.
 2. **Exclusion zones are separation controls on the path.** Whether one counts as an EEI *direct control* is unsettled. It is targeted and can be effective, but it depends on people (sentries, clearance checks), and EEI excludes controls that fail with unintentional human error. This feeds Q4.
 3. **Planned high-energy work needs the envelope gate**, or chance P = 1 floods the SIF class. For the classifier this means Pass 1 must recognise "planned release, nobody inside the envelope" as no event, which it currently doesn't attempt.
 
@@ -348,7 +429,7 @@ Clause (c) of the event, with build-ups assessed at their uncontrolled limit:
 | Crane overload with the LMI overridden; no collapse | Yes (c) | Collapse of crane and load | Control defeated → PSIF |
 | Turbine overspeed; the overspeed trip works | Yes (c) | Disc burst at the inherent limit (steam supply) | Trip = effective control → **Capacity** |
 | Electrician working on an isolated circuit; it is re-energised from another feed | Yes (c), "when": energy present when the intended state was zero | Per voltage band | Isolation failed (back-feed not identified) → PSIF |
-| Hydraulic system isolated; trapped pressure remains in an accumulator | Yes (c) if anyone works on it; otherwise a condition | Per pressure band | Isolation incomplete → PSIF |
+| Hydraulic system isolated; trapped pressure remains in an accumulator | No: an exposure (excursion in T, stored energy). An event (c) if the pressure releases | Per pressure band | Isolation incomplete → PSIF |
 | Vehicle moving within its designated route, no pedestrian present | No: inside the envelope | n/a | n/a |
 | Pedestrian walks into a segregated vehicle route while vehicles move | Yes (b) | Per speed and mass band | Segregation failed → PSIF |
 | Battery store; one cell starts thermal runaway, detected and isolated | Yes (c) | Store inventory (cascade to adjacent cells) | Detection and isolation = effective → **Capacity** |
@@ -364,10 +445,10 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 
 ## 5. A draft definition
 
-> **SIF potential (inherent).** An event has SIF potential when an energy envelope is breached, and that energy, had it reached a person with no protective control between the energy and the person, would more likely than not have caused a life-ending, life-threatening or life-altering injury.
+> **SIF potential (inherent).** An event has SIF potential when energy changes state with an excursion from its envelope or an incursion into it, and that energy, had it reached a person with no protective control between the energy and the person, would more likely than not have caused a life-ending, life-threatening or life-altering injury.
 >
-> - *Envelope breached*: energy outside its intended envelope in space; a person inside an envelope while it is live; or energy beyond its intended magnitude, or present when its intended state is zero.
-> - *Intended envelope*: bounds on the energy in magnitude (M: how much there may be), length (L: where it may be, and its required separation from people; for an intentional release, the release zone such as a blast exclusion zone, range danger area or relief discharge area) and time (T: when it may be present). A breach is a departure in any one of them.
+> - *Event*: a change of energy state at a point in time (release, transfer, build-up, energisation) that produces (a) an excursion in space, (b) active energy with a person inside the envelope (incursion), or (c) an excursion in magnitude or time. The same excursion or incursion with stored energy and no change of state is an *exposure*, a condition, not an event.
+> - *Intended envelope*: bounds on the energy in magnitude (M: how much there may be), length (L: where it may be, and its required separation from people; for an intentional release, the release zone such as a blast exclusion zone, range danger area or relief discharge area) and time (T: when it may be present). An *excursion* is energy going beyond any one of them; an *incursion* is a person entering the envelope.
 > - *Energy state*: potential is assessed on the energy present at the time, whatever its history. For a build-up, on the energy it would reach with no control acting, up to the source's inherent physical limit.
 > - *Protective control*: anything that must act, and can fail, to prevent, limit or redirect the energy or to keep it from a person. Containment of the source, inherent features of the source that need no demand (e.g. a negative temperature coefficient), the default environment and the person's own body are not controls.
 > - *More likely than not*: P(serious outcome) ≥ 0.50, from the calibrated outcome distribution. A lower policy threshold (≥ 0.10) marks *elevated* potential.
@@ -384,13 +465,13 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 3. **Layer 3 extraction.** Add a control-state field (effective / failed / absent / not stated) and a direct-control flag (EEI's three criteria). This is new work; until then, report the classifier's SIF as "PSIF (unverified controls)".
 4. **Proximity.** Decide whether a person must plausibly have been exposed (EEI's contact or proximity rule) or whether chance P = 1 applies regardless. This changes the "empty zone" cases.
 5. **Out-of-scope mechanisms.** Confirm that overexertion and abrasion are automatically NON_SIF. Decide how medical events (e.g. cardiac arrest at work) and chronic exposures are handled; they can be fatal without any energy transfer.
-6. **Envelope gate.** Pass 1 should recognise planned releases that stayed inside their envelope with nobody inside it, and record them as no event. It should also flag clause (b) events (person in a live envelope) and clause (c) events (over-magnitude build-ups, unexpected energisation) even when nothing was released.
+6. **Envelope gate.** Pass 1 should recognise planned releases that stayed inside their envelope with nobody inside it, and record them as no event. It should also flag clause (b) events (incursion into an active envelope) and clause (c) events (over-magnitude build-ups, unexpected energisation) even when nothing was released.
 7. **Build-up bands.** The calibration bands describe released energy (fall height, voltage, speed). Build-up events need a way to choose a band from the uncontrolled limit (e.g. vessel burst energy from inventory and failure pressure), not from what the narrative says was reached.
 8. **Threshold wording.** Rename the classes, or document them, so that SIF = "most likely outcome is serious" and ELEVATED = "credibly serious". This lets each reader map the classes onto their preferred tradition.
 
 ## 7. Open questions
 
-- **Q1.** Is the three-clause envelope breach (space, person inside, magnitude/state) the right event wording? It replaces "unwanted release", which fails for blasting, test firing and relief devices. Should "unexpected" be dropped entirely?
+- **Q1.** Is the three-clause event (excursion in space; incursion into an active envelope; excursion in magnitude or time) the right wording? It replaces "unwanted release", which fails for blasting, test firing and relief devices. Should "unexpected" be dropped entirely? Are *excursion*, *incursion* and *exposure* the right terms (replacing the earlier "breach")?
 - **Q1a.** Who defines the envelope? The design (blast plan, range danger-area template, relief discharge design), the permit, or the regulator? What happens when there is no documented envelope?
 - **Q1b.** Is it right to put all upstream steps (how the energy came to be present) out of scope for potential, and into layer 3 only?
 - **Q1c.** Should build-ups be assessed at the uncontrolled limit (consistent with control-blind layer 2) or at the peak actually reached (EEI facts-only)? The uncontrolled limit can be very large (reactor, runaway reaction); is a physical-inventory bound enough of a restraint?
@@ -408,14 +489,172 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 
 - Quotes from the Campbell Institute papers (2018, 2020) are from secondary sources. Check them against the PDFs.
 - ANSI/ASSP Z16.1-2022 definitions are unverified (paywalled).
+- BSEE (2023). *Safety Alert 468: Red Zone Hazards Pose Increased Risk to Personnel During Lifting Operations*. Bureau of Safety and Environmental Enforcement.
+- ConocoPhillips (2025). *Life Saving Rules Standard*. https://static.conocophillips.com/files/resources/life-saving-rules-standard.pdf
+- Energy Safety Canada. *Line of Fire Program*. https://www.energysafetycanada.com/resource/line-fire-program
 - ASTM E2920-26 wording is from the store summary and a vendor blog.
 - Viner (1991) "uncontrolled flow of energy" wording is unverified.
 - Origin of the energy wheel graphic is unverified.
 - **Units:** EEI's "500 ft-lbs" is about 680 J, *not* 1,500 J. EEI's own documents use both figures, so they are not a unit conversion. Our docs should state which one we mean wherever we cite either.
 - Hopkinson–Cranz cube-root scaling and the radiation-protection triad (time, distance, shielding) are cited as standard practice. Add a primary reference for each (e.g. Baker, *Explosions in Air*; ICRP).
 - Kletz (inherently safer design) and CCPS LOPA (independent protection layers) are cited from memory for the inherent-feature vs control test. Check the wording before relying on it.
+- "Excursion" (CCPS safe operating limits) and "incursion" (ICAO runway incursion) are cited as established usage from memory. Check both before relying on the parallel.
 - API RP 754: check the exact Tier 1/2 treatment of pressure-relief discharges and the Tier 3 "demands on safety systems" wording (taken from memory, not yet checked in this review).
 - BST precursor wording: Krause (2010) says "could reasonably result … if allowed to continue or repeat". The firmer "will result" is Martin & Black (2015). Quote the right one.
+
+## Appendix A. Line of Fire
+
+"Line of Fire" (LoF) is the phrase most used to explain energy-based safety on the shop floor. This appendix:
+
+- traces where the phrase comes from and what it rests on,
+- maps it onto the three-layer definition and the M, L, T envelope,
+- says what it adds and what it leaves out.
+
+### A.1 Origin
+
+- **Military origin.** "Line of fire" is the path of a projectile from a weapon's muzzle. It is recorded from the 1850s, and "in the line of fire" figuratively means "in harm's way".
+- **Industrial use.** We found no documented first use in industrial safety. Its institutional home is **oil and gas**:
+  - Energy Safety Canada's *Line of Fire* programme. It was reportedly adapted from a Suncor Energy programme; the source documents are no longer online.
+  - The **IOGP Life-Saving Rules**. Line of Fire was added as one of the nine rules in the 2018 major revision (IOGP Report 459, v3.0). Shell (2021) and ConocoPhillips (2019) adopted the IOGP set largely because it included Line of Fire.
+- **Regulators.** Neither OSHA nor BLS uses the term. Their nearest categories are OSHA's Focus Four (falls, struck-by, caught-in/between, electrocution) and BLS OIICS "contact with objects and equipment" (struck by, struck against, caught in or compressed by). BSEE Safety Alert 468 (2023) uses it alongside "red zone".
+- **Construction.** Usage there is mostly toolbox talks, not standards.
+
+### A.2 What the authoritative versions say
+
+**IOGP Life-Saving Rule, 2018** *(verbatim)*: "Keep yourself and others out of the line of fire.
+- I position myself to avoid: moving objects, vehicles, pressure releases, dropped objects.
+- I establish and obey barriers and exclusion zones.
+- I take action to secure loose objects and report potential dropped objects."
+
+**IOGP guidance** *(verbatim, extract)*: the rule "is intended to raise personal awareness of struck-by and caught-in-between hazards. Line of fire hazards are not always obvious or constant and can be introduced as the task progresses … At all times individuals need to continually monitor their surroundings and position themselves to avoid being in the line of fire."
+
+**IOGP data:**
+- 2008–2017: Line of Fire covered 135 of the 330 personal-safety fatalities that the nine rules address. It was the largest single rule.
+- The 2025 supporting pack sorts 631 fatalities (2000–2024) into ten LoF hazard categories (table in A.5). It also states: "the difference between a high potential event outcome … and a fatal incident is often dependent on where people are positioned in relation to the surrounding hazards."
+
+**Other definitions:**
+- **BSEE** *(verbatim)*: LoF hazards "occur when a worker is in the direct path of an object if a release of energy from that object would cause the worker to be hit, struck, pinched, impaled, crushed, or caught between objects."
+- **Energy Safety Canada** *(secondary, unverified)*: "You are in the line of fire when you are at risk of coming into contact with a force your body cannot endure."
+- **Common toolbox wording**: LoF injuries happen "when the path of a moving object or the release of hazardous energy intersects with an individual's body". This is widely used, but we found no authoritative source, so it shouldn't be cited as one.
+
+### A.3 The underlying model
+
+No authority names a theory behind Line of Fire. The model it carries is **Haddon's energy–path–target**, reduced to the path:
+
+- **Haddon countermeasure 5**: "separate in space or time the energy being released from the susceptible person". That is positioning.
+- **Haddon countermeasure 6**: a material barrier between energy and person. That is "barriers and exclusion zones".
+
+The link to Haddon is our inference; no source we read makes it explicitly.
+
+Hallowell's energy-based approach does not use LoF as an organising idea. Hallowell & Spencer (2024) cite the Campbell/DEKRA list item "struck by or in the line of fire of a moving object with sufficient energy to cause SIF harm" as an example of an imprecise, list-based PSIF definition.
+
+### A.4 Line of Fire in our definition
+
+| Our concept | Line of Fire equivalent | Comment |
+|---|---|---|
+| Source–path–target | The "line" is the path; the "fire" is the energy | LoF covers path and target. It says nothing about the source's magnitude |
+| Envelope, L dimension | Being *in* the line of fire means l < 1: separation less than the energy's reach | LoF is L only |
+| Envelope, T dimension | "Not always obvious or constant and can be introduced as the task progresses" | IOGP's guidance recognises that the envelope changes over time |
+| Envelope, M dimension | Absent. ESC's "a force your body cannot endure" is the only hint of a threshold | No magnitude threshold, which is Hallowell's criticism |
+| Layer 1, clause (b) | Incursion into an active envelope = "in the line of fire" when the energy is released | Clause (b) *is* the LoF event |
+| A condition, not an event | Standing under a suspended load with no release | HECA "Exposure" / BST precursor; no event yet |
+| Layer 2, inherent potential | **Chance P = 1 is the LoF question**: "if you had been in the line of fire, how bad would it be?" | LoF positioning changes chance P, not potential |
+| Layer 3, control state | Positioning, barriers, exclusion zones, securing loose objects | All **L controls**. M controls (isolation, relief) and T controls (permits, interlocks) sit in other rules, e.g. Energy Isolation |
+| EEI direct control | Barriers and engineered exclusion zones *may* qualify | Positioning by behaviour does not: it fails with unintentional human error. Feeds Q4 |
+
+**The key alignment.** IOGP's own statement, that the gap between a high-potential event and a fatality "is often dependent on where people are positioned", is the chance P / outcome P split of section 2 in shop-floor language. Positioning decides the draw; the energy decides the distribution.
+
+**"Line" is a simplification.** For dropped objects and projectiles the path is close to a line (a trajectory). For other energies it is a zone or a volume:
+
+- the whip zone of a hose,
+- the snap-back zone of a mooring line,
+- the radius of a blast,
+- the approach distance to a live conductor,
+- the swept path of a reversing vehicle.
+
+The envelope generalises the line, and blast and electrical scaling (section 3) give the size of the zone from the magnitude.
+
+### A.5 Crosswalk: IOGP LoF categories to classifier mechanisms
+
+The classifier's mechanisms can be rolled up into IOGP's LoF categories for shop-floor reporting:
+
+| IOGP LoF hazard category (fatalities 2000–2024) | Classifier mechanism(s) | Energy type(s) |
+|---|---|---|
+| Moving vehicles / mobile equipment (142) | transport, struck | motion |
+| Working at height: falls and dropped objects (94) | fall, struck | gravity |
+| Objects with uncontrolled roll, slide or fall potential (89) | struck, caught_in, structural_collapse | gravity, motion |
+| Mechanical lifting / hoisting (71) | struck, caught_in | gravity, mechanical |
+| Electrical equipment / exposure (68) | electrical | electrical |
+| Pressurised or vacuum systems / equipment (56) | pressure | pressure |
+| Machinery and tools (42) | caught_in, struck, abrasion | mechanical |
+| Projectiles / explosion / jet fire (34) | explosion, fire, struck | pressure, thermal, chemical, motion |
+| Tensioned lines / spring-loaded devices / stored energy (31) | struck, pressure | mechanical, pressure |
+| Natural environmental events / extreme weather (3) | structural_collapse, other | gravity, motion, thermal |
+| *Not LoF* | breathing, chemical, thermal (contact), radiation_noise, overexertion, slip_no_fall, assault, animal_insect | chemical, thermal, radiation, biological |
+
+The mapping is many-to-many, so a crosswalk needs the mechanism *and* the energy type, and sometimes the band, to place an event. Testing it against classified events is a follow-on task.
+
+### A.6 What LoF adds, and what it leaves out
+
+**Adds:**
+- **Communication.** Its everyday phrase explains chance P = 1 well: "SIF potential asks how bad it would have been if you had been in the line of fire."
+- **Incursion in a word.** "In the line of fire" is the incursion: as an event when the energy is active, as an exposure (condition) when it is stored.
+- **The T dimension in practice.** IOGP's "introduced as the task progresses" puts the time-varying envelope in shop-floor terms.
+- **A reporting crosswalk** (A.5) that IOGP members already use.
+
+**Leaves out:**
+- **Magnitude (M).** There is no threshold. LoF can't tell a dropped spanner from a dropped beam, which is the job of layer 2.
+- **Non-kinetic energies.** The 2018 rule text lists only kinetic and mechanical hazards. IOGP's 2025 categories and ConocoPhillips add electrical, explosion and weather. Chemical, thermal and toxic exposures sit with other rules.
+- **Most controls.** It is deliberately framed around individual action ("I position myself"). IOGP itself puts design and engineering controls with the site organisation under the hierarchy of controls. Critics (e.g. La Duke, 2013) note that some procedures themselves place workers in the line of fire.
+- **Process safety.** IOGP's fatality analysis behind the rules excluded process safety events, so LoF says little about clause (c) build-ups.
+
+**Recommendation.** Use Line of Fire as the **communication layer** for the L dimension and for chance P = 1, and offer the A.5 crosswalk for reporting. Don't use it as a definition: it has no magnitude and only part of the control picture.
+
+### A.7 Checks
+
+- Earliest industrial use of the phrase: not found.
+- Whether Line of Fire was among the 2012/13 OGP supplementary rules: not checked.
+- Energy Safety Canada / Suncor programme documents: not retrievable. The ESC definition is from search snippets only.
+- The common "path of a moving object or release of hazardous energy" definition has no authoritative source found.
+- The Haddon link is our inference.
+
+## Appendix B. Glossary
+
+Terms as used in this draft. Where a term comes from a published source, the source is named; otherwise it is ours.
+
+| Term | Meaning |
+|---|---|
+| **Active energy** | Energy that is moving, flowing or being released (a moving vehicle, a falling load, a blast). With a person inside its envelope it makes an *event*. Compare *stored energy* |
+| **Capacity** | (EEI SCL) A high-energy release with an effective direct control present and no serious injury: the control did its job. Not a PSIF under EEI |
+| **Chance P** | The probability that the energy reaches a person at all. SIF potential sets chance P = 1 |
+| **Containment** | What holds energy in its intended state (pipe wall, cable insulation, vessel). Part of the source, not a control; release is escape from it |
+| **Control (protective control)** | Anything that must act, and can fail, to prevent, limit or redirect the energy or keep it from a person. Classified as an M, L or T control. Compare *inherent feature* |
+| **Direct control** | (EEI) A control targeted to the high-energy source, effective when installed, verified and used properly, and effective even with unintentional human error. Training, rules, signs and generic PPE are excluded |
+| **Elevated** | Classifier class: P(serious outcome) ≥ 0.10 and < 0.50; "credibly serious" |
+| **Envelope (intended energy envelope)** | The designed bounds on an energy in magnitude (M), space and separation (L) and time (T): containment and designed path for contained energy; the release zone for an intentional release |
+| **Event** | A change of energy state at a point in time (release, transfer, build-up, energisation) that produces an excursion, or happens with active energy during an incursion. Layer 1 |
+| **Excursion** | Energy going beyond its envelope in L, M or T |
+| **Exposure** | A condition: an excursion or incursion that persists with stored energy and no change of state (EEI/HECA use the same word in a close sense) |
+| **HECA** | (EEI/CSRA) High-Energy Control Assessment: the share of observed high-energy hazards with a direct control in place, Success / (Success + Exposure) |
+| **High energy** | (EEI) Over 500 ft-lbs (about 680 J); Hallowell et al. (2017) use > 1,500 J for "most likely a SIF". Not the same threshold |
+| **Incursion** | A person entering an energy envelope |
+| **Inherent feature** | A property of the source with no failure mode that needs no demand (e.g. a negative temperature coefficient, pump dead-head pressure, reduced inventory). Part of the source; changes the potential |
+| **Inherent SIF potential** | Layer 2: the outcome distribution if the energy reached a person with no protective control between them, assessed on the energy state at the time (or the uncontrolled limit of a build-up) |
+| **Layer 1, 2, 3** | Event; inherent SIF potential; control state |
+| **LIFE** | (Bayona et al., 2023) Life-ending, life-threatening, life-altering: the three-part definition of a serious outcome |
+| **Line of Fire** | (IOGP and others) Shop-floor term for being in the path of energy; in our terms, an incursion. See Appendix A |
+| **M, L, T** | Magnitude, length (space and separation), time: the three dimensions of the envelope |
+| **Margins m, l, t** | Dimensionless ratios of actual to design value: m = magnitude / design magnitude; l = separation / required separation; t = presence outside the intended window. Excursion or incursion when m > 1, l < 1 or t > 0 |
+| **Outcome P** | The distribution of severity given the energy reaches a person. Layer 2 models this |
+| **P(serious)** | Classifier output (`sif_p_sif`): probability that the outcome is serious or worse, from the calibrated band distribution |
+| **PSIF (SIF precursor)** | An event with SIF potential, no serious injury, and no effective direct control (absent, failed or not stated). Close to EEI's PSIF and BST's precursor |
+| **SIF** | Serious injury or fatality. As a classifier class: P(serious) ≥ 0.50, "most likely outcome is serious" |
+| **SIF actual (HSIF)** | An event in which a serious injury or fatality occurred |
+| **Source–path–target** | The energy-damage model (Gibson, Haddon): energy leaves a source, travels a path, reaches a target. Controls act at the source or on the path |
+| **STKY** | (Hallowell/CSRA) "Stuff That Kills You": high-energy hazard categories |
+| **Stored energy** | Energy held, contained, suspended or energised but not flowing (a suspended load, a pressurised vessel, a live conductor). With a person within reach it makes an *exposure*. Compare *active energy* |
+| **Success** | (EEI/HECA) A high-energy hazard with a corresponding direct control in place |
+| **Uncontrolled limit** | For a build-up, the energy it would reach with no control acting, up to the source's physical limit (inventory, failure pressure, maximum speed) |
 
 ## References
 
@@ -436,13 +675,17 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 - Hallowell, M.R. & Spencer, C. (2024). Safety Classification & Learning Model: defining & classifying potential serious injuries & fatalities. *Professional Safety*, 69(2). https://assp.org/docs/default-source/psj-articles/f1hallowellspencer_0224.pdf
 - Hallowell, M. & Oguz Erkal, E.D. (2024). *High-Energy Control Assessments (HECA)*. Edison Electric Institute. https://cms.eei.org/-/media/Project/EEI/Documents/Issues-and-Policy/Power-to-Prevent-SIF/EEI-HECA.pdf
 - ICMM (2015). *Critical Control Management: Implementation Guide*. International Council on Mining and Metals.
+- IOGP (2018). *Report 459: IOGP Life-Saving Rules*, v3.0. International Association of Oil & Gas Producers. https://www.iogp.org/life-savingrules/
+- IOGP (2025). *Life-Saving Rules: Line of Fire – Introduction to Supporting Materials*. https://www.iogp.org/wp-content/uploads/2025/10/IOGP-Life-Saving-Rules-Line-of-Fire-Introduction-to-Supporting-Materials.pdf
 - Johnson, W.G. (1980). *MORT Safety Assurance Systems*. Marcel Dekker.
 - Kletz, T. (1991, 2nd ed. 2010 with Amyotte). *Process Plants: A Handbook for Inherently Safer Design*. (edition to check)
 - Krause, T.R. (2010). *New Findings on Serious Injuries and Fatalities*. BST.
+- La Duke, P. (2013). Working in the line of fire. *ISHN*, 22 August 2013.
 - Manuele, F.A. (2008). Serious injuries & fatalities: a call for a new focus on their prevention. *Professional Safety*, 53(12), 32–39.
 - Manuele, F.A. (2013). Preventing serious injuries & fatalities: time for a sociotechnical model for an operational risk management system. *Professional Safety*, 58(5).
 - Martin, D.K. & Black, A.A. (2015). Preventing serious injuries & fatalities: study reveals precursors & paradigms. *Professional Safety*, 60(9), 35–43.
 - Oguz Erkal, E.D. & Hallowell, M.R. (2023). Moving beyond TRIR: measuring & monitoring safety performance with high-energy control assessments. *Professional Safety*, 68(5), 26–35.
+- OSHA. *Construction Focus Four: Struck-By Hazards*, instructor guide. https://www.osha.gov/sites/default/files/struckby_ig.pdf
 - OSHA, 29 CFR 1904.39. Reporting fatalities, hospitalizations, amputations, and losses of an eye.
 - RIDDOR 2013, regulation 4 (specified injuries) and Schedule 2 (dangerous occurrences). https://www.legislation.gov.uk/uksi/2013/1471/regulation/4
 - Viner, D. (1991). *Accident Analysis and Risk Control*. (wording unverified)
