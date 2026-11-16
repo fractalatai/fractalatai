@@ -7,7 +7,7 @@ Version 1.6, 2026-11-16. For safety directors, safety teams and anyone coding in
 - [1. Scope](#1-scope)
 - [2. Terms](#2-terms)
 - [3. Events](#3-events)
-- [4. The fractalaw definition](#4-the-fractalaw-definition)
+- [4. The AI model definition](#4-the-ai-model-definition)
 - [5. Other published definitions](#5-other-published-definitions)
 - [6. Crosswalk](#6-crosswalk)
 - [7. Coding rules: determining PSIF](#7-coding-rules-determining-psif)
@@ -122,7 +122,9 @@ The moment of an event is when the separation margin is lost, even if the change
 
 The number of people does not change SIF potential, which is judged per person. It multiplies the exposure and the number of people who could be harmed in a single event.
 
-## 4. The fractalaw definition
+## 4. The AI model definition
+
+The definitions and rules in this section are those applied by the AI SIF classification model[^ai] and by human coders using section 7.
 
 ### 4.1 Definitions
 
@@ -256,13 +258,13 @@ ICMM (2015).
 
 ### 5.8 Event and near miss
 
-The fractalaw event is consistent with the standard definitions and is more specific. Each one below is either a broader form of it or a special case.
+The AI model's event is consistent with the standard definitions and is more specific. Each one below is either a broader form of it or a special case.
 
-| Source | Definition | Relation to the fractalaw event |
+| Source | Definition | Relation to the AI model's event |
 |---|---|---|
-| ISO 31000:2018 | Event: "occurrence or change of a particular set of circumstances" | Broader. fractalaw specifies the change: the separation between energy and people |
-| ISO 12100:2010 | Hazardous event: "event that can cause harm". Hazardous situation: "circumstance in which a person is exposed to at least one hazard" | The same split as fractalaw *event* and *exposure* |
-| ISO 45001:2018 | Incident: "occurrence arising out of, or in the course of, work that could or does result in injury and ill health" | Includes the outcome. The fractalaw event is defined before the outcome |
+| ISO 31000:2018 | Event: "occurrence or change of a particular set of circumstances" | Broader. The AI model specifies the change: the separation between energy and people |
+| ISO 12100:2010 | Hazardous event: "event that can cause harm". Hazardous situation: "circumstance in which a person is exposed to at least one hazard" | The same split as the AI model's *event* and *exposure* |
+| ISO 45001:2018 | Incident: "occurrence arising out of, or in the course of, work that could or does result in injury and ill health" | Includes the outcome. The AI model's event is defined before the outcome |
 | EEI SCL | Energy release: "a temporary loss of control of the high-energy, or the high-energy changes state while exposed to the work environment" | A special case: an excursion |
 | Bowtie top event | "the point in time which describes the release or loss of control over a Hazard" (UK CAA) | The same point in the risk chain |
 | CCPS / API RP 754 | Loss of primary containment: "an unplanned or uncontrolled release of material from primary containment" | A special case: an excursion in where |
@@ -271,7 +273,7 @@ The fractalaw event is consistent with the standard definitions and is more spec
 
 ## 6. Crosswalk
 
-| fractalaw | EEI SCL | Campbell | BST / DEKRA | ASTM E2920 |
+| AI model | EEI SCL | Campbell | BST / DEKRA | ASTM E2920 |
 |---|---|---|---|---|
 | SIF actual | HSIF | SIF | SIF | aSIF |
 | PSIF, all qualifiers | PSIF + Capacity | SIF potential | SIF exposure | pSIF |
@@ -411,7 +413,7 @@ If a serious injury occurred but the band is Elevated or Not SIF, recheck the ba
 
 ## Annex B. Band table
 
-Bands run from least to most severe within each mechanism. P(serious) comes from each band's calibrated outcome distribution, assuming a working-age adult, no controls and a hard receiving surface. The class uses the default thresholds (0.50 and 0.10). **High energy** marks bands that meet the high-energy ("Stuff That Kills You") criterion; `fall/low` (1–3 m) counts as high energy only when a height of 1.8 m or more is stated. The bands and probabilities are the fractalaw classifier's calibration, so human and AI coding use the same scale.
+Bands run from least to most severe within each mechanism. P(serious) comes from each band's calibrated outcome distribution, assuming a working-age adult, no controls and a hard receiving surface. The class uses the default thresholds (0.50 and 0.10). **High energy** marks bands that meet the high-energy ("Stuff That Kills You") criterion; `fall/low` (1–3 m) counts as high energy only when a height of 1.8 m or more is stated. The bands and probabilities are the AI model's calibration, so human and AI coding use the same scale.
 
 **abrasion**
 
@@ -611,3 +613,5 @@ Bands run from least to most severe within each mechanism. P(serious) comes from
 - OSHA. *Template for Near Miss Report Form*.
 - RIDDOR 2013, regulation 4 and Schedule 2.
 - UK Civil Aviation Authority. *BowTie: Top events*.
+
+[^ai]: The AI model is copyright © Spongl Ltd 2026.
