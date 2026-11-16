@@ -1,6 +1,6 @@
 # Defining SIF: a discussion draft
 
-Status: draft v0.3, 2026-11-16. A starting point to polish, not a settled position.
+Status: draft v0.5, 2026-11-16. A starting point to polish, not a settled position.
 
 ## Contents
 
@@ -23,6 +23,8 @@ Status: draft v0.3, 2026-11-16. A starting point to polish, not a settled positi
   - [Refinement: over-energy states (build-up without release)](#refinement-over-energy-states-build-up-without-release)
   - [Refinement: the envelope in Mass, Length, Time](#refinement-the-envelope-in-mass-length-time)
   - [Refinement: event, exposure, excursion and incursion](#refinement-event-exposure-excursion-and-incursion)
+  - [Refinement: exposure as the denominator of risk](#refinement-exposure-as-the-denominator-of-risk)
+  - [Refinement: cycles, breaking the circle](#refinement-cycles-breaking-the-circle)
 - [4. Proposal: three layers, not one definition](#4-proposal-three-layers-not-one-definition)
   - [4.1 Where does the source end and the path begin?](#41-where-does-the-source-end-and-the-path-begin)
   - [4.2 Intentional releases and relief devices](#42-intentional-releases-and-relief-devices)
@@ -30,6 +32,9 @@ Status: draft v0.3, 2026-11-16. A starting point to polish, not a settled positi
 - [5. A draft definition](#5-a-draft-definition)
 - [6. Consequences for the classifier if we adopt this](#6-consequences-for-the-classifier-if-we-adopt-this)
 - [7. Open questions](#7-open-questions)
+  - [Answered in this draft](#answered-in-this-draft)
+  - [Still open](#still-open)
+  - [Parked: beyond this paper](#parked-beyond-this-paper)
 - [8. Checks before polishing](#8-checks-before-polishing)
 - [Appendix A. Line of Fire](#appendix-a-line-of-fire)
   - [A.1 Origin](#a1-origin)
@@ -278,7 +283,7 @@ Energy itself has the dimensions **M L² T⁻²**, so magnitude, distance and ra
    | Clause | Dimension exceeded |
    |---|---|
    | (a) energy outside its envelope | L (energy moved) |
-   | (b) energy released or converging on an exposed person | L (target within reach; incursion if the plan kept the area clear) |
+   | (b) incursion into a danger zone, or a change of state while a person is exposed | L (target moved, or energy moved onto an exposed target) |
    | (c) over-magnitude | M |
    | (c) unexpected presence, e.g. energisation of an isolated system | T |
 
@@ -322,8 +327,8 @@ The fix separates two things that "breach" ran together: **whether energy and a 
 |---|---|---|---|
 | **Exposure** (a condition) | Energy and a person present together in time and space, the person within reach, controls disregarded | Working on a platform at height, guarded or not; working dead behind an isolator; a pedestrian in a lane with parked, fuelled vehicles; standing under a suspended load | A missing handrail with nobody on the platform: that is a *control state*, not an exposure. A circuit whose supply has been removed: eliminated |
 | **Excursion** | Energy goes beyond its envelope in L (outside its space), M (beyond its magnitude) or T (present where it should be zero) | Flyrock beyond the zone; overpressure; a re-energised isolated circuit | |
-| **Incursion** | An exposure inside an area the plan keeps clear of people (exclusion zone, segregated route, drop zone). A kind of exposure that means a separation (L) control was meant to prevent it | Entering a blast zone; walking into a segregated vehicle route | Planned exposure, e.g. a rigger at height doing the task |
-| **Event** | Something happens at a moment: the energy **changes state** (release, transfer, build-up, energisation), producing an excursion, or the energy and an exposed person **converge** (contact or near-contact) | The load drops; the vehicle reverses toward the pedestrian; the blast fires with someone in the zone; the reactor power rises | Vehicles moving past a pedestrian at a steady, safe clearance: continued exposure |
+| **Incursion** (an event) | A person **enters a danger zone**: an area within reach of the energy that the plan keeps clear of people (exclusion zone, segregated route, drop zone, a machine's danger zone). The entry is the event; remaining there is exposure | Walking into a segregated vehicle route; reaching into a running conveyor's danger zone; entering a blast zone | Planned exposure, e.g. a rigger at height doing the task |
+| **Event** | Something happens at a moment: the energy **changes state** (release, transfer, build-up, energisation), producing an excursion or reaching an exposed person, or a person makes an **incursion** | The load drops; the vehicle reverses toward the pedestrian; the blast fires with someone in the zone; the reactor power rises; a hand goes into a running machine | Vehicles moving past a pedestrian at a steady clearance in a shared area: continued exposure |
 
 **Exposure is control-blind**, like layer 2 and chance P = 1. Controls decide how an exposure is *classified*, not whether it exists. That gives the condition-side counterpart of PSIF and Capacity:
 
@@ -334,7 +339,7 @@ The fix separates two things that "breach" ran together: **whether energy and a 
 
 **Terminology clash.** EEI uses "Exposure" for the narrower case: a high-energy hazard *without* a direct control. Our exposure is the wider, control-blind condition, and EEI's Exposure is our exposure plus an absent or failed control. Either keep "exposure" and always qualify EEI's term ("uncontrolled exposure"), or choose another word for ours (e.g. "co-presence"). Q1f.
 
-**Stored and active energy** still describe the energy usefully (held, contained, suspended or isolated; or moving, flowing, being released), echoing potential and kinetic energy. They no longer separate exposure from event, though. A person near a moving vehicle is exposed; it becomes an event when something happens (the vehicle swerves, reverses or converges).
+**Stored and active energy** still describe the energy usefully (held, contained, suspended or isolated; or moving, flowing, being released), echoing potential and kinetic energy. They no longer separate exposure from event, though. A person near a moving vehicle is exposed; it becomes an event when the vehicle changes state (swerves, reverses) or the person makes an incursion into its danger zone.
 
 **Correction to v0.2.** v0.2 said a pedestrian in a route with every vehicle parked and immobilised "is not even an exposure". That was wrong: the fuel is available energy and immobilisation is a control, so it is an exposure with an effective control. The same reasoning reverses v0.2's treatment of successful isolation in 4.1. Working dead is an exposure, and isolation is its control.
 
@@ -346,12 +351,89 @@ Both "excursion" and "incursion" are already in use in neighbouring fields:
 **Event clauses restated:**
 
 - (a) energy changes state and goes **outside its envelope in space** (excursion in L), whether or not anyone is exposed,
-- (b) energy changes state, or its path **converges on a person**, while that person is exposed (release, contact or near-contact),
+- (b) a person makes an **incursion** into a danger zone, or the energy changes state while a person is exposed (the load drops near a rigger; a vehicle reverses toward a pedestrian in a shared area),
 - (c) energy **builds beyond its magnitude, or appears where it should be zero** (excursion in M or T).
 
 Exposures are observable before anything happens (HECA, BST's precursor "if allowed to continue", Appendix A's line-of-fire condition). Events are what the classifier reads in incident narratives.
 
+**When the target moves.** Earlier wording ("the energy converges on the person") was imprecise when it is the *person* who moves, toward a moving vehicle or into running machinery. "How near is near?" had no answer. Making the **incursion** the event gives one: the entry into the danger zone, whose boundary the plan defines (exclusion zone, segregated route, machine guarding perimeter; ISO 12100's "danger zone", wording to check). It works the same for vehicles and machinery. Where the plan defines no zone, only a change of energy state can make the event. Who should define zones is parked (Q1a).
+
+**Near miss.** That gives a definition: **a near miss is an event (a change of energy state, an excursion or an incursion) in which nobody was hurt.** Exposure alone is not a near miss. Common definitions describe a near miss as an event where "given a slight shift in time or position" injury could have occurred (NSC/OSHA usage, to check). That is a statement about the T and L margins at the moment of the event. A **PSIF** is a near miss with SIF potential and no effective direct control.
+
+### Refinement: exposure as the denominator of risk
+
+"Exposure" has a long-established meaning in risk, and it anchors ours. The widely used form of risk is a product of three terms:
+
+> **Risk = exposure × chance per unit of exposure × consequence**
+
+- **Exposure** is measured in units that fit the context: hours of driving per year, take-offs and landings per year, lifts, blasts fired, confined-space entries, isolations. It is a **quantity**, not just a condition.
+- **Chance** is a *rate*: the probability of a harmful event per unit of exposure (per hour, per take-off, per lift).
+- **Consequence** is the severity of the outcome, given the event.
+
+**Micromorts** make this concrete (Howard, 1980; Spiegelhalter & Blastland, 2013). A micromort is a one-in-a-million chance of death, quoted per unit of an activity, such as per mile driven, per parachute jump, or per general anaesthetic. Process safety uses the same structure as the **Fatal Accident Rate** (FAR: fatalities per 10⁸ exposed hours; Kletz). Even TRIR is one: its 200,000-hour denominator is a generic exposure. Illustration, figures to check: at about 1 micromort per 250 miles of UK driving, **1,000 hours a year** at an average 30 mph is about 30,000 miles, or about 120 micromorts a year (roughly 1.2 × 10⁻⁴).
+
+**How this anchors the definition:**
+
+1. **Our exposure is the risk formula's exposure.** Co-presence of energy and person, assessed without regard to controls, is exactly what the denominator must be. Controls belong in the *chance per unit* term, not in the denominator: a guardrail doesn't reduce the hours spent at height, it reduces the chance of a fall per hour. If exposure credited controls, a control would be counted twice. That is why exposure has to be control-blind.
+
+2. **Exposure has a T dimension built in.** As a quantity, exposure is co-presence accumulated over time: the person-hours (or person-episodes) a person spends within reach of the energy. In M, L, T terms it is the time integral of "person within L of energy with M > 0", summed over people. For discrete tasks (a lift, a blast, an entry) the natural unit is the count of episodes, not hours.
+
+3. **Each term maps onto a layer:**
+
+   | Risk term | Our framework |
+   |---|---|
+   | Exposure (units) | The condition of section 3, now measured: person-hours or episodes within reach, per energy type |
+   | Chance per unit exposure | Event rate per unit exposure: how often energy changes state near an exposed person, or a person makes an incursion. Driven by **controls (layer 3)**. This is the left side of the bowtie, which SIF potential deliberately sets aside (chance P = 1) |
+   | Consequence | **Inherent SIF potential (layer 2)**: the outcome distribution given the event, P(serious) |
+
+   So, for one energy type: **expected SIF = exposure × event rate per unit × P(serious | event)**. The classifier supplies the last term.
+
+4. **The classifier's severity scale already speaks micromorts.** Layer 2 is calibrated in P(death), so E[P(death) | event] × event rate × exposure gives expected micromorts directly. The life-altering gap noted in section 2 applies here too: micromorts count deaths only. Spiegelhalter's *microlife* (a half-hour of life expectancy lost) is one way to weight non-fatal harm (to check).
+
+5. **Rates need energy-specific denominators.** EEI advises against a PSIF *rate*. One reason is that the only denominator usually available is total hours worked, which mixes office hours with hours at height. With exposure anchored per energy type (hours at height, lifts, vehicle-km, isolations), a PSIF rate per unit of *that* exposure is meaningful. Without it, it isn't.
+
+6. **Incident data gives numerators only.** Narratives tell us about events. Exposure denominators have to come from elsewhere: timesheets by task, lift logs, permits, telematics, blast records. That is a data requirement, not something the classifier can infer.
+
+7. **Count-per-exposure data suits the Bayesian approach** in the validation work: event counts per unit of exposure are naturally modelled as Poisson with a Gamma prior on the rate.
+
+This also settles Q1f in favour of keeping "exposure". Ours is the standard risk-formula meaning; EEI's "Exposure" (a hazard without a direct control) is the specialised use, so it should be the one that gets qualified.
+
 The earlier refinements above are kept as the argument trail. Section 4 onwards uses these terms.
+
+### Refinement: cycles, breaking the circle
+
+Two questions from v0.4 turn out to be one problem.
+
+- **Upstream steps.** Putting "how the energy came to be present" into layer 3 is **circular**. A layer-3 control failure in one cycle (the cooling pump trips) is what starts layer 1 in the next (the reaction runs away).
+- **Build-up limits.** A build-up's "uncontrolled limit" often depends on a control rather than on physics. The inventory in a reactor is set by a feed control, and Kletz's point is that inventory is a design choice.
+- **Bridge conditions** add to it. The fuel that gives a vehicle its motion can burn. The battery that drives an electric vehicle can go into thermal runaway. Motion becomes heat in braking.
+
+**Proposal: analyse in cycles.**
+
+- A **cycle** is one energy source (one energy type at one location) taken through the three layers once: envelope, exposure, event, potential and control state.
+- Cycles **chain** through **bridge conditions**. The control failure or event of cycle A sets the starting state of cycle B. Energy conversion links cycles of different energy types (chemical → motion, chemical → thermal, motion → thermal).
+- **Within a cycle, layer 2 is control-blind. At the cycle's boundary, the starting state is taken as found.** The upstream controls that set it (a feed control limiting inventory, a governor limiting speed) belong to the upstream cycle. They are not set aside unless that cycle is opened.
+
+That breaks the circle: no control is both set aside and relied on within the same cycle.
+
+**The build-up limit, restated.** The uncontrolled limit is the limit *within the cycle under examination*, starting from the state as found (the batch as charged, the speed as governed). Asking "what if the feed control had failed too?" opens a further cycle, which must be labelled as such.
+
+**Scope is the investigator's choice.** Which cycles to examine depends on where the investigator wants to go:
+
+- **Evidential cycles**: those the facts show happened, where the narrative evidences the bridge (the cooling did fail; the battery did ignite). These are precursors chained by evidence.
+- **What-if cycles**: counterfactual extensions (had the relief also failed; had the fuel ignited). They are legitimate in investigation and risk assessment, but must be labelled.
+
+**Default for the classifier: evidential cycles only.** Each is assessed separately and the most serious is kept (EEI's per-energy-source rule). A what-if cycle needs an analyst. This keeps EEI's "facts only" discipline at the cycle boundary while staying control-blind within each cycle.
+
+| Narrative | Cycle A | Bridge | Cycle B | Default scope |
+|---|---|---|---|---|
+| Cooling-water pump trips on a batch reactor; temperature rises; the quench works | Cooling system (mechanical): control fails | Loss of cooling → heat accumulates | Runaway reaction (chemical → thermal, pressure). Limit = reactant inventory *as charged* | A and B, both evidential |
+| The same, and the analyst asks what if the batch had been overcharged | — | — | Inventory beyond the charge | What-if: analyst only, labelled |
+| Forklift strikes racking; no fire | Motion | — | Fuel fire would be a what-if | A only |
+| Electric vehicle damaged in a collision; smoke, then thermal runaway in the yard | Motion | Damage → cell short circuit | Battery (chemical → thermal) | A and B, both evidential |
+| Isolated circuit back-fed from a portable generator | Generator running outside the plan | Back-feed path | Work circuit energised (excursion in T) | A and B, both evidential |
+
+Mapping the whole chain is causal analysis (bowtie, MORT). SIF classification only needs the cycles that carry SIF potential.
 
 ## 4. Proposal: three layers, not one definition
 
@@ -359,7 +441,7 @@ Treat SIF as three separate questions, each answerable on its own:
 
 | Layer | Question | Source–path–target | Who answers |
 |---|---|---|---|
-| **1. Event** | Did something happen: did the energy change state so that (a) it went outside its envelope in space, (b) it changed state or converged on a person who was exposed, or (c) it went beyond its magnitude, or appeared where it should be zero? Energy and a person together with nothing happening is an *exposure* (a condition), not an event | Source changes state, builds up, or target enters the path | Narrative (classifier Pass 1: mechanism, energy type). The envelope gate is not yet implemented |
+| **1. Event** | Did something happen: did the energy change state so that (a) it went outside its envelope in space, (b) a person made an incursion into a danger zone, or the energy changed state while a person was exposed, or (c) it went beyond its magnitude, or appeared where it should be zero? Energy and a person together with nothing happening is an *exposure* (a condition), not an event | Source changes state, builds up, or target enters the path | Narrative (classifier Pass 1: mechanism, energy type). The envelope gate is not yet implemented |
 | **2. Inherent SIF potential** | If that energy had reached a person with nothing protective between them, what is the outcome distribution, and is a serious outcome more likely than not? For a build-up, assess the energy it would reach with no control acting, up to the source's inherent limit | Source (incl. inherent features) + carrier + default environment + target; **controls set aside** | Classifier (bands → P(serious)) |
 | **3. Control state** | Which controls acted on the source, the build-up or the path, and did they work? (effective / present but failed / absent / not stated). Upstream causes are recorded here | Source isolation, build-up controls (trips, relief, rods), path | Separate extraction; often "not stated" |
 
@@ -387,6 +469,7 @@ What this buys us:
 - **The Campbell/EEI split becomes a reporting choice**, not a definitional one. "PSIF incl. Capacity" and "PSIF excl. Capacity" are two views of the same data.
 - **It matches the simulator split**: Product 2 models layer 3 (outcome-P controls on the path).
 - **It gives a HECA-style measure** when controls are known: the share of SIF-potential events with an effective direct control.
+- **It slots into the risk formula** (see the exposure-as-denominator refinement): exposure × event rate per unit (layer 3 drives the rate) × P(serious | event) (layer 2).
 
 ### 4.1 Where does the source end and the path begin?
 
@@ -451,7 +534,7 @@ Clause (c) of the event, with build-ups assessed at their uncontrolled limit:
 | Electrician working on an isolated circuit; it is re-energised from another feed | Yes (c), "when": energy present when the intended state was zero | Per voltage band | Isolation failed (back-feed not identified) → PSIF |
 | Hydraulic system isolated; trapped pressure remains in an accumulator | No event; an **exposure** for anyone working on it (energy held in the accumulator). An event (c) if the pressure releases | Per pressure band | Isolation incomplete → PSIF |
 | Vehicle moving within its designated route, no pedestrian present | No: inside the envelope | n/a | n/a |
-| Pedestrian walks into a segregated vehicle route while vehicles move | **Exposure** (incursion). An event (b) if a vehicle converges on them (near miss or contact) | Per speed and mass band | Segregation failed → PSIF |
+| Pedestrian walks into a segregated vehicle route while vehicles move | **Exposure** (incursion). The entry is itself an event (b): an incursion. With no contact it is a near miss | Per speed and mass band | Segregation failed → PSIF |
 | Battery store; one cell starts thermal runaway, detected and isolated | Yes (c) | Store inventory (cascade to adjacent cells) | Detection and isolation = effective → **Capacity** |
 | Roof snow load beyond design; no collapse | Yes (c), slow build | Collapse | No control acting (snow clearing not done) → PSIF |
 
@@ -467,7 +550,8 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 
 > **SIF potential (inherent).** An event has SIF potential when energy changes state with an excursion from its envelope or an incursion into it, and that energy, had it reached a person with no protective control between the energy and the person, would more likely than not have caused a life-ending, life-threatening or life-altering injury.
 >
-> - *Event*: something that happens at a point in time. Either the energy changes state (release, transfer, build-up, energisation) and so produces (a) an excursion in space or (c) an excursion in magnitude or time, or (b) the energy changes state or converges on a person who is exposed.
+> - *Event*: something that happens at a point in time. Either the energy changes state (release, transfer, build-up, energisation) and so produces (a) an excursion in space or (c) an excursion in magnitude or time, or (b) a person makes an incursion into a danger zone, or the energy changes state while a person is exposed.
+> - *Near miss*: an event in which nobody was hurt. Exposure alone is not a near miss.
 > - *Exposure*: a condition, not an event. Energy (held, stored or available) and a person are together in time and space, the person within reach, assessed without regard to controls.
 > - *Intended envelope*: bounds on the energy in magnitude (M: how much there may be), length (L: where it may be, and its required separation from people; for an intentional release, the release zone such as a blast exclusion zone, range danger area or relief discharge area) and time (T: when it may be present). An *excursion* is energy going beyond any one of them; an *incursion* is a person entering the envelope.
 > - *Energy state*: potential is assessed on the energy present at the time, whatever its history. For a build-up, on the energy it would reach with no control acting, up to the source's inherent physical limit.
@@ -486,20 +570,23 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 3. **Layer 3 extraction.** Add a control-state field (effective / failed / absent / not stated) and a direct-control flag (EEI's three criteria). This is new work; until then, report the classifier's SIF as "PSIF (unverified controls)".
 4. **Proximity.** Decide whether a person must plausibly have been exposed (EEI's contact or proximity rule) or whether chance P = 1 applies regardless. This changes the "empty zone" cases.
 5. **Out-of-scope mechanisms.** Confirm that overexertion and abrasion are automatically NON_SIF. Decide how medical events (e.g. cardiac arrest at work) and chronic exposures are handled; they can be fatal without any energy transfer.
-6. **Envelope gate.** Pass 1 should recognise planned releases that stayed inside their envelope with nobody inside it, and record them as no event. It should also flag clause (b) events (release or convergence while a person is exposed) and clause (c) events (over-magnitude build-ups, unexpected energisation) even when nothing was released.
+6. **Envelope gate.** Pass 1 should recognise planned releases that stayed inside their envelope with nobody inside it, and record them as no event. It should also flag clause (b) events (incursions, and changes of state while a person is exposed) and clause (c) events (over-magnitude build-ups, unexpected energisation) even when nothing was released.
 7. **Build-up bands.** The calibration bands describe released energy (fall height, voltage, speed). Build-up events need a way to choose a band from the uncontrolled limit (e.g. vessel burst energy from inventory and failure pressure), not from what the narrative says was reached.
 8. **Threshold wording.** Rename the classes, or document them, so that SIF = "most likely outcome is serious" and ELEVATED = "credibly serious". This lets each reader map the classes onto their preferred tradition.
 
 ## 7. Open questions
 
-- **Q1.** Is the three-clause event (excursion in space; change of state or convergence while a person is exposed; excursion in magnitude or time) the right wording? It replaces "unwanted release", which fails for blasting, test firing and relief devices. Should "unexpected" be dropped entirely? Are *excursion*, *incursion* and *exposure* the right terms (replacing the earlier "breach")?
-- **Q1a.** Who defines the envelope? The design (blast plan, range danger-area template, relief discharge design), the permit, or the regulator? What happens when there is no documented envelope?
-- **Q1b.** Is it right to put all upstream steps (how the energy came to be present) out of scope for potential, and into layer 3 only?
-- **Q1c.** Should build-ups be assessed at the uncontrolled limit (consistent with control-blind layer 2) or at the peak actually reached (EEI facts-only)? The uncontrolled limit can be very large (reactor, runaway reaction); is a physical-inventory bound enough of a restraint?
-- **Q1d.** Is "no failure mode, no demand" the right test for an inherent feature (part of the source) versus a control?
-- **Q1f.** Our *exposure* is control-blind; EEI's "Exposure" means a hazard *without* a direct control. Keep our word and always qualify EEI's, or rename ours (e.g. "co-presence")?
-- **Q1g.** Is "convergence (contact or near-contact)" the right trigger for an event when the energy is already moving (vehicles, conveyors), and how close is "near"?
-- **Q1e.** Should the M, L, T envelope be made operational? For example: dimensionless margins (m, l, t) as fields, and control-state classified as M, L or T controls. Or does it stay as a framing device in the definition?
+### Answered in this draft
+
+- **Q1b + Q1c** (upstream steps; build-up limits). One circular problem, broken by analysing in **cycles**: control-blind within a cycle, the starting state taken as found at its boundary, and the investigator scoping evidential versus what-if cycles. See the cycles refinement in section 3.
+- **Q1d** ("no failure mode, no demand" as the test for an inherent feature). Accepted as the working definition of inherent safety / safety by design. Glossary wording to be anchored in the literature (CCPS, Kletz, IAEA, ISO 12100).
+- **Q1f** (exposure versus EEI's "Exposure"). Keep ours: it is the standard risk-formula meaning. Qualify EEI's as "Exposure (EEI)".
+- **Q1g** (convergence when the target moves). The **incursion** is the event: entry into a danger zone defined by the plan. This works for vehicles and machinery, and gives a definition of **near miss** (an event in which nobody was hurt). See the event/exposure refinement.
+
+### Still open
+
+- **Q1.** Is the three-clause event (excursion in space; incursion, or a change of state while a person is exposed; excursion in magnitude or time) the right wording? Are *excursion*, *incursion*, *exposure*, *event* and *near miss* the right terms? Should "unexpected" be dropped entirely? (The wording argument stays in section 3 as the case for the choice.)
+- **Q1i.** How is a cycle bounded in practice: per energy type, per source, or per location? How should what-if cycles be labelled in classifier output?
 - **Q2.** Credit working controls (EEI Capacity), or count barrier-saved events as PSIF (Campbell)? The layered model allows both views; which one is the headline?
 - **Q3.** Should the probability anchor be "more likely than not" (0.50) or "credible" (0.10)? Should validation against human coders use SIF alone or SIF + ELEVATED?
 - **Q4.** Which control definition: EEI's narrow direct control (targeted, effective, error-tolerant; no training, rules or generic PPE) or ICMM/BST's broader one?
@@ -508,17 +595,25 @@ The last three cases in 4.1 don't depend on the layer model. They depend on whic
 - **Q7.** Should missing detail default to the least severe band or to the population prior?
 - **Q8.** Should the definition fit the QQ SIFp grades (1 Fatal … 4 High), or should the grades be mapped onto the definition?
 
+### Parked: beyond this paper
+
+These belong to a later design specification that wraps the model (risk-control design, data fields, metrics), not to the SIF definition.
+
+- **Q1a.** Who defines the envelope (the design, the permit, the regulator), and what happens when none is documented? A question about the design of risk controls.
+- **Q1e.** Making M, L, T operational: dimensionless margins (m, l, t) as fields, and controls classified as M, L or T. In this paper M, L, T is a framing device.
+- **Q1h.** Standard exposure units per energy type, and where client data can supply the denominators. The paper shows there are several ways to measure exposure. Some energy types already converge on established metrics: chemical exposure as a time-weighted average against a workplace exposure limit (concentration × time), electromagnetic fields and ionising radiation as field-strength reference levels and dose (references to check).
+
 ## 8. Checks before polishing
 
 - Quotes from the Campbell Institute papers (2018, 2020) are from secondary sources. Check them against the PDFs.
 - ANSI/ASSP Z16.1-2022 definitions are unverified (paywalled).
-- BSEE (2023). *Safety Alert 468: Red Zone Hazards Pose Increased Risk to Personnel During Lifting Operations*. Bureau of Safety and Environmental Enforcement.
-- ConocoPhillips (2025). *Life Saving Rules Standard*. https://static.conocophillips.com/files/resources/life-saving-rules-standard.pdf
-- Energy Safety Canada. *Line of Fire Program*. https://www.energysafetycanada.com/resource/line-fire-program
 - ASTM E2920-26 wording is from the store summary and a vendor blog.
 - Viner (1991) "uncontrolled flow of energy" wording is unverified.
 - Origin of the energy wheel graphic is unverified.
 - **Units:** EEI's "500 ft-lbs" is about 680 J, *not* 1,500 J. EEI's own documents use both figures, so they are not a unit conversion. Our docs should state which one we mean wherever we cite either.
+- ISO 12100 "danger zone" / "hazard zone" wording and the NSC/OSHA near-miss definition ("a slight shift in time or position") are cited from memory. Check both.
+- Chemical exposure (TWA against workplace exposure limits) and EMF/ionising radiation metrics (reference levels, dose) are named as established exposure metrics without references.
+- Micromort figures (e.g. about 1 per 250 miles of UK driving), the FAR definition (per 10⁸ exposed hours) and *microlife* are cited from memory. Check them against Spiegelhalter & Blastland (2013) and Kletz before quoting.
 - Hopkinson–Cranz cube-root scaling and the radiation-protection triad (time, distance, shielding) are cited as standard practice. Add a primary reference for each (e.g. Baker, *Explosions in Air*; ICRP).
 - Kletz (inherently safer design) and CCPS LOPA (independent protection layers) are cited from memory for the inherent-feature vs control test. Check the wording before relying on it.
 - "Excursion" (CCPS safe operating limits) and "incursion" (ICAO runway incursion) are cited as established usage from memory. Check both before relying on the parallel.
@@ -579,7 +674,7 @@ Hallowell's energy-based approach does not use LoF as an organising idea. Hallow
 | Envelope, L dimension | Being *in* the line of fire means l < 1: separation less than the energy's reach | LoF is L only |
 | Envelope, T dimension | "Not always obvious or constant and can be introduced as the task progresses" | IOGP's guidance recognises that the envelope changes over time |
 | Envelope, M dimension | Absent. ESC's "a force your body cannot endure" is the only hint of a threshold | No magnitude threshold, which is Hallowell's criticism |
-| Layer 1, clause (b) | Energy released, or converging, while a person is "in the line of fire" | Clause (b) *is* the LoF event |
+| Layer 1, clause (b) | Stepping *into* the line of fire (incursion), or the energy releasing while a person is in it | Clause (b) *is* the LoF event |
 | Exposure (a condition) | "In the line of fire" with nothing happening: standing under a suspended load | Our exposure, control-blind. With no direct control it is also EEI "Exposure" |
 | Layer 2, inherent potential | **Chance P = 1 is the LoF question**: "if you had been in the line of fire, how bad would it be?" | LoF positioning changes chance P, not potential |
 | Layer 3, control state | Positioning, barriers, exclusion zones, securing loose objects | All **L controls**. M controls (isolation, relief) and T controls (permits, interlocks) sit in other rules, e.g. Energy Isolation |
@@ -621,7 +716,7 @@ The mapping is many-to-many, so a crosswalk needs the mechanism *and* the energy
 
 **Adds:**
 - **Communication.** Its everyday phrase explains chance P = 1 well: "SIF potential asks how bad it would have been if you had been in the line of fire."
-- **Exposure in a word.** "In the line of fire" is exposure, often an incursion. It becomes an event when the energy releases or converges.
+- **Exposure in a word.** "In the line of fire" is exposure, often an incursion. Stepping into it is an incursion (an event); being in it when the energy releases is an event too.
 - **The T dimension in practice.** IOGP's "introduced as the task progresses" puts the time-varying envelope in shop-floor terms.
 - **A reporting crosswalk** (A.5) that IOGP members already use.
 
@@ -648,31 +743,39 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | Term | Meaning |
 |---|---|
 | **Active energy** | Energy that is moving, flowing or being released (a moving vehicle, a falling load, a blast). Descriptive; it does not by itself make an event. Compare *stored energy* |
+| **Bridge condition** | A link from one cycle to the next: a control failure or event in one cycle that sets the starting state of another, often by energy conversion (fuel → motion, fuel or battery → fire, motion → heat) |
 | **Capacity** | (EEI SCL) A high-energy release with an effective direct control present and no serious injury: the control did its job. Not a PSIF under EEI |
 | **Chance P** | The probability that the energy reaches a person at all. SIF potential sets chance P = 1 |
+| **Chance per unit exposure** | In the risk formula, the probability (rate) of a harmful event per unit of exposure (per hour, per lift, per take-off). Driven by controls |
 | **Containment** | What holds energy in its intended state (pipe wall, cable insulation, vessel). Part of the source, not a control; release is escape from it |
 | **Control (protective control)** | Anything that must act, and can fail, to prevent, limit or redirect the energy or keep it from a person. Classified as an M, L or T control. Compare *inherent feature* |
+| **Cycle** | One energy source analysed through all three layers once (envelope, exposure, event, potential, control state). Cycles chain through bridge conditions; each is *evidential* (facts show it happened) or *what-if* (counterfactual, labelled) |
+| **Danger zone** | An area within reach of an energy that the plan keeps clear of people (ISO 12100 sense for machinery, to check). Entry is an incursion |
 | **Direct control** | (EEI) A control targeted to the high-energy source, effective when installed, verified and used properly, and effective even with unintentional human error. Training, rules, signs and generic PPE are excluded |
 | **Elevated** | Classifier class: P(serious outcome) ≥ 0.10 and < 0.50; "credibly serious" |
-| **Envelope (intended energy envelope)** | The designed bounds on an energy in magnitude (M), space and separation (L) and time (T): containment and designed path for contained energy; the release zone for an intentional release |
-| **Event** | Something that happens at a moment: a change of energy state (release, transfer, build-up, energisation) producing an excursion, or energy changing state or converging (contact or near-contact) on an exposed person. Layer 1 |
-| **Excursion** | Energy going beyond its envelope in L, M or T |
 | **Elimination** | Removing the energy from the source (supply disconnected and removed, system drained and vented, stored energy discharged). Changes the source and ends exposure. Compare *isolation* |
-| **Exposure** | A condition: energy (held, stored or available) and a person together in time and space, the person within reach, assessed **without regard to controls**. Not the same as EEI's "Exposure", which is a high-energy hazard *without* a direct control (our exposure + control absent) |
+| **Envelope (intended energy envelope)** | The designed bounds on an energy in magnitude (M), space and separation (L) and time (T): containment and designed path for contained energy; the release zone for an intentional release |
+| **Event** | Something that happens at a moment: a change of energy state (release, transfer, build-up, energisation) producing an excursion or reaching an exposed person, or a person's incursion into a danger zone. Layer 1 |
+| **Excursion** | Energy going beyond its envelope in L, M or T |
+| **Exposure** | As a condition: energy (held, stored or available) and a person together in time and space, the person within reach, assessed **without regard to controls**. As a quantity: that co-presence measured in context-specific units (person-hours, lifts, take-offs, km), the denominator of the risk formula. Not the same as EEI's "Exposure", which is a high-energy hazard *without* a direct control (our exposure + control absent) |
+| **FAR (Fatal Accident Rate)** | Fatalities per 10⁸ exposed hours (Kletz, process safety): a chance-per-unit-exposure measure |
 | **HECA** | (EEI/CSRA) High-Energy Control Assessment: the share of observed high-energy hazards with a direct control in place, Success / (Success + Exposure) |
 | **High energy** | (EEI) Over 500 ft-lbs (about 680 J); Hallowell et al. (2017) use > 1,500 J for "most likely a SIF". Not the same threshold |
-| **Incursion** | An exposure inside an area the plan keeps clear of people (exclusion zone, segregated route, drop zone): a separation (L) control was meant to prevent it |
-| **Isolation** | A control that holds energy away from the work (isolator, LOTO, immobilisation). It has failure modes, so the energy is still present and the person still exposed. Compare *elimination* |
+| **Incursion** | An event: a person entering a danger zone, an area within reach of the energy that the plan keeps clear (exclusion zone, segregated route, drop zone, machine danger zone). Remaining there is exposure |
 | **Inherent feature** | A property of the source with no failure mode that needs no demand (e.g. a negative temperature coefficient, pump dead-head pressure, reduced inventory). Part of the source; changes the potential |
 | **Inherent SIF potential** | Layer 2: the outcome distribution if the energy reached a person with no protective control between them, assessed on the energy state at the time (or the uncontrolled limit of a build-up) |
+| **Isolation** | A control that holds energy away from the work (isolator, LOTO, immobilisation). It has failure modes, so the energy is still present and the person still exposed. Compare *elimination* |
 | **Layer 1, 2, 3** | Event; inherent SIF potential; control state |
 | **LIFE** | (Bayona et al., 2023) Life-ending, life-threatening, life-altering: the three-part definition of a serious outcome |
 | **Line of Fire** | (IOGP and others) Shop-floor term for being in the path of energy; in our terms, an incursion. See Appendix A |
 | **M, L, T** | Magnitude, length (space and separation), time: the three dimensions of the envelope |
 | **Margins m, l, t** | Dimensionless ratios of actual to design value: m = magnitude / design magnitude; l = separation / required separation; t = presence outside the intended window. Excursion or incursion when m > 1, l < 1 or t > 0 |
+| **Micromort** | A one-in-a-million chance of death, quoted per unit of an activity (Howard; Spiegelhalter). Layer 2's P(death) scale lets expected micromorts be computed as exposure × event rate × E[P(death) given the event] |
+| **Near miss** | An event (change of energy state, excursion or incursion) in which nobody was hurt. Exposure alone is not a near miss |
 | **Outcome P** | The distribution of severity given the energy reaches a person. Layer 2 models this |
 | **P(serious)** | Classifier output (`sif_p_sif`): probability that the outcome is serious or worse, from the calibrated band distribution |
 | **PSIF (SIF precursor)** | An event with SIF potential, no serious injury, and no effective direct control (absent, failed or not stated). Close to EEI's PSIF and BST's precursor |
+| **Risk** | Exposure × chance per unit of exposure × consequence |
 | **SIF** | Serious injury or fatality. As a classifier class: P(serious) ≥ 0.50, "most likely outcome is serious" |
 | **SIF actual (HSIF)** | An event in which a serious injury or fatality occurred |
 | **Source–path–target** | The energy-damage model (Gibson, Haddon): energy leaves a source, travels a path, reaches a target. Controls act at the source or on the path |
@@ -689,6 +792,9 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 - Campbell Institute (2018). *Serious Injury and Fatality Prevention: Perspectives and Practices*. National Safety Council.
 - Campbell Institute (2020). *Designing Strategy for Serious Injury and Fatality Prevention*. National Safety Council.
 - Campbell Institute (2022). *SIF Prevention: Leading Indicators, Cumulative Risk, and Safety Networks*. National Safety Council.
+- BSEE (2023). *Safety Alert 468: Red Zone Hazards Pose Increased Risk to Personnel During Lifting Operations*. Bureau of Safety and Environmental Enforcement.
+- ConocoPhillips (2025). *Life Saving Rules Standard*. https://static.conocophillips.com/files/resources/life-saving-rules-standard.pdf
+- Energy Safety Canada. *Line of Fire Program*. https://www.energysafetycanada.com/resource/line-fire-program
 - ASTM E2920-26 (2026). *Standard Guide for Recording Priority Occupational Injuries and Illnesses and SIF-Related …* https://store.astm.org/e2920-26.html
 - ANSI/ASSP Z16.1-2022. *Safety and Health Metrics and Performance Measures*. ASSP.
 - CCPS (2001). *Layer of Protection Analysis: Simplified Process Risk Assessment*. Center for Chemical Process Safety / AIChE. (independent protection layer definition to check)
@@ -703,6 +809,8 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 - IOGP (2018). *Report 459: IOGP Life-Saving Rules*, v3.0. International Association of Oil & Gas Producers. https://www.iogp.org/life-savingrules/
 - IOGP (2025). *Life-Saving Rules: Line of Fire – Introduction to Supporting Materials*. https://www.iogp.org/wp-content/uploads/2025/10/IOGP-Life-Saving-Rules-Line-of-Fire-Introduction-to-Supporting-Materials.pdf
 - Johnson, W.G. (1980). *MORT Safety Assurance Systems*. Marcel Dekker.
+- Howard, R.A. (1980). On making life and death decisions. In R.C. Schwing & W.A. Albers (eds), *Societal Risk Assessment: How Safe Is Safe Enough?* Plenum. (micromort origin; to check)
+- Kletz, T. (1999). *Hazop and Hazan: Identifying and Assessing Process Industry Hazards*, 4th ed. IChemE. (FAR; edition to check)
 - Kletz, T. (1991, 2nd ed. 2010 with Amyotte). *Process Plants: A Handbook for Inherently Safer Design*. (edition to check)
 - Krause, T.R. (2010). *New Findings on Serious Injuries and Fatalities*. BST.
 - La Duke, P. (2013). Working in the line of fire. *ISHN*, 22 August 2013.
@@ -713,4 +821,5 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 - OSHA. *Construction Focus Four: Struck-By Hazards*, instructor guide. https://www.osha.gov/sites/default/files/struckby_ig.pdf
 - OSHA, 29 CFR 1904.39. Reporting fatalities, hospitalizations, amputations, and losses of an eye.
 - RIDDOR 2013, regulation 4 (specified injuries) and Schedule 2 (dangerous occurrences). https://www.legislation.gov.uk/uksi/2013/1471/regulation/4
+- Spiegelhalter, D. & Blastland, M. (2013). *The Norm Chronicles: Stories and Numbers About Danger*. Profile Books.
 - Viner, D. (1991). *Accident Analysis and Risk Control*. (wording unverified)
