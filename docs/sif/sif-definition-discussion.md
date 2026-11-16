@@ -1,6 +1,6 @@
 # Defining SIF: a discussion draft
 
-Status: draft v1.5, 2026-11-16. All open questions answered or parked. A starting point to polish, not a settled position.
+Status: draft v1.6, 2026-11-16. All open questions answered or parked. A starting point to polish, not a settled position.
 
 ## Contents
 
@@ -28,6 +28,7 @@ Status: draft v1.5, 2026-11-16. All open questions answered or parked. A startin
   - [Refinement: exposure strata, demand and incursion](#refinement-exposure-strata-demand-and-incursion)
   - [Refinement: the target has an envelope too](#refinement-the-target-has-an-envelope-too)
   - [Refinement: the event as shrinking separation](#refinement-the-event-as-shrinking-separation)
+  - [Refinement: live energy and the line of fire](#refinement-live-energy-and-the-line-of-fire)
   - [Refinement: cycles, breaking the circle](#refinement-cycles-breaking-the-circle)
 - [4. Proposal: three layers, not one definition](#4-proposal-three-layers-not-one-definition)
   - [4.1 Where does the source end and the path begin?](#41-where-does-the-source-end-and-the-path-begin)
@@ -525,6 +526,24 @@ The three cases are then positions on one scale, the event's **closest approach*
 
 Closest approach is the margins idea (m, l, t) applied to a single event. Recording it qualitatively (wide, close, contact) is part of the definition; numeric margins stay parked for the design specification (Q1e).
 
+### Refinement: live energy and the line of fire
+
+**The challenge.** A person enters the exclusion zone during a heavy lift. The person moved and the load didn't, so the separation shrank from the people's end. That is an incursion, and so an event. Yet v1.5 of the definitions document gave "standing under a suspended load" as an example of *exposure*, which is a condition and not an event.
+
+**A wrong turn.** The first response was a current-path test: an incursion counts as an event only if the energy could reach the person by continuing what it was already doing. A held load would need to drop as well, so entering beneath it would be exposure. That test was rejected. Separation can shrink from either end, which is the agreed meaning of an event. The judgement is about *how far* the margin was eroded, which is the closest approach, not *whether* there was an event.
+
+**The distinction that holds: live versus isolated.**
+
+- **A suspended load is live.** Only the crane and rigging, which are controls that can fail, hold its potential energy. Its drop path is a **line of fire**, which is why the exclusion zone exists. Entering it is an incursion: an event. The closest approach records how far in the person went (wide at the zone edge; close under the load).
+- **An isolated machine has no line of fire.** The energy is present behind the isolator, so the person is exposed, but nothing live points at them. Opening its guard is exposure under isolation, not an incursion.
+- **Tag-liners are planned exposure.** They are within reach of the lift but positioned at the edge, out of the drop path, with the tag-line length as their separation. There is no event unless something changes: the load swings, or they are drawn in under it.
+
+**Consequences:**
+
+- Two new terms. *Live*: energy in its working state, not isolated, with a line of fire to people. *Line of fire*: the path live energy takes as it moves, or would take if released. Danger zones are drawn around it. This brings the shop-floor term (Appendix A) into the definition itself.
+- "Standing under a suspended load" was a wrong exposure example. Getting there is an incursion; staying there counts as exposure.
+- *Present* and *live* now do different jobs. Present (held, stored, available, isolated) decides exposure. Live (present and not isolated, with a line of fire) decides whether an entry is an incursion.
+
 ### Refinement: cycles, breaking the circle
 
 Two questions from v0.4 turn out to be one problem.
@@ -759,6 +778,7 @@ The barrier-saved question is then answered by the CDF, not by a label. Take a f
 - **Q1j** (is incursion time the same as exposure?). **No.** Exposure is control-blind: the operator at a guarded machine is exposed for the whole time they use it, and the guard is in continuous demand. Incursion is entry into the danger zone while the energy is live; time inside is the highest exposure stratum. Entry under isolation is not an incursion. See "Refinement: exposure strata, demand and incursion".
 - **Q1k** (why did event tables keep coming out sparse?). The target needs an envelope too, in where, when and how much. An event is a change on either side (excursion or incursion) that brings the two envelopes together; it is the materialised chance term of the risk equation (the top event). See "Refinement: the target has an envelope too".
 - **Q1l** (does the event cover unoccupied excursions, near misses and harm events?). Yes, once the event is defined as a **shrinking of the separation margin**, a happening rather than a condition. Its closest approach (wide, close, contact) places it. "Chance P = 1" becomes **separation to zero**. See "Refinement: the event as shrinking separation".
+- **Q1m** (is a person entering a heavy-lift exclusion zone an event, when the load is unchanged?). Yes: the separation shrank from the people's end. The deciding distinction is **live** (a suspended load has a line of fire) versus **isolated** (no line of fire). The degree of erosion is the closest approach. See "Refinement: live energy and the line of fire".
 - **Q2** (credit working controls, or count barrier-saved events as PSIF?). **Headline = inherent SIF potential** (classifier, company threshold). Credit for controls comes as the **residual outcome distribution** from the simulator, whose Monte Carlo includes degraded and absent control states, so the answer is in the CDF. PSIF is the umbrella, qualified **protected / unprotected / unverified**; EEI's "Capacity" is PSIF (protected), avoiding confusion with Safety-II and HOP "capacity". See 4.4.
 - **Q3** (anchor at 0.50 "more likely than not" or 0.10 "credible"?). **Both stay in use**: SIF ≥ 0.50, ELEVATED ≥ 0.10, with the threshold set by the company. No change; revisit when the validation against human coders has been reconciled.
 - **Q4** (EEI's narrow direct control or a broader definition?). **No longer a definitional question.** EEI needs a narrow definition because its classification is yes/no: it must decide which controls "count". In our model every control (engineered, passive, procedural, training, PPE) enters the simulator through its effectiveness distribution. An error-tolerant engineered barrier has a high, narrow distribution; a rule or training has a low, wide one. EEI's three criteria are kept only for the EEI crosswalk (PSIF protected versus unprotected) and for HECA-style metrics.
@@ -855,7 +875,7 @@ Hallowell's energy-based approach does not use LoF as an organising idea. Hallow
 | Envelope, T dimension | "Not always obvious or constant and can be introduced as the task progresses" | IOGP's guidance recognises that the envelope changes over time |
 | Envelope, M dimension | Absent. ESC's "a force your body cannot endure" is the only hint of a threshold | No magnitude threshold, which is Hallowell's criticism |
 | Layer 1, clause (b) | Stepping *into* the line of fire (incursion), or the energy releasing while a person is in it | Clause (b) *is* the LoF event |
-| Exposure (a condition) | "In the line of fire" with nothing happening: standing under a suspended load | Our exposure, control-blind. With no direct control it is also EEI "Exposure" |
+| Exposure (a condition) | Within reach of live energy with nothing happening, e.g. tag-liners at the edge of a lift. Stepping *into* the line of fire, such as walking under a suspended load, is an incursion (an event) | Our exposure, control-blind. With no direct control it is also EEI "Exposure" |
 | Layer 2, inherent potential | **Chance P = 1 is the LoF question**: "if you had been in the line of fire, how bad would it be?" | LoF positioning changes chance P, not potential |
 | Layer 3, control state | Positioning, barriers, exclusion zones, securing loose objects | All **L controls**. M controls (isolation, relief) and T controls (permits, interlocks) sit in other rules, e.g. Energy Isolation |
 | EEI direct control | Barriers and engineered exclusion zones *may* qualify | Positioning by behaviour does not: it fails with unintentional human error. Feeds Q4 |
@@ -947,7 +967,7 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **FAR (Fatal Accident Rate)** | Fatalities per 10⁸ exposed hours (Kletz, process safety): a chance-per-unit-exposure measure |
 | **HECA** | (EEI/CSRA) High-Energy Control Assessment: the share of observed high-energy hazards with a direct control in place, Success / (Success + Exposure) |
 | **High energy** | (EEI) Over 500 ft-lbs (about 680 J); Hallowell et al. (2017) use > 1,500 J for "most likely a SIF". Not the same threshold |
-| **Incursion** | An event: people entering the energy's envelope, where the energy is, when it is live, or in greater numbers than planned. Remaining there counts towards exposure, in the stratum where that control is absent. Entry under isolation, or when the energy is not live, is not an incursion |
+| **Incursion** | An event: people entering the energy's envelope: into the line of fire of live energy, there when it is live, or in greater numbers than planned. Time inside counts as exposure. Entry under isolation, or when the energy is not live, is not an incursion: there is no line of fire |
 | **Inherent feature** | A property of the source's own materials, quantity, operating conditions or physics. It is in effect throughout normal operation without detection, actuation, power or human action, and can be lost only by changing the source (e.g. a reduced inventory, pump dead-head pressure, a negative temperature coefficient). Part of the source; changes the potential. Judged for a named hazard within the operating envelope |
 | **Inherent safety** | "The achievement of safety through the elimination or exclusion of inherent hazards through the fundamental conceptual design choices" (IAEA-TECDOC-626). In process safety, "eliminate or greatly reduce the hazard by changing the process to use materials and conditions that are nonhazardous or much less hazardous" (Hendershot, 2012). Kletz: "what you don't have, can't leak" |
 | **Inherent SIF potential** | Layer 2: the outcome distribution if the energy reached a person with no protective control between them, assessed on the energy state at the time (or the uncontrolled limit of a build-up) |
@@ -956,7 +976,8 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Isolation** | A control that holds energy away from the work (isolator, LOTO, immobilisation). It has failure modes, so the energy is still present and the person still exposed. A procedural control in CCPS terms. Compare *elimination* |
 | **Layer 1, 2, 3** | Event; inherent SIF potential; control state |
 | **LIFE** | (Bayona et al., 2023) Life-ending, life-threatening, life-altering: the three-part definition of a serious outcome |
-| **Line of Fire** | (IOGP and others) Shop-floor term for being in the path of energy; in our terms, an incursion. See Appendix A |
+| **Line of fire** | The path live energy takes as it moves, or would take if released (drop path, swing path, travel path, trajectory). Danger zones are drawn around it. Also the shop-floor term (IOGP); see Appendix A |
+| **Live** | Energy in its working state, not isolated, with a line of fire to people: a suspended load, a running machine, an energised conductor, plant under pressure. Isolated energy is present (exposure) but not live |
 | **M, L, T** | Magnitude, length (space and separation), time: the three dimensions of the envelope |
 | **Margins m, l, t** | Dimensionless ratios of actual to design value: m = magnitude / design magnitude; l = separation / required separation; t = presence outside the intended window. Excursion or incursion when m > 1, l < 1 or t > 0 |
 | **Micromort** | A one-in-a-million chance of death, quoted per unit of an activity (Howard; Spiegelhalter). Layer 2's P(death) scale lets expected micromorts be computed as exposure × event rate × E[P(death) given the event] |

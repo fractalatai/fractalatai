@@ -1,6 +1,6 @@
 # SIF definitions and coding rules
 
-Version 1.5, 2026-11-16. For safety directors, safety teams and anyone coding incident reports for serious injury and fatality (SIF) potential. The supporting rationale is in [sif-definition-discussion.md](sif-definition-discussion.md).
+Version 1.6, 2026-11-16. For safety directors, safety teams and anyone coding incident reports for serious injury and fatality (SIF) potential. The supporting rationale is in [sif-definition-discussion.md](sif-definition-discussion.md).
 
 ## Contents
 
@@ -31,7 +31,9 @@ Version 1.5, 2026-11-16. For safety directors, safety teams and anyone coding in
 | **Energy present** | Energy that is held, stored or available to be released, including the supply behind an isolator and the fuel in a parked vehicle. Only elimination removes it |
 | **Elimination** | Removing the energy from the source: supply disconnected and removed, system drained and vented, stored energy discharged, load landed |
 | **Envelope** | The designed bounds on an energy: **where** it may be and how far it must be kept from people; **when** it may be live; and **how much** may be present. For contained energy, the envelope is the containment and its designed path. For an intentional release (a blast, live firing, a relief discharge), it is the designed release zone |
-| **Danger zone** | An area within reach of an energy that is kept clear of people while the energy is live: an exclusion zone, a segregated route, a drop zone, or a machine's hazard zone behind its guards (ISO 12100) |
+| **Live** | Energy in its working state, not isolated, with a line of fire to people: a suspended load, a running machine, an energised conductor, plant under pressure. Isolated energy is present (people near it are exposed) but not live |
+| **Line of fire** | The path live energy takes as it moves, or would take if released: the drop path of a suspended load, the swing path of a slewed load, the travel path of a vehicle, the trajectory of flyrock. Danger zones are drawn around it |
+| **Danger zone** | An area around the line of fire of live energy that is kept clear of people: an exclusion zone, a segregated route, a drop zone, or a machine's hazard zone behind its guards (ISO 12100) |
 | **Containment** | What holds energy in its intended state: a vessel, pipe or cable insulation. Containment is part of the source, not a control |
 | **Inherent feature** | A property of the source's own materials, quantity, operating conditions or physics. It works throughout normal operation without detection, actuation, power or human action, and can be lost only by changing the source. Examples: a reduced inventory, pump dead-head pressure, a reactor's negative temperature coefficient. It is part of the source, not a control |
 
@@ -44,7 +46,7 @@ Version 1.5, 2026-11-16. For safety directors, safety teams and anyone coding in
 | **Separation margin** | What keeps energy and people apart: distance, time, or the margin to the design limit |
 | **Event** | A **happening**, not a condition: the separation margin between energy and people shrinks toward zero, because the energy changes (an excursion) or the people do (an incursion). An event is defined before any outcome is known |
 | **Excursion** | The energy goes beyond its envelope: it is released or moves (where), becomes live when it should not be (when), or builds up beyond its design (how much) |
-| **Incursion** | People enter the energy's envelope: they go where the energy is, are there when it is live, or are more than planned. Time spent inside counts as exposure. Entry under isolation, or when the energy is not live, is not an incursion |
+| **Incursion** | People enter the energy's envelope: they go into the line of fire of live energy, are there when it is live, or are more than planned. Time spent inside counts as exposure. Entry under isolation, or when the energy is not live, is not an incursion: there is no line of fire |
 | **Closest approach** | How near the energy came to people during an event: **wide** (nobody near), **close** (near miss) or **contact** (the energy reached a person) |
 | **Near miss** | An event whose closest approach was close, or that reached contact without harm. An excursion with nobody near is an event, not a near miss |
 
@@ -93,7 +95,7 @@ An event is a change on either side that shrinks the separation between the two 
 
 | | **The energy changes** (excursion) | **The people change** (incursion) |
 |---|---|---|
-| **Where** | It is released or moves beyond its envelope: flyrock beyond the zone; a load swings off its path; a vehicle leaves its route; a person at height falls | People enter where the energy is: walking into a segregated route; reaching into a running machine |
+| **Where** | It is released or moves beyond its envelope: flyrock beyond the zone; a load swings off its path; a vehicle leaves its route; a person at height falls | People enter the line of fire of live energy: walking into a segregated route; reaching into a running machine; walking under a suspended load |
 | **When** | It becomes live when it should not be: a back-fed isolated circuit; a machine restarts; firing starts early | People are present when the energy is live: entering the range during the firing window; still in the blast zone at firing |
 | **How much** | It builds up beyond its design: overpressure; overload; overspeed; a runaway reaction | More people than planned: a crowd gathers in the drop zone; a team works where one person was planned |
 
@@ -111,7 +113,7 @@ Every event has a closest approach. It is recorded for learning and reporting; i
 
 ### 3.4 Not events
 
-- **Exposure:** energy and people together, with nothing changing. Examples: standing under a suspended load; working dead behind an isolator.
+- **Exposure:** energy and people together, with nothing changing. Examples: tag-liners holding their lines at the edge of a lift, outside the drop path; an operator at a guarded, running machine; working dead behind an isolator.
 - **Separation held:** the envelopes are kept apart in where (distance, barriers) or when (scheduling, permits, firing windows). Entering the range tomorrow, when no firing is planned, is separation in time.
 - **A planned release that stays inside its envelope** with nobody in it, such as a blast fired with the zone clear.
 - **A control failing on its own**, such as a relief valve sticking. The event is what the energy does next (the overpressure); the stuck valve is its control state.
@@ -307,7 +309,7 @@ Work through steps 1–7 for **each energy source** in the report.
 
 **Step 3. Decide whether an event occurred.** Use section 3.2. Ask: **did the energy or the people change, so that the separation between them shrank?**
 - **Excursion:** the energy was released, moved, became live or built up. Examples: a dropped load, flyrock beyond the zone, a fall from height, a re-energised isolated circuit, overpressure.
-- **Incursion:** people entered where the energy was, were there when it was live, or were more than planned. Examples: reaching past a guard on a running machine, walking into a segregated route, being on the range during firing.
+- **Incursion:** people entered the line of fire of live energy, were there when it was live, or were more than planned. Entering near isolated energy is not an incursion. Examples: reaching past a guard on a running machine, walking into a segregated route, being on the range during firing.
 
 If yes, it is an **event**. Record whether it was an excursion, an incursion or both; the dimension (where, when, how much); and the closest approach (wide, close, contact). Go to step 4.
 
@@ -379,7 +381,9 @@ If a serious injury occurred but the band is Elevated or Not SIF, recheck the ba
 | "Operator cleared a jam on the conveyor with the guard open and the belt running. No injury." | Mechanical. Incursion, where; close. `caught_in/medium_machinery`: SIF. No injury. Guard removed, no isolation | **PSIF (unprotected)** |
 | "Electrician found the circuit live while working on it; it had been back-fed from a generator. No shock." | Electrical, 230 V. Excursion, when; close. `electrical/low`: Elevated. No injury | **Elevated** |
 | "Worker tripped over a cable in the office and bruised a knee." | Gravity. Excursion, where; contact. `fall/standing`: Not SIF | **Not SIF** |
-| "Rigger standing under a suspended load; nothing happened." | Gravity. Energy present; nothing changed | **SIF exposure** |
+| "During a heavy lift, a labourer walked under the load to fetch a tool." | Gravity, suspended load (live). Incursion into the drop path; close. `struck/heavy_object_fall`: SIF. No injury. Exclusion zone failed | **PSIF (unprotected)** |
+| "Visitor crossed the outer edge of the lift exclusion zone, well clear of the drop path." | Gravity, suspended load (live). Incursion, where; wide. `struck/heavy_object_fall`: SIF. No injury. Exclusion zone failed | **PSIF (unprotected)** |
+| "Tag-liners controlled the load from the edge of the zone throughout the lift." | Gravity, suspended load (live). Planned exposure outside the drop path; nothing changed | **SIF exposure** |
 | "Jam cleared with the guard open after LOTO was applied and verified." | Mechanical. Energy present behind the isolator; no incursion | **SIF exposure**, isolation effective |
 
 ## Annex A. Mechanisms
