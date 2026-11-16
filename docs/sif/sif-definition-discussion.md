@@ -1,0 +1,448 @@
+# Defining SIF: a discussion draft
+
+Status: draft v0.1, 2026-11-16. A starting point to polish, not a settled position.
+
+## Why we need this
+
+The SIF classifier already holds a definition of SIF potential. That definition is spread across a prompt, calibration files and design notes, and has never been written down in one place. Validation against human coders makes this urgent: we can't say whether a disagreement is the AI's error or a difference in definition until both sides' definitions are explicit (see the validation work in `data/qq/sif/validation/`).
+
+The hardest part is **controls**. Is SIF potential judged:
+
+- with controls ignored,
+- conditional on controls having failed, or
+- with working controls credited?
+
+The published literature splits on exactly this question.
+
+## 1. What the literature says
+
+Full citations are at the end. Wording marked *(verbatim)* was read in the source. Wording marked *(secondary)* comes from summaries and needs checking before we quote it.
+
+### 1.1 Severity: what counts as "serious"
+
+The literature is converging on a three-part intensional definition: **life-ending, life-threatening or life-altering**.
+
+- **LIFE model** (Bayona et al., 2023) *(verbatim)*: life-threatening is "a case that requires immediate medical intervention or lifesaving support (e.g., CPR, defibrillation) to save the injured person's life". Life-altering is "a case in which the injured worker will not fully recover and will most likely suffer permanent impairment from the loss of the use a major internal organ … body function or body part."
+- **EEI SIF Criteria** (2025): the same life-threatening and life-altering definitions, plus a 15-item list. Examples include amputation involving bone, and traumatic brain injury or loss of consciousness over 30 minutes.
+- **Campbell Institute** (2020, *secondary*): "a permanent impairment or life-altering state, or an injury that – if not immediately addressed – will lead to death or permanent or long-term impairment."
+- **ASTM E2920-26** (2026, *secondary*): life-ending, life-threatening or life-altering consequences.
+- **Regulatory lists** (outcome only, no "potential"):
+  - RIDDOR specified injuries (fractures other than fingers, thumbs or toes; amputation; sight loss; crush to head or torso; serious burns; loss of consciousness, …).
+  - OSHA severe-injury reporting (fatality, in-patient hospitalisation, amputation, loss of an eye).
+  - RIDDOR *dangerous occurrences* are the regulatory analogue of "potential": a list of no-injury events that must be reported because of what they could have caused.
+
+The lists are known to be unreliable at the margins. Bayona et al. show that a severed fingertip is classified differently by Cal/OSHA, WorkSafeBC, EEI, HSE and others.
+
+### 1.2 The "potential" counterfactual
+
+There are three anchors:
+
+| Anchor | Who | Question asked |
+|---|---|---|
+| Credible / single-factor change | Campbell 2018; BST/DEKRA (Martin & Black 2015) | "Could it reasonably and realistically have been a SIF if one thing had been different?" ("inches, seconds and luck") |
+| Most likely outcome, fixed by physics | EEI SCL (Hallowell & Spencer 2024) | "Is the most likely outcome of this event a serious injury or fatality?" Energy above about 500 ft-lbs counts as high. "Avoid 'what-if' scenarios … consider only the facts." |
+| Company threshold | ICMM 2015 | A material unwanted event is one whose "potential or real consequence exceeds a threshold defined by the company" |
+
+EEI's reason for banning the open "potential" question is the core argument in that model. Asked openly, the answer "is inevitably 'yes' if the analyst is creative enough". Before calibration, practitioners agreed only about 65% of the time; after 40 calibration cases the working group reached about 95% (percent agreement, not kappa).
+
+### 1.3 Controls: the sharpest split
+
+| Position | Who | Effect |
+|---|---|---|
+| **Ignored**: inherent hazard only | List approaches; plain "high energy present" | Control status doesn't enter the classification |
+| **Conditional on absence or failure** | BST precursor; Campbell precursor; MORT/DOE "accident"; EEI PSIF | A SIF precursor or PSIF requires controls to be "absent, ineffective, or not complied with" (BST 2010, *verbatim*) |
+| **Credited**: a working control removes PSIF status | EEI SCL ("Capacity", "Success") | High-energy release with a direct control present and no serious injury = **Capacity**, not PSIF |
+| **Counted as potential despite the barrier** | Campbell 2018 (*secondary*): "could have resulted in a SIF if not for certain barriers" | A barrier-saved event *is* a PSIF |
+
+So the same event, a worker caught by a properly worn fall-arrest harness, is a PSIF under Campbell and Capacity under EEI. Before the SCL model existed, EEI's working group split 50/50 on exactly this case.
+
+**What counts as a control** also differs:
+
+- **EEI direct control** *(verbatim)*: "specifically targeted to the high-energy source; effectively mitigates exposure … when installed, verified, and used properly; and is effective even if there is unintentional human error." Training, rules, signs, experience and generic PPE (hard hats, gloves) are excluded, and "a deficiency in any component of the system invalidates the entire direct control."
+- **ICMM** accepts acts as controls ("an act, object (engineered) or system").
+- **BST** speaks of "management controls", the broadest notion of the three.
+
+### 1.4 Energy: harmful, unwanted or uncontrolled?
+
+This is the wording question we started with. The sources map onto it like this:
+
+| Wording | Source | What it builds in |
+|---|---|---|
+| **Harmful / damaging** in amount and rate | Gibson / Haddon (1961–74): "transfer of energy in such ways and amounts, and at such rapid rates, that … structures are damaged" | Defined by the *effect* on the target; neutral about controls |
+| **Unwanted** transfer | MORT (Johnson): "incidents [are] unwanted energy transfers" | Defined by the target's (or the system's) *interest*; neutral about controls |
+| **Unwanted … due to absence or failure of barriers** | DOE-HDBK-1208-2012 (MORT descendant): "Accident: An unwanted transfer of energy … that, due to the absence or failure of barriers or controls, produces injury" | Control failure is part of the *definition of the event* |
+| **Release** = change of state / loss of control | EEI SCL: "Instance when an energy source changes state when exposed to the work environment"; "a temporary loss of control of the high-energy" | *Uncontrolled* in the operational sense; plus contact with, or proximity to, a worker |
+| **Uncontrolled flow of energy** | Attributed to Viner (1991) *(unverified)* | Ties the event to the source–path–target model with controls on the path |
+
+Haddon's countermeasure list frames controls as acting on three things: the *release* (prevent or modify), the *path* (separate people from energy, barriers) and the *target* (make it more resistant). That is the source–path–target model in its original form.
+
+### 1.5 Event or condition
+
+- **Incident-based**: PSIF, Capacity, aSIF.
+- **Condition-based**, needing no event: EEI Exposure and Success; the HECA score = Success / (Success + Exposure); ASTM SIFRisk; BST precursors "if allowed to continue". HECA explicitly excludes hypothetical situations.
+
+## 2. The definition our classifier holds implicitly
+
+Reconstructed from `scripts/sif/zeroshot_sif.py`, `scripts/sif/band_selector.py`, `data/sif/calibration/*.json`, `.claude/plans/sif/SIF-CLASSIFIER.md` and [what-is-sif-potential.md](what-is-sif-potential.md):
+
+| Element | Current implicit rule |
+|---|---|
+| Unit | One event narrative; the most severe mechanism per event |
+| Event | Any event with an identifiable energy transfer mechanism (18 mechanisms, 10 energy types). No requirement that the energy was "released", "unwanted" or reached anyone |
+| Counterfactual | **Chance P = 1**: assume the energy reached a person. Outcome is a distribution (P10/P50/P90), not a single worst case |
+| Controls | **All engineered controls excluded**, both those that prevent the event (guardrail, LOTO, barriers) and those that limit harm (net, harness, PPE). Test: "was this put there to prevent harm, or is it just what's there?" |
+| Included context | Source magnitude (height, mass, speed, voltage, …); carrier geometry (sharp, rotating); default receiving environment (concrete, rebar); body region |
+| Reference person | Working-age adult (18–65), random orientation, hard surface by default |
+| Severity scale | Mortality-based: P(death) on an AIS-derived scale; "serious injury" = P(death) ≥ 0.10 |
+| SIF threshold | P(outcome ≥ serious) ≥ **0.50** → SIF; ≥ 0.10 → ELEVATED; otherwise NON_SIF. Stated as policy, customer-configurable |
+| Missing detail | Least severe band ("if the narrative does not contain enough detail … select band 1") |
+| Out of scope | Overexertion and abrasion automatically NON_SIF; chronic exposure and illness not modelled |
+
+### Where this sits against the literature
+
+- **Counterfactual: closer to EEI than it looks.** P(serious) ≥ 0.50 is EEI's "most likely outcome is a SIF". Our energy bands do the job of EEI's energy threshold, but continuously and for each mechanism. ELEVATED (≥ 0.10) is closer to the Campbell/DEKRA "could reasonably have been".
+- **Controls: closer to Campbell than to EEI.** Because every control is excluded, a fall arrested by a harness scores the same as an unprotected fall. EEI would call it Capacity, not PSIF.
+- **Proximity: broader than EEI.** EEI needs a worker in contact or within about 6 ft. Chance P = 1 assumes a person even when nobody was near (a dropped object in an empty exclusion zone).
+- **Severity: narrower than LIFE.** A mortality scale captures life-ending and life-threatening injuries well but **under-counts life-altering ones**. An amputated finger, an eye injury or a crushed hand can be permanently disabling at low P(death). Every modern definition includes these.
+- **Missing information: facts-only, like EEI.** This matches EEI's "consider only the facts", but contradicts our own [bayesian-priors.md](bayesian-priors.md), which argues that missing detail should fall back to the population prior, not to the least severe case.
+- **Energy types: broader than EEI.** EEI's threshold is in physical units (ft-lbs). We also cover chemical, thermal, breathing and electrical energy, each with its own calibration curve. That breadth is a strength, but it needs saying.
+
+## 3. The wording problem: unwanted, unexpected or uncontrolled?
+
+### "Uncontrolled"
+
+"Uncontrolled flow/release" puts control status *inside* the definition of the event. Three consequences follow:
+
+1. **The narrative must say what the controls were.** Narratives rarely do, so classification depends on what the writer happened to mention.
+2. **A barrier-saved event is no longer an event.** A harness that arrests a fall means the release was "controlled", so it falls out of scope. Unlike EEI's Capacity category, it is then not counted at all.
+3. **It merges two questions**: "how bad could this be?" and "did the barriers work?". Section 4 argues they should be kept apart.
+
+What "uncontrolled" gets right is the source–path–target structure: energy leaves its source, travels a path and reaches a target, and controls sit at the source or on the path.
+
+### "Unexpected" (unplanned)
+
+"Unexpected" defines the event against the work plan. Three problems:
+
+- **Whose expectation?** The worker's, the planner's or the analyst's?
+- **Planned exposure.** Work deliberately done within reach of high energy (live-line work, work at height, traffic management) involves *expected* energy. An event that goes wrong within that plan may not feel unexpected, and yet it is exactly what we want to capture.
+- **Intent.** An assault is intended by the attacker. It isn't unexpected in that sense, but it is clearly unwanted by the victim.
+
+### "Unwanted" (unintended)
+
+"Unwanted" defines the event from the point of view of the target, and of the system as designed. It is MORT's original wording and makes no statement about controls. A near miss qualifies: the energy left its intended state, even though it reached nobody.
+
+### Proposed position
+
+**Starting point: define the event as an unwanted release or transfer of energy.** (Refined below: intentional releases need an envelope test.) "Unwanted" here means energy leaving its intended state, containment or path; "release" follows EEI's "change of state".
+
+**Keep control status out of the event definition** and record it as a separate attribute. This keeps the source–path–target model, because that is how controls get described, without making the event depend on them.
+
+### Refinement: intentional releases and the energy envelope
+
+"Unwanted release" breaks on work whose *purpose* is to release energy: blasting in quarries, controlled demolition, live test firing on a range. There the release is wanted. It is made safe by an **exclusion zone** (danger area), a designed envelope that the energy may enter and people may not. Relief devices raise a related question: a dust explosion vent or a pressure relief valve releases energy deliberately, by design, in response to an upset.
+
+What is unwanted in all of these is not the release but **energy and people meeting where the design says they should not**. So the event is better defined against an **intended energy envelope**:
+
+- For **contained energy** (pressure vessel, live conductor, load on a crane), the envelope is the containment and the designed path.
+- For **intentional releases** (blast, test round, relief discharge), the envelope is the designed release zone: the blast exclusion zone, the range danger area, the vent or relief discharge area.
+
+**Revised event wording (layer 1).** An event is either:
+
+- (a) energy outside its intended envelope, whether or not anyone was there, **or**
+- (b) a person inside an envelope while the energy in it is live or being released.
+
+Clause (b) is what catches the person in the exclusion zone during a blast. The release went to plan; the person was where the plan said nobody would be.
+
+Without a gate like this, chance P = 1 would make every routine blast a SIF potential event. That shows the gate is a necessary part of the definition, not a refinement.
+
+There is precedent for this framing in process safety. API RP 754 counts loss of primary containment as a process safety event, and treats a pressure-relief discharge as one only when it goes somewhere unsafe (e.g. liquid carryover, discharge to an unsafe location, shelter-in-place). A relief device lifting as designed counts as a *demand on a safety system* (Tier 3). That is the same distinction between "envelope breached" and "control called on" (wording to check against the standard).
+
+### Refinement: energy state, not its history
+
+Every case so far assumes a precondition: **the energy has to be present**. The vehicle has to be moving, the conductor live, the vessel pressurised, the load lifted. EEI's first question ("Was high energy present?") is the same test.
+
+**Proposal: SIF potential is a property of the energy state at the time, not of how that state came about.** It is assessed on the energy actually present (or building), whatever its history. The steps that led there are out of scope for layers 1 and 2 in every event class, but not out of scope altogether:
+
+| Upstream step | Where it belongs |
+|---|---|
+| Why the circuit was live (isolation missed, wrong circuit isolated, back-feed) | Layer 3: the isolation control failed |
+| Why the vehicle was in the pedestrian area (route, signage, segregation) | Layer 3: the segregation control |
+| Why pressure rose (blocked outlet, failed cooling, wrong feed) | Layer 3: the control that should have prevented or caught the build-up; plus investigation |
+| A *different* energy released along the way (a dropped load hits a valve, which releases pressure) | A separate energy source: assess each one and keep the most serious (EEI's rule) |
+
+So the history matters for **why** and for **which control failed**, never for **how bad**. This keeps layer 2 reproducible: two analysts looking at the same energy state should reach the same potential, however differently they reconstruct the cause.
+
+The envelope then needs **three dimensions**, not one:
+
+| Dimension | The envelope bounds… | Breach examples |
+|---|---|---|
+| **Where** (space, L) | Where the energy may be: containment, path, release zone | Flyrock outside the zone; vehicle off its route; steam discharge onto a walkway |
+| **How much** (magnitude, M) | How much energy the containment or system is designed for | Overpressure, overtemperature, overspeed, overload, reactivity excursion |
+| **When** (state, T) | When the energy should be present at all | Unexpected energisation of an isolated circuit; stored energy left after isolation; a vehicle moving while it should be immobilised |
+
+The "when" dimension covers isolation. An isolated system has an intended envelope of **zero energy**. Unexpected energisation while someone works on it is an envelope breach, even though the energy is exactly where and as large as it would be in normal operation.
+
+### Refinement: over-energy states (build-up without release)
+
+Some events involve no release at all: **energy builds up inside its containment beyond the design bound**. Examples:
+
+- a reactor power excursion, controlled (or not) by control rods,
+- a runaway chemical reaction,
+- pressure building behind a blocked outlet,
+- a turbine overspeeding,
+- a crane lifting beyond its rated load,
+- a battery starting thermal runaway,
+- snow load on a roof, or a dam level rising.
+
+These are breaches in the **magnitude** dimension: clause **(c)** of the event.
+
+**Revised event wording (layer 1).** An event is any of:
+
+- (a) energy outside its intended envelope in space,
+- (b) a person inside an envelope while the energy in it is live,
+- (c) energy beyond its intended magnitude, or present when its intended state is zero, even if still contained.
+
+**How big is the potential of a build-up?** At the moment it was caught, a build-up may have reached only a modest level. If layer 2 is assessed on the peak actually reached, a reactor excursion stopped by the rods would look harmless. That would be crediting the control, which layer 2 doesn't do.
+
+Consistency with the control-blind rule gives the answer. **Assess the energy the build-up would reach if no control acted, up to the source's inherent physical limit.** That limit is the inventory, fuel or reactant quantity, maximum pump head, failure pressure of the containment, or stored kinetic energy at the maximum possible speed. It is the build-up counterpart of chance P = 1. It is still bounded by physics, so it avoids EEI's concern about "creative" what-ifs: the analyst may not imagine energy that isn't there, only let the energy that is there run to its limit.
+
+**Inherent features versus controls.** Build-ups make it pressing to say where the source ends and the controls begin. Proposed rule, following Kletz's inherently safer design and the independent protection layers of LOPA (references to check):
+
+- A feature is **part of the source** if it has no failure mode and needs no demand or action: a negative temperature coefficient in a reactor, a pump's dead-head pressure, a reduced inventory, a weaker reagent. It changes the potential.
+- A feature is a **control** if it has to act, and can fail: control rods, trips, relief valves, bursting discs, quench and dump systems, load-moment cut-outs, overspeed trips. It is layer 3.
+
+This matches the hierarchy of controls: elimination and substitution change the source, and so change the potential; everything below them is a control.
+
+### Refinement: the envelope in Mass, Length, Time
+
+The three envelope dimensions line up with the base dimensions of mechanics, **M, L, T**. That is a useful metaphor, and in places more than a metaphor.
+
+| Base dimension | In the envelope | Varies how |
+|---|---|---|
+| **T, time** | When the energy is present, and how much is present at each moment | Presence and amount change over time: energised or isolated, build-up, decay, the firing sequence, the duty cycle |
+| **L, length** | The distance between energy and target. Once the source point is marked, the envelope's size is a radius or boundary around it | Separation changes as the energy moves (flyrock, vehicle) or the person moves (entering the zone) |
+| **M, mass** | The magnitude of the energy | Inventory, charge mass, pressure × volume, voltage, speed |
+
+Energy itself has the dimensions **M L² T⁻²**, so magnitude, distance and rate are not independent. Three established practices already work this way:
+
+- **Haddon** defines harm by energy transferred "in such ways and **amounts**, and at such rapid **rates**": magnitude (M) and rate (T).
+- **Radiation protection** uses *time, distance, shielding*: limit T, increase L, put a barrier on the path. Source strength is M. This is the source–path–target model expressed in M, L, T.
+- **Blast scaling** (Hopkinson–Cranz) sets the safe distance from the charge mass: the scaled distance Z = R / W^⅓ is constant for a given overpressure. So the size of the envelope in L is a function of M. Electrical limits of approach (distance by voltage), inverse-square fall-off for radiation and noise, and vehicle stopping distance by speed all follow the same pattern.
+
+**What this buys us:**
+
+1. **A completeness check.** An envelope is fully stated only when it has a bound in each of M, L and T. "Exclusion zone 500 m" is incomplete without the charge mass it was sized for (M) and the firing window (T). A narrative that gives only one dimension leaves the other two unknown, not satisfied.
+
+2. **Simpler event clauses.** L is the *relative* distance between energy and target, so clauses (a) and (b) are the same breach in L: it doesn't matter whether the energy moved out or the person moved in. Clause (c) is a breach in M (over-magnitude) or in T (present when it should be zero). So:
+
+   | Clause | Dimension breached |
+   |---|---|
+   | (a) energy outside its envelope | L (energy moved) |
+   | (b) person inside a live envelope | L (target moved) |
+   | (c) over-magnitude | M |
+   | (c) unexpected presence, e.g. energisation of an isolated system | T |
+
+3. **Dimensionless margins.** Each bound can be written as a ratio to its design value:
+   - *m* = actual magnitude / design magnitude,
+   - *l* = actual separation / required separation,
+   - *t* = presence outside the intended time window (0 or 1, or a fraction of it).
+   
+   The envelope is breached when m > 1, l < 1 or t > 0. The ratios also say *how far* it was breached: flyrock at 1.1 × the zone radius is not the same as at 3 ×. They work across energy types, as dimensionless groups do in physics. This is a possible future field for layer 3, or for control-state analytics.
+
+4. **Controls classified by dimension.**
+   - **M controls** reduce or cap magnitude: smaller inventory, isolation (M → 0), relief valves, load cut-outs, speed limiters.
+   - **L controls** keep or restore separation: exclusion zones, segregation, barriers, guarding. Shielding is an L control that absorbs energy on the path rather than adding distance.
+   - **T controls** limit when, or how long: permits and firing windows, interlocks, exposure time limits, soft-start and controlled-descent rate limiters.
+   
+   That gives layer 3 a structure that works across energy types.
+
+5. **T also sets severity, through rate and dose.** In layer 2, severity depends on M and on how fast the energy is delivered (T): a sudden release against a slow leak, the stopping distance in a fall. It also depends on dose (rate × duration) for thermal, chemical, radiation and noise exposure. The calibration bands already include some of this ("speed of release", "duration"). The M, L, T framing says it should be explicit for every mechanism.
+
+**Limits of the metaphor.** Electrical, thermal and chemical energy need other SI base quantities (current, temperature, amount of substance). So "M" here means *magnitude in the energy's own units*, not literally mass. L also does two jobs: separation distance in the envelope, and contact area at the target (Hallowell's intensity, J/cm², is L⁻²). The first belongs to the envelope (layers 1 and 3); the second is a carrier property in layer 2.
+
+## 4. Proposal: three layers, not one definition
+
+Treat SIF as three separate questions, each answerable on its own:
+
+| Layer | Question | Source–path–target | Who answers |
+|---|---|---|---|
+| **1. Event** | Was the energy envelope breached: (a) energy outside it in space, (b) a person inside it while live, or (c) energy beyond its magnitude, or present when it should be zero? | Source changes state, builds up, or target enters the path | Narrative (classifier Pass 1: mechanism, energy type). The envelope gate is not yet implemented |
+| **2. Inherent SIF potential** | If that energy had reached a person with nothing protective between them, what is the outcome distribution, and is a serious outcome more likely than not? For a build-up, assess the energy it would reach with no control acting, up to the source's inherent limit | Source (incl. inherent features) + carrier + default environment + target; **controls set aside** | Classifier (bands → P(serious)) |
+| **3. Control state** | Which controls acted on the source, the build-up or the path, and did they work? (effective / present but failed / absent / not stated). Upstream causes are recorded here | Source isolation, build-up controls (trips, relief, rods), path | Separate extraction; often "not stated" |
+
+Combining layers 2 and 3 recovers the vocabulary of the literature without changing what the classifier does:
+
+| Inherent potential | Control state | Outcome | Category (EEI term) |
+|---|---|---|---|
+| SIF | any | Serious injury | **SIF actual** (HSIF) |
+| SIF | absent / failed | No serious injury | **SIF precursor / PSIF** |
+| SIF | effective direct control | No serious injury | **Capacity**: the control did its job |
+| SIF | not stated | No serious injury | **PSIF (unverified controls)**: our current SIF flag |
+| not SIF | any | any | Low-severity (or LSIF if seriously injured) |
+
+What this buys us:
+
+- **The classifier stays control-blind.** That is intended, and it matches the narratives, which rarely say much about controls.
+- **The Campbell/EEI split becomes a reporting choice**, not a definitional one. "PSIF incl. Capacity" and "PSIF excl. Capacity" are two views of the same data.
+- **It matches the simulator split**: Product 2 models layer 3 (outcome-P controls on the path).
+- **It gives a HECA-style measure** when controls are known: the share of SIF-potential events with an effective direct control.
+
+### 4.1 Where does the source end and the path begin?
+
+The current test ("was this put there to prevent harm?") works for most cases but leaves three ambiguous:
+
+- **Containment.** A pipe wall, cable insulation or a vehicle body is part of the source system. *Proposal:* containment defines the energy's intended state, and the release is the escape from it. Containment is never counted as a "control" that excludes the event.
+- **Isolation (LOTO, de-energisation).** If isolation worked, there was no energy present to release. *Proposal:* assess the energy **actually present at the time**. Failed isolation, residual or stored energy counts; successful isolation means no event. This is a source-state rule, not crediting a path control.
+- **Evasive action, luck, "nobody there".** These are not controls; EEI excludes acts and relies on error-tolerant barriers. *Proposal:* they leave potential unchanged. This is the "one draw from the distribution" reasoning already in the design.
+
+Worked boundary cases:
+
+| Case | Layer 1 event? | Layer 2 potential | Layer 3 control state |
+|---|---|---|---|
+| Fall from 6 m arrested by a harness | Yes (fall started) | SIF | Effective direct control → Capacity |
+| Worker at 6 m behind an intact guardrail, no slip | No release | n/a | n/a (HECA "Success" if observed) |
+| Guardrail missing, worker at 6 m, no fall | No release | n/a | n/a (HECA "Exposure"; BST precursor) |
+| Scaffold board falls 20 m into an empty exclusion zone | Yes | SIF (chance P = 1) | Exclusion zone effective? → Capacity or PSIF |
+| Electrician touches a conductor that LOTO had de-energised | No energy present | n/a | Isolation worked |
+| LOTO applied but stored hydraulic pressure releases | Yes | per band | Isolation failed → PSIF |
+| Struck on the hard hat by a 2 kg tool from 10 m | Yes | per band (head) | Hard hat is generic PPE, not a direct control (EEI) |
+| Near miss with a reversing vehicle; worker jumped clear | Yes | per band | Evasive action is not a control → PSIF |
+
+### 4.2 Intentional releases and relief devices
+
+Using the envelope wording from section 3:
+
+| Case | Layer 1 event? | Layer 2 potential | Layer 3 control state |
+|---|---|---|---|
+| Quarry blast fired as planned; zone clear; no flyrock outside the zone | No: release stayed inside the envelope, nobody inside | n/a | n/a (HECA "Success" if observed) |
+| Quarry blast; flyrock lands beyond the exclusion zone, nobody there | Yes (a): energy outside the envelope | SIF (fragment mass × velocity) | Zone sizing or blast design failed → PSIF |
+| Controlled demolition; a person is found inside the exclusion zone after firing, unhurt | Yes (b): person inside a live envelope | SIF | Zone clearance and sentries failed → PSIF |
+| Blast halted at the countdown because a person was seen in the zone | No release | n/a | The clearance check worked; a condition, not an event (HECA "Success") |
+| Live test firing; a range user enters the danger area during firing | Yes (b) | SIF | Range control failed → PSIF |
+| Live test firing; a round or ricochet lands outside the danger area | Yes (a) | SIF | Danger-area design or weapon/ammunition failure → PSIF |
+| Misfire: an unexploded charge or round remains after firing | Stored energy left where it was not meant to be. A condition, like a missing guardrail | n/a until disturbed | Misfire procedure is the control; handling the misfire is high-energy work |
+| Dust explosion in a silo; the explosion vent opens and discharges to a safe area | Yes: the deflagration itself is unwanted (it breached containment) | SIF | Vent = effective mitigating control → **Capacity** |
+| Dust explosion; the vent discharges into an occupied area or walkway | Yes | SIF | Vent worked on the vessel but its discharge was outside a safe envelope → PSIF |
+| Boiler overpressure; the relief valve lifts and discharges to a safe point | Yes: the overpressure is an upset, the containment envelope was challenged | SIF (vessel rupture energy) | Relief valve = effective direct control → **Capacity**. API RP 754 would call this a demand on a safety system |
+| Relief valve lifts and discharges steam onto a walkway | Yes (a): the relief discharge is outside its intended envelope | per band (thermal / pressure at the discharge) | Relief design or discharge piping failed → PSIF |
+| Relief valve fails to lift (blocked or gagged), but the vessel holds | Yes: overpressure beyond design | SIF | Direct control failed; the vessel margin held, which is luck rather than a control → PSIF |
+| Planned blowdown or venting under a permit | No: inside the envelope | n/a | n/a |
+
+These cases expose three points that the first table didn't:
+
+1. **Relief devices are controls, not the event.** The upset (overpressure, deflagration) is the event; the relief device is a mitigating control that redirects energy into a safe envelope. A relief that works is Capacity. A relief whose own discharge reaches people is a second envelope breach.
+2. **Exclusion zones are separation controls on the path.** Whether one counts as an EEI *direct control* is unsettled. It is targeted and can be effective, but it depends on people (sentries, clearance checks), and EEI excludes controls that fail with unintentional human error. This feeds Q4.
+3. **Planned high-energy work needs the envelope gate**, or chance P = 1 floods the SIF class. For the classifier this means Pass 1 must recognise "planned release, nobody inside the envelope" as no event, which it currently doesn't attempt.
+
+### 4.3 Energy state and build-up cases
+
+Clause (c) of the event, with build-ups assessed at their uncontrolled limit:
+
+| Case | Layer 1 event? | Layer 2 potential | Layer 3 control state |
+|---|---|---|---|
+| Reactor power excursion; control rods insert (scram) and power falls | Yes (c): magnitude beyond design | Assessed at the excursion's uncontrolled limit, which for a reactor is set by inherent feedback and fuel inventory. The negative temperature coefficient is part of the source | Rods / scram = effective direct control → **Capacity** |
+| Reactor excursion; rods fail to insert, but inherent feedback limits power | Yes (c) | As above: the inherent feedback is already in the potential | Direct control failed → PSIF |
+| Runaway reaction in a batch reactor; quench or dump system works | Yes (c) | Reactant inventory → vessel rupture energy | Quench = effective control → **Capacity** |
+| Runaway reaction; relief undersized; vessel ruptures, nobody hurt | Yes (c), then (a) | SIF | Relief failed → PSIF |
+| Crane lift beyond rated load; the load-moment indicator cuts out the hoist | Yes (c): overload | Collapse of crane and load | LMI = effective control → **Capacity** |
+| Crane overload with the LMI overridden; no collapse | Yes (c) | Collapse of crane and load | Control defeated → PSIF |
+| Turbine overspeed; the overspeed trip works | Yes (c) | Disc burst at the inherent limit (steam supply) | Trip = effective control → **Capacity** |
+| Electrician working on an isolated circuit; it is re-energised from another feed | Yes (c), "when": energy present when the intended state was zero | Per voltage band | Isolation failed (back-feed not identified) → PSIF |
+| Hydraulic system isolated; trapped pressure remains in an accumulator | Yes (c) if anyone works on it; otherwise a condition | Per pressure band | Isolation incomplete → PSIF |
+| Vehicle moving within its designated route, no pedestrian present | No: inside the envelope | n/a | n/a |
+| Pedestrian walks into a segregated vehicle route while vehicles move | Yes (b) | Per speed and mass band | Segregation failed → PSIF |
+| Battery store; one cell starts thermal runaway, detected and isolated | Yes (c) | Store inventory (cascade to adjacent cells) | Detection and isolation = effective → **Capacity** |
+| Roof snow load beyond design; no collapse | Yes (c), slow build | Collapse | No control acting (snow clearing not done) → PSIF |
+
+Three points from these cases:
+
+1. **Upstream causes never change the potential.** The re-energised circuit scores the same whether the back-feed came from a generator, a wrong label or a contractor. The cause goes into layer 3.
+2. **Most build-up controls are trips and relief devices**, so build-up events with working controls usually come out as **Capacity**. That is the process-safety idea of a "demand on a safety system".
+3. **Slow build-ups have lead time.** Lead time affects whether people can get away (chance P), not how bad the outcome is if they don't. By the chance P = 1 rule it stays out of the potential. Evacuation is a control (layer 3).
+
+The last three cases in 4.1 don't depend on the layer model. They depend on which control definition we adopt (EEI direct control, or something broader). Open question Q4.
+
+## 5. A draft definition
+
+> **SIF potential (inherent).** An event has SIF potential when an energy envelope is breached, and that energy, had it reached a person with no protective control between the energy and the person, would more likely than not have caused a life-ending, life-threatening or life-altering injury.
+>
+> - *Envelope breached*: energy outside its intended envelope in space; a person inside an envelope while it is live; or energy beyond its intended magnitude, or present when its intended state is zero.
+> - *Intended envelope*: bounds on the energy in magnitude (M: how much there may be), length (L: where it may be, and its required separation from people; for an intentional release, the release zone such as a blast exclusion zone, range danger area or relief discharge area) and time (T: when it may be present). A breach is a departure in any one of them.
+> - *Energy state*: potential is assessed on the energy present at the time, whatever its history. For a build-up, on the energy it would reach with no control acting, up to the source's inherent physical limit.
+> - *Protective control*: anything that must act, and can fail, to prevent, limit or redirect the energy or to keep it from a person. Containment of the source, inherent features of the source that need no demand (e.g. a negative temperature coefficient), the default environment and the person's own body are not controls.
+> - *More likely than not*: P(serious outcome) ≥ 0.50, from the calibrated outcome distribution. A lower policy threshold (≥ 0.10) marks *elevated* potential.
+> - *Life-ending, life-threatening, life-altering*: as in the LIFE model (Bayona et al., 2023).
+>
+> **SIF precursor (PSIF).** An event with SIF potential, no serious injury, and no effective direct control on the path (absent, failed, or not stated).
+>
+> **Capacity.** An event with SIF potential, no serious injury, and an effective direct control that worked.
+
+## 6. Consequences for the classifier if we adopt this
+
+1. **Severity scale.** "Serious" is currently P(death) ≥ 0.10. Life-altering injuries (amputation, sight loss, permanent loss of function) need a route in: either a second scale, or a rule that certain mechanism × body-region bands count as serious whatever P(death) is.
+2. **Missing information.** Decide between least severe band (facts-only, EEI) and the population prior ([bayesian-priors.md](bayesian-priors.md)). This may explain some disagreement with human coders and should be tested before deciding.
+3. **Layer 3 extraction.** Add a control-state field (effective / failed / absent / not stated) and a direct-control flag (EEI's three criteria). This is new work; until then, report the classifier's SIF as "PSIF (unverified controls)".
+4. **Proximity.** Decide whether a person must plausibly have been exposed (EEI's contact or proximity rule) or whether chance P = 1 applies regardless. This changes the "empty zone" cases.
+5. **Out-of-scope mechanisms.** Confirm that overexertion and abrasion are automatically NON_SIF. Decide how medical events (e.g. cardiac arrest at work) and chronic exposures are handled; they can be fatal without any energy transfer.
+6. **Envelope gate.** Pass 1 should recognise planned releases that stayed inside their envelope with nobody inside it, and record them as no event. It should also flag clause (b) events (person in a live envelope) and clause (c) events (over-magnitude build-ups, unexpected energisation) even when nothing was released.
+7. **Build-up bands.** The calibration bands describe released energy (fall height, voltage, speed). Build-up events need a way to choose a band from the uncontrolled limit (e.g. vessel burst energy from inventory and failure pressure), not from what the narrative says was reached.
+8. **Threshold wording.** Rename the classes, or document them, so that SIF = "most likely outcome is serious" and ELEVATED = "credibly serious". This lets each reader map the classes onto their preferred tradition.
+
+## 7. Open questions
+
+- **Q1.** Is the three-clause envelope breach (space, person inside, magnitude/state) the right event wording? It replaces "unwanted release", which fails for blasting, test firing and relief devices. Should "unexpected" be dropped entirely?
+- **Q1a.** Who defines the envelope? The design (blast plan, range danger-area template, relief discharge design), the permit, or the regulator? What happens when there is no documented envelope?
+- **Q1b.** Is it right to put all upstream steps (how the energy came to be present) out of scope for potential, and into layer 3 only?
+- **Q1c.** Should build-ups be assessed at the uncontrolled limit (consistent with control-blind layer 2) or at the peak actually reached (EEI facts-only)? The uncontrolled limit can be very large (reactor, runaway reaction); is a physical-inventory bound enough of a restraint?
+- **Q1d.** Is "no failure mode, no demand" the right test for an inherent feature (part of the source) versus a control?
+- **Q1e.** Should the M, L, T envelope be made operational? For example: dimensionless margins (m, l, t) as fields, and control-state classified as M, L or T controls. Or does it stay as a framing device in the definition?
+- **Q2.** Credit working controls (EEI Capacity), or count barrier-saved events as PSIF (Campbell)? The layered model allows both views; which one is the headline?
+- **Q3.** Should the probability anchor be "more likely than not" (0.50) or "credible" (0.10)? Should validation against human coders use SIF alone or SIF + ELEVATED?
+- **Q4.** Which control definition: EEI's narrow direct control (targeted, effective, error-tolerant; no training, rules or generic PPE) or ICMM/BST's broader one?
+- **Q5.** Should there be a proximity requirement, or does chance P = 1 hold regardless?
+- **Q6.** How do we bring life-altering, non-fatal outcomes into a mortality-calibrated scale?
+- **Q7.** Should missing detail default to the least severe band or to the population prior?
+- **Q8.** Should the definition fit the QQ SIFp grades (1 Fatal … 4 High), or should the grades be mapped onto the definition?
+
+## 8. Checks before polishing
+
+- Quotes from the Campbell Institute papers (2018, 2020) are from secondary sources. Check them against the PDFs.
+- ANSI/ASSP Z16.1-2022 definitions are unverified (paywalled).
+- ASTM E2920-26 wording is from the store summary and a vendor blog.
+- Viner (1991) "uncontrolled flow of energy" wording is unverified.
+- Origin of the energy wheel graphic is unverified.
+- **Units:** EEI's "500 ft-lbs" is about 680 J, *not* 1,500 J. EEI's own documents use both figures, so they are not a unit conversion. Our docs should state which one we mean wherever we cite either.
+- Hopkinson–Cranz cube-root scaling and the radiation-protection triad (time, distance, shielding) are cited as standard practice. Add a primary reference for each (e.g. Baker, *Explosions in Air*; ICRP).
+- Kletz (inherently safer design) and CCPS LOPA (independent protection layers) are cited from memory for the inherent-feature vs control test. Check the wording before relying on it.
+- API RP 754: check the exact Tier 1/2 treatment of pressure-relief discharges and the Tier 3 "demands on safety systems" wording (taken from memory, not yet checked in this review).
+- BST precursor wording: Krause (2010) says "could reasonably result … if allowed to continue or repeat". The firmer "will result" is Martin & Black (2015). Quote the right one.
+
+## References
+
+- API RP 754 (3rd ed., 2021). *Process Safety Performance Indicators for the Refining and Petrochemical Industries*. American Petroleum Institute. (edition and wording to check)
+- Baker, S.P. & Haddon, W. Jr. (1974). Reducing injuries and their results: the scientific approach. *Milbank Memorial Fund Quarterly: Health and Society*, 52(4), 377–389.
+- Bayona, A., Bhandari, S., Hallowell, M., Sherratt, F., Bailey, J.M. & Upton, J. (2023). What is a serious injury? A model for defining serious injuries & fatalities. *Professional Safety*, 68(9). https://www.assp.org/docs/default-source/psj-articles/f1bayona_0923.pdf
+- Campbell Institute (2018). *Serious Injury and Fatality Prevention: Perspectives and Practices*. National Safety Council.
+- Campbell Institute (2020). *Designing Strategy for Serious Injury and Fatality Prevention*. National Safety Council.
+- Campbell Institute (2022). *SIF Prevention: Leading Indicators, Cumulative Risk, and Safety Networks*. National Safety Council.
+- ASTM E2920-26 (2026). *Standard Guide for Recording Priority Occupational Injuries and Illnesses and SIF-Related …* https://store.astm.org/e2920-26.html
+- ANSI/ASSP Z16.1-2022. *Safety and Health Metrics and Performance Measures*. ASSP.
+- CCPS (2001). *Layer of Protection Analysis: Simplified Process Risk Assessment*. Center for Chemical Process Safety / AIChE. (independent protection layer definition to check)
+- DOE-HDBK-1208-2012. *Accident and Operational Safety Analysis*. US Department of Energy.
+- Edison Electric Institute (2025). *SIF Criteria* (SCL model, Appendix 9).
+- Haddon, W. Jr. (1973). Energy damage and the ten countermeasure strategies. *Journal of Trauma*, 13(4), 321–331. doi:10.1097/00005373-197304000-00011
+- Hallowell, M.R., Alexander, D. & Gambatese, J.A. (2017). Energy-based safety risk assessment: does magnitude and intensity of energy predict injury severity? *Construction Management and Economics*, 35(1–2), 64–77. doi:10.1080/01446193.2016.1274418
+- Hallowell, M. (2020, rev. 2024). *Safety Classification and Learning (SCL) Model*. Edison Electric Institute. https://cms.eei.org/-/media/Project/EEI/Documents/Issues-and-Policy/Power-to-Prevent-SIF/eeiSCLmodel.pdf
+- Hallowell, M.R. & Spencer, C. (2024). Safety Classification & Learning Model: defining & classifying potential serious injuries & fatalities. *Professional Safety*, 69(2). https://assp.org/docs/default-source/psj-articles/f1hallowellspencer_0224.pdf
+- Hallowell, M. & Oguz Erkal, E.D. (2024). *High-Energy Control Assessments (HECA)*. Edison Electric Institute. https://cms.eei.org/-/media/Project/EEI/Documents/Issues-and-Policy/Power-to-Prevent-SIF/EEI-HECA.pdf
+- ICMM (2015). *Critical Control Management: Implementation Guide*. International Council on Mining and Metals.
+- Johnson, W.G. (1980). *MORT Safety Assurance Systems*. Marcel Dekker.
+- Kletz, T. (1991, 2nd ed. 2010 with Amyotte). *Process Plants: A Handbook for Inherently Safer Design*. (edition to check)
+- Krause, T.R. (2010). *New Findings on Serious Injuries and Fatalities*. BST.
+- Manuele, F.A. (2008). Serious injuries & fatalities: a call for a new focus on their prevention. *Professional Safety*, 53(12), 32–39.
+- Manuele, F.A. (2013). Preventing serious injuries & fatalities: time for a sociotechnical model for an operational risk management system. *Professional Safety*, 58(5).
+- Martin, D.K. & Black, A.A. (2015). Preventing serious injuries & fatalities: study reveals precursors & paradigms. *Professional Safety*, 60(9), 35–43.
+- Oguz Erkal, E.D. & Hallowell, M.R. (2023). Moving beyond TRIR: measuring & monitoring safety performance with high-energy control assessments. *Professional Safety*, 68(5), 26–35.
+- OSHA, 29 CFR 1904.39. Reporting fatalities, hospitalizations, amputations, and losses of an eye.
+- RIDDOR 2013, regulation 4 (specified injuries) and Schedule 2 (dangerous occurrences). https://www.legislation.gov.uk/uksi/2013/1471/regulation/4
+- Viner, D. (1991). *Accident Analysis and Risk Control*. (wording unverified)
