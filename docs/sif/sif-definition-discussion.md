@@ -103,7 +103,7 @@ EEI's reason for banning the open "potential" question is the core argument in t
 | **Ignored**: inherent hazard only | List approaches; plain "high energy present" | Control status doesn't enter the classification |
 | **Conditional on absence or failure** | BST precursor; Campbell precursor; MORT/DOE "accident"; EEI PSIF | A SIF precursor or PSIF requires controls to be "absent, ineffective, or not complied with" (BST 2010, *verbatim*) |
 | **Credited**: a working control removes PSIF status | EEI SCL ("Capacity", "Success") | High-energy release with a direct control present and no serious injury = **Capacity**, not PSIF |
-| **Counted as potential despite the barrier** | Campbell 2018 (*secondary*): "could have resulted in a SIF if not for certain barriers" | A barrier-saved event *is* a PSIF |
+| **Counted as potential despite the barrier** | Campbell 2018, p. 5: "could have resulted in SIF if not for one factor. This one factor could be a control that was in place…" | A barrier-saved event *is* a PSIF |
 
 So the same event, a worker caught by a properly worn fall-arrest harness, is a PSIF under Campbell and Capacity under EEI. Before the SCL model existed, EEI's working group split 50/50 on exactly this case.
 
@@ -802,7 +802,7 @@ These belong to a later design specification that wraps the model (risk-control 
 
 ## 8. Checks before polishing
 
-- Quotes from the Campbell Institute papers (2018, 2020) are from secondary sources. Check them against the PDFs.
+- Campbell Institute (2018, p. 5) SIF potential wording verified from the author's copy. The 2020 serious-injury quote is still from a secondary source.
 - ANSI/ASSP Z16.1-2022 definitions are unverified (paywalled).
 - ASTM E2920-26 wording is from the store summary and a vendor blog.
 - Viner (1991) "uncontrolled flow of energy" wording is unverified.

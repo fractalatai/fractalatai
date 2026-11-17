@@ -193,14 +193,14 @@ The model asks four questions: "Was high energy present? Did a high-energy incid
 
 ### 5.2 Campbell Institute (National Safety Council)
 
-Campbell Institute (2018, 2020).
+Campbell Institute (2018, p. 5; 2020).
 
-- **SIF potential**: an event that could have resulted in a serious injury or fatality but for the barriers or countermeasures in place, or if one factor had been different.
+- **SIF potential**: there is "not an official definition", but a commonly used criterion among members is that "an event has SIF potential if the situation could have been worse and could have resulted in SIF if not for one factor. This one factor could be a control that was in place, the location of a person or piece of equipment, the time of day, or even weather conditions."
 - **Precursor**: a high-risk situation where control measures are absent, ineffective or not complied with, and which would potentially result in a serious injury or fatality if allowed to continue.
 
 **Pros:** easy to explain; counts barrier-saved events, so high-potential events are not missed.
 
-**Cons:** "one factor different" is open-ended; agreement between raters is low (about 65% for list and judgement methods); no energy or severity threshold.
+**Cons:** the analyst chooses which "one factor" to change (a control, a location, the time of day, the weather), so the counterfactual is open-ended; agreement between raters is low (about 65% for list and judgement methods); no energy or severity threshold.
 
 ### 5.3 BST / DEKRA precursor
 
