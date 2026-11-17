@@ -14,7 +14,7 @@ The SIF definition work (discussion doc, definitions doc, counterfactuals paper)
 
 - [x] Paper 1 literature research (agent): controls in PSIF/precursor formulations; conditions and observations (HECA, BST precursors, EEI Exposure/Success); ICMM critical controls, bowtie, ARMS barriers; Safety-II objections
 - [x] Paper 1 draft v0.1: `docs/sif/sif-controls-precursors.md`, *Controls, precursors and conditions in SIF potential*, with an executive summary for the safety director
-- [ ] Paper 1: position on PSIF-coding observations and hazard conditions (QQ practice vs the *SIF exposure* definition)
+- [x] Paper 1: position on PSIF-coding observations and hazard conditions (QQ practice vs the *SIF exposure* definition)
 - [ ] Paper 1: verify quotes against primary sources (author supplies copies in `docs/sif/lit/`)
 - [ ] Paper 2 literature research: LIFE model adoption; AIS/ISS/NISS; impairment scales; regulatory lists
 - [ ] Paper 2 draft: `docs/sif/sif-severity.md`, LIFE vs AIS and the AI model's life-altering gap (parked Q6)
@@ -44,7 +44,7 @@ The SIF definition work (discussion doc, definitions doc, counterfactuals paper)
 
 **Draft v0.1** has an executive summary recommending that observations be recorded as SIF exposure (protected or unprotected), not PSIF.
 
-**Decision pending:** keep the "unverified" control state (the AI model's own addition, with no precedent found), or treat not-stated as absent, following EEI, HECA and ICMM.
+**Decided (Jason): keep "unverified".** It maps to unprotected for EEI and HECA comparisons, works as the panel's work queue, and its share is reported as a measure of reporting quality. Written into paper 1 §7.
 
 **Draft v0.2: two-sided events.** The v0.1 premise that "observations are conditions" was wrong under the AI model. Presence in the line of fire *is* the incursion, seen or not, so items are coded by what was observed, not by how they were reported. EEI's incident definition is source-centric: it needs a release ("temporary loss of control … or changes state", p. 11). That gives running machinery no route to PSIF, and a person under a load that holds is only Exposure. The one exception is EEI's traffic note, "or if an employee enters the traffic pattern" (p. 20): an incursion allowed for one hazard. v0.2 adds §4.2 (source-centric vs two-sided events, with a comparison table against EEI), rewrites recommendation 1 as "code by content, not by channel", and adds an EEI crosswalk showing where the counts differ.
 
@@ -57,3 +57,4 @@ The SIF definition work (discussion doc, definitions doc, counterfactuals paper)
 - An edge barrier or travel restraint marks a danger zone. Crossing or defeating it is an incursion (an event), and falling afterwards is a second event. Working at an edge where no zone is drawn is exposure. `sif-definition.md:102` ("a person climbs past edge protection and falls") stays correct as a both-sides example.
 - A trip or fall on a platform near an edge is an excursion (loss of balance) with same-level-fall potential. The edge does not count, and the SIF exposure to a fall from height continues. Only a continuous fall over the edge is the fall-from-height event. This diverges from EEI Case A. Check `sif-definition.md:298` "nearby edges" in the receiving environment, which may contradict it.
 - Triggers, exposure and receiving environment follow the direction of the energy flow and map onto the risk equation: trigger → chance, exposure → exposure, receiving environment → consequence. Only the receiving environment counts toward potential. A trigger is not a precursor; the precursor is the unprotected SIF exposure. Added as paper 1 §4.3, with triggers as an optional coding field. Back-port the `sif-definition.md:298` wording: "Count the receiving environment: what the energy would land on or strike (the surface below, rebar, sharp edges)".
+- Sources added in v0.2: CCPS & EI (2018) bowtie book (barrier criteria §2.6.3; training and competence are degradation controls, p. 43); Campbell Institute (2022) (DEKRA 2019 precursor definition; Dow pSIF reduction target; pSIF check-box on incident reports). Martin & Strikoff (2012) cannot be traced outside DEKRA, so it is dropped.
