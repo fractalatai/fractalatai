@@ -277,7 +277,7 @@ Practice is mixed. The Campbell Institute (2022) reports that Dow set an "annual
 ## 6. Critiques
 
 - **Bimodal thinking.** Safety-II argues that "Safety-I promotes a bimodal view of work" and that "seeing deficiencies in hindsight does nothing to explain the generation or persistence of those deficiencies" (Hollnagel, Wears & Braithwaite, 2015). A control coded only as present or absent is a bimodal construct. Recording control state does not explain why a control was absent; that needs investigation.
-- **Hindsight in "absent or not complied with".** Judging that a control was "not complied with" is often a judgement made after the outcome is known. The counterfactual paper discusses the bias ([sif-counterfactual.md](sif-counterfactual.md)). The narrow definitions (a fitted guard; a verified isolation) reduce the room for it.
+- **Hindsight in "not complied with".** Judging that a control was "not complied with" is often a judgement made after the outcome is known. The counterfactual paper discusses the bias ([sif-counterfactual.md](sif-counterfactual.md)). The narrow definitions (a fitted guard; a verified isolation) reduce the room for it.
 - **Compliance as a control.** The precursor schools' "not complied with" counts behaviour as a control. The bowtie and EEI definitions do not, because a control that depends on unerring behaviour fails with ordinary error.
 - **Weak evidence.** The definitions rest on expert consensus, the 87% claim on retrospective judgement, and the control–SIF link on one correlational study.
 
@@ -354,9 +354,11 @@ Against EEI SCL, the terms map one to one, but the populations differ:
 
 *For the author; remove before publication.*
 
-- **Read in full text (local or downloaded PDFs):** Krause (2010); Martin & Black (2015); Campbell Institute (2018, 2020, 2022); CCPS & EI (2018) bowtie book; Hallowell & Spencer (2024); EEI SCL (2024); Oguz Erkal & Hallowell (2023); Bayona et al. (2026); ICMM Implementation Guide (2015); Johnson et al. (2018); Manton et al. (2017); ARMS (2010); Busch et al. (2021); Hopkins (2009); Hollnagel et al. (2015); Reason (2000); Cooper (2019).
+- **Quotation check (2026-11-17).** Every quotation in sections 1 to 8 was matched word for word against the source text, allowing for line breaks and hyphenation in the PDFs. The executive summary repeats quotes from the body. No quotation is unverified. One wording was tightened: section 6 now quotes "not complied with", where it had loosely quoted "absent or not complied with".
+  - **All source copies are in `docs/sif/lit/`.** Those obtained online during research were added on 2026-11-17: `eei_scl_model_2024.pdf`, `hallowell_spencer_2024_scl_psj.pdf`, `iso_12100_2010_extract.pdf` (a 15-page extract, not the full standard), `busch_et_al_2021_psj.pdf`, `cooper_2019_safety_science.pdf`, `hopkins_2009_safety_science.pdf`, `hollnagel_wears_braithwaite_2015_safety_I_II.pdf`, `reason_2000_bmj.html` (the PMC web page), `johnson_et_al_2018_hazards28_bowties.pdf` and `manton_et_al_2017_hazards27_bowties_hf.pdf`. Also added: `eei_heca_guide.pdf`, and `wachter_ferguson_2013_psj.pdf` (for the Cooper correction below).
+  - **Page and section numbers** were checked only for EEI SCL (pp. 11, 19, 20) and CCPS & EI (2018) (p. 43, section 2.6.3).
 - **Local file:** `docs/sif/lit/bayone_et_al_2026.pdf` is Bayona et al. (2026, *J. Safety Research*), the HECA study, not the 2023 LIFE paper.
-- **EEI SCL (2024) quotes in section 4.2** are checked against the local text: the release and proximity definitions (p. 11), the glossary (p. 19), the traffic note (p. 20), and hazard #14 in the list of high-energy hazards.
+- **EEI SCL (2024) quotes in section 4.2** are checked against the source text: the release and proximity definitions (p. 11), the glossary (p. 19), the traffic note (p. 20), and hazard #14 in the list of high-energy hazards.
 - **DEKRA's own text** is not traceable. "Martin & Strikoff (2012)" could not be found outside DEKRA's own material, so DEKRA's definition is cited as DEKRA (2019) via Campbell Institute (2022).
 - **Not obtained:** the ICMM *Good Practice Guide*; ANSI/ASSP Z16.1-2022; Conklin (2019); Hollnagel (2014); Reason (1997); Bayona et al. (2024, *JCEM*).
 - **Corrections carried into this paper:**
