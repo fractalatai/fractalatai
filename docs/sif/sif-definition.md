@@ -1,6 +1,6 @@
 # SIF definitions and coding rules
 
-Version 1.6, 2026-11-16. For safety directors, safety teams and anyone coding incident reports for serious injury and fatality (SIF) potential. The supporting rationale is in [sif-definition-discussion.md](sif-definition-discussion.md).
+Version 1.7, 2026-11-17. For safety directors, safety teams and anyone coding incident reports for serious injury and fatality (SIF) potential. The supporting rationale is in [sif-definition-discussion.md](sif-definition-discussion.md).
 
 ## Contents
 
@@ -30,10 +30,11 @@ Version 1.6, 2026-11-16. For safety directors, safety teams and anyone coding in
 | **Energy source** | Anything that holds, stores or can release energy: gravity (height, suspended loads), motion, mechanical, electrical, pressure, thermal, chemical, radiation, sound, biological |
 | **Energy present** | Energy that is held, stored or available to be released, including the supply behind an isolator and the fuel in a parked vehicle. Only elimination removes it |
 | **Elimination** | Removing the energy from the source: supply disconnected and removed, system drained and vented, stored energy discharged, load landed |
-| **Envelope** | The designed bounds on an energy: **where** it may be and how far it must be kept from people; **when** it may be live; and **how much** may be present. For contained energy, the envelope is the containment and its designed path. For an intentional release (a blast, live firing, a relief discharge), it is the designed release zone |
-| **Live** | Energy in its working state, not isolated, with a line of fire to people: a suspended load, a running machine, an energised conductor, plant under pressure. Isolated energy is present (people near it are exposed) but not live |
-| **Line of fire** | The path live energy takes as it moves, or would take if released: the drop path of a suspended load, the swing path of a slewed load, the travel path of a vehicle, the trajectory of flyrock. Danger zones are drawn around it |
-| **Danger zone** | An area around the line of fire of live energy that is kept clear of people: an exclusion zone, a segregated route, a drop zone, or a machine's hazard zone behind its guards (ISO 12100) |
+| **Envelope** | The designed bounds on an energy: **where** it may be and how far it must be kept from people; **when** it may be live; and **how much** may be present. For contained energy, the envelope is the containment and its designed path. For an intentional release (a blast, live firing, a relief discharge), it is the designed release zone. A person at height is an energy source too: their envelope is the space in which they keep their balance and stay supported |
+| **Live** | Energy in its working state, with a line of fire to people: a suspended load until it is landed, a running machine, an energised conductor, plant under pressure. A machine that is stopped but not isolated is still live, because a restart is a line of fire |
+| **At rest** | Energy that is present but not live: a load landed, a machine stopped and isolated, a conductor de-energised. Isolation is one way to bring energy to rest. People near energy at rest are exposed, but it has no line of fire |
+| **Line of fire** | The path live energy takes as it moves, or the path a foreseeable release would take: the drop path of a suspended load, the swing path of a slewed load, the travel path of a vehicle, the trajectory of flyrock, the collapse radius of a crane. Danger zones are drawn around the parts the work keeps clear |
+| **Danger zone** | An area around the line of fire of live energy that is kept clear of people: an exclusion zone, a segregated route, a drop zone, a machine's hazard zone behind its guards (ISO 12100), or the edge zone behind edge barriers or a travel-restraint lanyard |
 | **Containment** | What holds energy in its intended state: a vessel, pipe or cable insulation. Containment is part of the source, not a control |
 | **Inherent feature** | A property of the source's own materials, quantity, operating conditions or physics. It works throughout normal operation without detection, actuation, power or human action, and can be lost only by changing the source. Examples: a reduced inventory, pump dead-head pressure, a reactor's negative temperature coefficient. It is part of the source, not a control |
 
@@ -42,13 +43,15 @@ Version 1.6, 2026-11-16. For safety directors, safety teams and anyone coding in
 | Term | Definition |
 |---|---|
 | **Target envelope** | Where people are, when they are there, and how many: one person, a team, a public crowd |
-| **Exposure** | A **condition**: energy is present and a person is within its reach, judged **as if no controls were in place**. An operator at a guarded machine is exposed for the whole time they use it. Exposure is measured in units that suit the work: person-hours, lifts, entries |
+| **Exposure** | A **condition**: energy is present and a person is within its reach, judged **as if no controls were in place**. An operator at a guarded machine is exposed for the whole time they use it. Planned presence within reach of live energy, outside any danger zone, is exposure: tag-liners at the edge of a lift are exposed to the load and the crane. Exposure is measured in units that suit the work: person-hours, lifts, entries |
 | **Separation margin** | What keeps energy and people apart: distance, time, or the margin to the design limit |
 | **Event** | A **happening**, not a condition: the separation margin between energy and people shrinks toward zero, because the energy changes (an excursion) or the people do (an incursion). An event is defined before any outcome is known |
 | **Excursion** | The energy goes beyond its envelope: it is released or moves (where), becomes live when it should not be (when), or builds up beyond its design (how much) |
-| **Incursion** | People enter the energy's envelope: they go into the line of fire of live energy, are there when it is live, or are more than planned. Time spent inside counts as exposure. Entry under isolation, or when the energy is not live, is not an incursion: there is no line of fire |
+| **Incursion** | People enter the energy's envelope: they go into a danger zone or the line of fire of live energy, are there when it is live, or are more than planned. Being there is the evidence of entry, whether or not anyone saw it. Time spent inside counts as exposure. Not incursions: planned presence within reach of the energy (exposure); entry when the energy is at rest (no line of fire). A person cannot enter their own line of fire (section 3.3) |
 | **Closest approach** | How near the energy came to people during an event: **wide** (nobody near), **close** (near miss) or **contact** (the energy reached a person) |
 | **Near miss** | An event whose closest approach was close, or that reached contact without harm. An excursion with nobody near is an event, not a near miss |
+| **Trigger** | A condition upstream of an event that can start it: a trip hazard, a wet deck, a gust, a jam that invites a reach-in. It bears on the chance of an event, not on its potential |
+| **Receiving environment** | What the energy would land on or strike: the surface below, rebar, sharp edges. It bears on the consequence and counts toward potential |
 
 ### 2.3 Outcomes and potential
 
@@ -71,7 +74,7 @@ Version 1.6, 2026-11-16. For safety directors, safety teams and anyone coding in
 | **Passive control** | Works by being there, and can still fail: guards, guardrails, bunds, blast walls, relief valves |
 | **Procedural control** | Depends on people following a procedure: LOTO, permits, exclusion-zone sentries, training |
 | **Direct control** | A control targeted at the specific energy, effective when installed, verified and used properly, and effective even if someone makes an unintentional error (EEI). Training, rules, signs and generic PPE are not direct controls |
-| **Control state** | For each control: effective, failed, absent, or not stated |
+| **Control state** | For each control: effective, failed, absent, or not stated (*unverified*) |
 
 ## 3. Events
 
@@ -95,13 +98,39 @@ An event is a change on either side that shrinks the separation between the two 
 
 | | **The energy changes** (excursion) | **The people change** (incursion) |
 |---|---|---|
-| **Where** | It is released or moves beyond its envelope: flyrock beyond the zone; a load swings off its path; a vehicle leaves its route; a person at height falls | People enter the line of fire of live energy: walking into a segregated route; reaching into a running machine; walking under a suspended load |
+| **Where** | It is released or moves beyond its envelope: flyrock beyond the zone; a load swings off its path; a crane overturns; a vehicle leaves its route; a person loses their balance or falls | People enter a danger zone or the line of fire of live energy: walking into a segregated route; reaching into a running machine; walking under a suspended load; climbing over an edge barrier |
 | **When** | It becomes live when it should not be: a back-fed isolated circuit; a machine restarts; firing starts early | People are present when the energy is live: entering the range during the firing window; still in the blast zone at firing |
 | **How much** | It builds up beyond its design: overpressure; overload; overspeed; a runaway reaction | More people than planned: a crowd gathers in the drop zone; a team works where one person was planned |
 
 Both sides can change at once: a person climbs past edge protection and falls; an isolated system is re-energised while a fitter is inside the guard.
 
-### 3.3 Closest approach
+Classify by what happened, not by how it was reported. A person seen under a suspended load on a hazard observation card is an incursion, because being there means they entered. A person seen working at an edge where no danger zone is drawn is exposure.
+
+A crane that overturns is an excursion. The tag-liners within its collapse radius were exposed; their presence was planned, so it is not an incursion. Their exposure becomes an event only if the crane fails.
+
+### 3.3 When the person is the energy
+
+At height, the energy source (the person's mass) and the target are the same. Vehicle occupants are the same case.
+
+- **The event is an excursion.** Like any energy source, the person can only leave the space in which they operate safely. A fall is the sign of it. A person cannot enter their own line of fire.
+- **Fall protection does not change the event.** An arrested fall is still an excursion; the harness is its control state, so the event is PSIF (protected).
+- **Edge barriers and travel restraint mark a danger zone.** Crossing the barrier, or unclipping the restraint to reach the edge, is an incursion, and so an event. A fall that follows is a second event, an excursion.
+- **Losing balance is an excursion wherever it happens.** A trip on a platform is a fall on the same level, judged on its own potential; the edge does not change it. The person's exposure to a fall from height carries on. Only a continuous fall over the edge is the fall-from-height event.
+- **Vehicles:** the event is the vehicle leaving its route or colliding.
+
+### 3.4 Triggers, exposure and the receiving environment
+
+Three things meet in any event. They follow the energy flow, and each maps to one term of the risk equation.
+
+| | Where it sits | Examples | Risk term | Counts toward SIF potential? |
+|---|---|---|---|---|
+| **Trigger** | Upstream: starts the excursion or incursion | A lifting lug to trip on; a wet deck; a gust | Chance | **No.** Separation to zero assumes the energy reaches the person anyway |
+| **Exposure** | Energy and people together | Work at a 25 ft unguarded edge; tag-lining a lift | Exposure | It is what is being judged |
+| **Receiving environment** | Downstream: where the energy is delivered | Rebar or plant below; a hard surface; a sharp edge to strike | Consequence | **Yes.** A fall onto rebar is worse than a fall onto soil |
+
+A trigger is not a precursor. The precursor is the unprotected SIF exposure (the unguarded edge); the trigger is what could set it off.
+
+### 3.5 Closest approach
 
 Every event has a closest approach. It is recorded for learning and reporting; it does not change the potential.
 
@@ -111,9 +140,10 @@ Every event has a closest approach. It is recorded for learning and reporting; i
 | **Close**: small margin, no contact | Near miss | Flyrock lands a metre from someone; a forklift stops short of a pedestrian |
 | **Contact**: no margin | The energy reached a person, with or without harm | A person is struck by flyrock; a harness arrests a fall |
 
-### 3.4 Not events
+### 3.6 Not events
 
-- **Exposure:** energy and people together, with nothing changing. Examples: tag-liners holding their lines at the edge of a lift, outside the drop path; an operator at a guarded, running machine; working dead behind an isolator.
+- **Exposure:** energy and people together, with nothing changing. Examples: tag-liners holding their lines at the edge of a lift, outside the drop path; an operator at a guarded, running machine; working dead behind an isolator; working at an edge where no danger zone is drawn.
+- **A trigger on its own**, such as a trip hazard. It is a condition that could start an event; record it with the exposure.
 - **Separation held:** the envelopes are kept apart in where (distance, barriers) or when (scheduling, permits, firing windows). Entering the range tomorrow, when no firing is planned, is separation in time.
 - **A planned release that stays inside its envelope** with nobody in it, such as a blast fired with the zone clear.
 - **A control failing on its own**, such as a relief valve sticking. The event is what the energy does next (the overpressure); the stuck valve is its control state.
@@ -285,6 +315,8 @@ The AI model's event is consistent with the standard definitions and is more spe
 | Elevated potential | (none) | (judgement) | (judgement) | pSIF (possible) |
 | Not SIF | Low-severity | (none) | (none) | Priority / recordable |
 
+The labels map, but the populations differ from EEI's. EEI counts an incident only when energy is released and someone is within 6 ft. The AI model also counts incursions (a person under a load that holds; a hand past an open guard) and excursions with nobody near, so its PSIF counts run higher. Do not benchmark one against the other directly. See [sif-controls-precursors.md](sif-controls-precursors.md), section 4.2.
+
 ## 7. Coding rules: determining PSIF
 
 ### 7.1 Before you start
@@ -295,7 +327,8 @@ Apply these rules throughout:
 
 - **Separation to zero.** Assess as if the energy reached a person, whether or not anyone was hit.
 - **Ignore all controls when judging potential.** Guardrails, harnesses, PPE, LOTO, interlocks, exclusion zones, training, evasive action and luck count for nothing at this stage.
-- **Count the receiving environment** (the surface someone would land on, nearby edges and rebar) and the body region at risk.
+- **Count the receiving environment:** what the energy would land on or strike (the surface below, rebar, sharp edges), and the body region at risk. Triggers (a trip hazard, a wet deck) do not count toward potential.
+- **Classify by what happened, not by how it was reported.** Code a hazard or positive observation by the same rules as an incident report.
 - **Use only facts in the report.** Do not add controls or energy the report does not describe.
 - **Never let the actual outcome lower the potential.** A minor injury from a high-energy event is still high potential.
 
@@ -310,8 +343,9 @@ Work through steps 1–7 for **each energy source** in the report.
 - Energy eliminated (removed, drained, discharged): **stop, no exposure.**
 
 **Step 3. Decide whether an event occurred.** Use section 3.2. Ask: **did the energy or the people change, so that the separation between them shrank?**
-- **Excursion:** the energy was released, moved, became live or built up. Examples: a dropped load, flyrock beyond the zone, a fall from height, a re-energised isolated circuit, overpressure.
-- **Incursion:** people entered the line of fire of live energy, were there when it was live, or were more than planned. Entering near isolated energy is not an incursion. Examples: reaching past a guard on a running machine, walking into a segregated route, being on the range during firing.
+- **Excursion:** the energy was released, moved, became live or built up. Examples: a dropped load, flyrock beyond the zone, a crane overturn, a fall from height, a loss of balance, a re-energised isolated circuit, overpressure.
+- **Incursion:** people entered a danger zone or the line of fire of live energy, were there when it was live, or were more than planned. Being found there counts as entering. Planned presence within reach (tag-liners) and entering near energy at rest are not incursions. Examples: reaching past a guard on a running machine, walking into a segregated route, being on the range during firing, climbing over an edge barrier.
+- **The person is the energy** (at height, in a vehicle): see section 3.3.
 
 If yes, it is an **event**. Record whether it was an excursion, an incursion or both; the dimension (where, when, how much); and the closest approach (wide, close, contact). Go to step 4.
 
@@ -337,7 +371,7 @@ If no:
 **Step 7. Record the control state.** Was a **direct control** in place on this energy, and did it work?
 - **Effective:** a direct control stopped or contained the energy. Examples: a harness arrested the fall; a relief valve lifted to a safe point; a trip worked.
 - **Failed or absent:** there was no direct control, or it failed or was defeated.
-- **Not stated:** the report does not say.
+- **Not stated (unverified):** the report does not say. Do not assume the control was absent. The panel establishes the control state before drawing lessons from the case. For EEI comparisons and HECA scores, count it as failed or absent.
 
 Training, rules, signs, generic PPE, evasive action and luck are **not** direct controls.
 
@@ -370,6 +404,7 @@ If a serious injury occurred but the band is Elevated or Not SIF, recheck the ba
 | P(serious) and class | From Annex B |
 | Serious injury | Yes or no |
 | Control state | Effective, failed or absent, or not stated, naming the control |
+| Trigger (optional) | Any condition seen that could start an event, such as a trip hazard at an unprotected edge. It does not change the determination, but shows which SIF exposures to fix first |
 | Determination | From 7.3 |
 | Rationale | One sentence |
 
@@ -387,6 +422,9 @@ If a serious injury occurred but the band is Elevated or Not SIF, recheck the ba
 | "Visitor crossed the outer edge of the lift exclusion zone, well clear of the drop path." | Gravity, suspended load (live). Incursion, where; wide. `struck/heavy_object_fall`: SIF. No injury. Exclusion zone failed | **PSIF (unprotected)** |
 | "Tag-liners controlled the load from the edge of the zone throughout the lift." | Gravity, suspended load (live). Planned exposure outside the drop path; nothing changed | **SIF exposure** |
 | "Jam cleared with the guard open after LOTO was applied and verified." | Mechanical. Energy present behind the isolator; no incursion | **SIF exposure**, isolation effective |
+| "Crane overturned during a lift; the tag-liners within the collapse radius were unhurt." | Gravity, crane and load. Excursion, where; close. `struck/heavy_object_fall`: SIF. No injury. No control stopped the overturn | **PSIF (unprotected)** |
+| "Roofer climbed over the edge barrier on a 6 m roof to clear a gutter. No fall." | Gravity, person at height. Incursion into the edge danger zone; close. `fall/medium`: SIF. No injury. Barrier defeated | **PSIF (unprotected)** |
+| "Worker on an 8 m platform tripped on a lifting lug and fell onto the deck, 0.6 m from the unguarded edge. Bruised hand." | Gravity. Excursion (loss of balance), where; contact. `fall/standing`: Not SIF. Trigger: the lifting lug. The exposure to the unguarded edge is recorded separately | **Not SIF** event, plus **SIF exposure (unprotected)** |
 
 ## Annex A. Mechanisms
 
