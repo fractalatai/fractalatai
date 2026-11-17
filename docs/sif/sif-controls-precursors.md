@@ -47,7 +47,7 @@ Keep the two questions apart, and give events and conditions their own labels.
 1. **Code by content, not by channel.** An event is PSIF however it is reported: a person seen in the line of fire of live energy is an incursion. A condition is **SIF exposure**, never PSIF. It is *unprotected* (a **precursor**) when no direct control is in place, and *protected* when one is. Energy with no person within reach is a hazard, not an exposure. Record any trigger seen with the exposure, such as a trip hazard at an unprotected edge. Triggers do not change the potential, but they show which precursors to fix first (section 4.3).
 2. **Keep the two counts separate.** Report PSIF (events) and SIF exposure (conditions) side by side, never summed. The AI model's PSIF counts include incursions, and excursions with no one nearby, so they will be higher than EEI's for the same work. Do not benchmark one against the other directly.
 3. **Use positive observations.** The share of SIF exposures with a direct control in place, EEI's high-energy control assessment (HECA), is the leading indicator the observation data can support.
-4. **Count only direct or critical controls** when recording control state: targeted at the energy, verified in place, and effective even if someone makes an unintentional error. Training, rules, signs and general PPE are not direct controls.
+4. **Count only direct or critical controls** when recording control state: targeted at the energy, verified in place, and effective even if someone makes an unintentional error. Training, rules, signs and general PPE are not direct controls. Where the report is silent, record the control state as *unverified*, not absent, and have the panel resolve it (section 7).
 5. **Use PSIF and precursor data for learning, not targets.** Precursor events are good warnings but poor performance indicators (Hopkins, 2009). EEI's model "should be used for learning, not for the creation of new metrics".
 
 ## Contents
@@ -84,6 +84,8 @@ BST introduced the precursor:
 > "A precursor of a SIF is defined as a high risk situation in which management controls are either absent, ineffective, or not complied with, and if allowed to continue or repeat could reasonably result in a serious injury or fatality." (Krause, 2010)
 
 Martin & Black (2015) firmed the wording to "will result in a serious or fatal injury if allowed to continue", and described precursors as "conditions, behaviors, practices, exposures, situations and factors". Their formula: "a high-risk situation must be present, the safety controls designed to protect against injury must fail and this combination must be allowed to continue."
+
+DEKRA's current wording, as quoted by the Campbell Institute (2022), keeps the form: "A high-risk situation in which control measures are absent, ineffective or not complied with, and would potentially result in a fatality or serious injury if allowed to continue" (DEKRA, 2019).
 
 The Campbell Institute adopted the two-part form and made the role of controls explicit:
 
@@ -137,7 +139,7 @@ The frameworks differ on what a "control" is. The ones that give credit for cont
 |---|---|---|
 | **BST / DEKRA** | "Management controls", not further defined (Krause, 2010) | Nothing explicit; behaviour and compliance count |
 | **ICMM (2015)** | "An act, object (engineered) or system (combination of act and object) intended to prevent or mitigate an unwanted event." A *critical* control is one whose "absence or failure … would significantly increase the risk despite the existence of the other controls" | Anything whose performance is not "specified, observable, measurable and auditable": "The plan may contain controls, but the plan itself is not the control" |
-| **CCPS / Energy Institute bowties** | Barriers must be "effective, independent and auditable" (Johnson et al., 2018). They are either prevention barriers ("stop threats from resulting in the top event") or mitigation barriers ("reduce the scale of … undesired consequences") | "training, competence, MOC, audit, inspection and maintenance programme, contractor management … are not barriers in themselves" (Johnson et al., 2018) |
+| **CCPS / Energy Institute bowties** | "Each valid barrier should be effective, independent, and auditable. It must have the capability to completely stop the threat from leading to the top event or, if a mitigation barrier, significantly reducing or eliminating the consequence" (CCPS & EI, 2018, section 2.6.3). They are either prevention barriers ("stop threats from resulting in the top event") or mitigation barriers ("reduce the scale of … undesired consequences") Training and competence: listing them as barriers is a common mistake, because "these are degradation controls and would appear on a degradation pathway supporting the barrier to which they apply" (CCPS & EI, 2018, p. 43). Likewise "training, competence, MOC, audit, inspection and maintenance programme, contractor management … are not barriers in themselves" (Johnson et al., 2018) |
 | **EEI direct control** | One that "1) is specifically targeted to the high-energy source; 2) effectively mitigates exposure to the high-energy source when installed, verified and used properly …; and 3) is effective even if there is unintentional human error" (Hallowell & Spencer, 2024). Direct controls are absolute (they eliminate exposure) or mitigating (they reduce it below the threshold) | Training, warning signs, rules, experience and most standard PPE. "A deficiency in any component of the system invalidates the entire direct control" (EEI, 2024) |
 
 On human factors, the bowtie literature is blunt: "Most of the controls that organisations use to minimise human error cannot meet the criteria necessary to be considered active barriers in their own right" (Manton et al., 2017).
@@ -270,6 +272,8 @@ His alternative is to measure controls: "process safety indicators must be chose
 
 EEI applies the same caution to its own categories: "The SCL model should be used for learning, not for the creation of new metrics … PSIF rates are not unidirectional" (Hallowell & Spencer, 2024).
 
+Practice is mixed. The Campbell Institute (2022) reports that Dow set an "annual reduction target for non-injury pSIFs", described as "a common leading indicator". It also notes that "some organizations choose not to create goals around SIF metrics because of the potential that these goals might create fear and discourage reporting". On capture, it reports that "including a check-box option to report a pSIF on an incident report has proven effective". That is the kind of reporter-selected label that section 4 recommends replacing with coding by content.
+
 ## 6. Critiques
 
 - **Bimodal thinking.** Safety-II argues that "Safety-I promotes a bimodal view of work" and that "seeing deficiencies in hindsight does nothing to explain the generation or persistence of those deficiencies" (Hollnagel, Wears & Braithwaite, 2015). A control coded only as present or absent is a bimodal construct. Recording control state does not explain why a control was absent; that needs investigation.
@@ -306,14 +310,16 @@ Against EEI SCL, the terms map one to one, but the populations differ:
 | Exposure | SIF exposure (unprotected) | EEI includes hazards with no one nearby; the AI model also needs a person within reach. Incursions EEI records as Exposure are PSIF in the AI model |
 | Success | SIF exposure (protected) | EEI includes hazards with no one nearby |
 
-**A choice to make: "unverified".** EEI and HECA treat a control that is not verified as absent: "the control is considered absent" (Oguz Erkal & Hallowell, 2023). ICMM similarly warns against assuming controls work "without direct observation". No reviewed framework has a separate "unverified" state; it is the AI model's own addition, made because incident narratives rarely say whether controls were in place. There are two options:
+**"Unverified" is kept.** EEI and HECA treat a control that is not verified as absent: "the control is considered absent" (Oguz Erkal & Hallowell, 2023). ICMM similarly warns against assuming controls work "without direct observation". No reviewed framework has a separate "unverified" state. The AI model adds one because incident narratives often do not say whether controls were in place. Treating silence as absent would overstate control failures and hide the gap in reporting. The rules are:
 
-- **Keep "unverified"**, and treat it as unprotected whenever a yes/no is needed (for EEI comparisons and HECA). This is honest about what the report says, and keeps the gap visible.
-- **Drop it**, and record not-stated as absent, following EEI. This is simpler and directly comparable, but it overstates control failures where the report is silent.
+- **Record unverified when the report does not say** whether a direct control was in place or worked. Example: "Scaffold board fell into the barriered area below", where nothing shows whether the exclusion zone held.
+- **Map unverified to unprotected** whenever a yes/no is needed: for EEI comparisons, and in HECA-style scores, where it counts as exposure.
+- **Treat unverified as a work queue.** The panel should establish the control state before drawing lessons from the case.
+- **Report the unverified share.** If it rises, reports are not capturing control state, and that is itself a finding.
 
 ## 8. Research agenda
 
-- **Test whether control state is reliably coded.** Measure agreement on direct control present or absent, in narratives and in observations, separately from agreement on potential.
+- **Test whether control state is reliably coded.** Measure agreement on direct control present, absent or unverified, in narratives and in observations, separately from agreement on potential. Track how often the panel resolves unverified cases, and which way they fall.
 - **HECA over time.** Collect HECA prospectively, before the injury window, to test the forward link that Bayona et al. (2026) could not.
 - **Observation bias.** Measure how much of the observation stream is the "easily observable" low-severity findings Busch et al. (2021) describe, before and after restricting control credit to direct controls.
 - **Incursions.** Measure the share of PSIF that are incursions, and agreement on whether the energy was live and the person was in its line of fire. This is the population EEI does not count.
@@ -327,6 +333,9 @@ Against EEI SCL, the terms map one to one, but the populations differ:
 - Busch, C., Usrey, C., Loud, J., Goodell, N. & Carrillo, R.A. (2021). Serious injuries & fatalities: why are they constant while injury rates decrease? *Professional Safety*, 66(1), 26–31.
 - Campbell Institute (2018). *Serious Injury and Fatality Prevention: Perspectives and Practices*. National Safety Council.
 - Campbell Institute (2020). *Designing Strategy for Serious Injury and Fatality Prevention*. National Safety Council.
+- Campbell Institute (2022). *Serious Injury and Fatality Prevention: Leading Indicators, Cumulative Risk and Safety Networks*. National Safety Council.
+- CCPS & Energy Institute (2018). *Bow Ties in Risk Management: A Concept Book for Process Safety*. Wiley / AIChE.
+- DEKRA (2019). Precursor definition, as quoted in Campbell Institute (2022).
 - Cooper, M.D. (2019). The efficacy of industrial safety science constructs for addressing serious injuries & fatalities (SIFs). *Safety Science*, 120, 164–178. doi:10.1016/j.ssci.2019.06.038
 - Edison Electric Institute (2024). *Safety Classification and Learning (SCL) Model*, rev. September 2024.
 - Hallowell, M.R. & Spencer, C. (2024). Safety classification & learning model: defining & classifying potential serious injuries & fatalities. *Professional Safety*, 69(2), 18–26.
@@ -345,10 +354,11 @@ Against EEI SCL, the terms map one to one, but the populations differ:
 
 *For the author; remove before publication.*
 
-- **Read in full text (local or downloaded PDFs):** Krause (2010); Martin & Black (2015); Campbell Institute (2018, 2020); Hallowell & Spencer (2024); EEI SCL (2024); Oguz Erkal & Hallowell (2023); Bayona et al. (2026); ICMM Implementation Guide (2015); Johnson et al. (2018); Manton et al. (2017); ARMS (2010); Busch et al. (2021); Hopkins (2009); Hollnagel et al. (2015); Reason (2000); Cooper (2019).
+- **Read in full text (local or downloaded PDFs):** Krause (2010); Martin & Black (2015); Campbell Institute (2018, 2020, 2022); CCPS & EI (2018) bowtie book; Hallowell & Spencer (2024); EEI SCL (2024); Oguz Erkal & Hallowell (2023); Bayona et al. (2026); ICMM Implementation Guide (2015); Johnson et al. (2018); Manton et al. (2017); ARMS (2010); Busch et al. (2021); Hopkins (2009); Hollnagel et al. (2015); Reason (2000); Cooper (2019).
 - **Local file:** `docs/sif/lit/bayone_et_al_2026.pdf` is Bayona et al. (2026, *J. Safety Research*), the HECA study, not the 2023 LIFE paper.
 - **EEI SCL (2024) quotes in section 4.2** are checked against the local text: the release and proximity definitions (p. 11), the glossary (p. 19), the traffic note (p. 20), and hazard #14 in the list of high-energy hazards.
-- **Not obtained:** Campbell Institute (2022) *Leading Indicators*; DEKRA's own precursor text (Martin & Strikoff, 2012; DEKRA's definition is known only via Campbell); the ICMM *Good Practice Guide*; the CCPS/EI (2018) bowtie book itself (wording is from its authors' conference papers); ANSI/ASSP Z16.1-2022; Conklin (2019); Hollnagel (2014); Reason (1997); Bayona et al. (2024, *JCEM*).
+- **DEKRA's own text** is not traceable. "Martin & Strikoff (2012)" could not be found outside DEKRA's own material, so DEKRA's definition is cited as DEKRA (2019) via Campbell Institute (2022).
+- **Not obtained:** the ICMM *Good Practice Guide*; ANSI/ASSP Z16.1-2022; Conklin (2019); Hollnagel (2014); Reason (1997); Bayona et al. (2024, *JCEM*).
 - **Corrections carried into this paper:**
   - Campbell (2020) reads "not in and of itself a precursor".
   - The 87% figure is from Martin & Black (2015), not Krause (2012).
