@@ -1,6 +1,6 @@
 # Counterfactuals in SIF potential
 
-Status: draft v0.6, 2026-11-17. A literature review in a series on the challenges, differences and points of consensus in defining serious injury and fatality (SIF) potential. Definitions follow [sif-definition.md](sif-definition.md).
+Status: draft v0.7, 2026-11-17. A literature review in a series on the challenges, differences and points of consensus in defining serious injury and fatality (SIF) potential. Definitions follow [sif-definition.md](sif-definition.md).
 
 ## Executive summary
 
@@ -24,31 +24,47 @@ The research is consistent on what happens next:
 
 The consequences differ by use:
 
-- **Flagging cases for review:** the pick list does a reasonable job.
-- **Trending PSIF over time, or comparing sites:** it is unreliable. A change in the numbers may be a change in who did the triage, not in the risk.
+- **Flagging cases for review:** the pick list does a reasonable job, if triagers flag generously.
+- **Deciding PSIF, trending it, or comparing sites:** it is unreliable. A change in the numbers may be a change in who did the triage, not in the risk.
 
 ### The fix
 
-The subjectivity comes from leaving the question open, not from PSIF itself. Fix the question, take the answer from data, and record controls separately.
+The subjectivity comes from leaving the question open, not from PSIF itself. Fix the question, decide it with calibrated people, check it against the AI model, and record controls separately. This needs no change to the reporting software: triagers keep the pick list, but it is no longer the classification of record.
+
+**Three stages:**
+
+1. **Triage: a coarse filter.** Triagers use the existing pick list, with a deliberately low bar ("if in doubt, flag"). Their job is to miss nothing, not to decide.
+2. **Screening: the AI model.** The AI model reads every case on the list. It puts forward likely PSIF candidates that the triagers did not flag, so under-calls at triage are caught.
+3. **Sentencing: a calibrated panel, monthly.** A small panel sentences every flagged and put-forward case. Its decision, recorded outside the reporting software, is the classification of record.
+
+**The panel answers one fixed question for each case:**
+
+> *If this energy (as described) had reached a person, with no protection, would a serious injury be more likely than not?*
+
+Each member answers yes or no, with their confidence that the answer is correct, from 50% (a guess) to 100% (certain). For example: **Yes, 70%**. This is the format Hubbard uses to train and measure calibrated assessors.
 
 | | Today | Proposed | Why |
 |---|---|---|---|
-| **The question** | "How severe could this have been?" (open) | "If this energy had reached a person, with no protection, would a serious injury be more likely than not?" One question, the same for every event | An open question gives a different answer for each triager. A fixed question gives the same answer |
-| **What the triager does** | Imagines an outcome and picks a label | Records the facts: the energy type and its size (height, speed, voltage, mass) from the report, using the band table | Reading facts is consistent. Imagining is not |
-| **Where the severity comes from** | The triager's judgement | The band table: the probability of a serious outcome for that energy and size, from injury data | Anchors the answer outside the triager |
-| **Classification** | A descriptive label | SIF (≥ 50%), Elevated (≥ 10%) or Not SIF, from the band | Thresholds are stated, and can be set by the company |
-| **Controls** | Mixed in, or ignored, case by case | Recorded separately: PSIF *protected* (a control worked), *unprotected* (it was absent or failed) or *unverified* (not stated) | Keeps "how dangerous was the energy" apart from "did our controls work" |
+| **Who decides** | The triager, at triage | A calibrated monthly panel. Triagers filter; the AI model adds missed candidates | Separates finding cases from deciding them |
+| **The question** | "How severe could this have been?" (open) | One fixed question, the same for every case (above) | An open question gives a different answer for each person |
+| **The answer** | A descriptive label | Yes or no, with 50–100% confidence, from each member. The panel's answer is the average | Confidence shows where the panel is sure and where it is guessing |
+| **Facts that are missing** | Filled in by imagination | Members give a range ("the fall was between 1.5 and 4 m") and answer accordingly | A calibrated range is honest about uncertainty; a guess is not |
+| **Checking the answer** | Not measured | Compared with the AI model's classification for the same case. Disagreements are discussed | Two independent readers catch each other's errors |
+| **Calibrating the panel** | Not done | Training and periodic tests on the same question, with answers known from the injury data behind the AI model (e.g. "a 3–6 m fall onto concrete") | Members learn what 70% confidence really means, and are scored on it |
+| **Controls** | Mixed in, or ignored, case by case | Recorded separately: PSIF *protected* (a control worked), *unprotected* (absent or failed) or *unverified* (not stated) | Keeps "how dangerous was the energy" apart from "did our controls work" |
 | **What-ifs** | Part of the rating | Recorded separately and labelled, for investigation only | What-ifs help learning but make classification inconsistent |
-| **Consistency check** | None measured | The AI model codes every report alongside the triager. Disagreements go to the review panel, and a blind double-coded sample is measured each quarter | The panel becomes a check on reading the report, not a substitute for a definition |
+
+**How the panel's answers combine.** "Yes, 70%" counts as 0.70 and "No, 70%" as 0.30. The panel's answer is the average: 0.5 or more is yes (PSIF), and below 0.5 is no. Cases where members are split, or where everyone is near 50%, are discussed before the result is recorded. Averaging several judges is itself a gain: in healthcare, a reliable potential-severity score needed at least four judges averaged per case.
 
 ### Recommendations
 
-1. **Adopt the definition.** Use the SIF potential definition and coding rules in [sif-definition.md](sif-definition.md) for all PSIF triage.
-2. **Replace the severity pick list.** Triagers record mechanism and band. The class follows from the band table, and the control state is recorded as a separate field. Run the old pick list in parallel for one quarter to compare.
-3. **Use the AI model as a second reader.** It applies the same rules to every report. The panel reviews cases where triager and model disagree.
-4. **Measure agreement.** Each quarter, double-code a blind sample. Report chance-corrected agreement between triagers, and between triagers and the AI model.
-5. **Ask reporters for the size of the energy.** Height, speed, voltage, weight and pressure are what decide the band. Thin reports are under-called.
-6. **Use PSIF to find cases now, and trend later.** Trend only on a fixed, versioned rule set. Do not set targets for PSIF rates, because that suppresses reporting. When the rules change, re-run all past cases; never re-classify history after one serious event.
+1. **Adopt the definition.** Use the SIF potential definition in [sif-definition.md](sif-definition.md) as the panel's question.
+2. **Keep triage as a filter.** No software change. Ask triagers to flag generously; the pick-list rating is their view, not the decision.
+3. **Use the AI model to screen all cases.** It adds likely candidates that triage missed, and gives the panel a second, independent reading of every case it sentences.
+4. **Set up a monthly sentencing panel** of four or five people from across the operation. Members answer yes or no with confidence, and the panel records the average and the control state.
+5. **Calibrate the panel.** Give initial calibration training, then test periodically with questions whose answers come from the injury data. Track each member's calibration with a Brier score.
+6. **Ask reporters for the size of the energy.** Height, speed, voltage, weight and pressure decide the answer. Thin reports are under-called.
+7. **Use PSIF to find cases now, and trend later.** Trend only once the panel is calibrated and its rules are fixed. Do not set targets for PSIF rates, because that suppresses reporting. Never re-classify history after one serious event.
 
 ## Contents
 
@@ -279,6 +295,25 @@ The question is then where the probability comes from. If it comes from the asse
 
 Collapsing the probability to a category also loses information. Risk-matrix bins have poor resolution and invite opposite ratings of the same risk (Cox, 2008). A "most likely" cut at 50% hides an outcome with a 30% chance of being serious.
 
+### 6.4 Calibrated assessors
+
+If the answer is a probability, the people giving it can be trained and measured like any other instrument. Hubbard's work on calibrated estimation is the most practical route (Hubbard, 2014; 2020). It draws on decades of research showing that people are typically overconfident, and that calibration improves with training and feedback (Lichtenstein, Fischhoff & Phillips, 1982).
+
+Hubbard's binary format matches the PSIF question exactly. A statement is presented, and the assessor answers true or false with a confidence of 50% to 100%. A calibrated assessor is right about 70% of the time on the answers they give at 70% confidence. For PSIF:
+
+> *If this energy had reached a person, with no protection, would a serious injury be more likely than not?* **Yes, 70%.**
+
+Four points make this work for PSIF:
+
+1. **Confidence is not P(serious).** "Yes, 70%" means "I am 70% confident a serious injury is more likely than not". It does not mean "P(serious) = 0.70". The format stays a yes/no decision against the threshold, with honesty about how sure the assessor is.
+2. **The answer key comes from data.** A counterfactual cannot be checked against what happened. But the question can be put in training and tests for energies whose outcome distributions are known: the injury data behind the AI model's band table. Assessors are then calibrated on the live question, not only on general-knowledge exercises.
+3. **Calibration is scored.** Each assessor's answers are compared with the answer key using a Brier score, the mean squared error of their stated probabilities (Brier, 1950). The score shows both accuracy and over- or under-confidence.
+4. **Ranges handle missing facts.** When a report omits the height, speed or weight, the assessor gives a 90% confidence interval for it (Hubbard's range estimate) and answers in light of that range. This addresses the thin-report under-call, where the AI model defaults to the lowest band.
+
+**Aggregation adds reliability.** Averaging several judges' probabilities is more reliable than any one judge. Dean & Barber (1999) needed at least four judges per case for a reliable potential-severity score. Forecasting research finds that averaged, calibrated, trained judges outperform individuals (Tetlock & Gardner, 2015).
+
+**Where this sits among the responses.** Calibrated assessment combines all three responses: it restricts who decides (a trained panel), restricts the question (one fixed antecedent), and answers it with a probability. Unlike an uncalibrated panel, its consistency can be measured, and so can its accuracy, against data.
+
 ## 7. Two counterfactuals, not one
 
 The critics' examples ("if only…", "should have…", "if he had struck his head just the right way") mix two different counterfactuals.
@@ -348,6 +383,8 @@ An organisation that sentences by panel can trend internally while the panel sta
 - **Measure outcome bias directly.** Present the same narrative with a benign and with a serious outcome, and compare the judged potential, with and without the fixed rule.
 - **Report detail as a confounder.** Measure how classification shifts with narrative completeness, which matters for trending.
 - **Framing and learning.** Test whether a probabilistic read-out ("P(serious) = 0.72") moves near-miss learning toward the vulnerable reading.
+- **Calibrate the panel, and measure it.** Track each panel member's Brier score on questions with data-derived answers. Test whether calibration training improves agreement with the AI model and between members.
+- **Ranges versus the lowest-band default.** Compare classifications from calibrated range estimates with the AI model's lowest-band default on thin reports.
 - **Validity, not just reliability.** Check the calibrated distributions against outcomes, so that a consistent rule is also a correct one.
 
 ## 10. Conclusion
@@ -367,6 +404,7 @@ Panels and calibration then become a check on reading reports, not a substitute 
 
 - ARMS Working Group (2010). *The ARMS Methodology for Operational Risk Assessment in Aviation Organisations*, v4.1, March 2010.
 - Baron, J. & Hershey, J.C. (1988). Outcome bias in decision evaluation. *Journal of Personality and Social Psychology*, 54(4), 569–579.
+- Brier, G.W. (1950). Verification of forecasts expressed in terms of probability. *Monthly Weather Review*, 78(1), 1–3.
 - Busch, C. (2019). *If You Can't Measure It… Maybe You Shouldn't: Reflections on Measuring Safety, Indicators, and Goals*. Mind the Risk. Chapter "Sifting Through SIF".
 - Busch, C., Usrey, C., Loud, J., Goodell, N. & Carrillo, R.A. (2021). Serious injuries & fatalities: why are they constant while injury rates decrease? *Professional Safety*, 66(1).
 - Byrne, R.M.J. (2005). *The Rational Imagination: How People Create Alternatives to Reality*. MIT Press.
@@ -387,6 +425,8 @@ Panels and calibration then become a check on reading reports, not a substitute 
 - Hallowell, M.R. & Spencer, C. (2024). Defining & classifying potential serious injuries & fatalities: the safety classification and learning model. *Professional Safety*, 69(2), 18–26.
 - Hallowell, M.R., Alexander, D. & Gambatese, J.A. (2017). Energy-based safety risk assessment: does magnitude and intensity of energy predict injury severity? *Construction Management and Economics*, 35(1–2), 64–77.
 - Hayward, R.A. & Hofer, T.P. (2001). Estimating hospital deaths due to medical errors: preventability is in the eye of the reviewer. *JAMA*, 286(4), 415–420.
+- Hubbard, D.W. (2014). *How to Measure Anything: Finding the Value of Intangibles in Business*, 3rd ed. Wiley.
+- Hubbard, D.W. (2020). *The Failure of Risk Management: Why It's Broken and How to Fix It*, 2nd ed. Wiley.
 - Kahneman, D. & Miller, D.T. (1986). Norm theory: comparing reality to its alternatives. *Psychological Review*, 93(2), 136–153. doi:10.1037/0033-295X.93.2.136
 - Kahneman, D. & Tversky, A. (1982). The simulation heuristic. In Kahneman, Slovic & Tversky (eds), *Judgment under Uncertainty: Heuristics and Biases*, 201–208. Cambridge University Press.
 - Kahneman, D. & Varey, C.A. (1990). Propensities and counterfactuals: the loser that almost won. *Journal of Personality and Social Psychology*, 59(6), 1101–1110.
@@ -395,6 +435,7 @@ Panels and calibration then become a check on reading reports, not a substitute 
 - Lewis, D. (1973a). *Counterfactuals*. Blackwell / Harvard University Press.
 - Lewis, D. (1973b). Causation. *Journal of Philosophy*, 70(17), 556–567. doi:10.2307/2025310
 - Lewis, D. (1979). Counterfactual dependence and time's arrow. *Noûs*, 13(4), 455–476.
+- Lichtenstein, S., Fischhoff, B. & Phillips, L.D. (1982). Calibration of probabilities: the state of the art to 1980. In Kahneman, Slovic & Tversky (eds), *Judgment under Uncertainty: Heuristics and Biases*, 306–334. Cambridge University Press.
 - Localio, A.R., Weaver, S.L., Landis, J.R., et al. (1996). Identifying adverse events caused by medical care: degree of physician agreement in a retrospective chart review. *Annals of Internal Medicine*, 125(6), 457–464.
 - Manaseki-Holland, S., Lilford, R.J., Te, A.P., et al. (2019). Ranking hospitals based on preventable hospital death rates: a systematic review with implications for both direct measurement and indirect measurement through standardized mortality rates. *Milbank Quarterly*, 97(1), 228–284. doi:10.1111/1468-0009.12375
 - March, J.G., Sproull, L.S. & Tamuz, M. (1991). Learning from samples of one or fewer. *Organization Science*, 2(1), 1–13. doi:10.1287/orsc.2.1.1
@@ -408,6 +449,7 @@ Panels and calibration then become a check on reading reports, not a substitute 
 - Roese, N.J. (1997). Counterfactual thinking. *Psychological Bulletin*, 121(1), 133–148. doi:10.1037/0033-2909.121.1.133
 - Snyder, R.A., Abarca, J., Meza, J.L., et al. (2007). Reliability evaluation of the adapted National Coordinating Council Medication Error Reporting and Prevention (NCC MERP) index. *Pharmacoepidemiology and Drug Safety*, 16(9), 1006–1013.
 - Teigen, K.H. (1998). When the unreal is more likely than the real: post hoc probability judgements and counterfactual closeness. *Thinking & Reasoning*, 4(2), 147–177.
+- Tetlock, P.E. & Gardner, D. (2015). *Superforecasting: The Art and Science of Prediction*. Crown.
 - Thomas, E.J., Lipsitz, S.R., Studdert, D.M. & Brennan, T.A. (2002). The reliability of medical record review for estimating adverse event rates. *Annals of Internal Medicine*, 136(11), 812–816.
 - Tinsley, C.H., Dillon, R.L. & Cronin, M.A. (2012). How near-miss events amplify or attenuate risky decision making. *Management Science*, 58(9), 1596–1613. doi:10.1287/mnsc.1120.1517
 - Tinsley, C.H., Dillon, R.L. & Madsen, P.M. (2011). How to avoid catastrophe. *Harvard Business Review*, 89(4), 90–97.
@@ -428,3 +470,4 @@ Panels and calibration then become a check on reading reports, not a substitute 
 - **Cooper:** Cooper (2019, *Safety Science*) describes itself as an opinion piece. Cooper (2017) is a slide deck; Cooper (2014) is a trade article. Quotes read in full text.
 - **ARMS Working Group (2010), v4.1, March 2010:** pp. 8, 18, 40, 41 and 49 verified from the author's copy. The Baines Simmons blog quote has been removed.
 - **Page numbers and DOIs:** confirm for Lewis (1979), Kahneman & Varey (1990), Dillon & Tinsley (2008), Busch et al. (2021) and Dekker (2002).
+- **Calibration sources (6.4):** Hubbard (2014, 2020), Lichtenstein, Fischhoff & Phillips (1982), Brier (1950) and Tetlock & Gardner (2015) are cited for their general findings, from memory. Check editions and pages before quoting. The binary 50–100% confidence format is as described by the author from Hubbard's training method.
