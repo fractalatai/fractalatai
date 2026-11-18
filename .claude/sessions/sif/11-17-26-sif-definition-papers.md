@@ -1,10 +1,80 @@
 ---
 session: SIF definition papers
-status: active
+status: closed
 opened: 2026-11-17
+closed: 2026-11-18
+outcome: success
+
+summary: >
+  Wrote the controls/precursors paper (v0.2, two-sided events) and the severity paper (v0.2, LIFE vs AIS,
+  life-altering gap). Back-ported both into the definitions and discussion docs (v1.8). Agreed the
+  live / at-rest / zero-energy energy states. Drafted the QQ proposal (v0.1) and the PSIF scenario index
+  (v0.1, risk-assessment side, range-operations pilot from DSA 03.OME Part 3).
+
+decisions:
+  - what: Code by content, not by channel; observations of an incursion are PSIF; conditions are SIF exposure
+    why: Presence in the line of fire is the incursion whether or not it was seen; EEI's source-centric event definition gives running machinery no route to PSIF
+    result: Paper 1 rec. 1; definitions v1.7 §3.2; proposal rec. 2
+  - what: Keep "unverified" as a third control state
+    why: Maps to unprotected for EEI/HECA; works as the panel's queue; its share measures reporting quality
+    result: Paper 1 §7; definitions §7.3
+  - what: Energy states live / at-rest / zero-energy (hyphenated defined terms)
+    why: Energised/de-energised is electrical-only; test is whether anything must keep working to hold the energy; gravity never reaches zero-energy
+    result: Definitions and discussion v1.8; landing a load removed from elimination
+  - what: Two severity axes (threat to life, permanent impairment), combined by maximum; body-region rule now, RPMI later
+    why: AIS is a threat-to-life scale and under-counts hand, finger and eye injuries; burden-of-injury data (EUROCOST/INTEGRIS) scores hand/eye at 0% lifelong
+    result: Paper 2 v0.2; ICISS recorded as the AIS-free fallback
+  - what: AI model positioned as an optional Spongl Ltd screen; the human panel process stands alone
+    why: Model is Spongl Ltd IP, not QQ's core process; recs 1–8 must not depend on it
+    result: Proposal rec. 9; Spongl fixes referenced only in passing
+  - what: Index PSIF scenarios proactively, linked to coded reports
+    why: Risk assessment needs no actual event; ranges have numeric envelopes (WDA, BSD) and written controls
+    result: sif-scenario-index.md v0.1, 36 range scenarios
+
+metrics:
+  papers: { controls_precursors: v0.2, severity: v0.2, definitions: v1.8, discussion: v1.8, proposal: v0.1, scenario_index: v0.1 }
+  qq_comparison: { reports: 3006, human_fatal_model_sif: "25%", not_sifp_read_as_sif: "~260", narratives_with_magnitude: "3-5%" }
+  range_scenarios: { total: 36, psif: 26, elevated: 4, sif_exposure: 6 }
+
+lessons:
+  - title: Verify agent-supplied quotes against saved primary texts
+    detail: Paper 1 research found Campbell 2020 wording, the 87% figure (Martin & Black, not Krause) and a Cooper quote all wrong in secondary use; the mislabelled bayone_et_al_2023.pdf was really Bayona 2026. Every quote was then checked word for word.
+    tag: methodology
+  - title: Source-centric event definitions miss incursions
+    detail: EEI needs a release to make an event, so a person under a holding load is only Exposure. Treating events as two-sided (excursion or incursion) fixed the sparse event tables and the observation-coding problem in one move.
+    tag: methodology
+  - title: Burden-of-injury data does not close the life-altering gap
+    detail: The ChatGPT-suggested EQ-5D/WHODAS/ICF/DALY measure realised burden, and EUROCOST/INTEGRIS scores hand and eye injury at 0% lifelong. Listing them as considered and set aside showed thoroughness without changing the recommendation.
+    tag: models
+  - title: The band table has no ballistic band
+    detail: Building the range index showed a stray rifle round would fall into struck/swinging_projectile (0.439, Elevated). Running the rules forwards over a new domain exposes calibration gaps that report-led coding hides.
+    tag: models
+  - title: Client research notes must be gitignored before they are committed
+    detail: sif_qq_schema.md held the client's full name and a signed portal URL; docs/sif/research/ was added to .gitignore.
+    tag: data
+  - title: Check that regulatory sources are current
+    detail: JSP 403 is withdrawn; the current MoD range code is DSA 03.OME Part 3. Its "Line of Fire" (barrel to target) clashes with the SIF term.
+    tag: data
+
+artifacts:
+  - docs/sif/sif-controls-precursors.md
+  - docs/sif/sif-severity.md
+  - docs/sif/sif-definition.md
+  - docs/sif/sif-definition-discussion.md
+  - docs/sif/proposal.md
+  - docs/sif/sif-scenario-index.md
+  - .gitignore
+
+depends_on:
+  - 10-29-26-qq-batch-oct.md
+
+enables:
+  - SIF AI model improvements session (deferred model actions from the papers, proposal and scenario index)
+  - QQ pilot of the calibrated panel
+  - Range-operations scenario index pilot
 ---
 
-# Session: SIF definition papers (ACTIVE)
+# Session: SIF definition papers (CLOSED)
 
 ## Problem
 
@@ -20,6 +90,8 @@ The SIF definition work (discussion doc, definitions doc, counterfactuals paper)
 - [x] Paper 2 draft: `docs/sif/sif-severity.md`, LIFE vs AIS and the AI model's life-altering gap (parked Q6)
 - [x] Back-port any definition changes to `sif-definition.md` and `sif-definition-discussion.md`
 - [x] QQ proposal draft v0.1: `docs/sif/proposal.md`, the argument for the recommendations, landing the PSIF definition and the Spongl Ltd AI model
+- [x] PSIF scenario index v0.1: `docs/sif/sif-scenario-index.md`, the risk-assessment side; schema and a range-operations pilot from DSA 03.OME Part 3
+- [ ] ⏸️ Add a `ballistic` mechanism and fragmentation/demolition explosion bands to the band table and AI model calibration (index §5) (deferred — moved to the SIF AI model improvements session)
 
 ## Dependencies
 
@@ -99,3 +171,23 @@ Energised/de-energised was rejected as electrical-only. Landing a load is no lon
 - **Recommendations:** 9 for QQ; the AI model is optional (rec. 9) and the human process stands alone. Spongl Ltd ownership is in a footnote; Spongl's development fixes are referenced only in passing.
 - **Annex A** recodes the guidance's own examples. Divergence: fire in an unoccupied storage building becomes PSIF with closest approach wide (separation to zero).
 - `research/sif_qq_schema.md` names the client in full and holds a signed portal URL, so it must not be committed as is.
+
+## PSIF scenario index (2026-11-18)
+
+**Idea (Jason):** run the coding rules from the risk-assessment side. Each credible excursion or incursion for an activity becomes a scenario, a PSIF event defined before it happens. Coded reports link back to scenarios, giving frequency, closest approach and control failure by scenario.
+
+**Draft v0.1** `docs/sif/sif-scenario-index.md`:
+- Six-table schema: scenario, activity, source, control, scenario_control, report_scenario. Scenario IDs take the form `RNG-EX-WN-02`.
+- Range pilot from DSA 03.OME Part 3 (JSP 403 is withdrawn). PDFs are in `docs/sif/lit/ranges/` (gitignored).
+- 36 scenarios: 26 PSIF, 4 Elevated, 6 SIF exposures.
+
+**Findings:**
+- Wide approaches dominate.
+- Excursions in time are hidden: found loaded, live round in blank ammunition.
+- Muzzle sweep has no direct control.
+- Closed impact areas are standing danger zones, because blinds are live.
+
+**Gaps and fit with MoD terms:**
+- The band table has no ballistic band, and `struck/swinging_projectile` (0.439) would under-rate a rifle round.
+- The MoD already uses "incursion" in our sense, and the WDA matches our envelope.
+- The MoD's "Line of Fire" (barrel to target) clashes with our term.
