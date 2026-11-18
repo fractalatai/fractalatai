@@ -1,6 +1,6 @@
 # What counts as serious: LIFE, trauma scales and the life-altering gap
 
-Status: draft v0.1, 2026-11-17. A literature review in the series on defining serious injury and fatality (SIF) potential. Definitions follow [sif-definition.md](sif-definition.md). Companion papers: [sif-counterfactual.md](sif-counterfactual.md) and [sif-controls-precursors.md](sif-controls-precursors.md).
+Status: draft v0.2, 2026-11-18. A literature review in the series on defining serious injury and fatality (SIF) potential. Definitions follow [sif-definition.md](sif-definition.md). Companion papers: [sif-counterfactual.md](sif-counterfactual.md) and [sif-controls-precursors.md](sif-controls-precursors.md).
 
 ## Executive summary
 
@@ -36,11 +36,11 @@ Treat severity as **two axes**, threat to life and permanent impairment, and cou
 ### Recommendations
 
 1. **Keep LIFE as the definition of a serious outcome.** It is the most widely adopted definition, and its three gates cover the right ground. Use it as the target the AI model is calibrated against, not as a scale.
-2. **Add a body-region rule now.** Flag the bands where energy is usually delivered to the hand, fingers or eyes, and set a probability of a life-altering outcome for them. This is transparent, needs no new data and matches how WorkSafeBC and Australian regulators single out hands and eyes.
+2. **Add a body-region rule now.** Flag the bands where energy is usually delivered to the hand, fingers or eyes, and set a probability of a life-altering outcome for them. This is transparent, needs no new data and matches how WorkSafeBC and Australian regulators single out hands and eyes. The Global Burden of Disease method sets a precedent: for amputations, "the probability of being a long-term injury is 1" (James et al., 2020).
 3. **Build an impairment axis later.** For each band, model the chance of permanent impairment using published tables of impairment risk by body region and AIS level (Malm et al., 2008). Take P(serious) as the larger of the two axes until the joint distribution is known.
 4. **Follow LIFE at the hand, not EEI.** LIFE counts the loss of any body part and any permanent loss of function. EEI's 2025 criteria exclude all finger and toe fractures, and fingertip amputations other than the thumb, index finger or great toe. Code to LIFE, and record the EEI criterion alongside it for benchmarking.
 5. **Use regulatory lists for calibration and audit, not as the definition.** They are outcome-only and disagree with each other. They are useful as labelled cases to test the AI model against.
-6. **Check the AIS licence.** AAAM, which owns AIS, prohibits "the use of all content in any way with generative AI, including training, scraping, or ingestion". The AI model uses AIS severity levels and published mortality rates, not dictionary content. Confirm that this is outside the restriction before any impairment axis draws on AIS-coded material.
+6. **Check the AIS licence.** AAAM, which owns AIS, prohibits "the use of all content in any way with generative AI, including training, scraping, or ingestion". The AI model uses AIS severity levels and published mortality rates, not dictionary content. Confirm that this is outside the restriction before any impairment axis draws on AIS-coded material. If it is not, survival risk ratios by ICD-10 code (ICISS) give an AIS-free threat-to-life scale (section 4.4). The European burden-of-injury data are AIS-free too, but they score hand fractures and eye injuries at 0% lifelong consequences, so they are not a usable impairment axis (section 5.2).
 
 ## Contents
 
@@ -151,7 +151,13 @@ The Injury Severity Score combines AIS across body regions (Baker et al., 1974).
 
 No occupational SIF definition found uses AIS. It appears in occupational epidemiology. Sears et al. (2015) estimated AIS from workers' compensation data and note that AIS "rates injury severity based on threat to life and does not take comorbidity or complications into account". The EU adopted MAIS3+ as its definition of a seriously injured road casualty in 2013 (*secondary*).
 
+### 4.4 An AIS-free route: ICISS
+
+ICISS (Osler et al., 1996) derives a survival risk ratio for each ICD injury code from registry data, with no AIS content. On 3,142 patients, it predicted survival better than ISS: "ISS Receiver Operator Characteristic Curve area = 0.872; ICISS … = 0.921". The authors conclude "that ICISS is a much better predictor of survival than ISS". ICISS is the fallback if the AIS licence rules out the current scale. The ratios would have to be derived from a trauma registry or sourced; none of the burden-of-injury classifications in section 5.2 supplies mortality by injury group ("injury-specific mortality data were not available", Polinder et al., 2007).
+
 ## 5. Impairment scales: life-altering
+
+### 5.1 Impairment scales
 
 | Scale | What it measures | Status | Fit as a life-altering axis |
 |---|---|---|---|
@@ -167,16 +173,46 @@ Predicting impairment is hard. IIS and pFCI disagreed four-fold on the same cras
 
 GBD weights show the problem with a single health-loss number: amputation of fingers other than the thumb is weighted 0.030, the thumb 0.013 and one leg, treated, 0.021 (Salomon et al., 2012, Table 2).
 
-**Considered and set aside.** Four other measures are often proposed as alternatives to AIS for morbidity. Each measures something real, but none can serve as a life-altering axis for *potential*:
+### 5.2 Burden-of-injury studies
+
+The European burden-of-injury work (EUROCOST, INTEGRIS, Injury-VIBES and the Global Burden of Disease injury method) estimates, for each injury group, the share of patients left with lifelong consequences. It is empirical, maps from ICD-10 and uses no AIS content, so it looked like a candidate for both the life-altering axis and the AIS licence problem.
+
+**The key table** is Haagsma et al. (2012), Table 1, from a Dutch cohort of over 8,500 patients followed with EQ-5D for 24 months. A case counts as lifelong if, "at the two-year follow-up, he or she still claimed to be experiencing injury-related health problems and also reported symptoms compatible with the injury suffered". Proportions are given separately for emergency-department (ED) and admitted (HDR) patients:
+
+| Injury group | Lifelong, ED (%) | Lifelong, admitted (%) |
+|---|---|---|
+| Fracture of hand/fingers | 0 | 0 |
+| Eye injury | 0 | 0 |
+| Dislocation/sprain/strain of wrist/hand/fingers | 0 | 0 (fewer than 10 cases) |
+| Fracture of wrist | 0 | 18 |
+| Concussion | 4 | 21 |
+| Other skull–brain injury | 13 | 23 |
+| Fracture of hip | 14 | 52 |
+| Fracture of knee/lower leg | 23 | 34 |
+
+So the source scores the injuries the life-altering axis exists for at zero. It also leaves out the worst of them:
+- **No amputation group.** The 39 EUROCOST groups have no amputation or crush category. An earlier version labels two groups "Amputation upper/lower extremity" where the later list has "Complex soft tissue injury" (Polinder et al., 2007, Appendix A), so amputations probably sit in complex soft-tissue injury (*inferred*).
+- **No severe burns.** "Patients with severe burns would have been treated at specialized burn units, which were not included in the study."
+- **Too few cases.** The Injury-VIBES cohort (Gabbe et al., 2016; 29,770 patients in six cohorts) marks admitted finger amputation, eye injury and wrist/hand/finger sprain as "sample too small".
+
+The authors' own view supports two axes: AIS and ISS were "developed to predict short-term death risks", and injury location and type are "better predictors of the functional consequences" (Haagsma et al., 2012).
+
+**The Global Burden of Disease method** gets closer. It treats a patient as permanently disabled "if one year post-injury patients return to a health status with more disability than their pre-injury health status", from follow-up studies "in just three countries (China, Netherlands and the USA)" (Haagsma et al., 2016). For amputations, "the probability of being a long-term injury is 1" (James et al., 2020). Its probabilities for other groups are published only as plots, and its results are licensed for non-commercial use only: "commercial use" means "any use that supports a commercial initiative, commercial advantage, financial transaction, or monetary compensation" (IHME user agreement).
+
+**Verdict.** As a source of P(life-altering), the burden-of-injury data would hide the hand and eye gap rather than close it. Self-reported health problems at two years are a different test from LIFE's loss of a body part or of function. Risk of permanent medical impairment (Malm et al., 2008) remains the better impairment axis, though it is tied to AIS. The GBD rule that an amputation is permanent supports the body-region rule (section 8).
+
+### 5.3 Considered and set aside
+
+Four other measures are often proposed as alternatives to AIS for morbidity. Each measures something real, but none can serve as a life-altering axis for *potential*:
 
 | Measure | What it measures | Why it is set aside as the axis |
 |---|---|---|
-| **EQ-5D-5L** (EuroQol) | Health-related quality of life across five dimensions (mobility, self-care, usual activities, pain or discomfort, anxiety or depression), five levels each, reported by the patient | Needs a living patient to answer it, so it cannot be applied to an event that caused no injury. A measure of realised harm, not potential |
-| **WHODAS 2.0** (WHO) | Disability and functioning across six domains, by questionnaire | Same: it measures disability after the event, by interview |
-| **ICF** (WHO) | A framework for classifying functioning, disability and health: body functions and structures, activities, participation, environment | A classification and shared vocabulary, not a scale. There is nothing to set a threshold on |
-| **DALY / YLD** (Global Burden of Disease) | Health burden: years of life lost plus years lived with disability (disability weight × duration) | A population burden measure. Its disability weights rank a finger amputation below many minor states (see above), so as a threshold it would rebuild the hand gap. It suits total-burden reporting, not the serious-or-not decision |
+| **EQ-5D-5L** (Herdman et al., 2011) | Health-related quality of life across five dimensions (mobility, self-care, usual activities, pain or discomfort, anxiety or depression), five levels each, reported by the patient | Needs a living patient to answer it, so it cannot be applied to an event that caused no injury. A measure of realised harm, not potential |
+| **WHODAS 2.0** (Üstün et al., 2010) | Disability and functioning across six domains, by questionnaire | Same: it measures disability after the event, by interview |
+| **ICF** (WHO, 2001) | A framework for classifying functioning, disability and health: body functions and structures, activities, participation, environment | A classification and shared vocabulary, not a scale. There is nothing to set a threshold on |
+| **DALY / YLD** (Murray, 1994) | Health burden: years of life lost plus years lived with disability (disability weight × duration) | A population burden measure. Its disability weights rank a finger amputation below many minor states (see above), so as a threshold it would rebuild the hand gap. It suits total-burden reporting, not the serious-or-not decision |
 
-All four are candidates for measuring the *realised* health burden of what actually happened (section 9), which is a different question from SIF potential. The references for these measures are pending verification.
+All four are candidates for measuring the *realised* health burden of what actually happened (section 9), which is a different question from SIF potential.
 
 ## 6. Regulatory lists
 
@@ -202,6 +238,8 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 | IIS / FCI / pFCI | Predicted impairment | Ordinal | From the AIS code | Cross-check only |
 | RPMI | Risk of permanent impairment | Probability by body region and AIS | From region and AIS | The candidate second axis |
 | GBD weights / AMA Guides | Health loss / whole-person impairment | 0–1 / % | Health state / months later | Audit |
+| EUROCOST / INTEGRIS lifelong proportions | Self-reported health problems at two years | % by injury group | From the ICD-10 code | Rejected: 0% for hand fractures and eye injuries |
+| ICISS | Threat to life | Survival risk ratio by ICD code | At diagnosis | AIS-free fallback for the threat-to-life axis |
 | EQ-5D-5L / WHODAS 2.0 / ICF / DALY | Quality of life / disability / functioning / population burden | Profile or score | After the outcome | Set aside for potential; realised burden only |
 | Regulatory lists | Mixed | Reportable or not | Within days | Calibration and audit labels |
 
@@ -215,7 +253,7 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 
 | Option | How it works | For | Against |
 |---|---|---|---|
-| **Body-region rule** (interim) | Flag bands where energy usually reaches the hand, fingers or eyes (light machinery, hand-held cutting tools, hydraulic injection, corrosives and lasers to the eye, molten metal on the hands) and set P(life-altering) for them | Transparent; needs no AIS content; matches WorkSafeBC and Australian lists; supported by Hallowell et al. (2017): "This residual variability can be primarily attributed to the vulnerability of the body part affected" (p. 73) | Brings back list-like choices; thresholds at the hand are contested |
+| **Body-region rule** (interim) | Flag bands where energy usually reaches the hand, fingers or eyes (light machinery, hand-held cutting tools, hydraulic injection, corrosives and lasers to the eye, molten metal on the hands) and set P(life-altering) for them | Transparent; needs no AIS content; matches WorkSafeBC and Australian lists; supported by Hallowell et al. (2017): "This residual variability can be primarily attributed to the vulnerability of the body part affected" (p. 73); GBD treats amputation as permanent (P = 1) | Brings back list-like choices; thresholds at the hand are contested |
 | **Impairment axis** (long term) | For each band, model the spread of body region and injury level, then map it to P(permanent impairment) using RPMI-type tables | Empirical and probabilistic, like the current calibration. Two-axis ratings have precedent in Swedish road safety (*secondary*) | Road-crash data; the impairment threshold is a value choice (is 10% life-altering?); needs body-region distributions per band; weak prediction validity |
 | **List overlay** | Apply EEI or RIDDOR items as extra SIF triggers | Aligns with how users benchmark | Outcome-only; the lists disagree with each other and with LIFE |
 
@@ -233,6 +271,7 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 - **The impairment threshold.** Decide what level of permanent impairment counts as life-altering (Sweden uses ≥1% for seriously injured and ≥10% for very seriously injured, *secondary*).
 - **Coder agreement on life-altering.** Measure agreement on the life-altering gate, with and without a medical view, since LIFE's own test reported no agreement statistic.
 - **Realised health burden.** Model the burden of what actually happened as a distribution, not a point score: disability over time (YLD as the integral of the disability weight over the recovery path), with metalogs for elicited or observed quantiles and a dependence model linking severity, duration and return to work. This fits the existing SIPmath work but answers a different question from SIF potential, and may become a separate paper.
+- **AIS-free threat to life.** If the AIS licence rules out the current scale, derive ICISS survival risk ratios by ICD-10 code from a trauma registry and recalibrate the bands against them.
 - **Hand definitions.** Compare LIFE, EEI and RIDDOR coding on the same hand-injury cases, and record where they diverge.
 
 ## References
@@ -247,16 +286,31 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 - CSRA (2022). *The LIFE Model*. Construction Safety Research Alliance, University of Colorado.
 - Dehouche, N. (2021). On some statistical and axiomatic properties of the Injury Severity Score. arXiv:2102.04233.
 - Edison Electric Institute (2024). *Safety Classification and Learning (SCL) Model*, rev. September 2024. Appendix 9: EEI SIF criteria, approved changes effective 1 January 2025.
+- Gabbe, B.J., Lyons, R.A., Simpson, P.M. et al. (2016). Disability weights based on patient-reported data from a multinational injury cohort. *Bulletin of the World Health Organization*, 94(11), 806–816C. doi:10.2471/BLT.16.172155.
+- Haagsma, J.A., Graetz, N., Bolliger, I. et al. (2016). The global burden of injury: incidence, mortality, disability-adjusted life years and time trends from the Global Burden of Disease study 2013. *Injury Prevention*, 22(1), 3–18. doi:10.1136/injuryprev-2015-041616.
+- Haagsma, J.A., Polinder, S., Lyons, R.A. et al. (2012). Improved and standardized method for assessing years lived with disability after injury. *Bulletin of the World Health Organization*, 90(7), 513–521. doi:10.2471/BLT.11.095109.
 - Hallowell, M.R., Alexander, D. & Gambatese, J.A. (2017). Energy-based safety risk assessment: does magnitude and intensity of energy predict injury severity? *Construction Management and Economics*, 35(1–2), 64–77. doi:10.1080/01446193.2016.1274418
+- Herdman, M., Gudex, C., Lloyd, A. et al. (2011). Development and preliminary testing of the new five-level version of EQ-5D (EQ-5D-5L). *Quality of Life Research*, 20(10), 1727–1736. doi:10.1007/s11136-011-9903-x.
+- IHME (2020). *Free-of-Charge Non-Commercial User Agreement*. Institute for Health Metrics and Evaluation, University of Washington.
+- James, S.L. et al. (2020). Estimating global injuries morbidity and mortality: methods and data used in the Global Burden of Disease 2017 study. *Injury Prevention*, 26(Suppl 1).
+- Keelin, T.W. (2016). The metalog distributions. *Decision Analysis*, 13(4), 243–277. doi:10.1287/deca.2016.0338.
+- Lyons, R.A. et al. (2011). Measuring the population burden of injuries: implications for global and national estimates. A multi-centre prospective UK longitudinal study. *PLoS Medicine*, 8, e1001140.
 - MacKenzie, E.J., Damiano, A., Miller, T. & Luchter, S. (1996). The development of the Functional Capacity Index. *Journal of Trauma*, 41(5), 799–807. doi:10.1097/00005373-199611000-00006
 - Malm, S., Krafft, M., Kullgren, A., Ydenius, A. & Tingvall, C. (2008). Risk of permanent medical impairment (RPMI) in road traffic accidents. *Annals of Advances in Automotive Medicine*, 52, 93ff. PMID 19026226.
-- Osler, T., Baker, S.P. & Long, W. (1997). A modification of the Injury Severity Score that both improves accuracy and simplifies scoring. *Journal of Trauma*, 43(6), 922–925. doi:10.1097/00005373-199712000-00009
+- Murray, C.J.L. (1994). Quantifying the burden of disease: the technical basis for disability-adjusted life years. *Bulletin of the World Health Organization*, 72(3), 429–445.
 - OSHA, 29 CFR 1904.39. Reporting fatalities, hospitalizations, amputations, and losses of an eye.
+- Osler, T., Baker, S.P. & Long, W. (1997). A modification of the Injury Severity Score that both improves accuracy and simplifies scoring. *Journal of Trauma*, 43(6), 922–925. doi:10.1097/00005373-199712000-00009
+- Osler, T., Rutledge, R., Deis, J. & Bedrick, E. (1996). ICISS: an International Classification of Disease-9 based injury severity score. *Journal of Trauma*, 41(3), 380–386. doi:10.1097/00005373-199609000-00002.
 - Palmer, C. (2007). Major trauma and the Injury Severity Score: where should we set the bar? *Annual Proceedings of the Association for the Advancement of Automotive Medicine*, 51, 13ff.
+- Perepolkin, D., Goodrich, B. & Sahlin, U. (2024). Hybrid elicitation and quantile-parametrized likelihood. *Statistics and Computing*, 34(1), 11. doi:10.1007/s11222-023-10325-0.
+- Perepolkin, D., Lindström, E. & Sahlin, U. (2025). Quantile-parameterized distributions for expert knowledge elicitation. *Decision Analysis*, 22(3), 169–188. doi:10.1287/deca.2024.0219.
+- Polinder, S., Meerding, W.J. et al. (2007). Assessing the burden of injury in six European countries. *Bulletin of the World Health Organization*, 85(1), 27–34. doi:10.2471/BLT.06.030973.
 - Rau, C.-S. et al. (2017). Same Abbreviated Injury Scale values may be associated with different risks to mortality in trauma patients: a cross-sectional retrospective study based on the trauma registry system in a level I trauma center. *International Journal of Environmental Research and Public Health*, 14, 1552. doi:10.3390/ijerph14121552
 - RIDDOR: The Reporting of Injuries, Diseases and Dangerous Occurrences Regulations 2013, reg. 4.
 - Salomon, J.A. et al. (2012). Common values in assessing health outcomes from disease and injury: disability weights measurement study for the Global Burden of Disease Study 2010. *The Lancet*, 380, 2129–2143. doi:10.1016/S0140-6736(12)61680-8
 - Sears, J.M., Bowman, S.M., Rotert, M. & Hogg-Johnson, S. (2015). A new method to classify injury severity by diagnosis: validation using workers' compensation and trauma registry data. *Journal of Occupational Rehabilitation*, 25, 742–751. doi:10.1007/s10926-015-9582-5
+- Üstün, T.B., Chatterji, S., Kostanjsek, N. et al. (2010). Developing the World Health Organization Disability Assessment Schedule 2.0. *Bulletin of the World Health Organization*, 88(11), 815–823. doi:10.2471/BLT.09.067231.
+- WHO (2001). *International Classification of Functioning, Disability and Health*. Geneva: World Health Organization.
 - WorkSafe WA. *Serious injury or illness*. Guidance on the Work Health and Safety Act 2020 (WA) s.36.
 - WorkSafeBC. Guideline G-P2-68-1, preliminary revision 17 September 2026.
 
@@ -265,6 +319,7 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 *For the author; remove before publication.*
 
 - **Research:** by a research agent on 2026-11-17. Its downloads (41 files) are in `docs/sif/lit/severity/` (gitignored), including the primary LIFE paper `bayona_2023_psj.pdf`, the CSRA LIFE handout, the EEI 2025 criteria and the regulation texts.
+- **Burden-of-injury research:** by a second research agent on 2026-11-18, prompted by a ChatGPT note (`docs/sif/research/ais_plus_chatgpt.md`) that proposed EQ-5D, WHODAS 2.0, ICF and DALY. Downloads are in `docs/sif/lit/severity/burden/` (gitignored). Haagsma et al. (2012) Table 1 values, the burns footnote, the GBD and James quotes, the ICISS figures and the IHME definition were checked against the saved texts. Haagsma (2012) was read from PMC HTML, so there are no page numbers. The 2012 paper's ICD-10 to EUROCOST mapping (Appendix A) could not be obtained; the GBD 2017 probability tables were not found. Licences: Haagsma (2016) CC BY-NC 4.0; James (2020) CC BY 4.0; Gabbe (2016) CC BY 3.0 IGO; none found for Haagsma (2012) or Polinder (2007); EQ-5D is licensed by EuroQol (not checked).
 - **Bayona et al. (2023)** has no DOI. Free PDF: assp.org/docs/default-source/psj-articles/f1bayona_0923.pdf.
 - **Secondary only:** ASTM E2920-26 (store summary); ANSI/ASSP Z16.1-2022 (via an ASSP article); the EU MAIS3+ definition; Sweden's impairment thresholds; Gustafsson's two-axis rating (via Malm et al.); Boyd et al. (1987) (via Palmer).
 - **Not obtained:** the AIS 2015 dictionary; the AAAM IIS manual; Baker (1974) and Boyd (1987) full texts; the Australian WHS Act s.36 text (regulator guidance used); Bayona et al. (2022, CRC).
