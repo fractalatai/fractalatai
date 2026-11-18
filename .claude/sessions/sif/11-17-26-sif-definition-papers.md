@@ -16,8 +16,8 @@ The SIF definition work (discussion doc, definitions doc, counterfactuals paper)
 - [x] Paper 1 draft v0.1: `docs/sif/sif-controls-precursors.md`, *Controls, precursors and conditions in SIF potential*, with an executive summary for the safety director
 - [x] Paper 1: position on PSIF-coding observations and hazard conditions (QQ practice vs the *SIF exposure* definition)
 - [x] Paper 1: verify quotes against primary sources (author supplies copies in `docs/sif/lit/`)
-- [ ] Paper 2 literature research: LIFE model adoption; AIS/ISS/NISS; impairment scales; regulatory lists
-- [ ] Paper 2 draft: `docs/sif/sif-severity.md`, LIFE vs AIS and the AI model's life-altering gap (parked Q6)
+- [x] Paper 2 literature research: LIFE model adoption; AIS/ISS/NISS; impairment scales; regulatory lists
+- [x] Paper 2 draft: `docs/sif/sif-severity.md`, LIFE vs AIS and the AI model's life-altering gap (parked Q6)
 - [x] Back-port any definition changes to `sif-definition.md` and `sif-definition-discussion.md`
 
 ## Dependencies
@@ -60,3 +60,21 @@ The SIF definition work (discussion doc, definitions doc, counterfactuals paper)
 - Sources added in v0.2: CCPS & EI (2018) bowtie book (barrier criteria §2.6.3; training and competence are degradation controls, p. 43); Campbell Institute (2022) (DEKRA 2019 precursor definition; Dow pSIF reduction target; pSIF check-box on incident reports). Martin & Strikoff (2012) cannot be traced outside DEKRA, so it is dropped.
 - Quotes verified (2026-11-17): every quotation matched word for word against the source text (8 sources local, 10 downloaded). None is unverified. Page numbers were checked only for EEI and CCPS/EI. The 10 downloaded copies, plus the EEI HECA guide and Wachter & Ferguson, were copied into `docs/sif/lit/` (gitignored).
 - Back-ported (2026-11-17): `sif-definition.md` v1.7 and `sif-definition-discussion.md` v1.7. Covers live/at rest, line of fire, danger zone (edge zone), exposure (planned presence), incursion, triggers and receiving environment. Adds new §3.3 (person as the energy) and §3.4 (triggers), an EEI population note under the crosswalk, rule 7.1 wording, step 3/7 changes, an optional trigger field, and 3 worked examples. The discussion doc gets a new refinement section and glossary rows, and its old "standing under a suspended load" exposure example is corrected.
+
+## Paper 2: severity (LIFE vs trauma scales)
+
+**Research (agent, 2026-11-17).** The primary LIFE paper is Bayona et al. (2023), *PSJ* 68(9):22–30, with no DOI. Its reliability test is one self-run pre/post study (KR-20 0.21–0.53, no kappa). LIFE judges actual outcomes only, and "potential" is left to future work. The EEI 2025 criteria use LIFE-like wording but exclude finger fractures and most fingertip amputations, so EEI and LIFE disagree on Bayona's own fingertip case. AIS is "mainly a threat-to-life scale". The best candidate for a second axis is RPMI (Malm et al., 2008), the risk of permanent impairment by body region × AIS. IIS and pFCI are poorly validated. AAAM prohibits using AIS content with generative AI; this needs checking against the AI model. Downloads are in `docs/sif/lit/severity/`.
+
+**Draft v0.1** `docs/sif/sif-severity.md` recommends:
+- two axes (threat to life, permanent impairment), counting an outcome as serious if either axis is crossed;
+- a body-region rule now (hands, fingers, eyes) and an RPMI-style axis later, combined by taking the maximum;
+- following LIFE at the hand, not EEI;
+- using lists for calibration only;
+- checking the AIS licence.
+
+Quotes are verified except the ASTM E2920-26 wording, which is marked unverified inline.
+
+**Series fixes (applied 2026-11-18, definitions and discussion v1.8):**
+- Make the difference between "P(death) ≥ 0.10" (the serious level on the scale) and "P(serious) ≥ 0.50" (the SIF class) explicit.
+- `sif-definition.md` §5.6 RIDDOR: add reg. 4(1)(h)(ii) "requires resuscitation", and use "likely to cause" for sight.
+- The Campbell 2020 quote in the discussion doc §1.1 is verified primary, without the dashes.
