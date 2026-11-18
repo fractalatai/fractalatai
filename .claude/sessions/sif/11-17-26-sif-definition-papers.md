@@ -74,6 +74,8 @@ The SIF definition work (discussion doc, definitions doc, counterfactuals paper)
 
 Quotes are verified except the ASTM E2920-26 wording, which is marked unverified inline.
 
+**v0.2 (2026-11-18): burden-of-injury route checked.** Jason's ChatGPT note (`docs/sif/research/ais_plus_chatgpt.md`) proposed EQ-5D, WHODAS 2.0, ICF and DALY. These were added to §5.3 as considered and set aside, because they measure realised burden, not potential. A second agent checked EUROCOST/INTEGRIS (Haagsma 2012 Table 1): it is AIS-free, but scores hand/finger fracture and eye injury at 0% lifelong, ED and admitted alike, with no amputation group and severe burns excluded. It is therefore rejected as a life-altering axis (§5.2), and RPMI stays the candidate. GBD treats amputation as P(long-term) = 1, which supports the body-region rule, but is non-commercial-licensed. None gives mortality by injury group; ICISS (Osler 1996, ICD-based survival risk ratios) is the AIS-free fallback for threat to life (§4.4). Downloads in `docs/sif/lit/severity/burden/`.
+
 **Series fixes (applied 2026-11-18, definitions and discussion v1.8):**
 - Make the difference between "P(death) ≥ 0.10" (the serious level on the scale) and "P(serious) ≥ 0.50" (the SIF class) explicit.
 - `sif-definition.md` §5.6 RIDDOR: add reg. 4(1)(h)(ii) "requires resuscitation", and use "likely to cause" for sight.
