@@ -1,6 +1,6 @@
 # SIF definitions and coding rules
 
-Version 1.7, 2026-11-17. For safety directors, safety teams and anyone coding incident reports for serious injury and fatality (SIF) potential. The supporting rationale is in [sif-definition-discussion.md](sif-definition-discussion.md).
+Version 1.8, 2026-11-18. For safety directors, safety teams and anyone coding incident reports for serious injury and fatality (SIF) potential. The supporting rationale is in [sif-definition-discussion.md](sif-definition-discussion.md).
 
 ## Contents
 
@@ -58,7 +58,7 @@ Version 1.7, 2026-11-17. For safety directors, safety teams and anyone coding in
 | Term | Definition |
 |---|---|
 | **Serious outcome** | A life-ending, life-threatening or life-altering injury (the LIFE model, section 5.5) |
-| **P(serious)** | The probability that the outcome is serious or worse, read from the outcome distribution of the energy band (Annex B) |
+| **P(serious)** | The probability that the outcome is serious or worse, read from the outcome distribution of the energy band (Annex B). On the AI model's threat-to-life scale, an outcome counts as serious when its P(death) is 0.10 or more (between AIS 3 and AIS 4). That 0.10 sets the *serious level*; it is not the SIF class threshold, which is P(serious) ≥ 0.50. The scale under-counts life-altering injuries to hands, fingers and eyes ([sif-severity.md](sif-severity.md)) |
 | **Separation to zero** | The basis for assessing potential: assume the separation margin went to zero, so the energy reached a person |
 | **Residual SIF potential** | The outcome distribution with the controls as they were or as designed, including the chance that each control is degraded or absent. Produced by modelling the controls |
 | **SIF (class)** | P(serious) ≥ 0.50: a serious outcome is the most likely outcome |
@@ -269,7 +269,7 @@ Bayona et al. (2023).
 
 ### 5.6 Regulatory lists
 
-- **RIDDOR 2013, reg. 4 (specified injuries):** fractures other than to fingers, thumbs and toes; amputation; permanent loss or reduction of sight; crush injury to the head or torso; serious burns; scalping; loss of consciousness from head injury or asphyxia; enclosed-space hypothermia or heat illness. RIDDOR's *dangerous occurrences* (Schedule 2) are a list of no-injury events that must be reported.
+- **RIDDOR 2013, reg. 4 (specified injuries):** fractures other than to fingers, thumbs and toes; amputation; any injury "likely to cause permanent blinding or reduction in sight in one or both eyes"; crush injury to the head or torso; serious burns; scalping; loss of consciousness from head injury or asphyxia; any other enclosed-space injury that leads to hypothermia or heat illness, or "requires resuscitation or admittance to hospital for more than 24 hours" (reg. 4(1)(h)). RIDDOR's *dangerous occurrences* (Schedule 2) are a list of no-injury events that must be reported.
 - **OSHA 29 CFR 1904.39:** fatality; in-patient hospitalisation; amputation; loss of an eye.
 
 **Pros:** legally defined; auditable; already collected.

@@ -1,6 +1,6 @@
 # Defining SIF: a discussion draft
 
-Status: draft v1.7, 2026-11-17. All open questions answered or parked. A starting point to polish, not a settled position.
+Status: draft v1.8, 2026-11-18. All open questions answered or parked. A starting point to polish, not a settled position.
 
 ## Contents
 
@@ -76,7 +76,7 @@ The literature is converging on a three-part intensional definition: **life-endi
 
 - **LIFE model** (Bayona et al., 2023) *(verbatim)*: life-threatening is "a case that requires immediate medical intervention or lifesaving support (e.g., CPR, defibrillation) to save the injured person's life". Life-altering is "a case in which the injured worker will not fully recover and will most likely suffer permanent impairment from the loss of the use a major internal organ … body function or body part."
 - **EEI SIF Criteria** (2025): the same life-threatening and life-altering definitions, plus a 15-item list. Examples include amputation involving bone, and traumatic brain injury or loss of consciousness over 30 minutes.
-- **Campbell Institute** (2020, *secondary*): "a permanent impairment or life-altering state, or an injury that – if not immediately addressed – will lead to death or permanent or long-term impairment."
+- **Campbell Institute** (2020): "a permanent impairment or life-altering state, or an injury that if not immediately addressed will lead to death or permanent or long-term impairment."
 - **ASTM E2920-26** (2026, *secondary*): life-ending, life-threatening or life-altering consequences.
 - **Regulatory lists** (outcome only, no "potential"):
   - RIDDOR specified injuries (fractures other than fingers, thumbs or toes; amputation; sight loss; crush to head or torso; serious burns; loss of consciousness, …).
@@ -166,7 +166,7 @@ Reconstructed from `scripts/sif/zeroshot_sif.py`, `scripts/sif/band_selector.py`
 | Controls | **All engineered controls excluded**, both those that prevent the event (guardrail, LOTO, barriers) and those that limit harm (net, harness, PPE). Test: "was this put there to prevent harm, or is it just what's there?" |
 | Included context | Source magnitude (height, mass, speed, voltage, …); carrier geometry (sharp, rotating); default receiving environment (concrete, rebar); body region |
 | Reference person | Working-age adult (18–65), random orientation, hard surface by default |
-| Severity scale | Mortality-based: P(death) on an AIS-derived scale; "serious injury" = P(death) ≥ 0.10 |
+| Severity scale | Mortality-based: P(death) on an AIS-derived scale; an outcome is "serious" when its P(death) ≥ 0.10 (the serious level). The SIF class is a separate threshold: P(serious) ≥ 0.50 |
 | SIF threshold | P(outcome ≥ serious) ≥ **0.50** → SIF; ≥ 0.10 → ELEVATED; otherwise NON_SIF. Stated as policy, customer-configurable |
 | Missing detail | Least severe band ("if the narrative does not contain enough detail … select band 1") |
 | Out of scope | Overexertion and abrasion automatically NON_SIF; chronic exposure and illness not modelled |
@@ -786,7 +786,7 @@ The barrier-saved question is then answered by the CDF, not by a label. Take a f
 
 ## 6. Consequences for the classifier if we adopt this
 
-1. **Severity scale.** "Serious" is currently P(death) ≥ 0.10. The outcome distribution already gives the chance of non-fatal serious outcomes, with seriousness measured as threat to life (Q6). Life-altering injuries with low mortality (amputation, sight loss, permanent loss of function) need a second axis or a body-region rule. That is parked for the design specification.
+1. **Severity scale.** An outcome is currently "serious" when its P(death) ≥ 0.10 (the serious level; the SIF class is P(serious) ≥ 0.50). The outcome distribution already gives the chance of non-fatal serious outcomes, with seriousness measured as threat to life (Q6). Life-altering injuries with low mortality (amputation, sight loss, permanent loss of function) need a second axis or a body-region rule. That is parked for the design specification.
 2. **Missing information.** The classifier currently defaults to the least severe band (facts-only, as EEI). A population prior ([bayesian-priors.md](bayesian-priors.md)) is an *extension*, not an alternative. Parked for the design specification (Q7).
 3. **Layer 3 extraction.** Add a control-state field (effective / failed / absent / not stated). An EEI direct-control flag is needed only for the EEI crosswalk (Q4). This is new work; until then, report the classifier's SIF as "PSIF (unverified)".
 4. **Proximity.** Settled for reported events: chance P = 1 (Q5). A proactive use, measuring energy, exposure and exclusion zones and running the Monte Carlo as a risk assessment, is a future line of work.
