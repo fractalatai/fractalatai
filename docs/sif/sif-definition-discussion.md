@@ -255,7 +255,7 @@ The envelope then needs **three dimensions**, not one:
 | **How much** (magnitude, M) | How much energy the containment or system is designed for | Overpressure, overtemperature, overspeed, overload, reactivity excursion |
 | **When** (state, T) | When the energy should be present at all | Unexpected energisation of an isolated circuit; stored energy left after isolation; a vehicle moving while it should be immobilised |
 
-The "when" dimension covers isolation. The isolated part of a system has an intended envelope of **zero energy**. The energy is still present behind the isolator, so a person working dead is exposed (see the event/exposure refinement below). Unexpected energisation while someone works on it is an excursion in time, even though the energy is exactly where and as large as it would be in normal operation.
+The "when" dimension covers isolation. The isolated part of a system has an intended envelope of **zero-energy**. The energy is still present behind the isolator, so a person working dead is exposed (see the event/exposure refinement below). Unexpected energisation while someone works on it is an excursion in time, even though the energy is exactly where and as large as it would be in normal operation.
 
 ### Refinement: over-energy states (build-up without release)
 
@@ -369,7 +369,7 @@ The fix separates two things that "breach" ran together: **whether energy and a 
 **Exposure is the presence of energy and a person in the same time and space, with the person within the energy's reach, assessed without regard to controls.** Exposure is a condition: it has a duration, not a moment.
 
 - **Energy counts as present if it is held, stored or available to be released.** That includes the fuel in a parked vehicle that could move, the supply held behind an isolator, a person's own height on a platform, and a suspended load.
-- **Only elimination removes it**: the supply disconnected and removed, the vessel drained and vented, the load landed, the vehicle removed.
+- **Only elimination removes it**: the supply disconnected and removed, the vessel drained and vented, the vehicle removed. Landing a load does not eliminate its energy: landed loads still topple, roll and slide, so a landed load is at-rest.
 - **Isolation, immobilisation, guarding and guardrails are controls.** They have failure modes, by the test in the build-up refinement above. They don't end the exposure; they are its control state.
 
 | Term | Meaning | Examples | Not this |
@@ -551,7 +551,7 @@ Paper 1 ([sif-controls-precursors.md](sif-controls-precursors.md)) tested the mo
 
 **1. Source-centric versus two-sided events.** EEI's incident needs a release: "a temporary loss of control of the high-energy, or the high-energy changes state". That gives running machinery no route to PSIF. A hand past an open guard into a running conveyor, without contact, is only an Exposure under EEI, and so is a worker under a load that holds. EEI allows one people-side event, for traffic: "or if an employee enters the traffic pattern". Our two-sided event (excursion or incursion) is a deliberate departure. It also means observations are coded by what was seen, not by how they were reported. A person seen in the line of fire is an incursion, because being there is the evidence of entry, whether or not anyone saw it.
 
-**2. Live until landed; at rest.** A suspended load is live until it is landed. Energy that is present but not live is *at rest*: a load landed, a machine stopped and isolated, a conductor de-energised. "Dead" was considered. It has a precise UK electrical meaning (isolated and proven dead), but reads oddly for a landed load. Isolation is one way to bring energy to rest. A machine that is stopped but not isolated stays live, because a restart is a line of fire.
+**2. Live until landed; at-rest and zero-energy.** A suspended load is live until it is landed. The test is whether anything has to keep working to hold the energy where it is. Live energy is moving or held by something that can fail or be undone. *At-rest* energy is present and stable, and moves only if someone releases it: a load landed, a machine stopped and isolated with stored energy remaining, a system isolated but not bled. *Zero-energy* (lockout's "zero energy state") is isolated and with stored energy drained, discharged or blocked; gravity never reaches it. Energised/de-energised was considered and rejected: the words are electrical, and a suspended load is neither. The three terms are hyphenated as defined terms, to aid searching. "Dead" was considered. It has a precise UK electrical meaning (isolated and proven dead), but reads oddly for a landed load. Isolation is one way to bring energy to rest. A machine that is stopped but not isolated stays live, because a restart is a line of fire.
 
 **3. Planned presence is exposure; collapse is an excursion.** "Would take if released" makes a crane's collapse radius part of the line of fire. Read literally, that would make the tag-liners' normal work an incursion. The fix is that an incursion is entry into a danger zone, or a line of fire the work keeps clear. Planned presence within reach of the energy is exposure. Tag-liners are exposed to the crane. A crane overturn is an excursion, and only then does their exposure become an event. A visitor crossing the lift exclusion zone is still an incursion, because that zone is kept clear.
 
@@ -974,7 +974,7 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 |---|---|
 | **Active control** | (CCPS) A control that detects and responds: trips, interlocks, safety instrumented functions, sprinklers, quench and dump systems. Compare *passive control*, *procedural control* |
 | **Active energy** | Energy that is moving, flowing or being released (a moving vehicle, a falling load, a blast). Descriptive; it does not by itself make an event. Compare *stored energy* |
-| **At rest** | Energy present but not live: a load landed, a machine stopped and isolated, a conductor de-energised. People near it are exposed, but there is no line of fire. Isolation is one way to bring energy to rest |
+| **At-rest** | Energy present and stable, with nothing having to hold it: a load landed, a machine stopped and isolated with stored energy remaining, a system isolated but not bled. People near it are exposed, but there is no line of fire. Isolation alone gives at-rest; compare *zero-energy* |
 | **Bridge condition** | A link from one cycle to the next: a control failure or event in one cycle that sets the starting state of another, often by energy conversion (fuel → motion, fuel or battery → fire, motion → heat) |
 | **Capacity** | (EEI SCL) A high-energy release with an effective direct control present and no serious injury. This draft says *PSIF (protected)*, because "capacity" means something broader in Safety-II, resilience engineering and HOP (the ability of people and systems to adapt and fail safely) |
 | **Chance P** | Earlier term: the probability that the energy reaches a person, "set to 1" for SIF potential. Replaced by *separation to zero*. It collided with the risk equation's chance term (the chance of the event per unit of exposure) |
@@ -998,7 +998,7 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **FAR (Fatal Accident Rate)** | Fatalities per 10⁸ exposed hours (Kletz, process safety): a chance-per-unit-exposure measure |
 | **HECA** | (EEI/CSRA) High-Energy Control Assessment: the share of observed high-energy hazards with a direct control in place, Success / (Success + Exposure) |
 | **High energy** | (EEI) Over 500 ft-lbs (about 680 J); Hallowell et al. (2017) use > 1,500 J for "most likely a SIF". Not the same threshold |
-| **Incursion** | An event: people entering the energy's envelope: into a danger zone or the line of fire of live energy, there when it is live, or in greater numbers than planned. Being there is the evidence of entry. Time inside counts as exposure. Not incursions: planned presence within reach (exposure); entry when the energy is at rest. A person cannot enter their own line of fire; at height, their event is an excursion |
+| **Incursion** | An event: people entering the energy's envelope: into a danger zone or the line of fire of live energy, there when it is live, or in greater numbers than planned. Being there is the evidence of entry. Time inside counts as exposure. Not incursions: planned presence within reach (exposure); entry when the energy is at-rest or zero-energy. A person cannot enter their own line of fire; at height, their event is an excursion |
 | **Inherent feature** | A property of the source's own materials, quantity, operating conditions or physics. It is in effect throughout normal operation without detection, actuation, power or human action, and can be lost only by changing the source (e.g. a reduced inventory, pump dead-head pressure, a negative temperature coefficient). Part of the source; changes the potential. Judged for a named hazard within the operating envelope |
 | **Inherent safety** | "The achievement of safety through the elimination or exclusion of inherent hazards through the fundamental conceptual design choices" (IAEA-TECDOC-626). In process safety, "eliminate or greatly reduce the hazard by changing the process to use materials and conditions that are nonhazardous or much less hazardous" (Hendershot, 2012). Kletz: "what you don't have, can't leak" |
 | **Inherent SIF potential** | Layer 2: the outcome distribution if the energy reached a person with no protective control between them, assessed on the energy state at the time (or the uncontrolled limit of a build-up) |
@@ -1008,7 +1008,7 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Layer 1, 2, 3** | Event; inherent SIF potential; control state |
 | **LIFE** | (Bayona et al., 2023) Life-ending, life-threatening, life-altering: the three-part definition of a serious outcome |
 | **Line of fire** | The path live energy takes as it moves, or the path a foreseeable release would take (drop path, swing path, travel path, trajectory, a crane's collapse radius). Danger zones are drawn around the parts the work keeps clear. Also the shop-floor term (IOGP); see Appendix A |
-| **Live** | Energy in its working state, with a line of fire to people: a suspended load until landed, a running machine, an energised conductor, plant under pressure. A machine stopped but not isolated is still live. Compare *at rest* |
+| **Live** | Energy in its working state, with a line of fire to people: a suspended load until landed, a running machine, an energised conductor, plant under pressure. A machine stopped but not isolated is still live. Compare *at-rest*, *zero-energy* |
 | **M, L, T** | Magnitude, length (space and separation), time: the three dimensions of the envelope |
 | **Margins m, l, t** | Dimensionless ratios of actual to design value: m = magnitude / design magnitude; l = separation / required separation; t = presence outside the intended window. Excursion or incursion when m > 1, l < 1 or t > 0 |
 | **Micromort** | A one-in-a-million chance of death, quoted per unit of an activity (Howard; Spiegelhalter). Layer 2's P(death) scale lets expected micromorts be computed as exposure × event rate × E[P(death) given the event] |
@@ -1035,6 +1035,7 @@ Terms as used in this draft. Where a term comes from a published source, the sou
 | **Target envelope** | Where people are, when they are there, and how many (one person, a team, a public crowd): the counterpart of the energy's envelope. An event brings the two envelopes together |
 | **Trigger** | Upstream of an event: a condition that can start it (a trip hazard, a wet deck, a gust). Bears on chance; does not count toward potential |
 | **Uncontrolled limit** | For a build-up, the energy it would reach with no control acting, up to the source's physical limit (inventory, failure pressure, maximum speed) |
+| **Zero-energy** | Isolated, with stored energy drained, bled, discharged or blocked (lockout's "zero energy state"; electrically, proven dead). The supply behind the isolator remains, so workers are still exposed to re-energisation. Gravity never reaches zero-energy |
 
 ## References
 
