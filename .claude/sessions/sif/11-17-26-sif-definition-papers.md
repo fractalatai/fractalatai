@@ -78,3 +78,12 @@ Quotes are verified except the ASTM E2920-26 wording, which is marked unverified
 - Make the difference between "P(death) ≥ 0.10" (the serious level on the scale) and "P(serious) ≥ 0.50" (the SIF class) explicit.
 - `sif-definition.md` §5.6 RIDDOR: add reg. 4(1)(h)(ii) "requires resuscitation", and use "likely to cause" for sight.
 - The Campbell 2020 quote in the discussion doc §1.1 is verified primary, without the dashes.
+
+## Energy states: live, at-rest, zero-energy (2026-11-18)
+
+**Decided (Jason):** three hyphenated defined terms, hyphenated to aid searching. The test is whether anything has to keep working to hold the energy where it is.
+- **Live:** moving, or held by something that can fail or be undone.
+- **At-rest:** present and stable; moves only if released (landed load, isolated machine with stored energy, isolated system not yet bled).
+- **Zero-energy:** isolated and with stored energy drained or blocked (lockout's "zero energy state"). Gravity never reaches it.
+
+Energised/de-energised was rejected as electrical-only. Landing a load is no longer listed as elimination, because landed loads topple, roll and slide. Applied to definitions and discussion v1.8.
