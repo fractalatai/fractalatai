@@ -19,6 +19,7 @@ The SIF definition work (discussion doc, definitions doc, counterfactuals paper)
 - [x] Paper 2 literature research: LIFE model adoption; AIS/ISS/NISS; impairment scales; regulatory lists
 - [x] Paper 2 draft: `docs/sif/sif-severity.md`, LIFE vs AIS and the AI model's life-altering gap (parked Q6)
 - [x] Back-port any definition changes to `sif-definition.md` and `sif-definition-discussion.md`
+- [x] QQ proposal draft v0.1: `docs/sif/proposal.md`, the argument for the recommendations, landing the PSIF definition and the Spongl Ltd AI model
 
 ## Dependencies
 
@@ -89,3 +90,12 @@ Quotes are verified except the ASTM E2920-26 wording, which is marked unverified
 - **Zero-energy:** isolated and with stored energy drained or blocked (lockout's "zero energy state"). Gravity never reaches it.
 
 Energised/de-energised was rejected as electrical-only. Landing a load is no longer listed as elimination, because landed loads topple, roll and slide. Applied to definitions and discussion v1.8.
+
+## QQ proposal (2026-11-18)
+
+**Draft v0.1** `docs/sif/proposal.md` (about 5,400 words). It is built from the four papers and from QQ's own data: the guidance text and FY2027 *Rating_1* counts from `docs/sif/research/sif_qq_schema.md`, plus the October batch comparison on 3,006 reports (human Fatal / High / Not SIFp against the model's SIF/Elevated/Not SIF).
+
+- **Argument:** the guidance mixes "on average" with "most serious credible"; the field mixes two scales (89% descriptor, 11% treatment); 69% of ratings are on observations; human levels don't separate on energy.
+- **Recommendations:** 9 for QQ; the AI model is optional (rec. 9) and the human process stands alone. Spongl Ltd ownership is in a footnote; Spongl's development fixes are referenced only in passing.
+- **Annex A** recodes the guidance's own examples. Divergence: fire in an unoccupied storage building becomes PSIF with closest approach wide (separation to zero).
+- `research/sif_qq_schema.md` names the client in full and holds a signed portal URL, so it must not be committed as is.
