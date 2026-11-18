@@ -16,3 +16,6 @@ backups/
 
 # SIF literature PDFs (copyrighted; local only)
 docs/sif/lit/
+
+# SIF research notes (client data, third-party chats)
+docs/sif/research/
