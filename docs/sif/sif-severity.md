@@ -167,6 +167,17 @@ Predicting impairment is hard. IIS and pFCI disagreed four-fold on the same cras
 
 GBD weights show the problem with a single health-loss number: amputation of fingers other than the thumb is weighted 0.030, the thumb 0.013 and one leg, treated, 0.021 (Salomon et al., 2012, Table 2).
 
+**Considered and set aside.** Four other measures are often proposed as alternatives to AIS for morbidity. Each measures something real, but none can serve as a life-altering axis for *potential*:
+
+| Measure | What it measures | Why it is set aside as the axis |
+|---|---|---|
+| **EQ-5D-5L** (EuroQol) | Health-related quality of life across five dimensions (mobility, self-care, usual activities, pain or discomfort, anxiety or depression), five levels each, reported by the patient | Needs a living patient to answer it, so it cannot be applied to an event that caused no injury. A measure of realised harm, not potential |
+| **WHODAS 2.0** (WHO) | Disability and functioning across six domains, by questionnaire | Same: it measures disability after the event, by interview |
+| **ICF** (WHO) | A framework for classifying functioning, disability and health: body functions and structures, activities, participation, environment | A classification and shared vocabulary, not a scale. There is nothing to set a threshold on |
+| **DALY / YLD** (Global Burden of Disease) | Health burden: years of life lost plus years lived with disability (disability weight × duration) | A population burden measure. Its disability weights rank a finger amputation below many minor states (see above), so as a threshold it would rebuild the hand gap. It suits total-burden reporting, not the serious-or-not decision |
+
+All four are candidates for measuring the *realised* health burden of what actually happened (section 9), which is a different question from SIF potential. The references for these measures are pending verification.
+
 ## 6. Regulatory lists
 
 | | LIFE | EEI 2025 | RIDDOR | OSHA | Cal/OSHA | WorkSafeBC | Australia (WA) |
@@ -191,6 +202,7 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 | IIS / FCI / pFCI | Predicted impairment | Ordinal | From the AIS code | Cross-check only |
 | RPMI | Risk of permanent impairment | Probability by body region and AIS | From region and AIS | The candidate second axis |
 | GBD weights / AMA Guides | Health loss / whole-person impairment | 0–1 / % | Health state / months later | Audit |
+| EQ-5D-5L / WHODAS 2.0 / ICF / DALY | Quality of life / disability / functioning / population burden | Profile or score | After the outcome | Set aside for potential; realised burden only |
 | Regulatory lists | Mixed | Reportable or not | Within days | Calibration and audit labels |
 
 ## 8. The AI model's position
@@ -220,6 +232,7 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 - **Body-region distributions.** Estimate, for each band, how often the energy reaches the hand, eyes, head or trunk, from incident data.
 - **The impairment threshold.** Decide what level of permanent impairment counts as life-altering (Sweden uses ≥1% for seriously injured and ≥10% for very seriously injured, *secondary*).
 - **Coder agreement on life-altering.** Measure agreement on the life-altering gate, with and without a medical view, since LIFE's own test reported no agreement statistic.
+- **Realised health burden.** Model the burden of what actually happened as a distribution, not a point score: disability over time (YLD as the integral of the disability weight over the recovery path), with metalogs for elicited or observed quantiles and a dependence model linking severity, duration and return to work. This fits the existing SIPmath work but answers a different question from SIF potential, and may become a separate paper.
 - **Hand definitions.** Compare LIFE, EEI and RIDDOR coding on the same hand-injury cases, and record where they diverge.
 
 ## References
