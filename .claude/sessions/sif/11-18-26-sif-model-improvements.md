@@ -27,6 +27,7 @@ The SIF definition papers, the QQ proposal and the scenario index have fixed the
 - [ ] Panel support: known-answer calibration items generated from the band distributions, for Brier scoring (counterfactual §6.4; proposal rec. 5)
 - [ ] Validation set: regulatory-list cases (RIDDOR, EEI) as labelled audit cases; check the distributions against outcomes (severity rec. 5; counterfactual §8)
 - [ ] Re-run the October QQ batch (3,006 reports) after the changes and compare with v1 and the human ratings (proposal §1.4)
+- [ ] QQ colleague feedback (2026-11-19): respond to QQ-FB-01 to 11 in `docs/sif/feedback/register.md`; link changes by `Feedback:` trailer
 - [ ] Update `sif-definition.md` §4 and Annex B, and the proposal §5.4 limits, to match the changed model
 
 ## Dependencies
@@ -124,3 +125,16 @@ Net class changes: the laser band moves to SIF, and nail gun to eye moves to Ele
 - Smoke test on the October batch (3,006 reports): 1 class change (laser to the eye: Elevated → SIF); 36 records are driven by the life-altering value with no change of class.
 - Papers: `sif-definition.md` §7.2 step 5 gains the hand/eye line. Severity paper v0.3: the executive summary now says the bands stay Elevated, and rec. 2 is marked done (provisional).
 - Deferred: nail gun to eye (about 0.4) needs its own band, so it goes with the ballistic/projectile band item.
+
+## QQ colleague feedback (2026-11-19, open)
+
+The feedback was on proposal v0.1: 11 points, logged as QQ-FB-01 to 11 in `docs/sif/feedback/register.md`.
+- 2 confirm: the reading of the proposal, and support for the panel.
+- 4 design: three categories; HiPo for PSIF; a plain-language front end; audiences and decisions.
+- 5 gap: risk-assessment subjectivity; the golden thread; leading indicators on critical controls; triage letting events through the gaps; two sources of truth between IMR and reporting.
+
+**Mechanism (decided, Jason):** GitHub issues were rejected because the repo is public.
+- The verbatim text is in `docs/sif/research/qq-feedback/` (gitignored).
+- The register holds neutral paraphrases in YAML frontmatter.
+- Commits carry a `Feedback: QQ-FB-nn` trailer.
+- `session_index.py` now builds `feedback` and `feedback_links` tables from the register's `changes` lists and from the git trailers. It was tested on a throwaway repo, where two trailer IDs resolved to their commit.
