@@ -38,8 +38,8 @@ The SIF definition papers, the QQ proposal and the scenario index have fixed the
 - [x] QQ-FB-07 (gap): the same subjectivity in risk assessment
 - [x] QQ-FB-08 (gap): golden thread — risk assessment to organisational learning
 - [x] QQ-FB-09 (gap): leading indicators on SIF-capable work and critical controls
-- [ ] QQ-FB-10 (gap): triage as a gate lets events through
-- [ ] QQ-FB-11 (gap): two sources of truth — IMR vs reporting
+- [x] QQ-FB-10 (gap): triage as a gate lets events through
+- [x] QQ-FB-11 (gap): two sources of truth — IMR vs reporting
 - [ ] Update `sif-definition.md` §4 and Annex B, and the proposal §5.4 limits, to match the changed model
 
 ## Dependencies
@@ -167,3 +167,5 @@ The feedback was on proposal v0.1: 11 points, logged as QQ-FB-01 to 11 in `docs/
 **QQ-FB-08 decided (Jason, 2026-11-19):** "scenario" is anchored as the assessment context (ISO 31000 6.3, scope, context and criteria; the scope of a HAZID or HAZOP). It ends in risk evaluation against tolerable risk (Guide 51, 3.12 and 3.15): the confidence to take the next step (after Robert Long), as in "do I fire the weapon in the test?". The index's old scenario rows become hazardous events (Guide 51, 3.3), and SX rows become hazardous situations (3.4). Scenario index v0.2 adds §1.1 Terms and §7 The golden thread. Responses are now written in the first person ("I").
 
 **QQ-FB-09 decided (Jason, 2026-11-19):** Hubbard's model sits over the response: measure to make better decisions, where the uncertainty is greatest; more focused and cheaper. Added to controls paper v0.3 §5.4. Version tables added to the definitions (v1.9), the controls paper (v0.3), the proposal (v0.2), the scenario index (v0.2) and the PIG paper (v1.1). From now on, commit locally after each feedback item is resolved.
+
+**QQ-FB-11 decided (Jason, 2026-11-19):** the IMR gap analysis (QQ-01, the two-tool boundary) puts reporting in ECO_ETL and Power BI and keeps IMR for capture and case work, as confirmed by the ETL/Power BI session. The panel's inputs and outputs flow through the reporting layer (an Excel workbook). The panel's to-do list comes from there; members open IMR records for details; the classification is joined on `row_sig`. The panel's PSIF is the classification of record in the reporting layer. Proposal v0.4. Constraints from the ETL session: don't contradict the SIFP precedence (I, T2, T, ED; latest stage wins), Lost Workday Case = 4 High, the FY22–FY23 matrix mapping, or Count_SIFp = classes 1–4; QQ documents must not name the store that holds the action list.
