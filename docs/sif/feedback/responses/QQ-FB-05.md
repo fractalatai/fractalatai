@@ -2,7 +2,7 @@
 
 **Your point.** You agreed with the energy principle, but many operational users think in hazards and consequences rather than energy. You suggested a plain front-end question, "Could this realistically have resulted in a life-ending, life-threatening or life-altering injury?", with the energy method kept behind the scenes.
 
-**Response.** Agreed that the front-end language should be plain and the energy method should stay behind the scenes, but the question itself does not change. Your suggested question, "could this realistically…", is the open counterfactual that gives different people different answers, so we have not adopted it. Instead:
+**Response.** Agreed that the front-end language should be plain and the energy method should stay behind the scenes, but the question itself does not change. Your suggested question, "could this realistically…", is the open counterfactual that gives different people different answers, so I have not adopted it. Instead:
 
 | Who | Task | Question |
 |---|---|---|

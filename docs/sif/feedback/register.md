@@ -5,7 +5,7 @@ sources:
   - id: QQ-FB-2026-11-19
     from: QQ colleague
     received: 2026-11-19
-    about: the PSIF proposal v0.1 (docs/sif/proposal.md)
+    about: the PSIF proposal (v0.1)
     verbatim: docs/sif/research/qq-feedback/2026-11-19-colleague.md  # gitignored
 items:
   - id: QQ-FB-01
@@ -61,7 +61,7 @@ items:
       potential event) as the operational term with the same method behind it.
     status: declined
     response: >
-      Declined: we keep the published term. HiPo (IOGP) is fatality-only with an open
+      Not adopted: I keep the published term. HiPo (IOGP) is fatality-only with an open
       counterfactual, so not equivalent to PSIF. QQ may name it as it wishes.
     response_doc: responses/QQ-FB-04.md
     changes: [1b10112]
@@ -102,7 +102,7 @@ items:
       risk assessment, not only in PSIF rating.
     status: answered
     response: >
-      Agreed: the probability-impact grid is the problem, and we reject it in risk assessment too.
+      Agreed: the probability-impact grid is the problem, and I reject it in risk assessment too.
       Severity and control effectiveness are distributions; judgement is given as calibrated ranges.
     response_doc: responses/QQ-FB-07.md
     changes: [1b10112]
@@ -130,7 +130,7 @@ items:
     status: done
     response: >
       Agreed, overlaid with Hubbard: measure where uncertainty could change the decision.
-      Coverage (HECA) as the summary; value of information directs assurance (controls paper §5.4).
+      Control coverage as the summary; value of information directs assurance (controls paper §5.4).
     response_doc: responses/QQ-FB-09.md
     changes: [1b10112]
   - id: QQ-FB-10
@@ -143,7 +143,7 @@ items:
     status: done
     response: >
       Agreed: a third safety net, a monthly random sample of unflagged reports sentenced by the
-      panel, estimates the miss rate (proposal v0.3 §4.1, §7).
+      panel, estimates the miss rate (proposal §4.1, §7).
     response_doc: responses/QQ-FB-10.md
     changes: [d4ed70d]
   - id: QQ-FB-11
@@ -155,7 +155,7 @@ items:
       one used for reporting and decisions.
     status: done
     response: >
-      Agreed: one source of truth. Following the gap analysis (QQ-01), reporting reads Power BI;
+      Agreed: one source of truth. Following the gap analysis (QQ-01), reporting reads the Power BI layer;
       the panel works in the reporting layer, and its classification is the record there.
     response_doc: responses/QQ-FB-11.md
     changes: [67264e1]

@@ -21,6 +21,10 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 FEEDBACK = ROOT / "docs" / "sif" / "feedback"
 
+# Register status -> wording for the reader
+OUTCOME = {"done": "Agreed; changed", "accepted": "Agreed; change to follow",
+           "answered": "Answered", "declined": "Not adopted", "open": "Open"}
+
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -43,12 +47,12 @@ def main():
         f"Feedback from: {src.get('from')}, received {src.get('received')}. "
         f"Response compiled {date.today().isoformat()}.",
         "",
-        "| Item | Kind | Status | Summary |",
-        "|---|---|---|---|",
+        "| Item | Outcome | Summary |",
+        "|---|---|---|",
     ]
     for i in items:
         summary = " ".join(str(i.get("response") or "Still open.").split())
-        parts.append(f"| {i['id']} | {i.get('kind')} | {i.get('status')} | {summary} |")
+        parts.append(f"| {i['id']} | {OUTCOME.get(i.get('status'), i.get('status'))} | {summary} |")
     parts.append("")
 
     missing = []

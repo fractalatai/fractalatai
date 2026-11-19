@@ -2,7 +2,7 @@
 
 **Your point.** There is a risk of two sources of truth if the classification captured in IMR differs from the one ultimately used for reporting and decision-making.
 
-**Response.** Agreed that it is a risk. The IMR gap analysis has addressed it: its action QQ-01 recommends a stated two-tool boundary. Power BI is for corporate reporting and decisions; IMR (EcoOnline) is for capture, case workflow and site-level views. All reporting already reads the ETL and Power BI layer, never IMR directly. IMR holds the ratings as entered, the ETL derives the one classification every dashboard uses, and errors are corrected at source in IMR. So there is one source of truth for reporting.
+**Response.** Agreed that it is a risk. The IMR gap analysis has addressed it: its action QQ-01 recommends a stated two-tool boundary. Power BI is for corporate reporting and decisions; IMR (EcoOnline) is for capture, case workflow and site-level views. All reporting already reads the reporting layer (the data pipeline that feeds Power BI), never IMR directly. IMR holds the ratings as entered, the pipeline derives the one classification every dashboard uses, and errors are corrected at source in IMR. So there is one source of truth for reporting.
 
 The panel works within that boundary:
 

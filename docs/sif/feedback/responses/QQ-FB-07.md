@@ -2,7 +2,7 @@
 
 **Your point.** Many of the problems the proposal identifies (likelihood, credibility and dependence on controls) mirror those in risk assessment. The proposal challenges subjectivity in SIF potential, but the same assumptions sit within the risk assessment process.
 
-**Response.** Agreed. The weakness is the probability-impact grid itself, and it is well documented: Cox (2008) found such grids can be "worse than useless", and Chapman and Ward say they should be "scrapped in all contexts". Our approach rejects them in risk assessment as well as in PSIF coding:
+**Response.** Agreed. The weakness is the probability-impact grid itself, and it is well documented: Cox (2008) found such grids can be "worse than useless", and Chapman and Ward say they should be "scrapped in all contexts". My approach rejects them in risk assessment as well as in PSIF coding:
 
 - **Severity** comes from the energy as a distribution, not a cell on a grid.
 - **Controls** carry their own effectiveness distributions and are combined by simulation. "How much does this control help, and what if two fail together?" then has a quantified answer rather than a moved cell.

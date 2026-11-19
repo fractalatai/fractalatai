@@ -1,4 +1,4 @@
-## QQ-FB-01. Have we understood the proposal correctly?
+## QQ-FB-01. Have you understood the proposal correctly?
 
 **Your point.** You read the problem as inconsistent individual judgement of severity, likelihood and credibility, which makes PSIF data hard to trend, compare and learn from. You read the solution as five parts, and asked whether that was right.
 
