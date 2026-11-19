@@ -23,11 +23,23 @@ The SIF definition papers, the QQ proposal and the scenario index have fixed the
 - [ ] Control-state extraction: effective, failed or absent, or unverified, with a direct-control flag, giving PSIF protected, unprotected or unverified (discussion §6.3; controls paper §7)
 - [ ] Optional trigger field, kept apart from the receiving environment, which does count (definitions §3.4, §7.4)
 - [ ] Missing magnitude: lowest-band default against a Bayesian prior or calibrated ranges, tested on thin QQ narratives (only 3–5% state a magnitude) (discussion Q7; counterfactual §8)
-- [ ] Scenario matching: map reports to scenario-index IDs, with `none` marking a candidate new scenario (scenario index §2.5)
+- [ ] Hazardous-event matching: map reports to scenario-index hazardous-event IDs, with `none` marking a candidate new row (scenario index v0.2 §2.5)
 - [ ] Panel support: known-answer calibration items generated from the band distributions, for Brier scoring (counterfactual §6.4; proposal rec. 5)
 - [ ] Validation set: regulatory-list cases (RIDDOR, EEI) as labelled audit cases; check the distributions against outcomes (severity rec. 5; counterfactual §8)
 - [ ] Re-run the October QQ batch (3,006 reports) after the changes and compare with v1 and the human ratings (proposal §1.4)
-- [ ] QQ colleague feedback (2026-11-19): respond to QQ-FB-01 to 11 in `docs/sif/feedback/register.md`; link changes by `Feedback:` trailer
+- [x] QQ-FB-01 (confirm): our reading of the problem and the five-part solution — is it right?
+- [x] QQ-FB-02 (confirm): support for moving the decision to a calibrated panel
+- [x] QQ-FB-03 (design): three core categories — SIF, HiPo, SIF precursor/exposure
+- [ ] AI model prompts: apply the foreseeable use or misuse test to conditions (definition v1.9 step 3); goes with Event output
+- [ ] Severity paper: review the IOGP permanent-impairment criteria (FPI definitions §3.5) for the impairment axis
+- [x] QQ-FB-04 (design): HiPo in place of PSIF/SIFP as the operational term
+- [x] QQ-FB-05 (design): plain-language front-end question; energy method behind the scenes
+- [x] QQ-FB-06 (design): audiences and the decisions each must make
+- [x] QQ-FB-07 (gap): the same subjectivity in risk assessment
+- [x] QQ-FB-08 (gap): golden thread — risk assessment to organisational learning
+- [x] QQ-FB-09 (gap): leading indicators on SIF-capable work and critical controls
+- [ ] QQ-FB-10 (gap): triage as a gate lets events through
+- [ ] QQ-FB-11 (gap): two sources of truth — IMR vs reporting
 - [ ] Update `sif-definition.md` §4 and Annex B, and the proposal §5.4 limits, to match the changed model
 
 ## Dependencies
@@ -138,3 +150,20 @@ The feedback was on proposal v0.1: 11 points, logged as QQ-FB-01 to 11 in `docs/
 - The register holds neutral paraphrases in YAML frontmatter.
 - Commits carry a `Feedback: QQ-FB-nn` trailer.
 - `session_index.py` now builds `feedback` and `feedback_links` tables from the register's `changes` lists and from the git trailers. It was tested on a throwaway repo, where two trailer IDs resolved to their commit.
+
+**QQ-FB-03 working decisions (Jason, 2026-11-19):**
+- An actual SIF is "SIF". It counts as PSIF by default with P = 1, so no judgement is needed. Add the P = 1 line to the definition.
+- HiPo is not PSIF. The term is older and has no single definition: Queensland CMSHA 1999 s17 ("potential to cause a significant adverse effect"); IOGP (OGP 456, 2011), fatality only, under "slightly different circumstances"; Shell, death or permanent disability. HiPo could be the name, with our definition behind it. The IOGP and Queensland texts still need saving before we cite them.
+- The threshold of 0.50 is part of the definition, and the AI model's base case must match it. A changed threshold is an analyst's prioritisation tool only. Remove "If your company sets different thresholds, use them" (definition §7.2 step 5) and the "company threshold" wording (proposal §5.2).
+- Conditions: the test is whether a person can be within reach during intended use or reasonably foreseeable misuse (ISO/IEC Guide 51:2014, 3.6 and 3.7; preview saved in `docs/sif/lit/terms/`). This replaces "a person within reach". "In usual circumstances…" is from QGN 07 (2010), a guidance note, not the Act.
+- Crosswalk the SIF-literature labels (Precursor, Success, Exposure) to established risk vocabulary, since they mean the same thing. Risk is dynamic: risk controls push one way and risk factors the other (Jason).
+
+**QQ-FB-04 decided (Jason, 2026-11-19): declined.** We follow the safety literature and published definitions strictly. HiPo (IOGP) is fatality-only, so it is not equivalent to PSIF. What QQ calls it is QQ's decision. QQ-FB-03 now names the categories SIF, PSIF and Precursor.
+
+**QQ-FB-05 decided (Jason, 2026-11-19):** reporters give facts only (no opinion, inference or judgement). Triagers apply the definition's question in plain words, with a low bar and no calibration. The panel applies it calibrated (Hubbard). Plain wording added to definition §7.1 and proposal §4.1; rec. 6 now says "facts only".
+
+**QQ-FB-07 (2026-11-19): answered** by the PIG critique (`docs/papers/from-pigs-to-probability-curves.md`). That paper is now v1.1, with a version table, and its "customer-configurable" threshold sentence now uses the analyst-tool wording.
+
+**QQ-FB-08 decided (Jason, 2026-11-19):** "scenario" is anchored as the assessment context (ISO 31000 6.3, scope, context and criteria; the scope of a HAZID or HAZOP). It ends in risk evaluation against tolerable risk (Guide 51, 3.12 and 3.15): the confidence to take the next step (after Robert Long), as in "do I fire the weapon in the test?". The index's old scenario rows become hazardous events (Guide 51, 3.3), and SX rows become hazardous situations (3.4). Scenario index v0.2 adds §1.1 Terms and §7 The golden thread. Responses are now written in the first person ("I").
+
+**QQ-FB-09 decided (Jason, 2026-11-19):** Hubbard's model sits over the response: measure to make better decisions, where the uncertainty is greatest; more focused and cheaper. Added to controls paper v0.3 §5.4. Version tables added to the definitions (v1.9), the controls paper (v0.3), the proposal (v0.2), the scenario index (v0.2) and the PIG paper (v1.1). From now on, commit locally after each feedback item is resolved.
