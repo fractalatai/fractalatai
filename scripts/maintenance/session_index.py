@@ -73,6 +73,28 @@ CREATE TABLE dependencies (
     target TEXT NOT NULL
 );
 
+CREATE TABLE feedback (
+    id TEXT PRIMARY KEY,
+    source TEXT,
+    source_from TEXT,
+    received TEXT,
+    kind TEXT,
+    touches TEXT,
+    point TEXT,
+    status TEXT,
+    response TEXT
+);
+
+CREATE TABLE feedback_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    feedback_id TEXT NOT NULL,
+    commit_hash TEXT NOT NULL,
+    date TEXT,
+    subject TEXT,
+    via TEXT NOT NULL,
+    UNIQUE (feedback_id, commit_hash)
+);
+
 CREATE INDEX idx_sessions_status ON sessions(status);
 CREATE INDEX idx_sessions_opened ON sessions(opened);
 CREATE INDEX idx_lessons_tag ON lessons(tag);
@@ -180,12 +202,76 @@ def index_session(conn: sqlite3.Connection, filepath: Path, sessions_dir: Path):
     return True
 
 
+FEEDBACK_REGISTERS = ["docs/sif/feedback/register.md"]
+
+
+def index_feedback(conn, repo_root: Path):
+    """Load feedback registers (YAML frontmatter) and link commits.
+
+    Links come from the register's `changes` lists and from `Feedback:` commit
+    trailers in git log. Returns (items, links).
+    """
+    for rel in FEEDBACK_REGISTERS:
+        fm = parse_frontmatter(repo_root / rel)
+        if not fm:
+            continue
+        sources = {s["id"]: s for s in fm.get("sources") or []}
+        for it in fm.get("items") or []:
+            src = sources.get(it.get("source"), {})
+            conn.execute(
+                "INSERT INTO feedback VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (it["id"], it.get("source"), src.get("from"), str(src.get("received") or ""),
+                 it.get("kind"), json.dumps(it.get("touches") or []),
+                 " ".join(str(it.get("point") or "").split()),
+                 it.get("status"), it.get("response")),
+            )
+            for h in it.get("changes") or []:
+                conn.execute(
+                    "INSERT OR IGNORE INTO feedback_links (feedback_id, commit_hash, via) VALUES (?, ?, ?)",
+                    (it["id"], str(h), "register"),
+                )
+    try:
+        out = subprocess.run(
+            ["git", "log", "--all", "--format=%H%x1f%ad%x1f%s%x1f%(trailers:key=Feedback,valueonly,separator=%x2C)%x1e",
+             "--date=short"],
+            check=True, capture_output=True, text=True, cwd=repo_root,
+        ).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        out = ""
+    for rec in out.split("\x1e"):
+        parts = rec.strip().split("\x1f")
+        if len(parts) != 4 or not parts[3].strip():
+            continue
+        h, d, subj, ids = parts
+        for fid in re.split(r"[,\s]+", ids.strip()):
+            if not fid:
+                continue
+            conn.execute(
+                "INSERT OR IGNORE INTO feedback_links (feedback_id, commit_hash, date, subject, via) "
+                "VALUES (?, ?, ?, ?, ?)", (fid, h, d, subj, "trailer"),
+            )
+    # Fill commit detail for register-listed short hashes where git knows them
+    for (lid, h) in conn.execute("SELECT id, commit_hash FROM feedback_links WHERE date IS NULL").fetchall():
+        try:
+            r = subprocess.run(["git", "log", "-1", "--format=%H%x1f%ad%x1f%s", "--date=short", h],
+                               check=True, capture_output=True, text=True, cwd=repo_root).stdout.strip()
+            full, d, subj = r.split("\x1f")
+            conn.execute("UPDATE OR IGNORE feedback_links SET commit_hash=?, date=?, subject=? WHERE id=?",
+                         (full, d, subj, lid))
+        except (subprocess.CalledProcessError, ValueError):
+            pass
+    items = conn.execute("SELECT COUNT(*) FROM feedback").fetchone()[0]
+    links = conn.execute("SELECT COUNT(*) FROM feedback_links").fetchone()[0]
+    return items, links
+
+
 def build_index(sessions_dir: Path, db_path: Path):
     """Scan all session docs and build the SQLite index."""
     conn = sqlite3.connect(str(db_path))
 
     # Drop and recreate (idempotent rebuild)
-    for table in ["dependencies", "artifacts", "metrics", "lessons", "decisions", "sessions"]:
+    for table in ["feedback_links", "feedback", "dependencies", "artifacts", "metrics",
+                  "lessons", "decisions", "sessions"]:
         conn.execute(f"DROP TABLE IF EXISTS {table}")
     conn.executescript(SCHEMA)
 
@@ -197,11 +283,13 @@ def build_index(sessions_dir: Path, db_path: Path):
         else:
             skipped += 1
 
+    index_feedback(conn, sessions_dir.parent.parent)
     conn.commit()
 
     # Summary
     counts = {}
-    for table in ["sessions", "decisions", "lessons", "metrics", "artifacts", "dependencies"]:
+    for table in ["sessions", "decisions", "lessons", "metrics", "artifacts", "dependencies",
+                  "feedback", "feedback_links"]:
         row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
         counts[table] = row[0]
 
