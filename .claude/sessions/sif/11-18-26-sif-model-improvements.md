@@ -14,7 +14,7 @@ The SIF definition papers, the QQ proposal and the scenario index have fixed the
 
 - [x] AIS licence check: does AAAM's generative-AI prohibition cover the model's AIS-derived bands? If so, plan an ICISS recalibration (severity rec. 6, §4.4, §9)
 - [x] Body-region rule: flag hand, finger and eye bands, set P(life-altering), and combine with threat to life by taking the maximum (severity §8; proposal §5.4)
-- [ ] Impairment axis groundwork: body-region distributions per band from incident data, mapped to RPMI-type tables (severity §9)
+- [x] Impairment axis groundwork: body-region distributions per band from incident data, mapped to IOGP criteria (RPMI dropped: AIS-keyed) (severity §9)
 - [ ] Band gaps: a `ballistic` mechanism (air weapon, backsplash, handgun, centrefire rifle) and `explosion/fragmenting_munition` and `demolition_charge` bands; wildland fire (scenario index §5)
 - [ ] Build-up bands: choose the band from the uncontrolled limit, not the level the narrative says was reached (discussion §6.7)
 - [ ] Out-of-scope gate: overexertion and abrasion are Not SIF; medical events and chronic exposure are out of scope (discussion §6.5)
@@ -170,7 +170,7 @@ The feedback was on proposal v0.1: 11 points, logged as QQ-FB-01 to 11 in `docs/
 
 **QQ-FB-11 decided (Jason, 2026-11-19):** the IMR gap analysis (QQ-01, the two-tool boundary) puts reporting in ECO_ETL and Power BI and keeps IMR for capture and case work, as confirmed by the ETL/Power BI session. The panel's inputs and outputs flow through the reporting layer (an Excel workbook). The panel's to-do list comes from there; members open IMR records for details; the classification is joined on `row_sig`. The panel's PSIF is the classification of record in the reporting layer. Proposal v0.4. Constraints from the ETL session: don't contradict the SIFP precedence (I, T2, T, ED; latest stage wins), Lost Workday Case = 4 High, the FY22–FY23 matrix mapping, or Count_SIFp = classes 1–4; QQ documents must not name the store that holds the action list.
 
-## Impairment axis groundwork (2026-11-19, in progress)
+## Impairment axis groundwork (2026-11-19, done — provisional values)
 
 **Decided (Jason): the IOGP permanent impairment criteria (FPI definitions §3.5, last edited 17 March 2026) are the working test of life-altering.**
 - Categorical criteria (loss of body parts; organ function; skin or musculoskeletal function; psychological function), judged within 180 days or at MMI. No percentage threshold is needed, which settles the severity §9 threshold question.
@@ -197,4 +197,12 @@ The feedback was on proposal v0.1: 11 points, logged as QQ-FB-01 to 11 in `docs/
 | 3, 4, 5, 6 | Division totals | | Too coarse: 5 is 52% COVID-19 |
 
 High-pressure injection has no BLS category. Next: outcome studies for P(meets IOGP | injury type) (research agent, saving to `docs/sif/lit/severity/impairment/`).
+
+**Outcome studies (research agent, 2026-11-19).** 41 files in `docs/sif/lit/severity/impairment/` (gitignored); key quotes spot-checked. Mostly hospital series, so the values are discounted for the unselected DART population.
+
+**Decided (Jason, 2026-11-19): P(meets IOGP | injury type)**: amputation 1; hand fracture 0.10; flexor tendon 0.30; extensor 0.15; digital nerve 0.10; serious eye 0.30; wrist or limb fracture 0.10; spine fracture 0.15; moderate or severe brain injury 0.30; mild 0.15; grafted burn 0.30; electrical low voltage 0.10, high voltage 0.30; injection 0.10; cuts, bruises and sprains 0. **Also decided:** assumed shares of DART burns grafted 0.10, DART eye cases serious 0.10, DART head cases concussion 0.30; hot surface to hand 0.25 → 0.03; calculated values applied to the existing blocks, and blocks added to the low bands.
+
+**Implemented.** `data/sif/calibration/impairment.json` (values, assumptions, BLS counts, band map, notes) and `scripts/sif/impairment.py` (calculation; `--write` splices the blocks). 12 bands carry blocks for all five regions; the laser block stays hand-set (no BLS event). Results: machinery to hand 0.054, corrosive to eye 0.041, hot surface to hand 0.030, head 0.06–0.11. October batch: **no class changes**; P(serious) changed on 765 records (low bands now driven by the life-altering value, 746 records; hand-tool eye and hot-surface hand cases went down). Severity paper v0.5 §5.4 results; definitions v1.11 step 5.
+
+**Lesson.** BLS gives one average per event across all magnitudes, so the axis only informs the low bands. The high bands are already SIF on threat to life. The life-altering gap is a coding problem at the hand and eye (LIFE vs EEI), not a class problem.
 
