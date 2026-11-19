@@ -19,3 +19,7 @@ docs/sif/lit/
 
 # SIF research notes (client data, third-party chats)
 docs/sif/research/
+
+# Python bytecode (build artefacts)
+__pycache__/
+*.pyc
