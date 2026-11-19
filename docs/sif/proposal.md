@@ -1,11 +1,12 @@
 # Proposal: a defined, reliable PSIF for QQ
 
-Status: draft v0.2, 2026-11-19. For QQ's safety director and EHS leadership. Internal.
+Status: draft v0.3, 2026-11-19. For QQ's safety director and EHS leadership. Internal.
 
 | Version | Date | Change |
 |---|---|---|
 | 0.1 | 2026-11-18 | First draft |
 | 0.2 | 2026-11-19 | §4.1: triagers ask the definition's question in plain words (QQ-FB-05). §4.4: stakeholders, their decisions and what they need (QQ-FB-06). §5.2: thresholds fixed by the definition (QQ-FB-03). Rec. 6: reporters give facts only (QQ-FB-05) |
+| 0.3 | 2026-11-19 | §4.1: missed-case audit, a monthly random sample of unflagged reports sentenced by the panel. §7: miss rate added as a measure (QQ-FB-10) |
 
 This proposal draws on four papers, which are available on request and referenced throughout:
 
@@ -241,6 +242,8 @@ The process is human. It needs no change to IMR beyond tidying the triage scale.
 | **2. Screening** (optional) | The AI model | Reads every report and puts forward likely PSIF that triage did not flag; gives a second reading of every flagged case | Added candidates, with energy, band, probability and a one-line rationale |
 | **3. Sentencing** | A calibrated panel of four or five people from across the operation, monthly | Answers the fixed question for every candidate | The classification of record, with control state |
 
+**Missed-case audit.** Each month the panel also sentences a small random sample of reports that neither triage nor the AI model put forward. It estimates the miss rate, with its uncertainty, without depending on either filter. A few dozen cases a month are enough to show whether misses are rare or common (Hubbard). If the rate is low, the sample stays small. If it is high, the triage bar or the screen needs attention. The sample size is set in the pilot.
+
 The classification of record is the panel's decision, recorded outside IMR. Triagers are no longer asked to decide PSIF at the point of triage, when they have the least information and the outcome is freshest.
 
 ### 4.2 The panel's answer
@@ -355,6 +358,7 @@ It also points to where the field is going: from yes/no flags to outcome distrib
 | Panel members' calibration (Brier score) | Shows whether confidence means what it says |
 | Agreement between panel and AI model, and the reasons for disagreement | Tests the model as a screen and second reader |
 | Cases the model put forward that triage missed, and how the panel sentenced them | The screen's value |
+| Miss rate from the unflagged sample, with its uncertainty | What triage and the screen both miss |
 | Share of PSIF *unverified* | Reporting quality on controls |
 | Share of reports stating a magnitude | Reporting quality on energy |
 | Panel time per case | Cost |

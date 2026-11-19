@@ -140,9 +140,11 @@ items:
     point: >
       If candidates progress only when a triager puts them forward, some events are
       never considered.
-    status: open
-    response:
-    response_doc:
+    status: done
+    response: >
+      Agreed: a third safety net, a monthly random sample of unflagged reports sentenced by the
+      panel, estimates the miss rate (proposal v0.3 §4.1, §7).
+    response_doc: responses/QQ-FB-10.md
     changes: []
   - id: QQ-FB-11
     source: QQ-FB-2026-11-19
