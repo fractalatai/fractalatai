@@ -28,21 +28,53 @@
       "life_altering": {
         "status": "provisional",
         "decided": "2026-11-19 (Jason)",
+        "method": "impairment.json: injury-type mix x P(meets IOGP)",
         "regions": {
           "hand_finger": {
-            "p": 0.06,
+            "p": 0.054,
             "range": [
-              0.03,
+              0.046,
+              0.094
+            ]
+          },
+          "eye": {
+            "p": 0.03,
+            "range": [
+              0.005,
               0.15
+            ]
+          },
+          "head": {
+            "p": 0.08,
+            "range": [
+              0.04,
+              0.158
+            ]
+          },
+          "trunk": {
+            "p": 0.017,
+            "range": [
+              0.013,
+              0.029
+            ]
+          },
+          "limb": {
+            "p": 0.012,
+            "range": [
+              0.006,
+              0.029
             ]
           }
         },
         "region_split": {
-          "hand_finger": 0.47
+          "hand_finger": 0.67,
+          "eye": 0.0,
+          "head": 0.02,
+          "trunk": 0.03,
+          "limb": 0.28
         },
-        "split_source": "BLS SOII 2023-24 biennial DART counts, source Machinery (3XXXXX)",
-        "band_level": 0.03,
-        "note": "Referral-series value 0.15 cut to 0.06: BLS amputations are <=2.4% of machinery hand/finger DART cases; amputation is the floor, tendon/nerve/fracture add."
+        "split_source": "BLS SOII 2023-24 biennial DART counts, Struck, caught, or compressed by running powered equipment (code 65XXXX)",
+        "band_level": 0.041
       }
     },
     {

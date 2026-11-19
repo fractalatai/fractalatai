@@ -41,21 +41,53 @@
       "life_altering": {
         "status": "provisional",
         "decided": "2026-11-19 (Jason)",
+        "method": "impairment.json: injury-type mix x P(meets IOGP)",
         "regions": {
-          "eye": {
-            "p": 0.05,
+          "hand_finger": {
+            "p": 0.017,
             "range": [
-              0.02,
-              0.1
+              0.007,
+              0.051
+            ]
+          },
+          "eye": {
+            "p": 0.041,
+            "range": [
+              0.008,
+              0.19
+            ]
+          },
+          "head": {
+            "p": 0.056,
+            "range": [
+              0.01,
+              0.14
+            ]
+          },
+          "trunk": {
+            "p": 0.011,
+            "range": [
+              0.003,
+              0.04
+            ]
+          },
+          "limb": {
+            "p": 0.011,
+            "range": [
+              0.003,
+              0.04
             ]
           }
         },
         "region_split": {
-          "eye": 0.25
+          "hand_finger": 0.2,
+          "eye": 0.45,
+          "head": 0.09,
+          "trunk": 0.04,
+          "limb": 0.23
         },
-        "split_source": "BLS SOII 2023-24 biennial DART counts, source Chemicals (1XXXXX)",
-        "band_level": 0.01,
-        "note": "Sight loss from a splash to the eye."
+        "split_source": "BLS SOII 2023-24 biennial DART counts, Chemicals and hazardous materials (code 1XXXXX)",
+        "band_level": 0.03
       }
     },
     {

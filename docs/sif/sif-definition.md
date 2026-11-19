@@ -1,12 +1,13 @@
 # SIF definitions and coding rules
 
-Version 1.10, 2026-11-19. For safety directors, safety teams and anyone coding incident reports for serious injury and fatality (SIF) potential. The supporting rationale is in [sif-definition-discussion.md](sif-definition-discussion.md).
+Version 1.11, 2026-11-19. For safety directors, safety teams and anyone coding incident reports for serious injury and fatality (SIF) potential. The supporting rationale is in [sif-definition-discussion.md](sif-definition-discussion.md).
 
 | Version | Date | Change |
 |---|---|---|
 | 1.8 | 2026-11-18 | Definition papers closed |
 | 1.9 | 2026-11-19 | Step 3: conditions count when a person could be within reach in intended use or reasonably foreseeable misuse. Step 5: thresholds fixed by the definition. Step 6: SIF actual counts as PSIF with P = 1. §3.4: trigger is a risk factor (QQ-FB-03). §7.1: the question in plain words; reporters give facts only (QQ-FB-05). Annex C: risk vocabulary crosswalk, including HiPo (QQ-FB-03, QQ-FB-04) and scenario (QQ-FB-08) |
 | 1.10 | 2026-11-19 | §5.5: the IOGP permanent impairment criteria are the working test of life-altering; LIFE prevails at the hand. Annex C: Potential FPI and Near Miss FPI ([sif-severity.md](sif-severity.md) v0.4) |
+| 1.11 | 2026-11-19 | Step 5: life-altering values now cover every body region for the low-energy bands, calculated against the IOGP criteria ([sif-severity.md](sif-severity.md) v0.5) |
 
 ## Contents
 
@@ -377,7 +378,7 @@ If no:
 - **Two bands fit:** take the higher if the head, neck or spine was at risk, or the landing was concrete, steel or rebar.
 
 **Step 5. Read the potential.** Take P(serious) and the class from Annex B.
-- **Hand, finger or eye at risk:** for the bands that carry a life-altering value, P(serious) is the larger of the threat to life and the chance of a life-altering outcome at the stated body region. If no region is stated, use the band-level value.
+- **Body region at risk:** for the bands that carry a life-altering value (light machinery, hand tools, dropped objects, low falls, same-level slips and falls, hot surfaces, localised corrosives, friction and lasers), P(serious) is the larger of the threat to life and the chance of a life-altering outcome at the stated body region: hand or finger, eye, head, trunk or limb. If no region is stated, use the band-level value. The values are calculated against the IOGP permanent impairment criteria ([sif-severity.md](sif-severity.md), section 5.4).
 - P(serious) ≥ 0.50: **SIF potential.**
 - 0.10 ≤ P(serious) < 0.50: **Elevated.**
 - P(serious) < 0.10: **Not SIF.**

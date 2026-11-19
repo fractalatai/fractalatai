@@ -1,0 +1,361 @@
+{
+  "description": "Impairment axis: P(life-altering | band, region) = sum over injury types of P(type | event, region) x P(meets IOGP | type). Life-altering is tested against the IOGP permanent impairment criteria (FPI definitions s3.5); LIFE prevails at the hand (sif-definition.md s5.5). Computed by scripts/sif/impairment.py, which writes each mapped band's life_altering block.",
+  "version": "0.1",
+  "status": "provisional",
+  "decided": "2026-11-19 (Jason)",
+  "p_meets_iogp": {
+    "amputation": {
+      "p": 1.0,
+      "range": [
+        1.0,
+        1.0
+      ],
+      "basis": "IOGP 3.5.1 automatic (through a joint); LIFE counts any body part"
+    },
+    "fracture_hand": {
+      "p": 0.1,
+      "range": [
+        0.05,
+        0.4
+      ],
+      "basis": "Gabbe et al. 2011 hand/wrist 0.60 not recovered at 12 mo is an upper bound (multiply injured, GOSE)"
+    },
+    "fracture_limb": {
+      "p": 0.1,
+      "range": [
+        0.05,
+        0.25
+      ],
+      "basis": "MacDermid et al. 2003 distal radius, any difficulty at 1 yr (over-inclusive)"
+    },
+    "fracture_spine": {
+      "p": 0.15,
+      "range": [
+        0.11,
+        0.25
+      ],
+      "basis": "Leucht et al. 2009: 11% complete, 25% any neurological deficit"
+    },
+    "tbi_moderate_severe": {
+      "p": 0.3,
+      "range": [
+        0.28,
+        0.5
+      ],
+      "basis": "TRACK-TBI (Nelson et al. 2023): 28% dependent at 1 yr"
+    },
+    "tbi_mild": {
+      "p": 0.15,
+      "range": [
+        0.05,
+        0.2
+      ],
+      "basis": "TRACK-TBI (Nelson et al. 2019): 53% vs 38% controls with GOSE<8 at 12 mo"
+    },
+    "tendon_flexor": {
+      "p": 0.3,
+      "range": [
+        0.2,
+        0.5
+      ],
+      "basis": "Rigo et al. 2016: 52% fair/poor Strickland at 7 mo"
+    },
+    "tendon_extensor": {
+      "p": 0.15,
+      "range": [
+        0.1,
+        0.25
+      ],
+      "basis": "Mehdinasab et al. 2012: 25% fair/bad Miller at 12 mo (referral)"
+    },
+    "nerve_digital": {
+      "p": 0.1,
+      "range": [
+        0.05,
+        0.3
+      ],
+      "basis": "Dunlop et al. 2019: <25% normal s2PD; protective sensation usually regained"
+    },
+    "eye_serious": {
+      "p": 0.3,
+      "range": [
+        0.1,
+        0.5
+      ],
+      "basis": "Cillino et al. 2008: 52% worse than 6/12, hospitalised; Bahrain 2017: 9.5% occupational"
+    },
+    "burn_grafted": {
+      "p": 0.3,
+      "range": [
+        0.15,
+        0.35
+      ],
+      "basis": "Goverman et al. 2017: 33% with a contracture at discharge"
+    },
+    "minor": {
+      "p": 0.0,
+      "range": [
+        0.0,
+        0.0
+      ],
+      "basis": "Cuts, bruises, sprains, abrasions without tendon or nerve involvement do not meet the criteria"
+    }
+  },
+  "assumptions": {
+    "burn_graft_share": {
+      "p": 0.1,
+      "range": [
+        0.05,
+        0.3
+      ],
+      "basis": "Share of DART burns needing a graft. No source found"
+    },
+    "eye_serious_share": {
+      "p": 0.1,
+      "range": [
+        0.05,
+        0.3
+      ],
+      "basis": "Share of DART eye cases comparable to an admitted injury. No source found; most are foreign bodies"
+    },
+    "head_mild_tbi_share": {
+      "p": 0.3,
+      "range": [
+        0.15,
+        0.5
+      ],
+      "basis": "Share of DART head cases that are concussion. No source found"
+    },
+    "head_fracture_as_tbi_ms": {
+      "basis": "Fractures at the head are taken as a proxy for moderate or severe brain injury"
+    },
+    "hand_tendon_share": {
+      "p": 0.023,
+      "basis": "Sorock et al. 2002: tendon damage 27 of 1,166 occupational hand injuries"
+    },
+    "hand_nerve_share": {
+      "p": 0.008,
+      "basis": "Sorock et al. 2002: nerve damage 9 of 1,166"
+    },
+    "independence": {
+      "basis": "BLS publishes nature and part of body as marginals; nature is assumed independent of region within an event, except amputations, which are all placed at the hand (upper bound)"
+    }
+  },
+  "bls": {
+    "source": "BLS SOII biennial 2023-24 DART counts, All U.S., OIICS v3 (event or exposure; chemicals by source)",
+    "events": {
+      "41": {
+        "label": "Fall to lower level (code 41XXXX)",
+        "dart_cases": 135830,
+        "nature": {
+          "fractures": 28690,
+          "amputations": 20,
+          "chemical_burns": null,
+          "thermal_burns": 40
+        },
+        "part": {
+          "head_incl_eye": 7100,
+          "eye": null,
+          "trunk": 19990,
+          "upper_extremities": 28720,
+          "hand_finger": 2830,
+          "lower_extremities": 50340,
+          "multiple": 25810
+        }
+      },
+      "42": {
+        "label": "Slip, trip, stumble while stepping between levels (code 42XXXX)",
+        "dart_cases": 152400,
+        "nature": {
+          "fractures": 14050,
+          "amputations": null,
+          "chemical_burns": null,
+          "thermal_burns": null
+        },
+        "part": {
+          "head_incl_eye": 2330,
+          "eye": null,
+          "trunk": 15070,
+          "upper_extremities": 12570,
+          "hand_finger": 1710,
+          "lower_extremities": 107890,
+          "multiple": 12630
+        }
+      },
+      "43": {
+        "label": "Slip, trip, stumble or fall on same level (code 43XXXX)",
+        "dart_cases": 593810,
+        "nature": {
+          "fractures": 66650,
+          "amputations": null,
+          "chemical_burns": 60,
+          "thermal_burns": 350
+        },
+        "part": {
+          "head_incl_eye": 39940,
+          "eye": 620,
+          "trunk": 69460,
+          "upper_extremities": 126940,
+          "hand_finger": 19440,
+          "lower_extremities": 241740,
+          "multiple": 101800
+        }
+      },
+      "51": {
+        "label": "Exposure to electricity (code 51XXXX)",
+        "dart_cases": 6320,
+        "nature": {
+          "fractures": null,
+          "amputations": null,
+          "chemical_burns": null,
+          "thermal_burns": null
+        },
+        "part": {
+          "head_incl_eye": 130,
+          "eye": 70,
+          "trunk": 60,
+          "upper_extremities": 1250,
+          "hand_finger": 1030,
+          "lower_extremities": 50,
+          "multiple": 360
+        }
+      },
+      "53": {
+        "label": "Exposure to temperature extremes (code 53XXXX)",
+        "dart_cases": 51900,
+        "nature": {
+          "fractures": null,
+          "amputations": null,
+          "chemical_burns": 110,
+          "thermal_burns": 41580
+        },
+        "part": {
+          "head_incl_eye": 2550,
+          "eye": 1240,
+          "trunk": 1620,
+          "upper_extremities": 26060,
+          "hand_finger": 15530,
+          "lower_extremities": 7750,
+          "multiple": 4090
+        }
+      },
+      "62": {
+        "label": "Contact with animals (code 62XXXX)",
+        "dart_cases": 47820,
+        "nature": {
+          "fractures": 1110,
+          "amputations": null,
+          "chemical_burns": null,
+          "thermal_burns": null
+        },
+        "part": {
+          "head_incl_eye": 3380,
+          "eye": 340,
+          "trunk": 2000,
+          "upper_extremities": 24240,
+          "hand_finger": 16250,
+          "lower_extremities": 9830,
+          "multiple": 2810
+        }
+      },
+      "64": {
+        "label": "Struck by propelled, falling, or suspended object (code 64XXXX)",
+        "dart_cases": 288050,
+        "nature": {
+          "fractures": 32900,
+          "amputations": 1050,
+          "chemical_burns": 60,
+          "thermal_burns": 20
+        },
+        "part": {
+          "head_incl_eye": 54580,
+          "eye": 7950,
+          "trunk": 11990,
+          "upper_extremities": 108990,
+          "hand_finger": 77180,
+          "lower_extremities": 93790,
+          "multiple": 14350
+        }
+      },
+      "65": {
+        "label": "Struck, caught, or compressed by running powered equipment (code 65XXXX)",
+        "dart_cases": 89610,
+        "nature": {
+          "fractures": 10420,
+          "amputations": 2100,
+          "chemical_burns": null,
+          "thermal_burns": null
+        },
+        "part": {
+          "head_incl_eye": 1960,
+          "eye": 90,
+          "trunk": 2680,
+          "upper_extremities": 66880,
+          "hand_finger": 58180,
+          "lower_extremities": 15590,
+          "multiple": 1600
+        }
+      },
+      "3": {
+        "label": "Explosions and fires (code 3XXXXX)",
+        "dart_cases": 5150,
+        "nature": {
+          "fractures": null,
+          "amputations": null,
+          "chemical_burns": 80,
+          "thermal_burns": 2760
+        },
+        "part": {
+          "head_incl_eye": 710,
+          "eye": 130,
+          "trunk": 120,
+          "upper_extremities": 1190,
+          "hand_finger": 540,
+          "lower_extremities": 790,
+          "multiple": 1760
+        }
+      },
+      "src_chemicals": {
+        "label": "Chemicals and hazardous materials (code 1XXXXX)",
+        "dart_cases": 36510,
+        "nature": {
+          "fractures": null,
+          "amputations": null,
+          "chemical_burns": 11630,
+          "thermal_burns": 2210
+        },
+        "part": {
+          "head_incl_eye": 10870,
+          "eye": 9140,
+          "trunk": 730,
+          "upper_extremities": 6450,
+          "hand_finger": 4000,
+          "lower_extremities": 2160,
+          "multiple": 2600
+        }
+      }
+    }
+  },
+  "band_map": {
+    "caught_in/light_machinery": "65",
+    "abrasion/power_tool_graze": "65",
+    "abrasion/high_speed_friction": "65",
+    "thermal/hot_surface": "53",
+    "chemical/corrosive_localised": "src_chemicals",
+    "motion_struck/hand_tool": "64",
+    "motion_struck/light_dropped": "64",
+    "falls_gravity/standing": "43",
+    "falls_gravity/low": "41",
+    "slip_no_fall/indoor_level": "43",
+    "slip_no_fall/outdoor_uneven": "43",
+    "slip_no_fall/near_secondary_hazard": "43"
+  },
+  "hand_set": {
+    "radiation_noise/laser_high_power": "No BLS event; eye 0.5 kept as set on 2026-11-19"
+  },
+  "notes": {
+    "motion_struck/hand_tool": "Nail gun to the eye (about 0.4) needs its own band: deferred to the ballistic/projectile band work.",
+    "thermal/hot_surface": "Hand-set 0.25 (burn-unit series) replaced on 2026-11-19 by the calculated value; even a 30% graft share gives about 0.08.",
+    "motion_struck/light_dropped": "Hand-set eye 0.08 replaced on 2026-11-19 by the calculated value."
+  }
+}

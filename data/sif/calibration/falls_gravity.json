@@ -32,7 +32,58 @@
       "p10_label": "no_injury",
       "p50_label": "first_aid",
       "p90_label": "medical_treatment",
-      "rationale": "Most same-level falls produce minor or no injury. P90 reflects fracture risk from awkward landing (wrist, ankle). Working-age adults rarely die from standing-height falls."
+      "rationale": "Most same-level falls produce minor or no injury. P90 reflects fracture risk from awkward landing (wrist, ankle). Working-age adults rarely die from standing-height falls.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "method": "impairment.json: injury-type mix x P(meets IOGP)",
+        "regions": {
+          "hand_finger": {
+            "p": 0.017,
+            "range": [
+              0.009,
+              0.056
+            ]
+          },
+          "eye": {
+            "p": 0.03,
+            "range": [
+              0.005,
+              0.15
+            ]
+          },
+          "head": {
+            "p": 0.079,
+            "range": [
+              0.039,
+              0.156
+            ]
+          },
+          "trunk": {
+            "p": 0.017,
+            "range": [
+              0.012,
+              0.028
+            ]
+          },
+          "limb": {
+            "p": 0.011,
+            "range": [
+              0.006,
+              0.028
+            ]
+          }
+        },
+        "region_split": {
+          "hand_finger": 0.04,
+          "eye": 0.0,
+          "head": 0.08,
+          "trunk": 0.15,
+          "limb": 0.73
+        },
+        "split_source": "BLS SOII 2023-24 biennial DART counts, Slip, trip, stumble or fall on same level (code 43XXXX)",
+        "band_level": 0.018
+      }
     },
     {
       "band": "low",
@@ -47,7 +98,58 @@
       "p10_label": "first_aid",
       "p50_label": "medical_treatment",
       "p90_label": "serious_injury",
-      "rationale": "Median outcome is moderate injury (fractures, sprains needing treatment). P90 reflects head-first impact onto concrete — serious but usually survivable. Crosses SIF threshold at P90."
+      "rationale": "Median outcome is moderate injury (fractures, sprains needing treatment). P90 reflects head-first impact onto concrete — serious but usually survivable. Crosses SIF threshold at P90.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "method": "impairment.json: injury-type mix x P(meets IOGP)",
+        "regions": {
+          "hand_finger": {
+            "p": 0.034,
+            "range": [
+              0.021,
+              0.103
+            ]
+          },
+          "eye": {
+            "p": 0.03,
+            "range": [
+              0.005,
+              0.15
+            ]
+          },
+          "head": {
+            "p": 0.108,
+            "range": [
+              0.067,
+              0.206
+            ]
+          },
+          "trunk": {
+            "p": 0.032,
+            "range": [
+              0.023,
+              0.053
+            ]
+          },
+          "limb": {
+            "p": 0.021,
+            "range": [
+              0.011,
+              0.053
+            ]
+          }
+        },
+        "region_split": {
+          "hand_finger": 0.03,
+          "eye": 0.0,
+          "head": 0.07,
+          "trunk": 0.19,
+          "limb": 0.72
+        },
+        "split_source": "BLS SOII 2023-24 biennial DART counts, Fall to lower level (code 41XXXX)",
+        "band_level": 0.029
+      }
     },
     {
       "band": "medium",

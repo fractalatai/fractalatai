@@ -1,6 +1,6 @@
 # What counts as serious: LIFE, trauma scales and the life-altering gap
 
-Status: draft v0.4, 2026-11-19. A literature review in the series on defining serious injury and fatality (SIF) potential. Definitions follow [sif-definition.md](sif-definition.md). Companion papers: [sif-counterfactual.md](sif-counterfactual.md) and [sif-controls-precursors.md](sif-controls-precursors.md).
+Status: draft v0.5, 2026-11-19. A literature review in the series on defining serious injury and fatality (SIF) potential. Definitions follow [sif-definition.md](sif-definition.md). Companion papers: [sif-counterfactual.md](sif-counterfactual.md) and [sif-controls-precursors.md](sif-controls-precursors.md).
 
 | Version | Date | Change |
 |---|---|---|
@@ -8,6 +8,7 @@ Status: draft v0.4, 2026-11-19. A literature review in the series on defining se
 | 0.2 | 2026-11-18 | Burden-of-injury data rejected as the life-altering axis; ICISS as the AIS-free threat-to-life fallback |
 | 0.3 | 2026-11-18 | AIS licence check: the AI model is AIS-free (rec. 6); BLS denominators and body-region rule done, provisional (rec. 2, 2026-11-19) |
 | 0.4 | 2026-11-19 | IOGP permanent impairment criteria (§5.4) adopted as the working test of life-altering; the impairment axis takes an AIS-free route in place of RPMI (rec. 3, §8, §9) |
+| 0.5 | 2026-11-19 | Impairment axis calculated for 12 bands (§5.4 results); hot surface to the hand cut from 0.25 to 0.03; no class changes on the October batch (rec. 3) |
 
 ## Executive summary
 
@@ -44,7 +45,7 @@ Treat severity as **two axes**, threat to life and permanent impairment, and cou
 
 1. **Keep LIFE as the definition of a serious outcome.** It is the most widely adopted definition, and its three gates cover the right ground. Use it as the target the AI model is calibrated against, not as a scale.
 2. **Add a body-region rule now.** Flag the bands where energy is usually delivered to the hand, fingers or eyes, and set a probability of a life-altering outcome for them. This is transparent, needs no new data and matches how WorkSafeBC and Australian regulators single out hands and eyes. The Global Burden of Disease method sets a precedent: for amputations, "the probability of being a long-term injury is 1" (James et al., 2020). *Done (provisional, 2026-11-19):* eight bands now carry a life-altering value by region, with P(serious) taken as the larger of the two axes.
-3. **Build an impairment axis on the IOGP criteria.** Use the IOGP permanent impairment criteria (section 5.4) as the working test of life-altering. For each band and body region, estimate the chance of permanent impairment as the mix of injury types the energy produces, times the chance that each type meets the criteria. This needs no AIS content. Take P(serious) as the larger of the two axes until the joint distribution is known. *Adopted 2026-11-19; values to follow.*
+3. **Build an impairment axis on the IOGP criteria.** Use the IOGP permanent impairment criteria (section 5.4) as the working test of life-altering. For each band and body region, estimate the chance of permanent impairment as the mix of injury types the energy produces, times the chance that each type meets the criteria. This needs no AIS content. Take P(serious) as the larger of the two axes until the joint distribution is known. *Adopted 2026-11-19; calculated for 12 low-energy bands (section 5.4). No band changes class.*
 4. **Follow LIFE at the hand, not EEI.** LIFE counts the loss of any body part and any permanent loss of function. EEI's 2025 criteria exclude all finger and toe fractures, and fingertip amputations other than the thumb, index finger or great toe. Code to LIFE, and record the EEI criterion alongside it for benchmarking.
 5. **Use regulatory lists for calibration and audit, not as the definition.** They are outcome-only and disagree with each other. They are useful as labelled cases to test the AI model against.
 6. **Keep the AI model AIS-free.** AAAM, which owns AIS, prohibits "the use of this content in any way with generative AI, including AI training, scraping, or ingestion" (AIS License page, checked 2026-11-18). The AI model does not use AIS. It holds no AIS codes, descriptors, severity assignments or AIS-coded records. Its prompt uses the model's own five outcome labels (no injury to fatality). Its calibration cites published mortality statistics that some papers report by AIS level (for example Baker et al., 1974). Those are facts from the literature, not AIS content. The restriction would apply if the model were asked to assign AIS codes, or if AIS-coded data or tables went into its prompts, training or retrieval. RPMI is keyed by AIS level, so it is not used. The impairment axis takes the AIS-free IOGP route instead (section 5.4). If the threat-to-life scale ever needs re-anchoring, survival risk ratios by ICD-10 code (ICISS) give an AIS-free route (section 4.4). The European burden-of-injury data are AIS-free too, but they score hand fractures and eye injuries at 0% lifelong consequences, so they are not a usable impairment axis (section 5.2).
@@ -250,7 +251,22 @@ P(life-altering | *b*, *r*) = Σ over injury types *n* of P(*n* | *b*, *r*) × P
 
 - **P(*n* | *b*, *r*)**, the injury-type mix, comes from occupational injury statistics by source of injury (BLS, OIICS nature × part of body). BLS publishes nature and body part as marginals, not crossed, so the joint has to be assumed or found elsewhere.
 - **P(meets IOGP | *n*, *r*)** is 1 where the criterion is automatic (amputation through a joint, enucleation) and comes from outcome studies where it is not (fractures, tendon injuries, deep burns, eye injuries short of loss).
-- The body-region rule (section 8) is a first, hand-set version of this. Its eight values will be re-derived by the calculation.
+- The body-region rule (section 8) is a first, hand-set version of this. Its values were re-derived by the calculation on 2026-11-19, except the laser band, which has no BLS event.
+
+**Results (provisional, 2026-11-19).** The calculation uses the BLS 2023–24 DART counts by event, Sorock et al. (2002) for the tendon and nerve shares at the hand (2.3% and 0.8% of 1,166 occupational hand injuries), and three assumed shares with no source: 10% of DART burns need a graft, 10% of DART eye cases are serious, and 30% of DART head cases are concussions. Nature is assumed independent of body region within an event, except amputations, which are all placed at the hand.
+
+| BLS event | Bands | Hand or finger | Eye | Head | Trunk | Limb |
+|---|---|---|---|---|---|---|
+| Struck, caught or compressed by running powered equipment | Light machinery; power-tool graze; high-speed friction | 0.054 | 0.030 | 0.080 | 0.017 | 0.012 |
+| Struck by propelled, falling or suspended object | Hand tool; light dropped object | 0.031 | 0.030 | 0.079 | 0.017 | 0.011 |
+| Exposure to temperature extremes | Hot surface | 0.030 | 0.054 | 0.069 | 0.024 | 0.024 |
+| Chemicals (by source) | Corrosive, localised | 0.017 | 0.041 | 0.056 | 0.011 | 0.011 |
+| Fall to lower level | Low fall | 0.034 | 0.030 | 0.108 | 0.032 | 0.021 |
+| Slip, trip or fall on same level | Standing fall; three same-level slip bands | 0.017 | 0.030 | 0.079 | 0.017 | 0.011 |
+
+- **Two hand-set values hold.** Machinery to the hand comes out at 0.054 (set at 0.06) and corrosive to the eye at 0.041 (set at 0.05).
+- **Hot surface to the hand was too high.** The burn-unit value of 0.25 becomes 0.03; even a 30% graft share gives only 0.08.
+- **No class changes.** BLS gives one average per event across all magnitudes, which fits the low bands. Every value is far below 0.50, and only the head after a low fall passes 0.10, in a band already Elevated on threat to life. The higher bands already have P(threat to life) ≥ 0.50. On the October batch (3,006 reports), P(serious) changed for 765 records and no class changed.
 
 ## 6. Regulatory lists
 

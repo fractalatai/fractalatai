@@ -17,7 +17,8 @@ calibration JSON:
 Region rule (Jason, 2026-11-18): region-conditional, with the band-level
 value used when no region is stated. A stated region that the block does
 not list contributes nothing on this axis (threat to life still applies).
-Values: Jason, 2026-11-19 (BLS-adjusted). See
+Values: computed by impairment.py (injury-type mix x P(meets IOGP), from
+data/sif/calibration/impairment.json), except the laser band. Jason, 2026-11-19. See
 .claude/sessions/sif/11-18-26-sif-model-improvements.md.
 """
 

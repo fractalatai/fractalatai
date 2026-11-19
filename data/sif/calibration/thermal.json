@@ -45,21 +45,54 @@
       "life_altering": {
         "status": "provisional",
         "decided": "2026-11-19 (Jason)",
+        "method": "impairment.json: injury-type mix x P(meets IOGP)",
         "regions": {
           "hand_finger": {
-            "p": 0.25,
+            "p": 0.03,
             "range": [
-              0.1,
-              0.5
+              0.01,
+              0.095
+            ]
+          },
+          "eye": {
+            "p": 0.054,
+            "range": [
+              0.011,
+              0.234
+            ]
+          },
+          "head": {
+            "p": 0.069,
+            "range": [
+              0.014,
+              0.184
+            ]
+          },
+          "trunk": {
+            "p": 0.024,
+            "range": [
+              0.006,
+              0.084
+            ]
+          },
+          "limb": {
+            "p": 0.024,
+            "range": [
+              0.006,
+              0.084
             ]
           }
         },
         "region_split": {
-          "hand_finger": 0.5
+          "hand_finger": 0.41,
+          "eye": 0.03,
+          "head": 0.03,
+          "trunk": 0.04,
+          "limb": 0.48
         },
-        "split_source": "assumed (no BLS hot-objects pull)",
-        "band_level": 0.13,
-        "note": "Contact burns to the hand: contracture and function loss."
+        "split_source": "BLS SOII 2023-24 biennial DART counts, Exposure to temperature extremes (code 53XXXX)",
+        "band_level": 0.029,
+        "note": "Hand-set 0.25 (burn-unit series) replaced on 2026-11-19 by the calculated value; even a 30% graft share gives about 0.08."
       }
     },
     {

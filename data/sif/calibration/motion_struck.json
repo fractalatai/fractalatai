@@ -29,17 +29,54 @@
       "life_altering": {
         "status": "provisional",
         "decided": "2026-11-19 (Jason)",
+        "method": "impairment.json: injury-type mix x P(meets IOGP)",
         "regions": {
+          "hand_finger": {
+            "p": 0.031,
+            "range": [
+              0.023,
+              0.07
+            ]
+          },
           "eye": {
-            "p": 0.08
+            "p": 0.03,
+            "range": [
+              0.005,
+              0.15
+            ]
+          },
+          "head": {
+            "p": 0.079,
+            "range": [
+              0.039,
+              0.157
+            ]
+          },
+          "trunk": {
+            "p": 0.017,
+            "range": [
+              0.013,
+              0.029
+            ]
+          },
+          "limb": {
+            "p": 0.011,
+            "range": [
+              0.006,
+              0.029
+            ]
           }
         },
         "region_split": {
-          "eye": 0.081
+          "hand_finger": 0.29,
+          "eye": 0.03,
+          "head": 0.17,
+          "trunk": 0.04,
+          "limb": 0.47
         },
-        "split_source": "BLS SOII 2023-24 biennial DART counts, source Parts and materials (4XXXXX)",
-        "band_level": 0.01,
-        "note": "Nail gun to eye (~0.4) needs its own band; deferred to the ballistic/projectile band work."
+        "split_source": "BLS SOII 2023-24 biennial DART counts, Struck by propelled, falling, or suspended object (code 64XXXX)",
+        "band_level": 0.03,
+        "note": "Nail gun to the eye (about 0.4) needs its own band: deferred to the ballistic/projectile band work."
       }
     },
     {
@@ -58,17 +95,54 @@
       "life_altering": {
         "status": "provisional",
         "decided": "2026-11-19 (Jason)",
+        "method": "impairment.json: injury-type mix x P(meets IOGP)",
         "regions": {
+          "hand_finger": {
+            "p": 0.031,
+            "range": [
+              0.023,
+              0.07
+            ]
+          },
           "eye": {
-            "p": 0.08
+            "p": 0.03,
+            "range": [
+              0.005,
+              0.15
+            ]
+          },
+          "head": {
+            "p": 0.079,
+            "range": [
+              0.039,
+              0.157
+            ]
+          },
+          "trunk": {
+            "p": 0.017,
+            "range": [
+              0.013,
+              0.029
+            ]
+          },
+          "limb": {
+            "p": 0.011,
+            "range": [
+              0.006,
+              0.029
+            ]
           }
         },
         "region_split": {
-          "eye": 0.081
+          "hand_finger": 0.29,
+          "eye": 0.03,
+          "head": 0.17,
+          "trunk": 0.04,
+          "limb": 0.47
         },
-        "split_source": "BLS SOII 2023-24 biennial DART counts, source Parts and materials (4XXXXX)",
-        "band_level": 0.01,
-        "note": "Penetrating eye injury from a small object."
+        "split_source": "BLS SOII 2023-24 biennial DART counts, Struck by propelled, falling, or suspended object (code 64XXXX)",
+        "band_level": 0.03,
+        "note": "Hand-set eye 0.08 replaced on 2026-11-19 by the calculated value."
       }
     },
     {

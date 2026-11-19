@@ -24,7 +24,58 @@
       "p10_label": "no_injury",
       "p50_label": "first_aid",
       "p90_label": "medical_treatment",
-      "rationale": "Most indoor slips produce bruising or minor sprains. P50=first_aid (ice pack, minor sprain). P90=medical_treatment reflects wrist/ankle fracture from bracing. Head strike onto hard floor is the SIF pathway but rare enough to not reach P90 for a working-age adult."
+      "rationale": "Most indoor slips produce bruising or minor sprains. P50=first_aid (ice pack, minor sprain). P90=medical_treatment reflects wrist/ankle fracture from bracing. Head strike onto hard floor is the SIF pathway but rare enough to not reach P90 for a working-age adult.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "method": "impairment.json: injury-type mix x P(meets IOGP)",
+        "regions": {
+          "hand_finger": {
+            "p": 0.017,
+            "range": [
+              0.009,
+              0.056
+            ]
+          },
+          "eye": {
+            "p": 0.03,
+            "range": [
+              0.005,
+              0.15
+            ]
+          },
+          "head": {
+            "p": 0.079,
+            "range": [
+              0.039,
+              0.156
+            ]
+          },
+          "trunk": {
+            "p": 0.017,
+            "range": [
+              0.012,
+              0.028
+            ]
+          },
+          "limb": {
+            "p": 0.011,
+            "range": [
+              0.006,
+              0.028
+            ]
+          }
+        },
+        "region_split": {
+          "hand_finger": 0.04,
+          "eye": 0.0,
+          "head": 0.08,
+          "trunk": 0.15,
+          "limb": 0.73
+        },
+        "split_source": "BLS SOII 2023-24 biennial DART counts, Slip, trip, stumble or fall on same level (code 43XXXX)",
+        "band_level": 0.018
+      }
     },
     {
       "band": "outdoor_uneven",
@@ -37,7 +88,58 @@
       "p10_label": "no_injury",
       "p50_label": "first_aid",
       "p90_label": "medical_treatment",
-      "rationale": "Similar to indoor but higher fracture rate from uneven ground (can't control the fall). P90 at 0.01 reflects hip/wrist fracture on concrete or ice. Still well below SIF threshold for working-age adults."
+      "rationale": "Similar to indoor but higher fracture rate from uneven ground (can't control the fall). P90 at 0.01 reflects hip/wrist fracture on concrete or ice. Still well below SIF threshold for working-age adults.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "method": "impairment.json: injury-type mix x P(meets IOGP)",
+        "regions": {
+          "hand_finger": {
+            "p": 0.017,
+            "range": [
+              0.009,
+              0.056
+            ]
+          },
+          "eye": {
+            "p": 0.03,
+            "range": [
+              0.005,
+              0.15
+            ]
+          },
+          "head": {
+            "p": 0.079,
+            "range": [
+              0.039,
+              0.156
+            ]
+          },
+          "trunk": {
+            "p": 0.017,
+            "range": [
+              0.012,
+              0.028
+            ]
+          },
+          "limb": {
+            "p": 0.011,
+            "range": [
+              0.006,
+              0.028
+            ]
+          }
+        },
+        "region_split": {
+          "hand_finger": 0.04,
+          "eye": 0.0,
+          "head": 0.08,
+          "trunk": 0.15,
+          "limb": 0.73
+        },
+        "split_source": "BLS SOII 2023-24 biennial DART counts, Slip, trip, stumble or fall on same level (code 43XXXX)",
+        "band_level": 0.018
+      }
     },
     {
       "band": "near_secondary_hazard",
@@ -50,7 +152,58 @@
       "p10_label": "first_aid",
       "p50_label": "medical_treatment",
       "p90_label": "serious_injury",
-      "rationale": "The slip is non-SIF but proximity to a secondary hazard creates SIF potential. P90=serious_injury reflects the 10% of such events where the slip leads to secondary exposure (into water, over edge, into machinery). Note: if the secondary event occurs, it should be reclassified to that mechanism (fall, caught_in, etc.). This band captures the potential."
+      "rationale": "The slip is non-SIF but proximity to a secondary hazard creates SIF potential. P90=serious_injury reflects the 10% of such events where the slip leads to secondary exposure (into water, over edge, into machinery). Note: if the secondary event occurs, it should be reclassified to that mechanism (fall, caught_in, etc.). This band captures the potential.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "method": "impairment.json: injury-type mix x P(meets IOGP)",
+        "regions": {
+          "hand_finger": {
+            "p": 0.017,
+            "range": [
+              0.009,
+              0.056
+            ]
+          },
+          "eye": {
+            "p": 0.03,
+            "range": [
+              0.005,
+              0.15
+            ]
+          },
+          "head": {
+            "p": 0.079,
+            "range": [
+              0.039,
+              0.156
+            ]
+          },
+          "trunk": {
+            "p": 0.017,
+            "range": [
+              0.012,
+              0.028
+            ]
+          },
+          "limb": {
+            "p": 0.011,
+            "range": [
+              0.006,
+              0.028
+            ]
+          }
+        },
+        "region_split": {
+          "hand_finger": 0.04,
+          "eye": 0.0,
+          "head": 0.08,
+          "trunk": 0.15,
+          "limb": 0.73
+        },
+        "split_source": "BLS SOII 2023-24 biennial DART counts, Slip, trip, stumble or fall on same level (code 43XXXX)",
+        "band_level": 0.018
+      }
     }
   ],
   "modifiers": {
