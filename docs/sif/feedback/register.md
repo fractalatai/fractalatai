@@ -145,7 +145,7 @@ items:
       Agreed: a third safety net, a monthly random sample of unflagged reports sentenced by the
       panel, estimates the miss rate (proposal v0.3 §4.1, §7).
     response_doc: responses/QQ-FB-10.md
-    changes: []
+    changes: [d4ed70d]
   - id: QQ-FB-11
     source: QQ-FB-2026-11-19
     kind: gap
@@ -153,9 +153,11 @@ items:
     point: >
       Risk of two sources of truth if the classification held in IMR differs from the
       one used for reporting and decisions.
-    status: open
-    response:
-    response_doc:
+    status: done
+    response: >
+      Agreed: one source of truth. Following the gap analysis (QQ-01), reporting reads Power BI;
+      the panel works in the reporting layer, and its classification is the record there.
+    response_doc: responses/QQ-FB-11.md
     changes: []
 ---
 

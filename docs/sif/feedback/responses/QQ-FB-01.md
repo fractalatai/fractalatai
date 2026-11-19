@@ -8,9 +8,9 @@
 |---|---|---|
 | Triage becomes a broad filter | §4.1: "if in doubt, flag"; the triager's rating is a view, not the decision | ✓ |
 | AI as second reading and extra candidates | §4.1 stage 2; optional and independent, and nothing in the human process depends on it | ✓ (*optional*) |
-| A calibrated panel decides | §4.1 stage 3; its answer is the classification of record, recorded outside IMR | ✓ |
+| A calibrated panel decides | §4.1 stage 3; its answer is the classification of record, held in the reporting layer | ✓ |
 | Potential assessed apart from controls | Potential is judged as if there were no protection; the control state is recorded separately as protected, unprotected or unverified | ✓ |
 | Events apart from precursors and exposures | Events count as PSIF, conditions as SIF exposure; reported side by side, never summed | ✓ |
 | *(not mentioned)* | **The fixed question** above, with hands, fingers and eyes counted as life-altering | Addition |
 
-The classification of record is the panel's, recorded outside IMR. Your point about two sources of truth is answered under QQ-FB-11.
+The classification of record is the panel's, held in the reporting layer. Your point about two sources of truth is answered under QQ-FB-11.
