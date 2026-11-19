@@ -82,7 +82,8 @@ CREATE TABLE feedback (
     touches TEXT,
     point TEXT,
     status TEXT,
-    response TEXT
+    response TEXT,
+    response_doc TEXT
 );
 
 CREATE TABLE feedback_links (
@@ -219,11 +220,12 @@ def index_feedback(conn, repo_root: Path):
         for it in fm.get("items") or []:
             src = sources.get(it.get("source"), {})
             conn.execute(
-                "INSERT INTO feedback VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO feedback VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (it["id"], it.get("source"), src.get("from"), str(src.get("received") or ""),
                  it.get("kind"), json.dumps(it.get("touches") or []),
                  " ".join(str(it.get("point") or "").split()),
-                 it.get("status"), it.get("response")),
+                 it.get("status"), " ".join(str(it.get("response") or "").split()) or None,
+                 it.get("response_doc")),
             )
             for h in it.get("changes") or []:
                 conn.execute(

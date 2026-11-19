@@ -7,6 +7,7 @@ Read [README.md](README.md) for the approach. These rules apply to any work on f
 - **No GitHub issues for feedback.** They would be public.
 - **IDs are permanent.** Never renumber or reuse one. Split a point by adding a new ID and noting it in the old item's `response`.
 - **Every change links back.** A commit an item drives ends with `Feedback: <ID>[, <ID>]`. Add its hash to the item's `changes` only after the commit has returned it.
+- **Responses go to the source.** `responses/<ID>.md` and the compiled `response-<source>.md` are written for the person who gave the feedback: plain language, no internal shorthand, no quotes of their words.
 - **Keep the status current.** Update `status` and `response` in the same commit as the change.
 - **Decisions are Jason's.** For `design` items, present the options and a recommendation; do not set `accepted` or `declined` without his decision. The AI model is Spongl Ltd's, so there is no panel review of model values.
 - **Re-index after edits:** `/usr/bin/python3 scripts/maintenance/session_index.py --root /var/home/jason/fractalaw`.
