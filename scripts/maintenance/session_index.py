@@ -212,6 +212,7 @@ def index_feedback(conn, repo_root: Path):
     Links come from the register's `changes` lists and from `Feedback:` commit
     trailers in git log. Returns (items, links).
     """
+    register_links = []
     for rel in FEEDBACK_REGISTERS:
         fm = parse_frontmatter(repo_root / rel)
         if not fm:
@@ -228,10 +229,7 @@ def index_feedback(conn, repo_root: Path):
                  it.get("response_doc")),
             )
             for h in it.get("changes") or []:
-                conn.execute(
-                    "INSERT OR IGNORE INTO feedback_links (feedback_id, commit_hash, via) VALUES (?, ?, ?)",
-                    (it["id"], str(h), "register"),
-                )
+                register_links.append((it["id"], str(h)))
     try:
         out = subprocess.run(
             ["git", "log", "--all", "--format=%H%x1f%ad%x1f%s%x1f%(trailers:key=Feedback,valueonly,separator=%x2C)%x1e",
@@ -252,16 +250,19 @@ def index_feedback(conn, repo_root: Path):
                 "INSERT OR IGNORE INTO feedback_links (feedback_id, commit_hash, date, subject, via) "
                 "VALUES (?, ?, ?, ?, ?)", (fid, h, d, subj, "trailer"),
             )
-    # Fill commit detail for register-listed short hashes where git knows them
-    for (lid, h) in conn.execute("SELECT id, commit_hash FROM feedback_links WHERE date IS NULL").fetchall():
+    # Register links: resolve to the full hash; merge with a trailer link if present
+    for fid, h in register_links:
         try:
             r = subprocess.run(["git", "log", "-1", "--format=%H%x1f%ad%x1f%s", "--date=short", h],
                                check=True, capture_output=True, text=True, cwd=repo_root).stdout.strip()
             full, d, subj = r.split("\x1f")
-            conn.execute("UPDATE OR IGNORE feedback_links SET commit_hash=?, date=?, subject=? WHERE id=?",
-                         (full, d, subj, lid))
-        except (subprocess.CalledProcessError, ValueError):
-            pass
+        except (subprocess.CalledProcessError, ValueError, FileNotFoundError):
+            full, d, subj = h, None, None
+        cur = conn.execute("UPDATE feedback_links SET via = 'register+trailer' "
+                           "WHERE feedback_id = ? AND commit_hash = ?", (fid, full))
+        if cur.rowcount == 0:
+            conn.execute("INSERT INTO feedback_links (feedback_id, commit_hash, date, subject, via) "
+                         "VALUES (?, ?, ?, ?, ?)", (fid, full, d, subj, "register"))
     items = conn.execute("SELECT COUNT(*) FROM feedback").fetchone()[0]
     links = conn.execute("SELECT COUNT(*) FROM feedback_links").fetchone()[0]
     return items, links
