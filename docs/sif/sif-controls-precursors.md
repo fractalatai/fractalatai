@@ -1,6 +1,11 @@
 # Controls, precursors and conditions in SIF potential
 
-Status: draft v0.2, 2026-11-17. A literature review in the series on defining serious injury and fatality (SIF) potential. Definitions follow [sif-definition.md](sif-definition.md); the companion paper on counterfactuals is [sif-counterfactual.md](sif-counterfactual.md).
+Status: draft v0.3, 2026-11-19. A literature review in the series on defining serious injury and fatality (SIF) potential. Definitions follow [sif-definition.md](sif-definition.md); the companion paper on counterfactuals is [sif-counterfactual.md](sif-counterfactual.md).
+
+| Version | Date | Change |
+|---|---|---|
+| 0.2 | 2026-11-17 | Draft for the definition papers |
+| 0.3 | 2026-11-19 | Conditions count when a person could be within reach during intended use or reasonably foreseeable misuse (§4.2; QQ-FB-03). Assurance directed by value of information (§5.4; QQ-FB-09) |
 
 ## Executive summary
 
@@ -192,7 +197,7 @@ Three consequences follow for observations:
 | Worker slips at the edge; harness arrests the fall | Excursion: **PSIF** (protected) | Capacity |
 | Worker climbs over the edge barrier, or unclips a travel restraint, to reach the edge; no fall | Incursion into the edge danger zone: **PSIF** (unprotected) | Exposure (no release) |
 | Worker at 25 ft trips and falls on the platform, 2 ft from an unguarded edge | Excursion: a fall on the same level, judged on its own potential; SIF exposure to the edge continues | High-energy incident (Case A) |
-| Guard missing on a running machine; no one nearby | Hazard only: no person within reach | Exposure (no person needed) |
+| Guard missing on a running machine; no one nearby | Condition: **SIF exposure** (unprotected), if a person could be within reach during intended use or reasonably foreseeable misuse (Guide 51, 3.6–3.7); otherwise hazard only | Exposure (no person needed) |
 
 ### 4.3 Triggers, exposure and the receiving environment
 
@@ -274,6 +279,19 @@ EEI applies the same caution to its own categories: "The SCL model should be use
 
 Practice is mixed. The Campbell Institute (2022) reports that Dow set an "annual reduction target for non-injury pSIFs", described as "a common leading indicator". It also notes that "some organizations choose not to create goals around SIF metrics because of the potential that these goals might create fear and discourage reporting". On capture, it reports that "including a check-box option to report a pSIF on an incident report has proven effective". That is the kind of reporter-selected label that section 4 recommends replacing with coding by content.
 
+### 5.4 Measure where the uncertainty is
+
+Coverage tells you how often a direct control was in place. It does not tell you where to look next. Hubbard (2014) treats a measurement as a reduction in uncertainty, made to inform a decision. It is worth its cost only where the uncertainty is large and could change the decision. Measuring everything evenly tends towards what he calls the *measurement inversion*: effort goes to what is easy to measure, not to what is worth measuring.
+
+Applied to SIF-capable work:
+
+- **The decision** is the scenario's risk evaluation: is the remaining risk tolerable, so that the work can go ahead ([sif-scenario-index.md](sif-scenario-index.md) §3)?
+- **The uncertainty** sits in the controls. Each direct control on a SIF-class hazardous event has an effectiveness distribution, not a yes or no. A fixed guard is well known; a procedure is wide.
+- **What to measure first** is the control whose uncertainty could change the decision, found by the value of information. A few observations of a wide, decision-critical control are worth more than many of a control already known to work.
+- **Each observation updates** the distribution of the control it checks, and the scenario's evaluation is revisited with less uncertainty.
+
+Coverage (HECA) stays as the summary measure. Value of information decides where the assurance effort goes. It is more focused and cheaper than even sampling.
+
 ## 6. Critiques
 
 - **Bimodal thinking.** Safety-II argues that "Safety-I promotes a bimodal view of work" and that "seeing deficiencies in hindsight does nothing to explain the generation or persistence of those deficiencies" (Hollnagel, Wears & Braithwaite, 2015). A control coded only as present or absent is a bimodal construct. Recording control state does not explain why a control was absent; that needs investigation.
@@ -307,7 +325,7 @@ Against EEI SCL, the terms map one to one, but the populations differ:
 |---|---|---|
 | PSIF | PSIF (unprotected) | The AI model adds incursions, and excursions with no one within 6 ft |
 | Capacity | PSIF (protected) | As above |
-| Exposure | SIF exposure (unprotected) | EEI includes hazards with no one nearby; the AI model also needs a person within reach. Incursions EEI records as Exposure are PSIF in the AI model |
+| Exposure | SIF exposure (unprotected) | EEI includes hazards with no one nearby; the AI model needs a person within reach now, or foreseeably in intended use or misuse. Incursions EEI records as Exposure are PSIF in the AI model |
 | Success | SIF exposure (protected) | EEI includes hazards with no one nearby |
 
 **"Unverified" is kept.** EEI and HECA treat a control that is not verified as absent: "the control is considered absent" (Oguz Erkal & Hallowell, 2023). ICMM similarly warns against assuming controls work "without direct observation". No reviewed framework has a separate "unverified" state. The AI model adds one because incident narratives often do not say whether controls were in place. Treating silence as absent would overstate control failures and hide the gap in reporting. The rules are:
@@ -340,6 +358,7 @@ Against EEI SCL, the terms map one to one, but the populations differ:
 - Edison Electric Institute (2024). *Safety Classification and Learning (SCL) Model*, rev. September 2024.
 - Hallowell, M.R. & Spencer, C. (2024). Safety classification & learning model: defining & classifying potential serious injuries & fatalities. *Professional Safety*, 69(2), 18–26.
 - Hollnagel, E., Wears, R.L. & Braithwaite, J. (2015). *From Safety-I to Safety-II: A White Paper*. Resilient Health Care Net.
+- Hubbard, D.W. (2014). *How to Measure Anything: Finding the Value of "Intangibles" in Business*, 3rd ed. Wiley.
 - Hopkins, A. (2009). Thinking about process safety indicators. *Safety Science*, 47(4), 460–465. doi:10.1016/j.ssci.2007.12.006
 - ICMM (2015). *Critical Control Management: Implementation Guide*. International Council on Mining and Metals.
 - ISO 12100:2010. *Safety of machinery – General principles for design – Risk assessment and risk reduction*.

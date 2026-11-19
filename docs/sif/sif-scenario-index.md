@@ -1,18 +1,23 @@
 # PSIF scenario index: the risk-assessment side
 
-*Version 0.1, 2026-11-18. Draft for discussion.*
+*Version 0.2, 2026-11-19. Draft for discussion.*
+
+| Version | Date | Change |
+|---|---|---|
+| 0.1 | 2026-11-18 | First draft; range-operations pilot from DSA 03.OME Part 3 |
+| 0.2 | 2026-11-19 | Terms anchored on risk vocabulary: a **scenario** is the assessment context (ISO 31000, 6.3); its rows are **hazardous events** and **hazardous situations** (ISO/IEC Guide 51, 3.3–3.4); triggers are **risk factors**. Golden-thread section added (section 7). Feedback: QQ-FB-08 |
 
 ## Summary
 
-Triagers and the panel code PSIF **from reports**: an event happened, someone wrote it down, and we judge its potential. The same rules can be run **from the other direction**. Take an activity and its energy sources, apply the coding rules to every credible change on either side (excursion or incursion), and record each one as a **scenario**: a PSIF event defined before it happens. No actual event is needed. That is the basis of risk assessment as a proactive method.
+Triagers and the panel code PSIF **from reports**: an event happened, someone wrote it down, and we judge its potential. The same rules can be run **from the other direction**. Take a **scenario**, the context of a risk assessment: an activity in its setting, with its scope, its energy sources, their envelopes and the criteria for accepting the risk. Apply the coding rules to every credible change on either side (excursion or incursion), and record each one as a **hazardous event**: a PSIF event defined before it happens. No actual event is needed. That is the basis of risk assessment as a proactive method, and it ends in a decision: is the risk tolerable, so that the work can go ahead?
 
-The result is a searchable **PSIF scenario index**. Each row is a credible event with its potential, its people at risk and the direct controls that stop it. Coded reports point back to the index, so every scenario gathers a history: how often it happened, how close it came and which control held or failed.
+The result is a searchable **PSIF scenario index**. Each scenario lists its credible hazardous events, each with its potential, its people at risk and the direct controls that stop it. Coded reports point back to the index, so every hazardous event gathers a history: how often it happened, how close it came and which control held or failed.
 
-Range operations make a good pilot because the MoD has already drawn most of the envelopes in numbers. Weapon and range danger areas, burst safety distances, backsplash distances and backblast areas are all specified, and the controls are written into Range Standing Orders (DSA 03.OME Part 3, formerly JSP 403). A first pass over the range code gives **36 scenarios**:
+Range operations make a good pilot because the MoD has already drawn most of the envelopes in numbers. Weapon and range danger areas, burst safety distances, backsplash distances and backblast areas are all specified, and the controls are written into Range Standing Orders (DSA 03.OME Part 3, formerly JSP 403). A first pass over the range code gives **36 entries**:
 
-- 26 are PSIF if they happen;
-- 4 are Elevated;
-- 6 are SIF exposures, which are conditions and not events.
+- 26 hazardous events are PSIF if they happen;
+- 4 hazardous events are Elevated;
+- 6 are hazardous situations (SIF exposures), which are conditions and not events.
 
 Four findings matter before a pilot:
 
@@ -23,48 +28,64 @@ Four findings matter before a pilot:
 
 ## 1. Why index scenarios
 
+### 1.1 Terms
+
+The index uses established risk vocabulary ([sif-definition.md](sif-definition.md) Annex C).
+
+| Term | Meaning here | Anchor |
+|---|---|---|
+| **Scenario** | The context of a risk assessment: an activity in its setting, with its scope, energy sources, envelopes, people and risk criteria. The same frame as the scope of a HAZID or HAZOP study | ISO 31000:2018, 6.3 "Scope, context and criteria"; IEC 31010, B.2.5 (scenario analysis); IEC 61882, 6.2.1 (scope of a HAZOP study) |
+| **Hazardous event** | A credible excursion or incursion within the scenario, coded before it happens | ISO/IEC Guide 51:2014, 3.3: "event that can cause harm" |
+| **Hazardous situation** | A credible condition within the scenario: energy and people within reach, nothing changing (a SIF exposure) | Guide 51, 3.4 |
+| **Risk factor** | Something that makes a hazardous event more likely, without changing its potential | WHO STEPS manual (2017) glossary |
+| **Risk evaluation** | The scenario's end point: is the remaining risk tolerable, so that the work can go ahead? | Guide 51, 3.12 and 3.15 |
+
+In process safety, "scenario" often means a single sequence from initiating event to consequence (LOPA). That is a hazardous event here.
+
+### 1.2 Report-led and scenario-led coding
+
 | | Report-led coding (today) | Scenario index (proposed) |
 |---|---|---|
-| Starting point | An event that happened and was reported | An activity, its energy sources and their envelopes |
+| Starting point | An event that happened and was reported | A scenario: an activity in its setting, its energy sources and their envelopes |
 | Question | What was the potential of this event? | What events could this activity produce, and which are PSIF? |
-| Who does it | Triager, AI screen, panel | Panel and activity owners, once per activity, reviewed periodically |
+| Who does it | Triager, AI screen, panel | Panel and activity owners, once per scenario, reviewed periodically |
 | Covers | What gets reported | What could happen, reported or not |
-| Output | One determination per report | A catalogue of credible PSIF events per activity, with their controls |
-| Gaps it shows | Under-reporting is invisible | Scenarios with no reports are visible: either rare or not reported |
+| Output | One determination per report | The credible hazardous events per scenario, with their controls, and a risk evaluation |
+| Gaps it shows | Under-reporting is invisible | Hazardous events with no reports are visible: either rare or not reported |
 
-The two directions share one rulebook ([sif-definition.md](sif-definition.md) §7). A scenario is coded exactly as a report would be: by energy source, event type (excursion or incursion; where, when or how much), mechanism and band, and P(serious). Two fields differ because no real event exists:
+The two directions share one rulebook ([sif-definition.md](sif-definition.md) §7). A hazardous event is coded exactly as a report would be: by energy source, event type (excursion or incursion; where, when or how much), mechanism and band, and P(serious). Two fields differ because no real event exists:
 
-- **Closest approach** is not set on the scenario. It belongs to each real event linked to it.
-- **Control state** is not set either. The scenario lists the direct controls that should stop it; each linked event records whether they did.
+- **Closest approach** is not set on the hazardous event. It belongs to each real event linked to it.
+- **Control state** is not set either. The hazardous event lists the direct controls that should stop it; each linked event records whether they did.
 
-The index does not replace coding. A report is still coded on its own facts. The scenario supplies a default band and the list of controls to check, and the facts stated in the report override it: an air rifle is not a service rifle.
+The index does not replace coding. A report is still coded on its own facts. The hazardous event supplies a default band and the list of controls to check, and the facts stated in the report override it: an air rifle is not a service rifle.
 
-**Related practice.** The nearest published idea is the ICMM *material unwanted event* (MUE) ([sif-definition.md](sif-definition.md) §5.7): an event, defined in advance, that critical controls must prevent. A SIF-class scenario is an MUE stated in the two-sided event terms, with its potential read from the band table rather than judged per site. The direct controls listed against SIF-class scenarios are the candidate critical controls.
+**Related practice.** The nearest published idea is the ICMM *material unwanted event* (MUE) ([sif-definition.md](sif-definition.md) §5.7): an event, defined in advance, that critical controls must prevent. A SIF-class hazardous event is an MUE stated in the two-sided event terms, with its potential read from the band table rather than judged per site. The direct controls listed against SIF-class hazardous events are the candidate critical controls.
 
 ## 2. Schema
 
-The index has six tables. The **scenario** is the core; the others describe what it is built from and link it to real reports.
+The index has seven tables. The **hazardous event** is the core; the **scenario** is its context, and the other tables describe what it is built from and link it to real reports.
 
 ```
-activity ─┐
-          ├─< scenario >─< scenario_control >─ control
-source  ──┘       │
-                  └─< report_scenario >─ (coded report)
+scenario ─┐
+          ├─< hazardous_event >─< event_control >─ control
+source  ──┘        │    └── hazardous_situation
+                   └─< report_event >─ (coded report)
 ```
 
-### 2.1 `scenario`
+### 2.1 `hazardous_event`
 
 | Field | Type | Content | Example |
 |---|---|---|---|
-| `scenario_id` | text, key | `<domain>-<side>-<dimension>-<nn>`. Side: `EX` excursion, `IN` incursion, `SX` SIF exposure. Dimension: `WR` where, `WN` when, `HM` how much | `RNG-EX-WN-02` |
+| `event_id` | text, key | `<domain>-<side>-<dimension>-<nn>`. Side: `EX` excursion, `IN` incursion (`SX` is used for hazardous situations). Dimension: `WR` where, `WN` when, `HM` how much | `RNG-EX-WN-02` |
 | `title` | text | The change, in plain words | Weapon found loaded after the unload drill |
-| `activity_ids` | list | Activities where it can occur | `rng.nda_barrack`, `rng.lftt`, `rng.wuf` |
+| `scenario_ids` | list | Scenarios where it can occur | `rng.nda_barrack`, `rng.lftt`, `rng.wuf` |
 | `source_id` | key | Energy source | `src.sa_centrefire_rifle` |
 | `energy_type` | enum | From §2.1 of the definitions | motion |
 | `energy_state` | enum | State in normal operation: `live`, `at-rest`, `zero-energy` | live |
 | `envelope` | text + ref | The designed bound that is crossed, with the clause that sets it | Weapon declared clear (zero-energy) by unload and proving drill |
 | `danger_zone` | text + ref | The area kept clear of people, if any | Range danger area (RDA) |
-| `side` | enum | `excursion`, `incursion`, `both`, `exposure` | excursion |
+| `side` | enum | `excursion`, `incursion`, `both` | excursion |
 | `dimension` | enum | `where`, `when`, `how_much` | when |
 | `description` | text | What changes, and why that shrinks the separation to people | The weapon was declared zero-energy but a round was chambered: energy is live when it should not be |
 | `people_at_risk` | list | Roles (§2.4) | firer, adjacent firers, armourer |
@@ -73,23 +94,24 @@ source  ──┘       │
 | `p_serious` | number | From the band | 0.72 (provisional) |
 | `class` | enum | SIF, Elevated, Not SIF | SIF |
 | `band_status` | enum | `calibrated`, `provisional` (band missing or borrowed) | provisional |
-| `if_event` | enum | The determination a matching report gets with no injury: PSIF, Elevated, Not SIF, or SIF exposure | PSIF |
-| `triggers` | list | Conditions that make it more likely (chance only; no effect on potential) | Stoppage cleared in a hurry; drill done out of sequence |
-| `related_exposure` | key | The SIF exposure (`SX-`) this event comes from | `RNG-SX-01` |
+| `if_event` | enum | The determination a matching report gets with no injury: PSIF, Elevated or Not SIF | PSIF |
+| `risk_factors` | list | Conditions that make it more likely (chance only; no effect on potential) | Stoppage cleared in a hurry; drill done out of sequence |
+| `related_situation` | key | The hazardous situation (`SX-`) this event comes from | `RNG-SX-01` |
 | `report_phrases` | list | Words people use in reports, for search and AI matching | "not cleared", "round in chamber", "unload drill" |
-| `source_refs` | list | Clauses the scenario is built from | DSA 03.OME Pt 3 Vol 1 Pt 2 para 9 |
+| `source_refs` | list | Clauses the hazardous event is built from | DSA 03.OME Pt 3 Vol 1 Pt 2 para 9 |
 | `notes` | text | Boundary cases, coding notes | Proved clear and inspected: zero-energy, no event |
 | `status` | enum | `draft`, `panel_reviewed`, `retired` | draft |
 | `version`, `reviewed_on` | text, date | Change control | 0.1, — |
 
-### 2.2 `activity` and `source`
+### 2.2 `scenario`, `hazardous_situation` and `source`
 
 | Table | Fields | Example |
 |---|---|---|
-| `activity` | `activity_id`, `name`, `domain`, `range_type` (MoD category), `practices`, `source_refs` | `rng.grenade`, Grenade range, ranges, Vol 2 Ch 18 |
+| `scenario` | `scenario_id`, `name`, `domain`, `range_type` (MoD category), `scope` (what is in and out), `context` (setting, people, conditions), `risk_criteria` (what makes the risk tolerable), `evaluation` (go, go with conditions, no go), `evaluated_on`, `source_refs` | `rng.grenade`, Grenade range, ranges, Vol 2 Ch 18 |
+| `hazardous_situation` | `situation_id` (`<domain>-SX-<nn>`), `title`, `scenario_ids`, `source_id`, `people_at_risk`, `band`, `class`, `why_not_event`, `source_refs` | `RNG-SX-04`, EOD operators clearing blinds |
 | `source` | `source_id`, `name`, `energy_type`, `magnitude` (value + unit: muzzle energy J, NEQ kg, speed km/h), `default_band`, `envelope_type` (WDA template, BSD, backsplash, backblast area, ADH), `source_refs` | `src.hand_grenade`, HE hand grenade, chemical/pressure + fragments, BSD from Pamphlet 21 |
 
-### 2.3 `control` and `scenario_control`
+### 2.3 `control` and `event_control`
 
 | Field | Content |
 |---|---|
@@ -98,18 +120,19 @@ source  ──┘       │
 | `direct` | yes or no. Training, rules, signs and generic PPE are not direct (EEI) |
 | `acts_on` | source (stops the excursion) or path (keeps people out: stops the incursion) |
 | `source_refs` | The clause that requires it: Vol 2 para 2-13 |
-| `scenario_control.role` | `prevents` (stops the event) or `mitigates` (limits harm once it starts) |
+| `event_control.role` | `prevents` (stops the event) or `mitigates` (limits harm once it starts) |
 
 ### 2.4 Roles (`people_at_risk`)
 
 Ranges have fixed roles, which keeps searches clean: firer, adjacent firer, range conducting officer (RCO), safety supervisor or safety staff, butt marker, range warden or sentry, EOD operator or clearance team, spectator, authorised public (permissive access), unauthorised public, aircrew, range maintenance staff.
 
-### 2.5 `report_scenario` (the link back)
+### 2.5 `report_event` (the link back)
 
 | Field | Content |
 |---|---|
 | `report_id` | The coded report |
-| `scenario_id` | The matched scenario; `none` if no scenario fits (a candidate for a new row) |
+| `event_id` | The matched hazardous event; `none` if none fits (a candidate for a new row) |
+| `scenario_id` | The scenario the work was in |
 | `matched_by` | triager, AI model, panel |
 | `match_confidence` | 50–100% (the panel's confidence scale) |
 | `closest_approach` | wide, close, contact |
@@ -118,28 +141,28 @@ Ranges have fixed roles, which keeps searches clean: firer, adjacent firer, rang
 
 With this link the index answers the questions a risk assessment cannot answer alone:
 
-- How often did each scenario happen?
+- How often did each hazardous event happen?
 - What share came close or made contact?
 - Which control failed most?
-- Which SIF-class scenarios have never been reported?
+- Which SIF-class hazardous events have never been reported?
 
 ### 2.6 Searches it supports
 
 | Question | Query on |
 |---|---|
 | What PSIF events can a butt marker suffer? | `people_at_risk` |
-| What does the Clear Range Procedure protect against, and what is left if it fails? | `scenario_control` |
-| Which range scenarios are excursions in time? | `side`, `dimension` |
-| A report says "round went over the butts": which scenario, which controls to check? | `report_phrases`, then `scenario_control` |
-| Which scenarios borrow a band? | `band_status = provisional` |
-| Which SIF-class scenarios have no linked reports in 12 months? | `report_scenario` |
+| What does the Clear Range Procedure protect against, and what is left if it fails? | `event_control` |
+| Which range hazardous events are excursions in time? | `side`, `dimension` |
+| A report says "round went over the butts": which hazardous event, which controls to check? | `report_phrases`, then `event_control` |
+| Which hazardous events borrow a band? | `band_status = provisional` |
+| Which SIF-class hazardous events have no linked reports in 12 months? | `report_event` |
 
 ### 2.7 Example record
 
 ```yaml
-scenario_id: RNG-IN-WR-04
+event_id: RNG-IN-WR-04
 title: Person enters a closed impact area
-activity_ids: [rng.mortar, rng.grenade, rng.at_weapon, rng.lftt]
+scenario_ids: [rng.mortar, rng.grenade, rng.at_weapon, rng.lftt]
 source_id: src.blind_fuzed_ordnance
 energy_type: chemical          # explosive fill, held by a fuze
 energy_state: live             # the fuze can function on disturbance
@@ -153,7 +176,7 @@ band: fragmenting_munition      # proposed (section 5)
 class: SIF
 band_status: provisional
 if_event: PSIF
-related_exposure: RNG-SX-04    # EOD clearance is planned presence, so exposure
+related_situation: RNG-SX-04   # EOD clearance is planned presence: a hazardous situation
 report_phrases: ["impact area", "past the fence", "UXO", "blind", "recovered a target"]
 source_refs: ["DSA 03.OME Pt 3 Vol 2 para 2-25", "para 2-106"]
 status: draft
@@ -161,23 +184,25 @@ status: draft
 
 ## 3. How it is built
 
-The build applies the coding steps forwards, once per activity:
+The build applies the coding steps forwards, once per scenario:
 
-1. **List the energy sources** for the activity: each weapon and ammunition nature, explosive store, vehicle, and anything else in Annex A.
-2. **Write each source's envelope** in the three dimensions, taken from the code where it exists:
+1. **Set the scenario**: the activity, its scope and context, and the risk criteria (ISO 31000, 6.3).
+2. **List the energy sources** for the scenario: each weapon and ammunition nature, explosive store, vehicle, and anything else in Annex A.
+3. **Write each source's envelope** in the three dimensions, taken from the code where it exists:
    - where: the WDA template, burst safety distance, backsplash distance, backblast area, air danger height;
    - when: the firing window, waiting times after a misfire, the state the weapon was declared to be in;
    - how much: the authorised natures, muzzle energy limits and net explosive quantity (NEQ).
-3. **Write the people's envelope**: roles, where each is planned to be, when, and how many.
-4. **Run each cell of the two-envelope table** ([sif-definition.md](sif-definition.md) §3.2). For each source, ask what excursion and what incursion is credible in where, when and how much. Keep the credible ones as scenarios.
-5. **Code each scenario**: mechanism, band, receiving environment, class. Planned presence within reach becomes an `SX-` exposure, not an event.
-6. **List the direct controls** from the code and Range Standing Orders against each scenario, marking which prevent and which mitigate.
-7. **Panel review**: challenge credibility, the bands and the control lists. Set `status: panel_reviewed`.
+4. **Write the people's envelope**: roles, where each is planned to be, when, and how many.
+5. **Run each cell of the two-envelope table** ([sif-definition.md](sif-definition.md) §3.2). For each source, ask what excursion and what incursion is credible in where, when and how much. Keep the credible ones as hazardous events.
+6. **Code each hazardous event**: mechanism, band, receiving environment, class. Planned or foreseeable presence within reach becomes an `SX-` hazardous situation, not an event.
+7. **List the direct controls** from the code and Range Standing Orders against each hazardous event, marking which prevent and which mitigate.
+8. **Panel review**: challenge credibility, the bands and the control lists. Set `status: panel_reviewed`.
+9. **Evaluate the scenario**: with the direct controls in place, is the remaining risk tolerable against the scenario's criteria (Guide 51, 3.12)? Record go, go with conditions, or no go.
 
 Two rules from the definitions carry over unchanged:
 
 - **Separation to zero.** The potential assumes the energy reached a person. A round that leaves the danger area over empty moorland has the same potential as one that lands by a walker.
-- **The number of people does not change potential.** A spectator stand inside a safety distance is one scenario per person; it multiplies exposure and the number who could be harmed in one event.
+- **The number of people does not change potential.** A spectator stand inside a safety distance is one hazardous event per person; it multiplies exposure and the number who could be harmed in one event.
 
 ## 4. Pilot: range operations
 
@@ -203,13 +228,13 @@ All five are DSA 03.OME Part 3, Defence Code of Practice (DCOP) and guidance not
 
 Quotations are checked against the local copies in `docs/sif/lit/ranges/` (gitignored). Paragraph numbers are as printed. Ammunition natures and distances here are illustrative; the pilot would take them from the current tables.
 
-### 4.3 What surfaces: PSIF scenarios
+### 4.3 What surfaces: PSIF hazardous events
 
 All of these are **PSIF if they happen without injury**, determined on separation to zero. Bands marked † use the proposed `ballistic` mechanism or a borrowed band (section 5) and are provisional.
 
 **Excursions: the energy changes**
 
-| ID | Scenario | Dimension | People at risk | Band | Direct controls (prevent) |
+| ID | Hazardous event | Dimension | People at risk | Band | Direct controls (prevent) |
 |---|---|---|---|---|---|
 | RNG-EX-WR-01 | Round leaves the RDA: over the stop butt, out of arcs, wrong elevation | where | Unauthorised and authorised public, other range users | `ballistic/centrefire_rifle` † | Stop butt, baffles, arc limiters (passive); RDA cleared (procedural) |
 | RNG-EX-WR-02 | Ricochet leaves the RDA (hard ground, stones on the range floor, a struck steel target) | where | As above | `ballistic/centrefire_rifle` † | Soft range floor, ricochet-safe targetry, maintenance (passive) |
@@ -231,7 +256,7 @@ All of these are **PSIF if they happen without injury**, determined on separatio
 
 **Incursions: the people change**
 
-| ID | Scenario | Dimension | People at risk | Band | Direct controls (prevent) |
+| ID | Hazardous event | Dimension | People at risk | Band | Direct controls (prevent) |
 |---|---|---|---|---|---|
 | RNG-IN-WR-01 | Unauthorised person (walker, rider, vehicle) inside the RDA during firing, past flags and sentries | where | Unauthorised public | `ballistic/*` † | Sentries, surveillance, fences (Vol 1 Pt 2 para 102); means to stop firing promptly |
 | RNG-IN-WR-02 | Authorised person forward of the firing line during firing (to fetch kit, check a target, or in the wrong lane) | where | Firers, range staff | `ballistic/*` † | Firing-line control by the RCO (procedural) |
@@ -245,18 +270,18 @@ All of these are **PSIF if they happen without injury**, determined on separatio
 
 ### 4.4 What surfaces: Elevated
 
-| ID | Scenario | Band | Note |
+| ID | Hazardous event | Band | Note |
 |---|---|---|---|
 | RNG-EX-WR-10 | Backsplash beyond the backsplash distance (Vol 2 Table 2-2) | `ballistic/backsplash` † | The eye is the region at risk. The body-region rule ([sif-severity.md](sif-severity.md) §8) may lift it to SIF; the panel decides |
 | RNG-IN-WR-08 | Person moves inside the backsplash distance of a hard target (for example, close engagement on live-fire tactical training) | `ballistic/backsplash` † | As above |
 | RNG-EX-HM-04 | Weapon or barrel failure at the firer: obstruction, wrong round, overpressure | `explosion/minor_confined` (0.10) | Face, eyes and hands are at risk; the body-region rule may lift it to SIF |
 | RNG-EX-WN-06 | Blank fired at close range (gas and debris within the blank safety distance, Vol 4 Table 403/3/1) | `pressure/*` † | Eye and face; no calibrated band |
 
-### 4.5 What surfaces: SIF exposures (conditions, not events)
+### 4.5 What surfaces: hazardous situations (SIF exposures; conditions, not events)
 
 These carry no PSIF count. They are listed because the risk assessment has to see them; each is the condition its PSIF events come from.
 
-| ID | Exposure | Why it is not an event |
+| ID | Hazardous situation | Why it is not an event |
 |---|---|---|
 | RNG-SX-01 | Firers on the firing point with loaded weapons, within reach of their neighbours' weapons | Planned presence; loaded weapons are live, held by a safety catch and a trigger finger |
 | RNG-SX-02 | Butt markers in the gallery during firing, behind the mantlet | Planned presence behind a passive control |
@@ -280,7 +305,7 @@ These carry no PSIF count. They are listed because the risk assessment has to se
 
 - **Wide approaches dominate.** Most range excursions (RNG-EX-WR-01, -02, -06) and the main incursion (RNG-IN-WR-01) usually happen with nobody near. Separation to zero makes them PSIF anyway. This is where a range index will add the most counts, and where the panel will most need to agree the rule ([proposal.md](proposal.md) Annex A raises the same point for a fire in an unoccupied building).
 - **Excursions in time are the hidden class.** RNG-EX-WN-02 (found loaded) and RNG-EX-HM-01 (live in blank) involve no discharge and no visible harm. Under the energy-state terms they are live energy where zero-energy was declared, which is the same shape as the back-fed circuit in the worked examples. Report-led coding is likely to miss them; the index names them.
-- **Many SIF-class scenarios have only procedural controls.** Muzzle sweep has no direct control at all, and found-loaded has only a procedural one. Unload and prove, misfire waiting times, ammunition checks and the Clear Range Procedure are all procedures. Passive controls (stop butts, baffles, mantlets, bay walls, fences) cover the where-excursions and fixed danger zones well. They cover the when-excursions hardly at all.
+- **Many SIF-class hazardous events have only procedural controls.** Muzzle sweep has no direct control at all, and found-loaded has only a procedural one. Unload and prove, misfire waiting times, ammunition checks and the Clear Range Procedure are all procedures. Passive controls (stop butts, baffles, mantlets, bay walls, fences) cover the where-excursions and fixed danger zones well. They cover the when-excursions hardly at all.
 - **Impact areas never go to rest.** A blind's fuze can function on disturbance, so the energy is live and the closed impact area is a standing danger zone. Entry is an incursion whether or not firing is in progress.
 
 ## 5. Gap: the band table has no ballistic band
@@ -322,23 +347,37 @@ The anchors are borrowed values, not calibration. The AI model uses the same ban
 | **Line of Fire**: "an imaginary straight line from the barrel of the weapon delivery system to the target" (Vol 2 para 2-27) | **Not** our line of fire | **Clash.** Our line of fire is the path live energy takes or a foreseeable release would take; for a weapon that is the cone of fire plus ricochet, so the WDA. Range coders must be told which is meant |
 | "Authorised but unprotected persons" (Vol 1 Pt 2 para 100) | People in the target envelope without a passive control | Separates planned exposure (markers behind a mantlet) from incursion |
 
-## 7. Pilot plan
+## 7. The golden thread
+
+A scenario and its hazardous events are the common key from risk assessment to learning. Each stage carries the IDs, so a record at one stage can be traced to the others.
+
+| Stage | What happens | Key carried |
+|---|---|---|
+| **Risk assessment** | The scenario is set (scope, context, criteria); its hazardous events and situations are coded; the direct controls are listed; the scenario is evaluated (go, go with conditions, no go). The simulator can test control options before the work | `scenario_id`, `event_id`, `control_id` |
+| **SIF identification** | Each report is coded by the same rules and matched to a hazardous event (`report_event`) | `event_id` |
+| **Investigation categorisation** | Class, control state and closest approach set the depth of investigation | `event_id`, `control_id`. The depth per class is the client's process |
+| **Assurance and control verification** | Observations check the listed direct controls on the hazardous situations; each result is protected or unprotected | `situation_id`, `control_id` |
+| **Organisational learning** | Unmatched reports become new hazardous events; silent SIF-class events are reviewed; outcomes and control results update the bands and control evidence; the scenario's evaluation is revisited | All |
+
+The thread ends where it began: a scenario evaluated with better evidence, and the confidence to take the next step.
+
+## 8. Pilot plan
 
 1. **Scope:** four range types: the 25 m barrack range (Vol 2 Ch 6), the grenade range (Ch 18), live-fire tactical training (Ch 15) and demolitions (Vol 4).
 2. **Fix the band gap** (section 5) in the band table and the AI model's calibration.
 3. **Build and review the index** for the four types, with the panel and a range safety specialist (an RCO or range warden), using sections 3 and 4 as the starting set.
-4. **Back-test.** Take 12 months of range occurrence and incident reports and code each against the index. Record the scenario match, closest approach, control state and determination.
+4. **Back-test.** Take 12 months of range occurrence and incident reports and code each against the index. Record the hazardous-event match, closest approach, control state and determination.
 5. **Measure:**
-   - coverage: the share of reports that match a scenario (target 90%); unmatched reports become new scenarios;
-   - silent scenarios: SIF-class scenarios with no reports, which are either rare or not reported;
+   - coverage: the share of reports that match a hazardous event (target 90%); unmatched reports become new rows;
+   - silent events: SIF-class hazardous events with no reports, which are either rare or not reported;
    - control failure by control: which direct and procedural controls fail most;
    - reliability: agreement between coders with and without the index (the panel's kappa).
-6. **Hand-over:** each activity's risk assessment cites its scenario IDs. The direct controls against SIF-class scenarios become the critical-control list for verification.
+6. **Hand-over:** each risk assessment cites its scenario and hazardous-event IDs. The direct controls against SIF-class hazardous events become the critical-control list for verification.
 
-## 8. Open questions
+## 9. Open questions
 
 1. **Wide-approach PSIF.** Does the client accept PSIF counts for rounds leaving the danger area with nobody near? If not, the index should still list them, and the panel's scoping rule should say why they are excluded.
-2. **Procedural-only controls.** For scenarios with no direct control (muzzle sweep, found loaded), is the control state always "failed or absent" by definition, as EEI's direct-control test implies? Or should a verified procedural control count as protected on ranges?
+2. **Procedural-only controls.** For hazardous events with no direct control (muzzle sweep, found loaded), is the control state always "failed or absent" by definition, as EEI's direct-control test implies? Or should a verified procedural control count as protected on ranges?
 3. **Data access.** The back-test needs range occurrence reports. Whose are they, and is "prevented incursion" recorded in a usable form?
 4. **Domain boundary.** Explosives storage, transport of ammunition and heat illness are left out of the range pilot. Should they be separate indexes or later rows?
 
@@ -357,5 +396,9 @@ DOSR (2026b). *DSA 03.OME Part 3 DCOP 313: Fieldcraft Training Areas (FTA)*. Min
 ICMM (2015). *Health and safety critical control management: good practice guide*. International Council on Mining and Metals.
 
 Ministry of Defence (n.d.). *JSP 403: Handbook of Defence Land Ranges Safety* (collection page, withdrawn content). GOV.UK.
+
+ISO 31000:2018. *Risk management – Guidelines*. Clause 6.3.
+
+ISO/IEC Guide 51:2014. *Safety aspects – Guidelines for their inclusion in standards*. Clauses 3.3, 3.4, 3.12 and 3.15.
 
 Companion papers: [sif-definition.md](sif-definition.md), [sif-severity.md](sif-severity.md), [sif-controls-precursors.md](sif-controls-precursors.md), [sif-counterfactual.md](sif-counterfactual.md), [proposal.md](proposal.md).

@@ -1,6 +1,11 @@
 # SIF definitions and coding rules
 
-Version 1.8, 2026-11-18. For safety directors, safety teams and anyone coding incident reports for serious injury and fatality (SIF) potential. The supporting rationale is in [sif-definition-discussion.md](sif-definition-discussion.md).
+Version 1.9, 2026-11-19. For safety directors, safety teams and anyone coding incident reports for serious injury and fatality (SIF) potential. The supporting rationale is in [sif-definition-discussion.md](sif-definition-discussion.md).
+
+| Version | Date | Change |
+|---|---|---|
+| 1.8 | 2026-11-18 | Definition papers closed |
+| 1.9 | 2026-11-19 | Step 3: conditions count when a person could be within reach in intended use or reasonably foreseeable misuse. Step 5: thresholds fixed by the definition. Step 6: SIF actual counts as PSIF with P = 1. §3.4: trigger is a risk factor (QQ-FB-03). §7.1: the question in plain words; reporters give facts only (QQ-FB-05). Annex C: risk vocabulary crosswalk, including HiPo (QQ-FB-03, QQ-FB-04) and scenario (QQ-FB-08) |
 
 ## Contents
 
@@ -13,6 +18,7 @@ Version 1.8, 2026-11-18. For safety directors, safety teams and anyone coding in
 - [7. Coding rules: determining PSIF](#7-coding-rules-determining-psif)
 - [Annex A. Mechanisms](#annex-a-mechanisms)
 - [Annex B. Band table](#annex-b-band-table)
+- [Annex C. Risk vocabulary crosswalk](#annex-c-risk-vocabulary-crosswalk)
 - [References](#references)
 
 ## 1. Scope
@@ -125,7 +131,7 @@ Three things meet in any event. They follow the energy flow, and each maps to on
 
 | | Where it sits | Examples | Risk term | Counts toward SIF potential? |
 |---|---|---|---|---|
-| **Trigger** | Upstream: starts the excursion or incursion | A lifting lug to trip on; a wet deck; a gust | Chance | **No.** Separation to zero assumes the energy reaches the person anyway |
+| **Trigger** (risk factor) | Upstream: starts the excursion or incursion | A lifting lug to trip on; a wet deck; a gust | Chance | **No.** Separation to zero assumes the energy reaches the person anyway |
 | **Exposure** | Energy and people together | Work at a 25 ft unguarded edge; tag-lining a lift | Exposure | It is what is being judged |
 | **Receiving environment** | Downstream: where the energy is delivered | Rebar or plant below; a hard surface; a sharp edge to strike | Consequence | **Yes.** A fall onto rebar is worse than a fall onto soil |
 
@@ -324,6 +330,12 @@ The labels map, but the populations differ from EEI's. EEI counts an incident on
 
 You need the incident report, Annex A (mechanisms) and Annex B (bands).
 
+**The question in plain words.** Triagers and anyone outside the safety team can use this wording. It is the same question as section 4, with the energy made concrete:
+
+> If the thing that could have hurt someone (the fall, the load, the vehicle, the electricity, the machine) had reached a person with no protection, would a life-ending, life-threatening or life-altering injury have been more likely than not?
+
+Reporters are not asked this question. They give facts only: what happened, what was involved, and its size.
+
 Apply these rules throughout:
 
 - **Separation to zero.** Assess as if the energy reached a person, whether or not anyone was hit.
@@ -351,7 +363,7 @@ Work through steps 1–7 for **each energy source** in the report.
 If yes, it is an **event**. Record whether it was an excursion, an incursion or both; the dimension (where, when, how much); and the closest approach (wide, close, contact). Go to step 4.
 
 If no:
-- Energy and a person were together with nothing changing: assess steps 4–5, and if the result is SIF, record **SIF exposure**. **Stop: not an event, not a PSIF.**
+- Energy and a person were together with nothing changing, or a person could be within reach during intended use or reasonably foreseeable misuse (ISO/IEC Guide 51, 3.6–3.7): assess steps 4–5, and if the result is SIF, record **SIF exposure**. **Stop: not an event, not a PSIF.**
 - Otherwise: **stop, no event.**
 
 **Step 4. Choose the mechanism and band.**
@@ -366,9 +378,9 @@ If no:
 - P(serious) ≥ 0.50: **SIF potential.**
 - 0.10 ≤ P(serious) < 0.50: **Elevated.**
 - P(serious) < 0.10: **Not SIF.**
-- If your company sets different thresholds, use them.
+- The thresholds are part of the definition. The panel and the AI model both apply them. An analyst may rank or filter cases at other levels, but that does not change the class.
 
-**Step 6. Record the outcome.** Did anyone suffer a life-ending, life-threatening or life-altering injury (section 5.5)? Yes or no.
+**Step 6. Record the outcome.** Did anyone suffer a life-ending, life-threatening or life-altering injury (section 5.5)? Yes or no. If yes, it is **SIF actual**. It counts as PSIF with P(serious) = 1, so it needs no judgement of potential.
 
 **Step 7. Record the control state.** Was a **direct control** in place on this energy, and did it work?
 - **Effective:** a direct control stopped or contained the energy. Examples: a harness arrested the fall; a relief valve lifted to a safe point; a trip worked.
@@ -632,6 +644,25 @@ Bands run from least to most severe within each mechanism. P(serious) comes from
 | 2 | `road_speed` | Urban/road speed (20–60 km/h) | 0.720 | SIF | yes |
 | 3 | `highway_speed` | Highway/dual carriageway speed (≥ 60 km/h) | 0.900 | SIF | yes |
 
+## Annex C. Risk vocabulary crosswalk
+
+The SIF literature has coined its own labels (precursor, exposure, success) for ideas that risk management already defines. The table maps them to the established terms. Risk is dynamic: risk factors push the likelihood of harm up, and risk controls (protective factors) push it down. An event is the point where the balance tips and the energy or the people leave the envelope.
+
+| Established term | Source and definition | Term here | SIF-literature label |
+|---|---|---|---|
+| Hazard | ISO/IEC Guide 51, 3.2: "potential source of harm" | Energy source | (none) |
+| Scenario | ISO 31000, 6.3: the scope, context and criteria of a risk assessment; the scope of a HAZID or HAZOP study. In process safety (LOPA) the word often means one initiating-event-to-consequence sequence instead, which is a hazardous event here | The context of a risk assessment ([sif-scenario-index.md](sif-scenario-index.md) §1.1), ending in risk evaluation against tolerable risk (Guide 51, 3.12 and 3.15) | (none) |
+| Hazardous situation | Guide 51, 3.4: "circumstance in which people, property or the environment is/are exposed to one or more hazards" | SIF exposure (a condition) | Exposure (EEI) |
+| Intended use; reasonably foreseeable misuse | Guide 51, 3.6–3.7: misuse "which can result from readily predictable human behaviour" | The test for a person being within reach of a condition (step 3) | (none) |
+| Risk factor | WHO STEPS manual (2017): "any attribute, characteristic, or exposure of an individual, which increases the likelihood of developing a disease, or other unwanted condition/event" | Trigger (section 3.4). Can also raise the magnitude, which moves the band | (none) |
+| Risk control; protective measure | ISO 31000, 3.8: a measure that "maintains and/or modifies risk" (wording from secondary sources; the preview ends at 3.5). Guide 51, 3.13: "action or means to eliminate hazards or reduce risks" | Direct control | Critical control (ICMM) |
+| Event | ISO 31000, 3.5: "occurrence or change of a particular set of circumstances". Guide 51, 3.3: hazardous event, "event that can cause harm" | Event: an excursion or incursion, outside the envelope | PSIF, when serious |
+| Hazardous situation, control absent or failed | (composite) | SIF exposure (unprotected) | Precursor (BST, Campbell); Exposure (EEI) |
+| Hazardous situation, control effective | (composite) | SIF exposure (protected) | Success (EEI) |
+| High potential event (HiPo) | IOGP: "could have, under slightly different circumstances, realistically resulted in a fatal incident". Company definitions vary | Not equivalent to PSIF: PSIF uses a fixed question and energy bands, and covers life-altering injury, not fatality only | HiPo |
+
+Example: a heavy lift with people near the load is a hazardous situation. Rising wind is a risk factor. When the wind passes the lift plan's limit, the lift has left its envelope: an excursion, and so an event, before the load ever swings.
+
 ## References
 
 - API RP 754 (2021). *Process Safety Performance Indicators for the Refining and Petrochemical Industries*, 3rd ed. American Petroleum Institute. PAYWALLED
@@ -646,7 +677,10 @@ Bands run from least to most severe within each mechanism. P(serious) comes from
 - [ICAO (2010). *Annex 13 to the Convention on International Civil Aviation: Aircraft Accident and Incident Investigation*, 10th ed](https://elibrary.icao.int/reader/475561/&returnUrl%3DaHR0cHM6Ly9lbGlicmFyeS5pY2FvLmludC9wcm9kdWN0LzQ3NTU2MQ%3D%3D)
 - [ICMM (2015). *Critical Control Management: Implementation Guide*](https://pimcore.icmm.com/website/publications/pdfs/health-and-safety/2015/guidance_ccm-implementation.pdf)
 - ISO 12100:2010. *Safety of machinery – General principles for design – Risk assessment and risk reduction*. PAYWALLED
-- ISO 31000:2018. *Risk management – Guidelines*.
+- ISO 31000:2018. *Risk management – Guidelines*. Clauses 3.5 and 3.8.
+- ISO/IEC Guide 51:2014. *Safety aspects – Guidelines for their inclusion in standards*. Clauses 3.2–3.7 and 3.13.
+- [IOGP. *Fatality and Permanent Impairment injury definitions*, section 3.4](https://www.iogp.org/workstreams/safety/safety/iogp-fatality-and-permanent-impairment/iogp-fatality-and-permanent-impairment-injury-definitions/)
+- [WHO (2017). *WHO STEPS Surveillance Manual*, Part 7 Glossary](https://www.who.int/docs/default-source/ncds/ncd-surveillance/steps/steps-manual.pdf)
 - ISO 45001:2018. *Occupational health and safety management systems*.
 - [Krause, T.R. (2010). *New Findings on Serious Injuries and Fatalities*. BST](https://ppsa.memberclicks.net/assets/Webinars/Presentations/Krause%202010%20-%20New%20Findings%20on%20Serious%20Injury%20and%20Fatality%20Prevention.pdf)
 - [Martin, D.K. & Black, A.A. (2015). Preventing serious injuries & fatalities: study reveals precursors & paradigms. *Professional Safety*, 60(9)](https://safetyfocus.assp.org/docs/Don%20Martin_Preventing%20Serios%20Injuries%20and%20Fatalities_September%202015.pdf)

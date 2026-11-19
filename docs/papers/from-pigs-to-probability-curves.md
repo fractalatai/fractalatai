@@ -2,6 +2,11 @@
 
 2026-09-21 · Jason Woodruff
 
+| Version | Date | Change |
+|---|---|---|
+| 1.0 | 2026-09-21 | First published |
+| 1.1 | 2026-11-19 | The classification thresholds are fixed by the PSIF definition, not set by each customer. Analysts may rank or filter at other levels |
+
 Ten years ago I wrote a short paper arguing that probability-impact grids should be scrapped. The tools to replace them existed but were not widely adopted. They now are — and we have built a working system that does what that paper could only advocate.
 
 ## The original argument
@@ -74,7 +79,7 @@ From the three severity quantiles, a metalog distribution is fitted and P(SIF) i
 | 0.10–0.50 | Elevated | Review; may warrant investigation |
 | < 0.10 | Non-SIF | Standard incident processing |
 
-The threshold is customer-configurable. The model outputs the probability; the organisation decides the response. This separates the scientific question — what is the severity distribution? — from the operational question — what warrants investigation? The PIG merges these and leaves both opaque.
+The thresholds are part of the PSIF definition, so the model and a calibrated human panel classify the same way. The model outputs the probability. An analyst can rank or filter at other levels to set priorities, but the class does not change. This separates the scientific question (what is the severity distribution?) from the operational one (what do we look at first?). The PIG merges these and leaves both opaque.
 
 When quantitative information is missing from the narrative — "worker fell from ladder" with no height stated — the system draws on a [Bayesian prior](../sif/bayesian-priors.md): the distribution of ladder fall heights from OSHA data. A contextual clue ("top of extension ladder") narrows the prior substantially. A specific measurement ("6-metre scaffold") collapses it to near-certainty. The system reports the uncertainty: "P(SIF) = 0.45, but height was estimated from prior — specify actual height for more precise classification." Over time, reporters learn what information matters, and data quality improves. No PIG has ever driven this feedback loop.
 

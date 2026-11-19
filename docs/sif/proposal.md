@@ -1,6 +1,11 @@
 # Proposal: a defined, reliable PSIF for QQ
 
-Status: draft v0.1, 2026-11-18. For QQ's safety director and EHS leadership. Internal.
+Status: draft v0.2, 2026-11-19. For QQ's safety director and EHS leadership. Internal.
+
+| Version | Date | Change |
+|---|---|---|
+| 0.1 | 2026-11-18 | First draft |
+| 0.2 | 2026-11-19 | §4.1: triagers ask the definition's question in plain words (QQ-FB-05). §4.4: stakeholders, their decisions and what they need (QQ-FB-06). §5.2: thresholds fixed by the definition (QQ-FB-03). Rec. 6: reporters give facts only (QQ-FB-05) |
 
 This proposal draws on four papers, which are available on request and referenced throughout:
 
@@ -232,7 +237,7 @@ The process is human. It needs no change to IMR beyond tidying the triage scale.
 
 | Stage | Who | Job | What it produces |
 |---|---|---|---|
-| **1. Triage** | Triagers, as now | A coarse filter, with a deliberately low bar: "if in doubt, flag" | A list of candidate cases. The rating is the triager's view, not the decision |
+| **1. Triage** | Triagers, as now | A coarse filter, with a deliberately low bar: "if in doubt, flag". Triagers ask the definition's question in plain words (definitions §7.1), uncalibrated | A list of candidate cases. The rating is the triager's view, not the decision |
 | **2. Screening** (optional) | The AI model | Reads every report and puts forward likely PSIF that triage did not flag; gives a second reading of every flagged case | Added candidates, with energy, band, probability and a one-line rationale |
 | **3. Sentencing** | A calibrated panel of four or five people from across the operation, monthly | Answers the fixed question for every candidate | The classification of record, with control state |
 
@@ -260,6 +265,16 @@ Panel members are trained and then tested periodically on the same question, usi
 
 PSIF and SIF exposure are reported side by side, never summed.
 
+**Who uses what.** Each stakeholder gets the measures for the decision they make. The complexity sits with the panel and the analysts. This table is a proposal to confirm during the pilot.
+
+| Stakeholder | Decision they make | What they need | What they don't need |
+|---|---|---|---|
+| **Senior leaders** | Where to put attention and resource; whether SIF-capable work is under control | SIF actual; PSIF (unprotected); the share of SIF exposures that are protected | Bands, probabilities, Elevated |
+| **Safety director and EHS leadership** | Programme priorities, such as a critical-control campaign by energy type | PSIF and Precursor by mechanism and control state; the unverified share | Individual cases |
+| **Site and operational managers** | What to fix locally: which work, which control | Their open Precursors and control failures, case by case | Trends across sites |
+| **Investigators** | How deep to investigate | The PSIF class, closest approach and control state on each case | Aggregates |
+| **Safety analysts** | Whether the data can be trusted and trended | Everything: Elevated, bands, panel calibration (Brier scores), agreement between the panel and the AI model | (none) |
+
 ---
 
 ## 5. The AI model
@@ -280,7 +295,7 @@ It applies the same definition and rules as the human coders in section 2. The b
 
 | Today's practice | What the model adds |
 |---|---|
-| A label chosen from a pick list | A **probability**, from injury data, that a company threshold turns into a class. Elevated cases are visible, not lost between "Medium" and "High" |
+| A label chosen from a pick list | A **probability**, from injury data, that the definition's thresholds turn into a class. Elevated cases are visible, not lost between "Medium" and "High" |
 | Potential imagined case by case | Potential set **by rule**: separation to zero, controls set aside, energy physics. The same report gives the same answer every time |
 | Different methods for different hazards | **One method across every energy type**, including chemical, thermal and breathing hazards |
 | Controls mixed into potential | **Potential and controls kept apart**, so control effectiveness can be measured, not assumed |
@@ -318,7 +333,7 @@ It also points to where the field is going: from yes/no flags to outcome distrib
 
 5. **Set up a calibrated monthly sentencing panel.** Four or five people, answering the fixed question yes or no with confidence. The panel's average is the classification of record. Train and test members on known-answer cases, and track calibration with a Brier score. *(Sections 3.3, 4.2, 4.3)*
 
-6. **Ask reporters for the size of the energy.** Height, voltage, speed, weight, pressure, and what it would have landed on. These decide the answer, and today only about 3–5% of narratives give them. *(Sections 1.4, 3.1)*
+6. **Ask reporters for the size of the energy.** Facts only, no opinion or judgement: height, voltage, speed, weight, pressure, and what it would have landed on. These decide the answer, and today only about 3–5% of narratives give them. *(Sections 1.4, 3.1)*
 
 7. **Count life-altering injuries at the hand and eye.** Follow LIFE: the loss of any body part, or any permanent loss of function or sight, is serious. Record the EEI criterion alongside for benchmarking. *(Section 3.4)*
 
