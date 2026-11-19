@@ -23,7 +23,7 @@ items:
       Yes on all five points. Additions: the AI model is optional; the core is the single
       fixed question the panel answers.
     response_doc: responses/QQ-FB-01.md
-    changes: [af3bace]
+    changes: [af3bace, 67264e1]
   - id: QQ-FB-02
     source: QQ-FB-2026-11-19
     kind: confirm
@@ -158,7 +158,7 @@ items:
       Agreed: one source of truth. Following the gap analysis (QQ-01), reporting reads Power BI;
       the panel works in the reporting layer, and its classification is the record there.
     response_doc: responses/QQ-FB-11.md
-    changes: []
+    changes: [67264e1]
 ---
 
 # SIF feedback register
