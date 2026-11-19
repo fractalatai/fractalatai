@@ -1,6 +1,13 @@
 # What counts as serious: LIFE, trauma scales and the life-altering gap
 
-Status: draft v0.3, 2026-11-18. A literature review in the series on defining serious injury and fatality (SIF) potential. Definitions follow [sif-definition.md](sif-definition.md). Companion papers: [sif-counterfactual.md](sif-counterfactual.md) and [sif-controls-precursors.md](sif-controls-precursors.md).
+Status: draft v0.4, 2026-11-19. A literature review in the series on defining serious injury and fatality (SIF) potential. Definitions follow [sif-definition.md](sif-definition.md). Companion papers: [sif-counterfactual.md](sif-counterfactual.md) and [sif-controls-precursors.md](sif-controls-precursors.md).
+
+| Version | Date | Change |
+|---|---|---|
+| 0.1 | 2026-11-18 | First draft |
+| 0.2 | 2026-11-18 | Burden-of-injury data rejected as the life-altering axis; ICISS as the AIS-free threat-to-life fallback |
+| 0.3 | 2026-11-18 | AIS licence check: the AI model is AIS-free (rec. 6); BLS denominators and body-region rule done, provisional (rec. 2, 2026-11-19) |
+| 0.4 | 2026-11-19 | IOGP permanent impairment criteria (§5.4) adopted as the working test of life-altering; the impairment axis takes an AIS-free route in place of RPMI (rec. 3, §8, §9) |
 
 ## Executive summary
 
@@ -31,16 +38,16 @@ Treat severity as **two axes**, threat to life and permanent impairment, and cou
 | Axis | What it covers | Current state in the AI model | Evidence base |
 |---|---|---|---|
 | **Threat to life** | Life-ending and life-threatening | Calibrated (mortality-anchored; no AIS content) | Strong: AIS is the standard trauma scale |
-| **Permanent impairment** | Life-altering | Missing | Moderate: Swedish insurance data give the risk of permanent impairment by body region and AIS level (Malm et al., 2008) |
+| **Permanent impairment** | Life-altering | Body-region rule on eight hand and eye bands; elsewhere missing | Moderate: the IOGP permanent impairment criteria (2026) give an AIS-free test; injury-type shares by source come from BLS data |
 
 ### Recommendations
 
 1. **Keep LIFE as the definition of a serious outcome.** It is the most widely adopted definition, and its three gates cover the right ground. Use it as the target the AI model is calibrated against, not as a scale.
 2. **Add a body-region rule now.** Flag the bands where energy is usually delivered to the hand, fingers or eyes, and set a probability of a life-altering outcome for them. This is transparent, needs no new data and matches how WorkSafeBC and Australian regulators single out hands and eyes. The Global Burden of Disease method sets a precedent: for amputations, "the probability of being a long-term injury is 1" (James et al., 2020). *Done (provisional, 2026-11-19):* eight bands now carry a life-altering value by region, with P(serious) taken as the larger of the two axes.
-3. **Build an impairment axis later.** For each band, model the chance of permanent impairment using published tables of impairment risk by body region and AIS level (Malm et al., 2008). Take P(serious) as the larger of the two axes until the joint distribution is known.
+3. **Build an impairment axis on the IOGP criteria.** Use the IOGP permanent impairment criteria (section 5.4) as the working test of life-altering. For each band and body region, estimate the chance of permanent impairment as the mix of injury types the energy produces, times the chance that each type meets the criteria. This needs no AIS content. Take P(serious) as the larger of the two axes until the joint distribution is known. *Adopted 2026-11-19; values to follow.*
 4. **Follow LIFE at the hand, not EEI.** LIFE counts the loss of any body part and any permanent loss of function. EEI's 2025 criteria exclude all finger and toe fractures, and fingertip amputations other than the thumb, index finger or great toe. Code to LIFE, and record the EEI criterion alongside it for benchmarking.
 5. **Use regulatory lists for calibration and audit, not as the definition.** They are outcome-only and disagree with each other. They are useful as labelled cases to test the AI model against.
-6. **Keep the AI model AIS-free.** AAAM, which owns AIS, prohibits "the use of this content in any way with generative AI, including AI training, scraping, or ingestion" (AIS License page, checked 2026-11-18). The AI model does not use AIS. It holds no AIS codes, descriptors, severity assignments or AIS-coded records. Its prompt uses the model's own five outcome labels (no injury to fatality). Its calibration cites published mortality statistics that some papers report by AIS level (for example Baker et al., 1974). Those are facts from the literature, not AIS content. The restriction would apply if the model were asked to assign AIS codes, or if AIS-coded data or tables went into its prompts, training or retrieval. RPMI, the candidate impairment axis, is keyed by AIS level, so it needs an AIS-free route or AAAM's permission before it is built into the model. If the threat-to-life scale ever needs re-anchoring, survival risk ratios by ICD-10 code (ICISS) give an AIS-free route (section 4.4). The European burden-of-injury data are AIS-free too, but they score hand fractures and eye injuries at 0% lifelong consequences, so they are not a usable impairment axis (section 5.2).
+6. **Keep the AI model AIS-free.** AAAM, which owns AIS, prohibits "the use of this content in any way with generative AI, including AI training, scraping, or ingestion" (AIS License page, checked 2026-11-18). The AI model does not use AIS. It holds no AIS codes, descriptors, severity assignments or AIS-coded records. Its prompt uses the model's own five outcome labels (no injury to fatality). Its calibration cites published mortality statistics that some papers report by AIS level (for example Baker et al., 1974). Those are facts from the literature, not AIS content. The restriction would apply if the model were asked to assign AIS codes, or if AIS-coded data or tables went into its prompts, training or retrieval. RPMI is keyed by AIS level, so it is not used. The impairment axis takes the AIS-free IOGP route instead (section 5.4). If the threat-to-life scale ever needs re-anchoring, survival risk ratios by ICD-10 code (ICISS) give an AIS-free route (section 4.4). The European burden-of-injury data are AIS-free too, but they score hand fractures and eye injuries at 0% lifelong consequences, so they are not a usable impairment axis (section 5.2).
 
 ## Contents
 
@@ -214,6 +221,37 @@ Four other measures are often proposed as alternatives to AIS for morbidity. Eac
 
 All four are candidates for measuring the *realised* health burden of what actually happened (section 9), which is a different question from SIF potential.
 
+### 5.4 IOGP permanent impairment criteria
+
+The International Association of Oil & Gas Producers (IOGP) publishes *Fatality and Permanent Impairment (FPI) injury definitions* for energy-industry reporting (definitions last edited 17 March 2026). They are written "for use … by industry personnel without health qualifications" and are "aligned to recognized international systems of classification including the American Medical Association Guides: The sixth edition [and the] WHO International Classification of Functioning, Disability, and Health (ICF)".
+
+**The definition.** Permanent impairment is "the outcome of a work-related injury from which the worker cannot or is not expected to return to their previous (pre-incident) whole person function as a result of an acute, single incident" (section 3.2.1). It is classified within 180 days, at maximum medical improvement if that is reached sooner. The criteria (section 3.5) fall into four groups, met "singularly or in combination":
+
+| IOGP criterion | Named examples (abridged) | Settled by the injury type? |
+|---|---|---|
+| 3.5.1 Permanent loss of body parts | "amputations with loss of bone inclusive of one or more joints (not able to be reattached)"; loss of an eye; loss of an internal organ; loss of facial structures | Yes: P = 1 |
+| 3.5.2 Permanent reduction of organ function | Permanent loss of vision; spinal injury "requiring ongoing use of wheelchair"; brain injury with ongoing epilepsy; permanent hearing loss or tinnitus after a blast | Partly: depends on the extent of the injury |
+| 3.5.3 Permanent reduction in skin and/or musculoskeletal function | "Deep burns with scarring or skin grafts that permanently impair body movement"; tendon or ligament tear with lasting loss of joint movement; "Fracture with ongoing impairment to mobility"; reattached amputation with abnormal function | No: a share of each injury type |
+| 3.5.4 Permanent reduction in psychological, social or cognitive function | Brain injury with ongoing cognitive effects; PTSD with inability to return to the previous work role | Out of scope for an energy model, except brain injury |
+
+**Why it fits.**
+- **No threshold to choose.** The criteria are categorical, not a percentage of whole-person impairment, so the open question of section 9 (is 10% life-altering?) falls away.
+- **AIS-free.** The criteria name injuries and functions, not AIS codes. They can be matched to the injury types (nature of injury) that occupational statistics already record.
+- **Close to LIFE.** LIFE's life-altering gate is a worker who "will not fully recover and will most likely suffer permanent impairment from the loss of the use [of] a major internal organ … body function or body part" (Bayona et al., 2023). IOGP covers the same ground and lists examples, which LIFE does not.
+- **Built for non-clinicians**, like the AI model's coders and QQ's panel.
+
+**Where it differs from LIFE.** IOGP's automatic amputation criterion needs "loss of bone inclusive of one or more joints". A fingertip amputation short of a joint goes to medical opinion. LIFE counts the loss of any body part. Recommendation 4 stands: code to LIFE at the hand, and use IOGP for everything LIFE leaves to judgement.
+
+**Its own potential category.** IOGP defines "Potential FPI" ("an incident that results in an occupational injury that could have realistically resulted in a fatality or permanent impairment") and "Near Miss FPI" (the same, "where there was no actual injury"). Unlike HiPo, these cover permanent impairment as well as death. They are still not PSIF: there is no probability threshold, no fixed counterfactual and no energy band ([sif-definition.md](sif-definition.md), Annex C).
+
+**The calculation.** For a band *b* and body region *r*:
+
+P(life-altering | *b*, *r*) = Σ over injury types *n* of P(*n* | *b*, *r*) × P(meets IOGP | *n*, *r*)
+
+- **P(*n* | *b*, *r*)**, the injury-type mix, comes from occupational injury statistics by source of injury (BLS, OIICS nature × part of body). BLS publishes nature and body part as marginals, not crossed, so the joint has to be assumed or found elsewhere.
+- **P(meets IOGP | *n*, *r*)** is 1 where the criterion is automatic (amputation through a joint, enucleation) and comes from outcome studies where it is not (fractures, tendon injuries, deep burns, eye injuries short of loss).
+- The body-region rule (section 8) is a first, hand-set version of this. Its eight values will be re-derived by the calculation.
+
 ## 6. Regulatory lists
 
 | | LIFE | EEI 2025 | RIDDOR | OSHA | Cal/OSHA | WorkSafeBC | Australia (WA) |
@@ -236,7 +274,8 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 | EEI SIF criteria | LIFE-like, applied through 15 items | Yes/no per item | At diagnosis or surgery | Benchmark label |
 | AIS / ISS / NISS | Threat to life | Ordinal (AIS 1–6; ISS 1–75) | At diagnosis | The current axis |
 | IIS / FCI / pFCI | Predicted impairment | Ordinal | From the AIS code | Cross-check only |
-| RPMI | Risk of permanent impairment | Probability by body region and AIS | From region and AIS | The candidate second axis |
+| RPMI | Risk of permanent impairment | Probability by body region and AIS | From region and AIS | Not used: keyed by AIS level |
+| IOGP permanent impairment criteria | Permanent impairment | Yes/no against named criteria | Within 180 days, or at maximum medical improvement | The working test of life-altering; the second axis is built on it |
 | GBD weights / AMA Guides | Health loss / whole-person impairment | 0–1 / % | Health state / months later | Audit |
 | EUROCOST / INTEGRIS lifelong proportions | Self-reported health problems at two years | % by injury group | From the ICD-10 code | Rejected: 0% for hand fractures and eye injuries |
 | ICISS | Threat to life | Survival risk ratio by ICD code | At diagnosis | AIS-free fallback for the threat-to-life axis |
@@ -254,7 +293,7 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 | Option | How it works | For | Against |
 |---|---|---|---|
 | **Body-region rule** (interim) | Flag bands where energy usually reaches the hand, fingers or eyes (light machinery, hand-held cutting tools, hydraulic injection, corrosives and lasers to the eye, molten metal on the hands) and set P(life-altering) for them | Transparent; needs no AIS content; matches WorkSafeBC and Australian lists; supported by Hallowell et al. (2017): "This residual variability can be primarily attributed to the vulnerability of the body part affected" (p. 73); GBD treats amputation as permanent (P = 1) | Brings back list-like choices; thresholds at the hand are contested |
-| **Impairment axis** (long term) | For each band, model the spread of body region and injury level, then map it to P(permanent impairment) using RPMI-type tables | Empirical and probabilistic, like the current calibration. Two-axis ratings have precedent in Swedish road safety (*secondary*) | Road-crash data; the impairment threshold is a value choice (is 10% life-altering?); needs body-region distributions per band; weak prediction validity; RPMI tables are keyed by AIS level, so using them in the AI model falls within the AAAM restriction unless AAAM permits it |
+| **Impairment axis** (adopted 2026-11-19) | For each band and body region, model the mix of injury types, then the chance each meets the IOGP permanent impairment criteria (section 5.4) | Empirical and probabilistic, like the current calibration; AIS-free; no impairment threshold to choose. Two-axis ratings have precedent in Swedish road safety (*secondary*) | Needs injury-type distributions per band and region; BLS gives nature and body part only as marginals; weak prediction validity for the non-automatic criteria. RPMI tables were the earlier candidate but are keyed by AIS level, so they are not used |
 | **List overlay** | Apply EEI or RIDDOR items as extra SIF triggers | Aligns with how users benchmark | Outcome-only; the lists disagree with each other and with LIFE |
 
 **Combining the axes.** The joint distribution is unknown, and the two axes are correlated, so 1 − (1 − a)(1 − b) would overstate the chance. Take P(serious) as the larger of P(threat to life) and P(life-altering) as a conservative floor, and state that this is the rule used.
@@ -268,11 +307,12 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 
 - **Size the gap.** Code a sample of actual life-altering injuries (amputations, sight loss, permanent loss of hand function) and compare them with the AI model's P(serious) for the same events.
 - **Body-region distributions.** Estimate, for each band, how often the energy reaches the hand, eyes, head or trunk, from incident data.
-- **The impairment threshold.** Decide what level of permanent impairment counts as life-altering (Sweden uses ≥1% for seriously injured and ≥10% for very seriously injured, *secondary*).
+- **The impairment threshold.** *Resolved 2026-11-19:* the IOGP permanent impairment criteria (section 5.4) are categorical, so no percentage threshold is needed. (Sweden uses ≥1% for seriously injured and ≥10% for very seriously injured, *secondary*.)
+- **Injury-type distributions.** For the priority bands (falls from low height, heavy caught-in, burns, high-pressure injection, mid-energy struck-by), estimate the injury-type mix by body region from BLS source tables, and P(meets IOGP) for each type from outcome studies.
 - **Coder agreement on life-altering.** Measure agreement on the life-altering gate, with and without a medical view, since LIFE's own test reported no agreement statistic.
 - **Realised health burden.** Model the burden of what actually happened as a distribution, not a point score: disability over time (YLD as the integral of the disability weight over the recovery path), with metalogs for elicited or observed quantiles and a dependence model linking severity, duration and return to work. This fits the existing SIPmath work but answers a different question from SIF potential, and may become a separate paper.
 - **AIS-free threat to life.** The current scale uses no AIS content. If it ever needs re-anchoring on registry data, derive ICISS survival risk ratios by ICD-10 code and recalibrate the bands against them, rather than using AIS-coded records.
-- **AIS-free impairment.** Find an impairment mapping keyed by ICD code or body region rather than by AIS level, or obtain AAAM's permission, before an RPMI-type axis enters the model.
+- **AIS-free impairment.** *Resolved 2026-11-19:* the IOGP criteria are keyed by injury and function, not by AIS level (section 5.4).
 - **Hand definitions.** Compare LIFE, EEI and RIDDOR coding on the same hand-injury cases, and record where they diverge.
 
 ## References
@@ -293,6 +333,7 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 - Haagsma, J.A., Polinder, S., Lyons, R.A. et al. (2012). Improved and standardized method for assessing years lived with disability after injury. *Bulletin of the World Health Organization*, 90(7), 513–521. doi:10.2471/BLT.11.095109.
 - Hallowell, M.R., Alexander, D. & Gambatese, J.A. (2017). Energy-based safety risk assessment: does magnitude and intensity of energy predict injury severity? *Construction Management and Economics*, 35(1–2), 64–77. doi:10.1080/01446193.2016.1274418
 - Herdman, M., Gudex, C., Lloyd, A. et al. (2011). Development and preliminary testing of the new five-level version of EQ-5D (EQ-5D-5L). *Quality of Life Research*, 20(10), 1727–1736. doi:10.1007/s11136-011-9903-x.
+- IOGP (2026). *Fatality and Permanent Impairment (FPI) injury definitions*, sections 3.2–3.5, definitions last edited 17 March 2026. International Association of Oil & Gas Producers. iogp.org (checked 2026-11-19).
 - IHME (2020). *Free-of-Charge Non-Commercial User Agreement*. Institute for Health Metrics and Evaluation, University of Washington.
 - James, S.L. et al. (2020). Estimating global injuries morbidity and mortality: methods and data used in the Global Burden of Disease 2017 study. *Injury Prevention*, 26(Suppl 1).
 - Keelin, T.W. (2016). The metalog distributions. *Decision Analysis*, 13(4), 243–277. doi:10.1287/deca.2016.0338.
@@ -325,6 +366,7 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 - **Bayona et al. (2023)** has no DOI. Free PDF: assp.org/docs/default-source/psj-articles/f1bayona_0923.pdf.
 - **Secondary only:** ASTM E2920-26 (store summary); ANSI/ASSP Z16.1-2022 (via an ASSP article); the EU MAIS3+ definition; Sweden's impairment thresholds; Gustafsson's two-axis rating (via Malm et al.); Boyd et al. (1987) (via Palmer).
 - **Not obtained:** the AIS 2015 dictionary; the AAAM IIS manual; Baker (1974) and Boyd (1987) full texts; the Australian WHS Act s.36 text (regulator guidance used); Bayona et al. (2022, CRC).
+- **IOGP FPI definitions (2026-11-19).** Read from the saved web page `docs/sif/lit/terms/iogp_fpi_definitions.txt` (gitignored); quotations in section 5.4 were checked against it. The downloadable OGP flyer and FAQ were not obtained.
 - **AIS licence check (2026-11-18).** The AAAM wording was fetched from the AIS License page and the AIS FAQs, and saved in `docs/sif/lit/severity/` (`aaam_ais-license_2026-11-18.html`, `aaam_ais-faqs_2026-11-18.html`). The licence page has "this content … including AI training"; the FAQ has "all content … including training". Model usage was checked against `scripts/sif/zeroshot_sif.py` and `data/sif/calibration/*.json`: AIS appears only in citations and descriptions. This is a reading of the published terms, not legal advice.
 - **Quotation check (2026-11-17).** Every quotation was matched word for word against the saved source text, allowing for line breaks and hyphenation. The exceptions:
   - **Unverified:** the ASTM E2920-26 wording (section 3), which was seen only in the ASTM store summary.

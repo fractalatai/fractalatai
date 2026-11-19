@@ -1,11 +1,12 @@
 # SIF definitions and coding rules
 
-Version 1.9, 2026-11-19. For safety directors, safety teams and anyone coding incident reports for serious injury and fatality (SIF) potential. The supporting rationale is in [sif-definition-discussion.md](sif-definition-discussion.md).
+Version 1.10, 2026-11-19. For safety directors, safety teams and anyone coding incident reports for serious injury and fatality (SIF) potential. The supporting rationale is in [sif-definition-discussion.md](sif-definition-discussion.md).
 
 | Version | Date | Change |
 |---|---|---|
 | 1.8 | 2026-11-18 | Definition papers closed |
 | 1.9 | 2026-11-19 | Step 3: conditions count when a person could be within reach in intended use or reasonably foreseeable misuse. Step 5: thresholds fixed by the definition. Step 6: SIF actual counts as PSIF with P = 1. §3.4: trigger is a risk factor (QQ-FB-03). §7.1: the question in plain words; reporters give facts only (QQ-FB-05). Annex C: risk vocabulary crosswalk, including HiPo (QQ-FB-03, QQ-FB-04) and scenario (QQ-FB-08) |
+| 1.10 | 2026-11-19 | §5.5: the IOGP permanent impairment criteria are the working test of life-altering; LIFE prevails at the hand. Annex C: Potential FPI and Near Miss FPI ([sif-severity.md](sif-severity.md) v0.4) |
 
 ## Contents
 
@@ -273,6 +274,8 @@ Bayona et al. (2023).
 **Pros:** rule-based rather than a list; consistent at the margins where lists disagree; widely adopted.
 
 **Cons:** defines severity only, with no potential or control element; "will not fully recover" needs judgement.
+
+**Working test of life-altering.** Code the life-altering gate against the IOGP permanent impairment criteria (IOGP FPI definitions, section 3.5): permanent loss of body parts, permanent reduction of organ function, permanent reduction in skin or musculoskeletal function, or permanent reduction in psychological, social or cognitive function, judged within 180 days. The criteria name the injuries that count without a medical scale, and they use no AIS content ([sif-severity.md](sif-severity.md), section 5.4). Where the two differ, LIFE prevails: a fingertip amputation short of a joint is life-altering under LIFE, though IOGP refers it to medical opinion.
 
 ### 5.6 Regulatory lists
 
@@ -659,6 +662,7 @@ The SIF literature has coined its own labels (precursor, exposure, success) for 
 | Event | ISO 31000, 3.5: "occurrence or change of a particular set of circumstances". Guide 51, 3.3: hazardous event, "event that can cause harm" | Event: an excursion or incursion, outside the envelope | PSIF, when serious |
 | Hazardous situation, control absent or failed | (composite) | SIF exposure (unprotected) | Precursor (BST, Campbell); Exposure (EEI) |
 | Hazardous situation, control effective | (composite) | SIF exposure (protected) | Success (EEI) |
+| Potential FPI; Near Miss FPI | IOGP FPI definitions, 3.4: an incident, with or without an injury, "that could have realistically resulted in a fatality or permanent impairment" | Closer to PSIF than HiPo, since it covers permanent impairment, but not equivalent: no probability threshold, no fixed counterfactual, no energy bands | (none) |
 | High potential event (HiPo) | IOGP: "could have, under slightly different circumstances, realistically resulted in a fatal incident". Company definitions vary | Not equivalent to PSIF: PSIF uses a fixed question and energy bands, and covers life-altering injury, not fatality only | HiPo |
 
 Example: a heavy lift with people near the load is a hazardous situation. Rising wind is a risk factor. When the wind passes the lift plan's limit, the lift has left its envelope: an excursion, and so an event, before the load ever swings.
@@ -679,7 +683,7 @@ Example: a heavy lift with people near the load is a hazardous situation. Rising
 - ISO 12100:2010. *Safety of machinery – General principles for design – Risk assessment and risk reduction*. PAYWALLED
 - ISO 31000:2018. *Risk management – Guidelines*. Clauses 3.5 and 3.8.
 - ISO/IEC Guide 51:2014. *Safety aspects – Guidelines for their inclusion in standards*. Clauses 3.2–3.7 and 3.13.
-- [IOGP. *Fatality and Permanent Impairment injury definitions*, section 3.4](https://www.iogp.org/workstreams/safety/safety/iogp-fatality-and-permanent-impairment/iogp-fatality-and-permanent-impairment-injury-definitions/)
+- [IOGP. *Fatality and Permanent Impairment injury definitions*, sections 3.4–3.5](https://www.iogp.org/workstreams/safety/safety/iogp-fatality-and-permanent-impairment/iogp-fatality-and-permanent-impairment-injury-definitions/)
 - [WHO (2017). *WHO STEPS Surveillance Manual*, Part 7 Glossary](https://www.who.int/docs/default-source/ncds/ncd-surveillance/steps/steps-manual.pdf)
 - ISO 45001:2018. *Occupational health and safety management systems*.
 - [Krause, T.R. (2010). *New Findings on Serious Injuries and Fatalities*. BST](https://ppsa.memberclicks.net/assets/Webinars/Presentations/Krause%202010%20-%20New%20Findings%20on%20Serious%20Injury%20and%20Fatality%20Prevention.pdf)
