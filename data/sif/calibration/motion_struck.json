@@ -25,7 +25,22 @@
       "p10_label": "no_injury",
       "p50_label": "first_aid",
       "p90_label": "medical_treatment",
-      "rationale": "Low kinetic energy, small impact area. P90 reflects head strike producing concussion or facial laceration needing treatment. Fatal only with direct temple/eye strike — rare enough to not reach P90."
+      "rationale": "Low kinetic energy, small impact area. P90 reflects head strike producing concussion or facial laceration needing treatment. Fatal only with direct temple/eye strike — rare enough to not reach P90.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "regions": {
+          "eye": {
+            "p": 0.08
+          }
+        },
+        "region_split": {
+          "eye": 0.081
+        },
+        "split_source": "BLS SOII 2023-24 biennial DART counts, source Parts and materials (4XXXXX)",
+        "band_level": 0.01,
+        "note": "Nail gun to eye (~0.4) needs its own band; deferred to the ballistic/projectile band work."
+      }
     },
     {
       "band": "light_dropped",
@@ -39,7 +54,22 @@
       "p10_label": "no_injury",
       "p50_label": "medical_treatment",
       "p90_label": "serious_injury",
-      "rationale": "Without hard hat, a 2kg wrench from 5m delivers ~100J to the skull — enough for concussion or depressed fracture. Median is medical treatment (laceration, simple fracture). P90 serious injury from direct crown/temple strike. Crosses SIF threshold at P90."
+      "rationale": "Without hard hat, a 2kg wrench from 5m delivers ~100J to the skull — enough for concussion or depressed fracture. Median is medical treatment (laceration, simple fracture). P90 serious injury from direct crown/temple strike. Crosses SIF threshold at P90.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "regions": {
+          "eye": {
+            "p": 0.08
+          }
+        },
+        "region_split": {
+          "eye": 0.081
+        },
+        "split_source": "BLS SOII 2023-24 biennial DART counts, source Parts and materials (4XXXXX)",
+        "band_level": 0.01,
+        "note": "Penetrating eye injury from a small object."
+      }
     },
     {
       "band": "heavy_dropped",

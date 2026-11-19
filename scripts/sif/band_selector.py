@@ -107,6 +107,7 @@ RULES:
 - If the narrative does not contain enough detail to determine the magnitude, select band 1 (least severe)
 - Extract any specific magnitude values mentioned (heights, speeds, voltages, temperatures, etc.)
 - If a value is not mentioned or cannot be inferred, set it to null
+- body_region_at_risk: the body region the energy reached or would have reached (hand_finger, eye, head, trunk, limb); use unknown if not stated
 
 Respond with valid JSON only:
 {{
@@ -119,6 +120,7 @@ Respond with valid JSON only:
     "speed_kmh": <number or null>,
     "temperature_c": <number or null>,
     "mass_kg": <number or null>,
+    "body_region_at_risk": "<hand_finger|eye|head|trunk|limb|unknown>",
     "other": "<any other relevant magnitude>"
   }},
   "reasoning": "<one sentence>"

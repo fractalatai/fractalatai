@@ -23,6 +23,8 @@ from pathlib import Path
 
 import duckdb
 
+from life_altering import norm_region, p_serious, region_from_text
+
 DUCKDB_PATH = Path("data/sif.duckdb")
 QWEN_FILE = Path("data/sif/benchmarks/qq_zeroshot_full.json")
 BAND_FILE = Path("data/sif/benchmarks/band_selection_full.json")
@@ -290,7 +292,9 @@ def build_joined_records():
             rec["sif_speed_kmh"] = num(ev.get("speed_kmh"))
             rec["sif_temperature_c"] = num(ev.get("temperature_c"))
             rec["sif_mass_kg"] = num(ev.get("mass_kg"))
+            region = norm_region(ev.get("body_region_at_risk"))
         else:
+            region = None
             rec.update({
                 "sif_band": "", "sif_band_confidence": "",
                 "sif_reasoning_pass2": "",
@@ -299,7 +303,16 @@ def build_joined_records():
                 "sif_mass_kg": None,
             })
 
-        # Calibrated P(SIF)
+        # Body region at risk: pass-2 field; until the pod re-run, fall back to pass-1 free text.
+        if region:
+            rec["sif_body_region_at_risk"], rec["sif_region_source"] = region, "pass2"
+        else:
+            raw_body = (qw or {}).get("prediction", {}).get("body_vulnerability", "")
+            region = region_from_text(raw_body)
+            rec["sif_body_region_at_risk"] = region
+            rec["sif_region_source"] = "pass1_text" if region != "unknown" else "none"
+
+        # Calibrated P(serious) = max(threat to life, life-altering)
         mech = rec.get("sif_mechanism", "")
         band_name = rec.get("sif_band", "")
         cal = cal_cache.get(mech)
@@ -312,13 +325,20 @@ def build_joined_records():
             if not band:
                 band = cal["magnitude_bands"][0]
             p10, p50, p90 = band["p10"], band["p50"], band["p90"]
-            psif = p_sif_bounded(p10, p50, p90)
+            p_ttl = p_sif_bounded(p10, p50, p90)
+            psif, pla, driven_by = p_serious(p_ttl, band, rec["sif_body_region_at_risk"])
+            rec["sif_p_threat_to_life"] = round(p_ttl, 3)
+            rec["sif_p_life_altering"] = pla
+            rec["sif_driven_by"] = driven_by
             rec["sif_p_sif"] = round(psif, 3)
             rec["sif_classification"] = sif_label(psif)
             rec["sif_cal_p10"] = p10
             rec["sif_cal_p50"] = p50
             rec["sif_cal_p90"] = p90
         else:
+            rec["sif_p_threat_to_life"] = None
+            rec["sif_p_life_altering"] = None
+            rec["sif_driven_by"] = ""
             rec["sif_p_sif"] = None
             rec["sif_classification"] = ""
             rec["sif_cal_p10"] = None
@@ -340,6 +360,9 @@ CSV_COLUMNS = [
     # SIF analysis
     "sif_mechanism", "sif_energy_types", "sif_band", "sif_band_confidence",
     "sif_p_sif", "sif_classification",
+    # Severity axes (P(SIF) = max of the two)
+    "sif_p_threat_to_life", "sif_p_life_altering", "sif_driven_by",
+    "sif_body_region_at_risk", "sif_region_source",
     # Extracted magnitudes
     "sif_height_m", "sif_voltage_v", "sif_speed_kmh", "sif_temperature_c", "sif_mass_kg",
     # Context
@@ -387,14 +410,18 @@ def export_csv(records, output_path):
 def export_bands(output_path):
     """Band lookup for the dashboard: sort order + calibrated quantiles per (mechanism, band)."""
     cols = ["mechanism", "band", "band_order", "band_description",
-            "cal_p10", "cal_p50", "cal_p90", "p_sif", "sif_classification", "high_energy"]
+            "cal_p10", "cal_p50", "cal_p90", "p_threat_to_life", "p_life_altering_band",
+            "p_sif", "sif_classification", "high_energy"]
     rows = []
     for mech, cal in sorted(load_calibrations().items()):
         for i, b in enumerate(cal["magnitude_bands"], start=1):
-            psif = round(p_sif_bounded(b["p10"], b["p50"], b["p90"]), 3)
+            p_ttl = p_sif_bounded(b["p10"], b["p50"], b["p90"])
+            psif, pla, _ = p_serious(p_ttl, b, "unknown")  # band-level (no region)
+            psif = round(psif, 3)
             rows.append({"mechanism": mech, "band": b["band"], "band_order": i,
                          "band_description": " ".join(b.get("description", "").split()),
                          "cal_p10": b["p10"], "cal_p50": b["p50"], "cal_p90": b["p90"],
+                         "p_threat_to_life": round(p_ttl, 3), "p_life_altering_band": pla,
                          "p_sif": psif, "sif_classification": sif_label(psif),
                          "high_energy": "true" if band_high_energy(mech, b["band"]) else "false"})
     with open(output_path, "w", newline="", encoding="utf-8") as f:
@@ -524,7 +551,8 @@ def generate_report(records, output_path):
     lines.append(f"- **Pass 2**: Qwen 3 8B band selection using calibration-derived prompts")
     lines.append(f"- **Calibration**: Literature-based dose-response curves (18 mechanisms, 87 bands)")
     lines.append(f"- **P(SIF)**: Probability of Serious Injury or Fatality from bounded metalog distribution")
-    lines.append(f"- **SIF threshold**: P(death) >= 0.10 (AIS 3-4 severity, ~10% mortality)")
+    lines.append(f"- **SIF threshold**: P(death) >= 0.10 (serious level, anchored on published mortality statistics)")
+    lines.append(f"- **Life-altering axis**: P(SIF) = max(threat to life, P(life-altering | band, body region)); provisional hand/eye values")
     lines.append(f"- **Default rule**: When narrative lacks magnitude detail, least-severe band is used (conservative)")
     lines.append(f"")
 

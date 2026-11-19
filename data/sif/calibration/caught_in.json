@@ -24,7 +24,26 @@
       "p10_label": "first_aid",
       "p50_label": "medical_treatment",
       "p90_label": "serious_injury",
-      "rationale": "Light machines have limited torque — they may catch a glove or loose clothing but typically stall or allow the worker to pull free. P50=medical_treatment reflects laceration, fracture, or partial degloving. P90=serious_injury from finger/hand amputation when glove is caught in drill or grinder. Crosses SIF threshold at P90."
+      "rationale": "Light machines have limited torque — they may catch a glove or loose clothing but typically stall or allow the worker to pull free. P50=medical_treatment reflects laceration, fracture, or partial degloving. P90=serious_injury from finger/hand amputation when glove is caught in drill or grinder. Crosses SIF threshold at P90.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "regions": {
+          "hand_finger": {
+            "p": 0.06,
+            "range": [
+              0.03,
+              0.15
+            ]
+          }
+        },
+        "region_split": {
+          "hand_finger": 0.47
+        },
+        "split_source": "BLS SOII 2023-24 biennial DART counts, source Machinery (3XXXXX)",
+        "band_level": 0.03,
+        "note": "Referral-series value 0.15 cut to 0.06: BLS amputations are <=2.4% of machinery hand/finger DART cases; amputation is the floor, tendon/nerve/fracture add."
+      }
     },
     {
       "band": "medium_machinery",

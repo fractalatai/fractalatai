@@ -1,6 +1,6 @@
 # What counts as serious: LIFE, trauma scales and the life-altering gap
 
-Status: draft v0.2, 2026-11-18. A literature review in the series on defining serious injury and fatality (SIF) potential. Definitions follow [sif-definition.md](sif-definition.md). Companion papers: [sif-counterfactual.md](sif-counterfactual.md) and [sif-controls-precursors.md](sif-controls-precursors.md).
+Status: draft v0.3, 2026-11-18. A literature review in the series on defining serious injury and fatality (SIF) potential. Definitions follow [sif-definition.md](sif-definition.md). Companion papers: [sif-counterfactual.md](sif-counterfactual.md) and [sif-controls-precursors.md](sif-controls-precursors.md).
 
 ## Executive summary
 
@@ -12,7 +12,7 @@ Status: draft v0.2, 2026-11-18. A literature review in the series on defining se
 
 1. **The LIFE model** (Bayona et al., 2023) defines a serious injury as one that is life-ending, life-threatening or life-altering. These are three yes/no gates, applied to the actual outcome. Most SIF definitions now use LIFE or close variants, including EEI, ASTM E2920 and the Campbell Institute.
 2. **Regulatory lists** (RIDDOR specified injuries, OSHA severe-injury reporting, EEI's 15 SIF criteria) name injuries that count. They disagree with each other at the margins, most of all at the hand.
-3. **Trauma scales** (AIS, ISS) rate injuries by their **threat to life**. The AI model's severity scale comes from this family: each energy band has an outcome distribution calibrated to the chance of death.
+3. **Trauma scales** (AIS, ISS) rate injuries by their **threat to life**. The AI model's severity scale is anchored on this family without using AIS itself: each energy band has an outcome distribution calibrated to the chance of death, and the serious level (P(death) 0.10) is set from published mortality statistics that the trauma literature reports by AIS level.
 
 The AI model's definition says "life-ending, life-threatening or life-altering", but its scale measures only the first two. An injury that rarely kills but changes a life (a finger or hand amputation, sight loss, a crushed hand) scores low. In the AI model, the bands where such injuries are common are often *Elevated*, not *SIF*:
 
@@ -22,7 +22,7 @@ The AI model's definition says "life-ending, life-threatening or life-altering",
 | `chemical/corrosive_localised` | 0.100 | Elevated | Sight loss from a splash to the eye |
 | `radiation_noise/laser_high_power` | 0.100 | Elevated | Permanent retinal damage |
 
-Under LIFE, these outcomes are serious. The trauma literature has the same problem: the ISS > 15 threshold for "major trauma" is criticised as "arbitrary (as it addresses only one dimension of injury severity …)" (Palmer, 2007).
+Under LIFE, these outcomes are serious. That does not make the bands SIF: the class asks how likely a serious outcome is, not how serious it is when it happens. Against BLS denominators (2023–24, days away, transfer or restriction), amputations make up at most 2.4% of machinery hand and finger cases. A life-altering outcome is credible in these bands but not the most likely one, so most stay Elevated under the body-region rule (§8). Only the laser band with the eye at risk moves to SIF. The trauma literature has the same problem: the ISS > 15 threshold for "major trauma" is criticised as "arbitrary (as it addresses only one dimension of injury severity …)" (Palmer, 2007).
 
 ### The fix
 
@@ -30,17 +30,17 @@ Treat severity as **two axes**, threat to life and permanent impairment, and cou
 
 | Axis | What it covers | Current state in the AI model | Evidence base |
 |---|---|---|---|
-| **Threat to life** | Life-ending and life-threatening | Calibrated (AIS-derived) | Strong: AIS is the standard trauma scale |
+| **Threat to life** | Life-ending and life-threatening | Calibrated (mortality-anchored; no AIS content) | Strong: AIS is the standard trauma scale |
 | **Permanent impairment** | Life-altering | Missing | Moderate: Swedish insurance data give the risk of permanent impairment by body region and AIS level (Malm et al., 2008) |
 
 ### Recommendations
 
 1. **Keep LIFE as the definition of a serious outcome.** It is the most widely adopted definition, and its three gates cover the right ground. Use it as the target the AI model is calibrated against, not as a scale.
-2. **Add a body-region rule now.** Flag the bands where energy is usually delivered to the hand, fingers or eyes, and set a probability of a life-altering outcome for them. This is transparent, needs no new data and matches how WorkSafeBC and Australian regulators single out hands and eyes. The Global Burden of Disease method sets a precedent: for amputations, "the probability of being a long-term injury is 1" (James et al., 2020).
+2. **Add a body-region rule now.** Flag the bands where energy is usually delivered to the hand, fingers or eyes, and set a probability of a life-altering outcome for them. This is transparent, needs no new data and matches how WorkSafeBC and Australian regulators single out hands and eyes. The Global Burden of Disease method sets a precedent: for amputations, "the probability of being a long-term injury is 1" (James et al., 2020). *Done (provisional, 2026-11-19):* eight bands now carry a life-altering value by region, with P(serious) taken as the larger of the two axes.
 3. **Build an impairment axis later.** For each band, model the chance of permanent impairment using published tables of impairment risk by body region and AIS level (Malm et al., 2008). Take P(serious) as the larger of the two axes until the joint distribution is known.
 4. **Follow LIFE at the hand, not EEI.** LIFE counts the loss of any body part and any permanent loss of function. EEI's 2025 criteria exclude all finger and toe fractures, and fingertip amputations other than the thumb, index finger or great toe. Code to LIFE, and record the EEI criterion alongside it for benchmarking.
 5. **Use regulatory lists for calibration and audit, not as the definition.** They are outcome-only and disagree with each other. They are useful as labelled cases to test the AI model against.
-6. **Check the AIS licence.** AAAM, which owns AIS, prohibits "the use of all content in any way with generative AI, including training, scraping, or ingestion". The AI model uses AIS severity levels and published mortality rates, not dictionary content. Confirm that this is outside the restriction before any impairment axis draws on AIS-coded material. If it is not, survival risk ratios by ICD-10 code (ICISS) give an AIS-free threat-to-life scale (section 4.4). The European burden-of-injury data are AIS-free too, but they score hand fractures and eye injuries at 0% lifelong consequences, so they are not a usable impairment axis (section 5.2).
+6. **Keep the AI model AIS-free.** AAAM, which owns AIS, prohibits "the use of this content in any way with generative AI, including AI training, scraping, or ingestion" (AIS License page, checked 2026-11-18). The AI model does not use AIS. It holds no AIS codes, descriptors, severity assignments or AIS-coded records. Its prompt uses the model's own five outcome labels (no injury to fatality). Its calibration cites published mortality statistics that some papers report by AIS level (for example Baker et al., 1974). Those are facts from the literature, not AIS content. The restriction would apply if the model were asked to assign AIS codes, or if AIS-coded data or tables went into its prompts, training or retrieval. RPMI, the candidate impairment axis, is keyed by AIS level, so it needs an AIS-free route or AAAM's permission before it is built into the model. If the threat-to-life scale ever needs re-anchoring, survival risk ratios by ICD-10 code (ICISS) give an AIS-free route (section 4.4). The European burden-of-injury data are AIS-free too, but they score hand fractures and eye injuries at 0% lifelong consequences, so they are not a usable impairment axis (section 5.2).
 
 ## Contents
 
@@ -246,7 +246,7 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 ## 8. The AI model's position
 
 1. **The definition is LIFE.** A serious outcome is life-ending, life-threatening or life-altering ([sif-definition.md](sif-definition.md), section 5.5). This matches EEI, ASTM and Campbell.
-2. **The scale is threat to life.** Each band's outcome distribution is AIS-derived and mortality-calibrated, and P(serious) is the chance of an outcome at the serious level or worse (about 10% mortality). This captures life-ending and life-threatening outcomes. It under-counts life-altering ones.
+2. **The scale is threat to life.** Each band's outcome distribution is mortality-calibrated, with the serious level anchored on published mortality statistics reported by AIS level, not on AIS content, and P(serious) is the chance of an outcome at the serious level or worse (about 10% mortality). This captures life-ending and life-threatening outcomes. It under-counts life-altering ones.
 3. **LIFE has no potential element, and the AI model supplies it.** LIFE judges actual outcomes only, and leaves potential severity to "future work". The AI model's separation-to-zero counterfactual and band table are the potential layer that LIFE lacks.
 
 **Closing the gap.** There are three options:
@@ -254,7 +254,7 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 | Option | How it works | For | Against |
 |---|---|---|---|
 | **Body-region rule** (interim) | Flag bands where energy usually reaches the hand, fingers or eyes (light machinery, hand-held cutting tools, hydraulic injection, corrosives and lasers to the eye, molten metal on the hands) and set P(life-altering) for them | Transparent; needs no AIS content; matches WorkSafeBC and Australian lists; supported by Hallowell et al. (2017): "This residual variability can be primarily attributed to the vulnerability of the body part affected" (p. 73); GBD treats amputation as permanent (P = 1) | Brings back list-like choices; thresholds at the hand are contested |
-| **Impairment axis** (long term) | For each band, model the spread of body region and injury level, then map it to P(permanent impairment) using RPMI-type tables | Empirical and probabilistic, like the current calibration. Two-axis ratings have precedent in Swedish road safety (*secondary*) | Road-crash data; the impairment threshold is a value choice (is 10% life-altering?); needs body-region distributions per band; weak prediction validity |
+| **Impairment axis** (long term) | For each band, model the spread of body region and injury level, then map it to P(permanent impairment) using RPMI-type tables | Empirical and probabilistic, like the current calibration. Two-axis ratings have precedent in Swedish road safety (*secondary*) | Road-crash data; the impairment threshold is a value choice (is 10% life-altering?); needs body-region distributions per band; weak prediction validity; RPMI tables are keyed by AIS level, so using them in the AI model falls within the AAAM restriction unless AAAM permits it |
 | **List overlay** | Apply EEI or RIDDOR items as extra SIF triggers | Aligns with how users benchmark | Outcome-only; the lists disagree with each other and with LIFE |
 
 **Combining the axes.** The joint distribution is unknown, and the two axes are correlated, so 1 − (1 − a)(1 − b) would overstate the chance. Take P(serious) as the larger of P(threat to life) and P(life-altering) as a conservative floor, and state that this is the rule used.
@@ -271,12 +271,14 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 - **The impairment threshold.** Decide what level of permanent impairment counts as life-altering (Sweden uses ≥1% for seriously injured and ≥10% for very seriously injured, *secondary*).
 - **Coder agreement on life-altering.** Measure agreement on the life-altering gate, with and without a medical view, since LIFE's own test reported no agreement statistic.
 - **Realised health burden.** Model the burden of what actually happened as a distribution, not a point score: disability over time (YLD as the integral of the disability weight over the recovery path), with metalogs for elicited or observed quantiles and a dependence model linking severity, duration and return to work. This fits the existing SIPmath work but answers a different question from SIF potential, and may become a separate paper.
-- **AIS-free threat to life.** If the AIS licence rules out the current scale, derive ICISS survival risk ratios by ICD-10 code from a trauma registry and recalibrate the bands against them.
+- **AIS-free threat to life.** The current scale uses no AIS content. If it ever needs re-anchoring on registry data, derive ICISS survival risk ratios by ICD-10 code and recalibrate the bands against them, rather than using AIS-coded records.
+- **AIS-free impairment.** Find an impairment mapping keyed by ICD code or body region rather than by AIS level, or obtain AAAM's permission, before an RPMI-type axis enters the model.
 - **Hand definitions.** Compare LIFE, EEI and RIDDOR coding on the same hand-injury cases, and record where they diverge.
 
 ## References
 
-- AAAM (n.d.). *AIS frequently asked questions*. Association for the Advancement of Automotive Medicine. aisinjuryscale.org.
+- AAAM (n.d.). *AIS frequently asked questions*. Association for the Advancement of Automotive Medicine. aaam.org/ais/resources/ais-faqs (checked 2026-11-18).
+- AAAM (n.d.). *AIS License*. Association for the Advancement of Automotive Medicine. aaam.org/ais/ais-products/ais-license (checked 2026-11-18).
 - Baker, S.P., O'Neill, B., Haddon, W. & Long, W.B. (1974). The Injury Severity Score: a method for describing patients with multiple injuries and evaluating emergency care. *Journal of Trauma*, 14(3), 187–196.
 - Barnes, J. & Morris, A. (2009). A study of impairing injuries in real world crashes using the Injury Impairment Scale (IIS) and the predicted Functional Capacity Index (PFCI-AIS). *Annals of Advances in Automotive Medicine*, 53, 195ff. PMID 20184844.
 - Bayona, A., Bhandari, S., Hallowell, M., Sherratt, F., Bailey, J.M. & Upton Jr., J. (2023). What is a serious injury? A model for defining serious injuries and fatalities. *Professional Safety*, 68(9), 22–30.
@@ -323,6 +325,7 @@ Most lists mix life-altering items (amputation, sight, disfigurement) with treat
 - **Bayona et al. (2023)** has no DOI. Free PDF: assp.org/docs/default-source/psj-articles/f1bayona_0923.pdf.
 - **Secondary only:** ASTM E2920-26 (store summary); ANSI/ASSP Z16.1-2022 (via an ASSP article); the EU MAIS3+ definition; Sweden's impairment thresholds; Gustafsson's two-axis rating (via Malm et al.); Boyd et al. (1987) (via Palmer).
 - **Not obtained:** the AIS 2015 dictionary; the AAAM IIS manual; Baker (1974) and Boyd (1987) full texts; the Australian WHS Act s.36 text (regulator guidance used); Bayona et al. (2022, CRC).
+- **AIS licence check (2026-11-18).** The AAAM wording was fetched from the AIS License page and the AIS FAQs, and saved in `docs/sif/lit/severity/` (`aaam_ais-license_2026-11-18.html`, `aaam_ais-faqs_2026-11-18.html`). The licence page has "this content … including AI training"; the FAQ has "all content … including training". Model usage was checked against `scripts/sif/zeroshot_sif.py` and `data/sif/calibration/*.json`: AIS appears only in citations and descriptions. This is a reading of the published terms, not legal advice.
 - **Quotation check (2026-11-17).** Every quotation was matched word for word against the saved source text, allowing for line breaks and hyphenation. The exceptions:
   - **Unverified:** the ASTM E2920-26 wording (section 3), which was seen only in the ASTM store summary.
   - **Not source quotes:** "life-ending, life-threatening or life-altering" in the executive summary, and "P(death) ≥ 0.10" in section 8, quote the series' own documents.

@@ -81,7 +81,26 @@
       "p10_label": "no_injury",
       "p50_label": "medical_treatment",
       "p90_label": "serious_injury",
-      "rationale": "Class 3B/4 lasers cause permanent eye damage on momentary exposure — retinal burn, corneal damage, blindness. P50=medical_treatment reflects partial vision loss. P90=serious_injury reflects permanent bilateral blindness from direct beam exposure. Not typically fatal but permanent disabling injury = serious. Crosses SIF threshold at P90."
+      "rationale": "Class 3B/4 lasers cause permanent eye damage on momentary exposure — retinal burn, corneal damage, blindness. P50=medical_treatment reflects partial vision loss. P90=serious_injury reflects permanent bilateral blindness from direct beam exposure. Not typically fatal but permanent disabling injury = serious. Crosses SIF threshold at P90.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "regions": {
+          "eye": {
+            "p": 0.5,
+            "range": [
+              0.3,
+              0.7
+            ]
+          }
+        },
+        "region_split": {
+          "eye": 0.9
+        },
+        "split_source": "assumed (class 3B/4 injuries are mostly ocular)",
+        "band_level": 0.45,
+        "note": "Permanent retinal damage; eye stated -> SIF, region unknown -> Elevated."
+      }
     },
     {
       "band": "uv_arc_flash",

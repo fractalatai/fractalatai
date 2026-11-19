@@ -41,7 +41,26 @@
       "p10_label": "first_aid",
       "p50_label": "medical_treatment",
       "p90_label": "serious_injury",
-      "rationale": "Contact at these temperatures produces instant partial-thickness burns. Median is medical treatment (localised burn, debridement). P90 serious injury reflects large BSA scald (burst pipe, steam release) or facial/airway involvement. Crosses SIF threshold at P90."
+      "rationale": "Contact at these temperatures produces instant partial-thickness burns. Median is medical treatment (localised burn, debridement). P90 serious injury reflects large BSA scald (burst pipe, steam release) or facial/airway involvement. Crosses SIF threshold at P90.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "regions": {
+          "hand_finger": {
+            "p": 0.25,
+            "range": [
+              0.1,
+              0.5
+            ]
+          }
+        },
+        "region_split": {
+          "hand_finger": 0.5
+        },
+        "split_source": "assumed (no BLS hot-objects pull)",
+        "band_level": 0.13,
+        "note": "Contact burns to the hand: contracture and function loss."
+      }
     },
     {
       "band": "high_temp_surface",

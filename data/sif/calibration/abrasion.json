@@ -36,7 +36,22 @@
       "p10_label": "no_injury",
       "p50_label": "first_aid",
       "p90_label": "medical_treatment",
-      "rationale": "Brief glancing contact with a powered surface produces deep abrasion or laceration. P90=medical_treatment reflects laceration needing sutures or skin graft. If the worker is drawn into the machine, the mechanism transitions to caught_in — abrasion covers only the surface contact without entanglement."
+      "rationale": "Brief glancing contact with a powered surface produces deep abrasion or laceration. P90=medical_treatment reflects laceration needing sutures or skin graft. If the worker is drawn into the machine, the mechanism transitions to caught_in — abrasion covers only the surface contact without entanglement.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "regions": {
+          "hand_finger": {
+            "p": 0.05
+          }
+        },
+        "region_split": {
+          "hand_finger": 0.59
+        },
+        "split_source": "BLS SOII 2023-24 biennial DART counts, source Hand tools (71XXXX)",
+        "band_level": 0.03,
+        "note": "Cut from 0.15; stays Not SIF under max()."
+      }
     },
     {
       "band": "high_speed_friction",
@@ -49,7 +64,26 @@
       "p10_label": "first_aid",
       "p50_label": "medical_treatment",
       "p90_label": "serious_injury",
-      "rationale": "Sustained friction with a high-speed surface removes tissue deeply — degloving, deep burns, potential amputation. P90=serious_injury reflects extensive degloving or friction amputation. Crosses SIF threshold at P90 but only just. If the worker is pulled onto the conveyor, this transitions to caught_in."
+      "rationale": "Sustained friction with a high-speed surface removes tissue deeply — degloving, deep burns, potential amputation. P90=serious_injury reflects extensive degloving or friction amputation. Crosses SIF threshold at P90 but only just. If the worker is pulled onto the conveyor, this transitions to caught_in.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "regions": {
+          "hand_finger": {
+            "p": 0.1,
+            "range": [
+              0.05,
+              0.3
+            ]
+          }
+        },
+        "region_split": {
+          "hand_finger": 0.47
+        },
+        "split_source": "BLS SOII 2023-24 biennial DART counts, source Machinery (3XXXXX), assumed for friction",
+        "band_level": 0.05,
+        "note": "Referral-series value 0.3 cut to 0.10 against the BLS machinery base."
+      }
     }
   ],
   "modifiers": {

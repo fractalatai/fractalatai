@@ -362,6 +362,7 @@ If no:
 - **Two bands fit:** take the higher if the head, neck or spine was at risk, or the landing was concrete, steel or rebar.
 
 **Step 5. Read the potential.** Take P(serious) and the class from Annex B.
+- **Hand, finger or eye at risk:** for the bands that carry a life-altering value, P(serious) is the larger of the threat to life and the chance of a life-altering outcome at the stated body region. If no region is stated, use the band-level value.
 - P(serious) ≥ 0.50: **SIF potential.**
 - 0.10 ≤ P(serious) < 0.50: **Elevated.**
 - P(serious) < 0.10: **Not SIF.**

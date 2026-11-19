@@ -37,7 +37,26 @@
       "p10_label": "first_aid",
       "p50_label": "medical_treatment",
       "p90_label": "serious_injury",
-      "rationale": "Concentrated corrosive on exposed skin causes chemical burn progressing with contact duration. P50=medical_treatment for localised burn needing hospital. P90=serious_injury from facial/eye exposure — alkali to eyes can cause permanent blindness. Crosses SIF threshold at P90. Immediate decontamination is the critical intervention."
+      "rationale": "Concentrated corrosive on exposed skin causes chemical burn progressing with contact duration. P50=medical_treatment for localised burn needing hospital. P90=serious_injury from facial/eye exposure — alkali to eyes can cause permanent blindness. Crosses SIF threshold at P90. Immediate decontamination is the critical intervention.",
+      "life_altering": {
+        "status": "provisional",
+        "decided": "2026-11-19 (Jason)",
+        "regions": {
+          "eye": {
+            "p": 0.05,
+            "range": [
+              0.02,
+              0.1
+            ]
+          }
+        },
+        "region_split": {
+          "eye": 0.25
+        },
+        "split_source": "BLS SOII 2023-24 biennial DART counts, source Chemicals (1XXXXX)",
+        "band_level": 0.01,
+        "note": "Sight loss from a splash to the eye."
+      }
     },
     {
       "band": "corrosive_large_area",
