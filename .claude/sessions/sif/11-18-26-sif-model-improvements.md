@@ -182,5 +182,19 @@ The feedback was on proposal v0.1: 11 points, logged as QQ-FB-01 to 11 in `docs/
 
 **Papers.** Severity paper v0.4 (version table added): new §5.4, rec. 3, rec. 6, §7 and §8 rows, §9 items resolved. Definitions v1.10: §5.5 working test, an Annex C row, and the reference now covers §3.4–3.5.
 
-**Next: BLS pulls by event** (same 2023–24 DART table as the source pulls, but "by event or exposure", for nature and part of body) for the priority bands: falls to lower level, falls on same level, caught in or compressed, struck by object, exposure to electricity, exposure to temperature extremes, fires and explosions.
+**BLS event pulls (2023–24 DART, OIICS v3, saved as `bls_event_<code>.xlsx` in `docs/sif/lit/severity/body-region/`).** OIICS v3 renumbered events, so pick by name. Nature and body part are still marginals, not crossed.
+
+| Code | Event | DART cases | Key shares |
+|---|---|---|---|
+| 41 | Fall to lower level | 135,830 | Fractures 21%; multiple parts 19%; trunk 15%; wrist 4.3% |
+| 42 | Slip, trip, stumble stepping between levels | 152,400 | Sprains 58%; fractures 9% |
+| 43 | Slip, trip, stumble or fall on same level | 593,810 | Fractures 11%; wrist 4.7% |
+| 51 | Exposure to electricity | 6,320 | Hand/finger 16%; body systems 69%; nature suppressed |
+| 53 | Exposure to temperature extremes | 51,900 | Thermal burns 80%; hand/finger 30% |
+| 62 | Contact with animals | 47,820 | Cuts 55%; hand/finger 34% |
+| 64 | Struck by propelled, falling or suspended object | 288,050 | Fractures 11%; amputations 0.4%; head 19%; foot 21% |
+| 65 | Struck, caught or compressed by running powered equipment | 89,610 | Hand/finger 65%; amputations 2.3% (≤3.6% of hand cases); cuts 36% |
+| 3, 4, 5, 6 | Division totals | | Too coarse: 5 is 52% COVID-19 |
+
+High-pressure injection has no BLS category. Next: outcome studies for P(meets IOGP | injury type) (research agent, saving to `docs/sif/lit/severity/impairment/`).
 
