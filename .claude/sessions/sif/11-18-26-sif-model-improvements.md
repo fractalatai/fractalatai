@@ -31,7 +31,7 @@ The SIF definition papers, the QQ proposal and the scenario index have fixed the
 - [x] QQ-FB-02 (confirm): support for moving the decision to a calibrated panel
 - [x] QQ-FB-03 (design): three core categories — SIF, HiPo, SIF precursor/exposure
 - [ ] AI model prompts: apply the foreseeable use or misuse test to conditions (definition v1.9 step 3); goes with Event output
-- [ ] Severity paper: review the IOGP permanent-impairment criteria (FPI definitions §3.5) for the impairment axis
+- [x] Severity paper: review the IOGP permanent-impairment criteria (FPI definitions §3.5) for the impairment axis
 - [x] QQ-FB-04 (design): HiPo in place of PSIF/SIFP as the operational term
 - [x] QQ-FB-05 (design): plain-language front-end question; energy method behind the scenes
 - [x] QQ-FB-06 (design): audiences and the decisions each must make
@@ -169,3 +169,18 @@ The feedback was on proposal v0.1: 11 points, logged as QQ-FB-01 to 11 in `docs/
 **QQ-FB-09 decided (Jason, 2026-11-19):** Hubbard's model sits over the response: measure to make better decisions, where the uncertainty is greatest; more focused and cheaper. Added to controls paper v0.3 §5.4. Version tables added to the definitions (v1.9), the controls paper (v0.3), the proposal (v0.2), the scenario index (v0.2) and the PIG paper (v1.1). From now on, commit locally after each feedback item is resolved.
 
 **QQ-FB-11 decided (Jason, 2026-11-19):** the IMR gap analysis (QQ-01, the two-tool boundary) puts reporting in ECO_ETL and Power BI and keeps IMR for capture and case work, as confirmed by the ETL/Power BI session. The panel's inputs and outputs flow through the reporting layer (an Excel workbook). The panel's to-do list comes from there; members open IMR records for details; the classification is joined on `row_sig`. The panel's PSIF is the classification of record in the reporting layer. Proposal v0.4. Constraints from the ETL session: don't contradict the SIFP precedence (I, T2, T, ED; latest stage wins), Lost Workday Case = 4 High, the FY22–FY23 matrix mapping, or Count_SIFp = classes 1–4; QQ documents must not name the store that holds the action list.
+
+## Impairment axis groundwork (2026-11-19, in progress)
+
+**Decided (Jason): the IOGP permanent impairment criteria (FPI definitions §3.5, last edited 17 March 2026) are the working test of life-altering.**
+- Categorical criteria (loss of body parts; organ function; skin or musculoskeletal function; psychological function), judged within 180 days or at MMI. No percentage threshold is needed, which settles the severity §9 threshold question.
+- AIS-free, aligned to the AMA Guides (sixth edition) and the WHO ICF. This replaces RPMI, which is keyed by AIS level.
+- LIFE prevails where the two differ: IOGP's automatic amputation criterion needs loss of bone through a joint, while LIFE counts any body part (rec. 4).
+- IOGP "Potential FPI" and "Near Miss FPI" go in Annex C: closer to PSIF than HiPo, but not equivalent.
+
+**Method.** P(life-altering | band, region) = Σ over injury types P(type | band, region) × P(meets IOGP | type, region). The automatic criteria score 1; the others come from outcome studies. The eight hand-set body-region values are re-derived the same way.
+
+**Papers.** Severity paper v0.4 (version table added): new §5.4, rec. 3, rec. 6, §7 and §8 rows, §9 items resolved. Definitions v1.10: §5.5 working test, an Annex C row, and the reference now covers §3.4–3.5.
+
+**Next: BLS pulls by event** (same 2023–24 DART table as the source pulls, but "by event or exposure", for nature and part of body) for the priority bands: falls to lower level, falls on same level, caught in or compressed, struck by object, exposure to electricity, exposure to temperature extremes, fires and explosions.
+
